@@ -20,7 +20,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | invoker | `maven-plugin/src/it` | the Maven plugin in real Maven builds |
 | unit, integration | `mill-plugin/test`, `mill-plugin/integration` | the Mill plugin in process through `UnitTester`, and in a real Mill: 1.1.4, the oldest supported, and 1.1.10 |
 | e2e | `scripts/pre-commit-e2e.sh` | both families of pre-commit hooks, native and Node, installed from this repository as a user would |
-| acceptance | `scripts/cli-acceptance.sh` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, input beyond one read, refusals, `--version`, argument errors |
+| `CliAcceptanceSuite` | `acceptance` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, redirected files and pipes, input beyond one read, refusals, `--version`, argument errors; `sbt acceptance/test` |
 
 ## Property tests
 
