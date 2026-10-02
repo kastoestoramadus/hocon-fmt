@@ -136,7 +136,8 @@ jobs:
         run: sbt -batch cliJS/fastLinkJS cliNative/nativeLink cliJVM/compile
       - name: JVM
         run: |
-          classpath=$(sbt -batch --error "export cliJVM/Runtime/fullClasspath" | tail -1)
+          # sbt ends its output with ANSI control sequences on a runner, so strip them before taking the last line.
+          classpath=$(sbt -batch -Dsbt.color=false --error "export cliJVM/Runtime/fullClasspath" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep . | tail -1)
           scripts/cli-acceptance.sh jvm java -cp "$classpath" ww86.hocon_fmt.CmdApi
       - name: Node
         if: ${{ !cancelled() }}
