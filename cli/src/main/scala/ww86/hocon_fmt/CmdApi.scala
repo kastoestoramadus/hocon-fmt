@@ -79,15 +79,14 @@ object CmdApi extends IOApp {
         examineAll(arguments).flatTap(run => IO.print(run.rendered)).map(_.exitCode)
       case Right(Invocation.Version)         => IO.println(s"hocon-formatter ${BuildInfo.version}").as(ExitCode.Success)
       case Right(Invocation.Stdin(filename)) =>
-        fs2.io
-          .stdin[IO](4096)
-          .compile
-          .to(Array)
+        StdStreams.readStdin
           .map(formatStdin(_, filename))
           .handleError { e =>
             StdinResult("", s"cannot read $filename: ${Option(e.getMessage).getOrElse(e.toString)}\n", ExitCode(2))
           }
-          .flatMap(result => IO.print(result.stdout) *> Console[IO].error(result.stderr).as(result.exitCode))
+          .flatMap(result =>
+            StdStreams.writeStdout(result.stdout) *> Console[IO].error(result.stderr).as(result.exitCode)
+          )
       case Left(help) => usage(help)
     }
 

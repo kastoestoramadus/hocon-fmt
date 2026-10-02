@@ -119,6 +119,10 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
       "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % Test
     )
   )
+  // Blocking java.io for the standard streams; Scala.js has no System.in and keeps fs2 (see StdStreams).
+  .platformsSettings(JVMPlatform, NativePlatform)(
+    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "jvm-native" / "src" / "main" / "scala"
+  )
   .jvmSettings(
     announceRuntime("cli on the JVM"),
     Compile / mainClass := Some("ww86.hocon_fmt.CmdApi"),
