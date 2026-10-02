@@ -120,6 +120,32 @@ jobs:
       - name: Hooks end to end
         run: scripts/pre-commit-e2e.sh
 
+  # The command line contract on a real process, on every runtime. CmdApiSpec runs in the test JVM
+  # and cannot see locale, streams or exit codes.
+  cli-acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - name: Build the three runtimes
+        run: sbt -batch cliJS/fastLinkJS cliNative/nativeLink cliJVM/compile
+      - name: JVM
+        run: |
+          # sbt ends its output with ANSI control sequences on a runner, so strip them before taking the last line.
+          classpath=$(sbt -batch -Dsbt.color=false --error "export cliJVM/Runtime/fullClasspath" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep . | tail -1)
+          scripts/cli-acceptance.sh jvm java -cp "$classpath" ww86.hocon_fmt.CmdApi
+      - name: Node
+        if: ${{ !cancelled() }}
+        run: scripts/cli-acceptance.sh node node cli/.js/target/scala-3.8.2/hocon-formatter-cli-fastopt/main.js
+      - name: Native
+        if: ${{ !cancelled() }}
+        run: scripts/cli-acceptance.sh native cli/.native/target/scala-3.8.2/hocon-formatter
+
   # Report-only: shared runners are too noisy to fail a build on. main keeps the history in
   # refs/notes/benchmarks; a pull request is compared against it in the job summary.
   benchmarks:
