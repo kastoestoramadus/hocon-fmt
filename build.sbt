@@ -3,6 +3,7 @@ import scala.scalanative.build.{LTO, Mode}
 val scala3    = "3.8.2"
 val sconfig   = "1.12.4"
 val munit     = "1.2.4"
+val osLib     = "0.11.8"
 val sjavatime = "1.5.0"
 
 val catsEffect      = "3.7.1"
@@ -46,7 +47,20 @@ def announceRuntime(label: String): Setting[?] =
 lazy val root = project
   .in(file("."))
   // Aggregation drives compile, scalafmt and the rest.
-  .aggregate(coreJVM, coreJS, coreNative, cliJVM, cliJS, cliNative, web, benchJVM, benchJS, benchNative, sbtPlugin)
+  .aggregate(
+    coreJVM,
+    coreJS,
+    coreNative,
+    cliJVM,
+    cliJS,
+    cliNative,
+    acceptance,
+    web,
+    benchJVM,
+    benchJS,
+    benchNative,
+    sbtPlugin
+  )
   .settings(
     name           := "hocon-formatter",
     publish / skip := true,
@@ -167,6 +181,28 @@ lazy val cliJS     = cli.js
 lazy val cliNative = cli.native
 
 val bundle = taskKey[File]("The playground's script: the optimised web module under a licence banner.")
+
+/** The command line as a process, on every runtime: output encoding, how stdin and stdout are attached,
+  * exit codes. `CmdApiSpec` runs inside the test JVM and cannot see those. Too slow for the `test`
+  * sequence, since it links the Scala.js and Scala Native builds; run it with `sbt acceptance/test`.
+  * The runtimes under test are handed over as system properties, so no script has to find them.
+  */
+lazy val acceptance = project
+  .in(file("acceptance"))
+  .settings(
+    name           := "hocon-formatter-acceptance",
+    publish / skip := true,
+    libraryDependencies ++= Seq(
+      "com.lihaoyi"   %% "os-lib" % osLib % Test,
+      "org.scalameta" %% "munit"  % munit % Test
+    ),
+    Test / fork := true,
+    Test / javaOptions ++= Seq(
+      s"-Dcli.jvm.classpath=${(cliJVM / Runtime / fullClasspath).value.files.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator)}",
+      s"-Dcli.node.main=${(cliJS / Compile / fastLinkJSOutput).value.getAbsolutePath}/main.js",
+      s"-Dcli.native.binary=${(cliNative / Compile / nativeLink).value.getAbsolutePath}"
+    )
+  )
 
 /** The formatter as a script for web pages, behind the playground: one global, `HoconFormatter`,
   * with a small JavaScript API; see docs/playground.md. A classic script rather than an ES module,
