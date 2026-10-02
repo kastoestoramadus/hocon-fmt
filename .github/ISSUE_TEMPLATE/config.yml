@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Feature requests and ideas
+    url: https://github.com/kastoestoramadus/hocon-formatter/issues/22
+    about: Add your wishes as comments on the Wishlist, one idea per comment.

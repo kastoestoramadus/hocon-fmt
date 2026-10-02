@@ -15,13 +15,28 @@ All JVM channels need Java 17 or newer, as Scala 3.8 does.
 
 ```
 hocon-formatter [--check] <file>...
+hocon-formatter --stdin [--stdin-filename <name>]
+hocon-formatter --version
 ```
 
 | exit code | meaning |
 |---|---|
 | 0 | done; with `--check`, every file is formatted or refused |
-| 1 | `--check` found an unformatted file |
-| 2 | the arguments could not be parsed |
+| 1 | `--check` found an unformatted file, or stdin was refused |
+| 2 | the arguments could not be parsed, or stdin could not be read |
+
+`--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
+summary. Already formatted input is returned unchanged. A refusal writes nothing to stdout,
+prints the reason to stderr, and exits 1 so an editor can keep its original buffer.
+`--stdin-filename` supplies a name for diagnostics only; it does not access that file.
+Do not combine stdin mode with file arguments or `--check`.
+
+```sh
+hocon-formatter --stdin --stdin-filename application.conf < input.conf > output.conf
+hocon-formatter --version
+```
+
+`--version` prints the build version shared by all CLI runtimes and needs no input.
 
 Three builds of the same program:
 

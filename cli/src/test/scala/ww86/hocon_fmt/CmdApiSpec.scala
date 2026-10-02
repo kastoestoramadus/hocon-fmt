@@ -125,13 +125,58 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   test("arguments: files, with --check or -c") {
     assertEquals(
       CmdApi.command.parse(List("--check", "a.conf", "b.conf")),
-      Right(Arguments(List(Path("a.conf"), Path("b.conf")), checkOnly = true))
+      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf"), Path("b.conf")), checkOnly = true)))
     )
-    assertEquals(CmdApi.command.parse(List("-c", "a.conf")), Right(Arguments(List(Path("a.conf")), checkOnly = true)))
-    assertEquals(CmdApi.command.parse(List("a.conf")), Right(Arguments(List(Path("a.conf")), checkOnly = false)))
+    assertEquals(
+      CmdApi.command.parse(List("-c", "a.conf")),
+      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf")), checkOnly = true)))
+    )
+    assertEquals(
+      CmdApi.command.parse(List("a.conf")),
+      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf")), checkOnly = false)))
+    )
   }
 
   test("arguments: at least one file is required") {
     assert(CmdApi.command.parse(Nil).isLeft)
+  }
+
+  test("arguments: stdin and version need no files") {
+    assertEquals(CmdApi.command.parse(List("--stdin")), Right(CmdApi.Invocation.Stdin("<stdin>")))
+    assertEquals(
+      CmdApi.command.parse(List("--stdin", "--stdin-filename", "editor.conf")),
+      Right(CmdApi.Invocation.Stdin("editor.conf"))
+    )
+    assertEquals(CmdApi.command.parse(List("--version")), Right(CmdApi.Invocation.Version))
+  }
+
+  test("arguments: reject ambiguous modes and orphaned stdin filename") {
+    List(
+      List("--stdin", "a.conf"),
+      List("--stdin", "--check"),
+      List("--version", "a.conf"),
+      List("--version", "--stdin"),
+      List("--stdin-filename", "editor.conf", "a.conf")
+    ).foreach(args => assert(CmdApi.command.parse(args).isLeft, args.toString))
+  }
+
+  test("stdin formats without mixing reports into stdout") {
+    val result = CmdApi.formatStdin(unformatted.getBytes(UTF_8), "editor.conf")
+    assertEquals(result.stdout, formatted)
+    assertEquals(result.stderr, "")
+    assertEquals(result.exitCode, ExitCode.Success)
+  }
+
+  test("stdin preserves already formatted input") {
+    assertEquals(CmdApi.formatStdin(formatted.getBytes(UTF_8), "<stdin>").stdout, formatted)
+  }
+
+  test("stdin refusal emits no output and fails, naming the input on stderr") {
+    List("a: ${".getBytes(UTF_8), Array(0xff.toByte)).foreach { bytes =>
+      val result = CmdApi.formatStdin(bytes, "editor.conf")
+      assertEquals(result.stdout, "")
+      assertEquals(result.exitCode, ExitCode(1))
+      assert(result.stderr.contains("editor.conf"), result.stderr)
+    }
   }
 }
