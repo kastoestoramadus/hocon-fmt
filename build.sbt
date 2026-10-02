@@ -106,9 +106,12 @@ lazy val coreNative = core.native
 lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .crossType(CrossType.Pure)
   .in(file("cli"))
+  .enablePlugins(BuildInfoPlugin)
   .dependsOn(core)
   .settings(
     name := "hocon-formatter-cli",
+    buildInfoPackage := "ww86.hocon_fmt",
+    buildInfoKeys    := Seq[BuildInfoKey](version),
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-effect"       % catsEffect,
       "co.fs2"        %%% "fs2-io"            % fs2,

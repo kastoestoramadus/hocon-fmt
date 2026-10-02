@@ -1,0 +1,39 @@
+name: Bug report
+description: Report incorrect output, a crash, or an unexpected refusal.
+title: "[Bug]: "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Formatter version
+      description: Paste the output of hocon-formatter --version, or the commit SHA for a source build.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and how you run the formatter (native, Node, JVM, pre-commit, or build-tool plugin).
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Minimal HOCON input
+      description: Share the smallest example that reproduces the problem. Remove credentials and private values.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the output or refusal message and the command you ran.
+    validations:
+      required: true

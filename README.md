@@ -35,6 +35,13 @@ Parsing HOCON resolves `include` directives and keeps nothing to render, so a pl
 round trip deletes them. The formatter carries each whole statement across the round trip; see
 [architecture](docs/architecture.md#include-masking).
 
+## Feedback
+
+Have a feature request? Add it as a comment on the [Wishlist](https://github.com/kastoestoramadus/hocon-formatter/issues/22),
+one idea per comment with a short use case. React with 👍 to ideas you would use.
+For bugs, [open a bug report](https://github.com/kastoestoramadus/hocon-formatter/issues/new/choose)
+with the formatter version and a minimal example.
+
 ## Use it
 
 | channel | |

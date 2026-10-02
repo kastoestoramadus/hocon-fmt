@@ -53,18 +53,12 @@ surprises in `CmdApiSpec`.
 
 ## The command line
 
-### Standard input to standard output (S)
+Standard input to standard output and `--version` are implemented; see [usage](usage.md).
 
-`hocon-formatter --stdin < in.conf > out.conf`, with `--stdin-filename` for messages. Nearly
-every editor integration expects exactly this, and so do Spotless's `nativeCmd` step and an LSP
-server; it is what unlocks most of the entries below. A refused input would print nothing on
-stdout and the reason on stderr, with exit 1, since an editor must not replace a buffer with
-nothing.
-
-### Directories, ignores, `--version` (S)
+### Directories and ignores (S)
 
 `hocon-formatter src/` walking for `*.conf` and `*.hocon`, skipping what `.gitignore` excludes, as
-ruff and prettier do; today the caller expands globs. `--version` for bug reports. Maybe
+ruff and prettier do; today the caller expands globs. Maybe
 `--strict`, turning a refusal into a failure, for teams that want every `.conf` to be HOCON.
 
 ## Distribution

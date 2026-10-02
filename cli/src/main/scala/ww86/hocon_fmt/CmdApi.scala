@@ -1,5 +1,8 @@
 package ww86.hocon_fmt
 
+import java.nio.charset.StandardCharsets.UTF_8
+
+import cats.data.Validated
 import cats.effect.std.Console
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.syntax.all.*
@@ -14,21 +17,40 @@ object CmdApi extends IOApp {
 
   final case class Arguments(files: List[Path], checkOnly: Boolean)
 
-  val command: Command[Arguments] =
+  enum Invocation {
+    case FileMode(arguments: Arguments)
+    case Stdin(filename: String)
+    case Version
+  }
+
+  val command: Command[Invocation] =
     Command(
       name = "hocon-formatter",
       header = "Formats HOCON files in place. Files it cannot format safely are left alone."
     ) {
       (
-        Opts.arguments[String]("file").map(_.toList.map(Path(_))),
+        Opts.arguments[String]("file").orEmpty.map(_.toList.map(Path(_))),
         Opts
           .flag(
             "check",
             "Report unformatted files instead of rewriting them; exit 1 if any are found.",
             short = "c"
           )
-          .orFalse
-      ).mapN(Arguments.apply)
+          .orFalse,
+        Opts.flag("stdin", "Read UTF-8 from stdin and write only formatted text to stdout.").orFalse,
+        Opts.option[String]("stdin-filename", "Name used in stdin diagnostics; no file is read or written.").orNone,
+        Opts.flag("version", "Print the formatter version and exit.").orFalse
+      ).tupled.mapValidated { case (files, checkOnly, stdin, filename, version) =>
+        if (version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty))
+          Validated.invalidNel("--version cannot be combined with formatting arguments.")
+        else if (version) Validated.validNel(Invocation.Version)
+        else if (stdin && (files.nonEmpty || checkOnly))
+          Validated.invalidNel("--stdin cannot be combined with files or --check.")
+        else if (stdin) Validated.validNel(Invocation.Stdin(filename.getOrElse("<stdin>")))
+        else if (filename.nonEmpty) Validated.invalidNel("--stdin-filename requires --stdin.")
+        else if (files.isEmpty) Validated.invalidNel("At least one file or --stdin is required.")
+        else Validated.validNel(Invocation.FileMode(Arguments(files, checkOnly)))
+      }
     }
 
   enum Outcome {
@@ -53,8 +75,30 @@ object CmdApi extends IOApp {
   // Scala.js hands `main` no arguments; under Node they are in `process.argv`.
   override def run(args: List[String]): IO[ExitCode] =
     command.parse(PlatformApp.ambientArgs.getOrElse(args)) match {
-      case Right(arguments) => examineAll(arguments).flatTap(run => IO.print(run.rendered)).map(_.exitCode)
-      case Left(help)       => usage(help)
+      case Right(Invocation.FileMode(arguments)) =>
+        examineAll(arguments).flatTap(run => IO.print(run.rendered)).map(_.exitCode)
+      case Right(Invocation.Version)         => IO.println(s"hocon-formatter ${BuildInfo.version}").as(ExitCode.Success)
+      case Right(Invocation.Stdin(filename)) =>
+        fs2.io
+          .stdin[IO](4096)
+          .compile
+          .to(Array)
+          .map(formatStdin(_, filename))
+          .handleError { e =>
+            StdinResult("", s"cannot read $filename: ${Option(e.getMessage).getOrElse(e.toString)}\n", ExitCode(2))
+          }
+          .flatMap(result => IO.print(result.stdout) *> Console[IO].error(result.stderr).as(result.exitCode))
+      case Left(help) => usage(help)
+    }
+
+  final case class StdinResult(stdout: String, stderr: String, exitCode: ExitCode)
+
+  def formatStdin(content: Array[Byte], filename: String): StdinResult =
+    Verdict.of(content) match {
+      case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, "", ExitCode.Success)
+      case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), "", ExitCode.Success)
+      case Verdict.Refused(refusal)           =>
+        StdinResult("", s"cannot format $filename: ${refusal.reason}\n", ExitCode(1))
     }
 
   /** Examines every file, even after an unformatted one is found, and each file once.
