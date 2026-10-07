@@ -35,20 +35,20 @@ jobs:
         run: sbt cliNative/nativeLink
       - name: Smoke test
         run: |
-          binary=cli/.native/target/scala-3.8.2/hocon-formatter
+          binary=cli/.native/target/scala-3.8.2/hocon-fmt
           printf 'a   =   1\n' > smoke.conf
           if "$binary" --check smoke.conf; then echo "check passed on an unformatted file"; exit 1; fi
           "$binary" smoke.conf && [ "$(cat smoke.conf)" = "a: 1" ]
       # The wheel behind the pre-commit hooks; its platform tag comes from the binary itself.
       - name: Wheel
-        run: python3 python/build_wheel.py --binary cli/.native/target/scala-3.8.2/hocon-formatter
-      - run: mv cli/.native/target/scala-3.8.2/hocon-formatter "hocon-formatter-${{ matrix.target }}"
+        run: python3 python/build_wheel.py --binary cli/.native/target/scala-3.8.2/hocon-fmt
+      - run: mv cli/.native/target/scala-3.8.2/hocon-fmt "hocon-fmt-${{ matrix.target }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: hocon-formatter-${{ matrix.target }}
+          name: hocon-fmt-${{ matrix.target }}
           path: |
-            hocon-formatter-${{ matrix.target }}
-            hocon_formatter-*.whl
+            hocon-fmt-${{ matrix.target }}
+            hocon_fmt-*.whl
 
   npm:
     runs-on: ubuntu-latest
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: npm-package
-          path: hocon-formatter-*.tgz
+          path: hocon-fmt-*.tgz
 
   # The playground's script, fetched by release so a page pins the formatter it runs.
   web:
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: web-script
-          path: web/target/bundle/hocon-formatter.js
+          path: web/target/bundle/hocon-fmt.js
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -97,4 +97,4 @@ jobs:
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-formatter-* hocon_formatter-*.whl hocon-formatter.js
+        run: gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-fmt-* hocon_fmt-*.whl hocon-fmt.js

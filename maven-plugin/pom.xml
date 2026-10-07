@@ -5,14 +5,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.github.kastoestoramadus</groupId>
-  <!-- The `<prefix>-maven-plugin` form is what gives the goals the `hocon-formatter:` prefix. -->
-  <artifactId>hocon-formatter-maven-plugin</artifactId>
+  <!-- The `<prefix>-maven-plugin` form is what gives the goals the `hocon-fmt:` prefix. -->
+  <artifactId>hocon-fmt-maven-plugin</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
-  <name>hocon-formatter-maven-plugin</name>
+  <name>hocon-fmt-maven-plugin</name>
   <description>Formats HOCON configuration files, or fails the build when they are not formatted.</description>
-  <url>https://github.com/kastoestoramadus/hocon-formatter</url>
+  <url>https://github.com/kastoestoramadus/hocon-fmt</url>
 
   <licenses>
     <license>
@@ -29,8 +29,8 @@
     </developer>
   </developers>
   <scm>
-    <url>https://github.com/kastoestoramadus/hocon-formatter</url>
-    <connection>scm:git:https://github.com/kastoestoramadus/hocon-formatter.git</connection>
+    <url>https://github.com/kastoestoramadus/hocon-fmt</url>
+    <connection>scm:git:https://github.com/kastoestoramadus/hocon-fmt.git</connection>
   </scm>
 
   <!-- The floor Apache's own plugins require; older releases are long out of support. -->
@@ -50,7 +50,7 @@
   <dependencies>
     <dependency>
       <groupId>io.github.kastoestoramadus</groupId>
-      <artifactId>hocon-formatter-core_3</artifactId>
+      <artifactId>hocon-fmt-core_3</artifactId>
       <version>0.1.0-SNAPSHOT</version>
     </dependency>
     <!-- Maven 3.9 stopped putting plexus-utils on plugin classpaths, so it has to be declared. -->

@@ -19,12 +19,12 @@ ThisBuild / version      := "0.1.0-SNAPSHOT"
 // which is what `cs` and therefore the pre-commit coursier hook resolve from.
 ThisBuild / organization     := "io.github.kastoestoramadus"
 ThisBuild / organizationName := "kastoestoramadus"
-ThisBuild / homepage         := Some(url("https://github.com/kastoestoramadus/hocon-formatter"))
+ThisBuild / homepage         := Some(url("https://github.com/kastoestoramadus/hocon-fmt"))
 ThisBuild / licenses         := Seq("GPL-3.0" -> url("https://www.gnu.org/licenses/gpl-3.0.html"))
 ThisBuild / scmInfo          := Some(
   ScmInfo(
-    url("https://github.com/kastoestoramadus/hocon-formatter"),
-    "scm:git:https://github.com/kastoestoramadus/hocon-formatter.git"
+    url("https://github.com/kastoestoramadus/hocon-fmt"),
+    "scm:git:https://github.com/kastoestoramadus/hocon-fmt.git"
   )
 )
 ThisBuild / developers := List(
@@ -62,7 +62,7 @@ lazy val root = project
     sbtPlugin
   )
   .settings(
-    name           := "hocon-formatter",
+    name           := "hocon-fmt",
     publish / skip := true,
     // `test` is spelled out instead of aggregated: aggregated projects run concurrently, and
     // their summaries then arrive unlabelled and interleaved, with no way to tell which runtime
@@ -89,7 +89,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .crossType(CrossType.Full)
   .in(file("core"))
   .settings(
-    name := "hocon-formatter-core",
+    name := "hocon-fmt-core",
     libraryDependencies ++= Seq(
       "org.ekrich"    %%% "sconfig"          % sconfig,
       "org.scalameta" %%% "munit"            % munit           % Test,
@@ -123,7 +123,7 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .enablePlugins(BuildInfoPlugin)
   .dependsOn(core)
   .settings(
-    name := "hocon-formatter-cli",
+    name := "hocon-fmt-cli",
     buildInfoPackage := "ww86.hocon_fmt",
     buildInfoKeys    := Seq[BuildInfoKey](version),
     libraryDependencies ++= Seq(
@@ -155,7 +155,7 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     announceRuntime("cli on Scala Native"),
     // The shipped binary is optimised; tests link in debug mode, which is several times faster.
     Compile / nativeConfig ~= {
-      _.withBaseName("hocon-formatter").withMode(Mode.releaseFast).withLTO(LTO.thin)
+      _.withBaseName("hocon-fmt").withMode(Mode.releaseFast).withLTO(LTO.thin)
     },
     Test / nativeConfig ~= { _.withMode(Mode.debug).withLTO(LTO.none) }
   )
@@ -168,7 +168,7 @@ cliJS / npmPackage := {
   IO.delete(staging)
   IO.copyDirectory(file("npm"), staging)
   // npm links `bin` entries as executables, which needs the shebang to pick Node.
-  val cli = staging / "hocon-formatter.js"
+  val cli = staging / "hocon-fmt.js"
   IO.write(cli, "#!/usr/bin/env node\n" + IO.read(linked))
   cli.setExecutable(true)
   val manifest = staging / "package.json"
@@ -190,7 +190,7 @@ val bundle = taskKey[File]("The playground's script: the optimised web module un
 lazy val acceptance = project
   .in(file("acceptance"))
   .settings(
-    name           := "hocon-formatter-acceptance",
+    name           := "hocon-fmt-acceptance",
     publish / skip := true,
     libraryDependencies ++= Seq(
       "com.lihaoyi"   %% "os-lib" % osLib % Test,
@@ -213,7 +213,7 @@ lazy val web = project
   .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
   .dependsOn(coreJS)
   .settings(
-    name           := "hocon-formatter-web",
+    name           := "hocon-fmt-web",
     publish / skip := true,
     announceRuntime("web on Scala.js"),
     libraryDependencies ++= Seq(
@@ -227,10 +227,10 @@ lazy val web = project
     Seq(Compile, Test).map(_ / fullLinkJS / scalaJSLinkerConfig ~= (_.withClosureCompilerIfAvailable(true))),
     bundle := {
       val linked = (Compile / fullLinkJSOutput).value / "main.js"
-      val script = target.value / "bundle" / "hocon-formatter.js"
+      val script = target.value / "bundle" / "hocon-fmt.js"
       // The source map is not shipped, so neither is the comment that points to it.
       val code = IO.readLines(linked).filterNot(_.startsWith("//# sourceMappingURL=")).mkString("\n")
-      IO.write(script, s"/*! hocon-formatter ${version.value} | GPL-3.0 | ${homepage.value.get} */\n$code\n")
+      IO.write(script, s"/*! hocon-fmt ${version.value} | GPL-3.0 | ${homepage.value.get} */\n$code\n")
       script
     }
   )
@@ -256,7 +256,7 @@ lazy val bench = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("bench"))
   .dependsOn(core)
   .settings(
-    name           := "hocon-formatter-bench",
+    name           := "hocon-fmt-bench",
     publish / skip := true
   )
   .jvmSettings(run / fork := true)
@@ -284,7 +284,7 @@ lazy val sbtPlugin = project
   .in(file("sbt-plugin"))
   .enablePlugins(SbtPlugin, BuildInfoPlugin)
   .settings(
-    name         := "sbt-hocon-formatter",
+    name         := "sbt-hocon-fmt",
     scalaVersion := "2.12.21",
     // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
     buildInfoPackage := "ww86.hocon_fmt.sbt",

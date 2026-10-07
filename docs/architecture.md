@@ -17,7 +17,7 @@ around it in `HoconFormatter`.
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter`; the [playground](playground.md)'s engine | Scala.js | core |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | core, at run time |
 | `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | core, at run time |
-| `maven-plugin` | `hocon-formatter:format`, `hocon-formatter:check`; standalone Maven build | JVM, Java 17 | core |
+| `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | core |
 | `mill-plugin` | `hoconFormat`, `hoconFormatCheck` for Mill 1.1.4 and later; standalone Mill build | JVM, Scala 3 | core |
 | `npm/` | template of the npm package that wraps the Node build of the CLI | Node | cli |
 | `python/` | builds the wheel that carries the native binary, for the pre-commit hooks | | cli |

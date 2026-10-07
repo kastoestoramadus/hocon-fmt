@@ -15,8 +15,8 @@ export PRE_COMMIT_HOME="$work/pre-commit-cache"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 (cd "$root" && sbt -batch cliNative/nativeLink cliJS/npmPackage)
-python3 "$root/python/build_wheel.py" --binary "$root/cli/.native/target/scala-3.8.2/hocon-formatter" --out "$work"
-wheel=$(ls "$work"/hocon_formatter-*.whl)
+python3 "$root/python/build_wheel.py" --binary "$root/cli/.native/target/scala-3.8.2/hocon-fmt" --out "$work"
+wheel=$(ls "$work"/hocon_fmt-*.whl)
 tarball="$work/$(npm pack --silent --pack-destination "$work" "$root/cli/.js/target/npm-package")"
 
 consumer="$work/consumer"
@@ -28,10 +28,10 @@ repos:
   - repo: $root
     rev: $(git -C "$root" rev-parse HEAD)
     hooks:
-      - { id: hocon-formatter,            additional_dependencies: ["$wheel"] }
-      - { id: hocon-formatter-check,      additional_dependencies: ["$wheel"] }
-      - { id: hocon-formatter-node,       additional_dependencies: ["$tarball"] }
-      - { id: hocon-formatter-check-node, additional_dependencies: ["$tarball"] }
+      - { id: hocon-fmt,            additional_dependencies: ["$wheel"] }
+      - { id: hocon-fmt-check,      additional_dependencies: ["$wheel"] }
+      - { id: hocon-fmt-node,       additional_dependencies: ["$tarball"] }
+      - { id: hocon-fmt-check-node, additional_dependencies: ["$tarball"] }
 EOF
 
 unformatted=$(printf 'app {\n    name = "svc"\n   port =8080\n}')
@@ -58,5 +58,5 @@ scenario() {
   echo "pre-commit hooks $format_id and $check_id: OK"
 }
 
-scenario hocon-formatter hocon-formatter-check
-scenario hocon-formatter-node hocon-formatter-check-node
+scenario hocon-fmt hocon-fmt-check
+scenario hocon-fmt-node hocon-fmt-check-node

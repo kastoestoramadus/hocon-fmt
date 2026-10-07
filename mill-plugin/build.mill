@@ -13,10 +13,10 @@ object `package` extends ScalaModule, PublishModule {
 
   def scalaVersion   = "3.8.2"
   def platformSuffix = "_mill1"
-  def artifactName   = "mill-hocon-formatter"
+  def artifactName   = "mill-hocon-fmt"
 
   def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:$millVersion")
-  def mvnDeps        = Seq(mvn"io.github.kastoestoramadus::hocon-formatter-core:$formatterVersion")
+  def mvnDeps        = Seq(mvn"io.github.kastoestoramadus::hocon-fmt-core:$formatterVersion")
 
   // The suffix names the Mill the plugin runs on; the core is an ordinary Scala 3 library.
   protected def resolvedDepsWarnNonPlatform = Task { false }
@@ -59,9 +59,9 @@ object `package` extends ScalaModule, PublishModule {
   def pomSettings = PomSettings(
     description = "Formats HOCON configuration files, or fails the build when they are not formatted.",
     organization = "io.github.kastoestoramadus",
-    url = "https://github.com/kastoestoramadus/hocon-formatter",
+    url = "https://github.com/kastoestoramadus/hocon-fmt",
     licenses = Seq(License.`GPL-3.0-only`),
-    versionControl = VersionControl.github("kastoestoramadus", "hocon-formatter"),
+    versionControl = VersionControl.github("kastoestoramadus", "hocon-fmt"),
     developers = Seq(Developer("kastoestoramadus", "Waldemar Wosinski", "https://github.com/kastoestoramadus"))
   )
 }

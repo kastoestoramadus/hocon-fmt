@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: Formatter version
-      description: Paste the output of hocon-formatter --version, or the commit SHA for a source build.
+      description: Paste the output of hocon-fmt --version, or the commit SHA for a source build.
     validations:
       required: true
   - type: input

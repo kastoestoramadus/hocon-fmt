@@ -10,7 +10,7 @@ is in [releasing](releasing.md), not here.
 
 ### A file that cannot be read fails the run (S)
 
-`hocon-formatter --check missing.conf` prints
+`hocon-fmt --check missing.conf` prints
 `ERROR: cannot format, leaving unchanged: .../missing.conf (missing.conf)` and exits 0. A typo in
 a CI script's path therefore passes silently, and the reason in brackets is the exception's
 message, which for a missing file is only its name. A missing or unreadable file is not a refusal
@@ -57,7 +57,7 @@ Standard input to standard output and `--version` are implemented; see [usage](u
 
 ### Directories and ignores (S)
 
-`hocon-formatter src/` walking for `*.conf` and `*.hocon`, skipping what `.gitignore` excludes, as
+`hocon-fmt src/` walking for `*.conf` and `*.hocon`, skipping what `.gitignore` excludes, as
 ruff and prettier do; today the caller expands globs. Maybe
 `--strict`, turning a refusal into a failure, for teams that want every `.conf` to be HOCON.
 
@@ -65,16 +65,16 @@ ruff and prettier do; today the caller expands globs. Maybe
 
 ### Homebrew tap (S)
 
-`brew install kastoestoramadus/tap/hocon-formatter` on macOS and Linux, installing the release
+`brew install kastoestoramadus/tap/hocon-fmt` on macOS and Linux, installing the release
 binary. **Your part:** create the repository `kastoestoramadus/homebrew-tap`, and a fine-grained
 token that can write to it only, saved as the secret `HOMEBREW_TAP_TOKEN` (the workflow's own
-token cannot push to another repository). **Code:** `Formula/hocon-formatter.rb` with a URL and
+token cannot push to another repository). **Code:** `Formula/hocon-fmt.rb` with a URL and
 SHA-256 per platform, and a release job that rewrites it for each tag. homebrew-core itself
 accepts only projects with some following, so it comes later if at all.
 
 ### coursier (S)
 
-`cs install hocon-formatter` for the Scala crowd, who have coursier already. coursier installs
+`cs install hocon-fmt` for the Scala crowd, who have coursier already. coursier installs
 apps from a channel, a JSON description that can point either at the JVM command line on Maven
 Central or at the native binaries on GitHub releases. **Your part:** decide where the channel
 lives (a file in this repository, or a small channel repository). **Code:** the app descriptor;
@@ -82,19 +82,19 @@ publishing `cliJVM` to Maven Central with its main class, if the JVM variant is 
 
 ### Scoop (S, after the Windows build)
 
-`scoop install hocon-formatter`, a JSON manifest in a bucket repository
+`scoop install hocon-fmt`, a JSON manifest in a bucket repository
 `kastoestoramadus/scoop-bucket`, pointing at the Windows binary; same shape as the Homebrew tap.
 
 ### Nix (M)
 
-A flake in this repository (`nix run github:kastoestoramadus/hocon-formatter`) that fetches the
+A flake in this repository (`nix run github:kastoestoramadus/hocon-fmt`) that fetches the
 release binary and patches its interpreter, and later a nixpkgs package. Building from source in
 Nix's sandbox would mean packaging sbt's dependencies, which is where most Scala packages there
 stall.
 
 ### Docker image (S)
 
-`docker run --rm -v "$PWD:/work" -w /work ghcr.io/kastoestoramadus/hocon-formatter --check ...`,
+`docker run --rm -v "$PWD:/work" -w /work ghcr.io/kastoestoramadus/hocon-fmt --check ...`,
 for CI systems that run containers and nothing else. The binary links glibc and libstdc++
 dynamically, so the base must carry both: Debian slim does, scratch and Alpine do not. **Your
 part:** after the first push, check the package's visibility in its settings on GitHub and make it
@@ -106,14 +106,14 @@ public.
 ### GitHub Action (S)
 
 ```yaml
-- uses: kastoestoramadus/hocon-formatter-action@v1
+- uses: kastoestoramadus/hocon-fmt-action@v1
   with: { files: "**/*.conf", version: 0.1.0 }
 ```
 
 A composite action that downloads the release binary for the runner and runs `--check`, with an
 annotation on each unformatted file. **Your part:** the Marketplace takes an action only from a
 public repository with `action.yml` at its root and no workflow files, so it needs its own
-repository, `kastoestoramadus/hocon-formatter-action`; then tag `v1` and tick "Publish this
+repository, `kastoestoramadus/hocon-fmt-action`; then tag `v1` and tick "Publish this
 Action to the GitHub Marketplace" on the release. **Code:** `action.yml` and a short script.
 
 ### Spotless (S, after `--stdin`)
@@ -195,7 +195,7 @@ suites and properties keep their meaning.
 
 ### Configurable style (M, after the parser)
 
-A `.hocon-formatter.conf` choosing `:` or `=`, indentation, and whether to flatten single-key
+A `.hocon-fmt.conf` choosing `:` or `=`, indentation, and whether to flatten single-key
 objects. Every channel would read it from the project root. Pointless while sconfig decides the
 output.
 
