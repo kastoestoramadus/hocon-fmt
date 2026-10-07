@@ -244,7 +244,7 @@ lazy val web = project
   * repository (hocon-fmt.ww86.eu); the Laminar app calls `coreJS` itself, with no JavaScript API
   * in between. Not published; see docs/site.md.
   */
-val build = taskKey[File]("Assembles the Pages output into site/target/site: index.html, the optimised script, CNAME.")
+val build = taskKey[File]("Assembles the Pages output into site/target/site: index.html, the optimised script, CNAME, .nojekyll.")
 
 lazy val site = project
   .in(file("site"))
@@ -279,6 +279,9 @@ lazy val site = project
       val index = (Compile / resources).value.find(_.getName == "index.html")
       IO.copyFile(index.getOrElse(sys.error("site resources are missing index.html")), out / "index.html")
       IO.write(out / "CNAME", "hocon-fmt.ww86.eu\n")
+      // A Pages branch is served through Jekyll unless it is told not to; nothing here wants a
+      // preprocessor, and this keeps the three files above byte for byte.
+      IO.write(out / ".nojekyll", "")
       out
     }
   )

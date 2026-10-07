@@ -13,11 +13,12 @@ plan in [playground](playground.md); the `web` module and its script are unchang
 17.2.1, the latest stable for `_sjs1_3`, renders it; sjavatime supplies the `java.time` sconfig
 needs, the way `web` does.
 
-`sbt site/build` links the app with fullOpt and writes three files:
+`sbt site/build` links the app with fullOpt and writes four files:
 
 - `index.html` — the markup and every style; no web fonts, no CDNs, no analytics.
 - `main.js` — one classic script, not an ES module, so a `<script>` tag loads it from `file://`.
 - `CNAME` — `hocon-fmt.ww86.eu`, for Pages.
+- `.nojekyll` — so a Pages branch serves the files as they are, without Jekyll in between.
 
 ## The page
 
