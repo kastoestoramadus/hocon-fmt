@@ -1,9 +1,7 @@
 package ww86.hocon_fmt.site
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.scalajs.js
-import scala.util.Failure
 
 import Browser.given
 
@@ -35,7 +33,7 @@ class BrowserSpec extends munit.FunSuite:
     super.afterEach(context)
 
   test("the browser's own fetch answers the author's pull requests") {
-    val browser = fakeBrowser()
+    val browser = FakeBrowser()
     install(browser.window(Some(browser.answering(searchBody))))
     GitHubApi.authorPrs("ekrich/sconfig").map { prs =>
       assertEquals(prs.map(_.number).sorted, List(600, 999))
@@ -44,7 +42,7 @@ class BrowserSpec extends munit.FunSuite:
   }
 
   test("the refresh folds the live answer into the snapshot, dates it today, lists the unknown") {
-    val browser = fakeBrowser()
+    val browser = FakeBrowser()
     install(browser.window(Some(browser.answering(searchBody))))
     ContributionsView.refreshBoard.map { board =>
       assertEquals(board.liveLibraries, Library.values.toList)
@@ -59,7 +57,7 @@ class BrowserSpec extends munit.FunSuite:
   }
 
   test("a second refresh within the cache window searches nothing again") {
-    val browser = fakeBrowser()
+    val browser = FakeBrowser()
     install(browser.window(Some(browser.answering(searchBody))))
     val twice = for
       first  <- ContributionsView.refreshBoard
@@ -74,19 +72,19 @@ class BrowserSpec extends munit.FunSuite:
   }
 
   test("a browser without fetch at all leaves the snapshot standing") {
-    val browser = fakeBrowser()
+    val browser = FakeBrowser()
     install(browser.window(None))
     ContributionsView.refreshBoard.map(assertSnapshotStands)
   }
 
   test("a search that fails leaves the snapshot standing") {
-    val browser = fakeBrowser()
+    val browser = FakeBrowser()
     install(browser.window(Some(js.Any.fromFunction1((url: String) => js.Promise.reject(new js.Error("network"))))))
     ContributionsView.refreshBoard.map(assertSnapshotStands)
   }
 
   test("a search that never answers is abandoned at its deadline, not waited on") {
-    val browser = fakeBrowser()
+    val browser = FakeBrowser()
     install(browser.window(Some(browser.neverAnswers)))
     Browser
       .withDeadline(50)("https://api.github.com/search/issues")
@@ -145,5 +143,3 @@ class BrowserSpec extends munit.FunSuite:
       fetch match
         case Some(f) => js.Dynamic.literal(fetch = f, localStorage = storage)
         case None    => js.Dynamic.literal(localStorage = storage)
-
-  private def fakeBrowser(): FakeBrowser = new FakeBrowser
