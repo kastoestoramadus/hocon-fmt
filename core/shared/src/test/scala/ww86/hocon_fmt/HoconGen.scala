@@ -12,10 +12,13 @@ import org.scalacheck.Gen
   */
 object HoconGen {
 
+  /** `joined` writes the node on the line of the one before it, after a comma. A comment ends its
+    * line, so nothing is joined to one.
+    */
   enum Node {
-    case Field(key: String, separator: String, value: Value)
+    case Field(key: String, separator: String, value: Value, joined: Boolean = false)
     case Comment(marker: String, text: String)
-    case Include(statement: String)
+    case Include(statement: String, joined: Boolean = false)
   }
 
   enum Value {
@@ -30,7 +33,7 @@ object HoconGen {
 
     def comments: List[String] = collect(nodes) { case Node.Comment(_, text) => text }
 
-    def includes: List[String] = collect(nodes) { case Node.Include(statement) => statement }
+    def includes: List[String] = collect(nodes) { case Node.Include(statement, _) => statement }
 
     /** sconfig drops a comment with no field after it, which the formatter must refuse; documents
       * without one are those it has no reason to refuse.
@@ -53,17 +56,68 @@ object HoconGen {
       case _ => false
     }
 
+    /** An include written on a line that holds another field or include. sconfig leaves fields on
+      * one line in no defined order, so the formatter has reason to refuse these.
+      */
+    def includeSharesALine: Boolean = lists(nodes).exists { level =>
+      def joinedToPrevious(at: Int) = level.indices.contains(at) && isJoined(level(at), level.lift(at - 1))
+      level.indices.exists(i => level(i).isInstanceOf[Node.Include] && (joinedToPrevious(i) || joinedToPrevious(i + 1)))
+    }
+
+    /** For each include, the paths of what is written before it in its object: the keys of its
+      * earlier fields down to their leaves, and the earlier includes beside it. The order in which
+      * a later definition wins is the order of the source, which is what the formatter must keep.
+      */
+    def keysBeforeIncludes: Map[String, Set[List[String]]] = HoconGen.keysBeforeIncludes(nodes, Nil)
+
     override def toString: String = s"\n$text"
+  }
+
+  def isJoined(node: Node, previous: Option[Node]): Boolean = {
+    val joined = node match {
+      case Node.Field(_, _, _, joined) => joined
+      case Node.Include(_, joined)     => joined
+      case _                           => false
+    }
+    joined && previous.exists(!_.isInstanceOf[Node.Comment])
+  }
+
+  // A quoted key is one segment, a dotted one is a path.
+  def segments(key: String): List[String] =
+    if (key.startsWith("\"")) List(key.stripPrefix("\"").stripSuffix("\"")) else key.split('.').toList
+
+  def includeKey(statement: String): List[String] = List(s"include $statement")
+
+  def keysBeforeIncludes(nodes: List[Node], at: List[String]): Map[String, Set[List[String]]] = {
+    def leaves(path: List[String], value: Value): Set[List[String]] = value match {
+      case Value.Object(inner) =>
+        inner.flatMap { case Node.Field(key, _, v, _) => leaves(path ++ segments(key), v); case _ => Nil }.toSet
+      case _ => Set(path)
+    }
+    val (_, found) = nodes.foldLeft((Set.empty[List[String]], Map.empty[String, Set[List[String]]])) {
+      case ((before, acc), Node.Field(key, _, value, _)) =>
+        val path   = at ++ segments(key)
+        val nested = value match { case Value.Object(inner) => keysBeforeIncludes(inner, path); case _ => Map.empty }
+        (before ++ leaves(path, value), acc ++ nested)
+      case ((before, acc), Node.Include(statement, _)) =>
+        (before + includeKey(statement), acc + (statement -> before))
+      case (state, _) => state
+    }
+    found
   }
 
   // ---- rendering -------------------------------------------------------------------------------
 
-  def render(nodes: List[Node], indent: String): String = nodes.map(render(_, indent)).mkString("\n")
+  def render(nodes: List[Node], indent: String): String =
+    nodes.zipWithIndex.map { case (node, i) =>
+      if (isJoined(node, nodes.lift(i - 1))) s", ${render(node, "")}"
+      else s"${if (i > 0) "\n" else ""}${render(node, indent)}"
+    }.mkString
 
   def render(node: Node, indent: String): String = node match {
-    case Node.Field(key, separator, value) => s"$indent$key$separator${render(value, indent)}"
-    case Node.Comment(marker, text)        => s"$indent$marker $text"
-    case Node.Include(statement)           => s"$indent$statement"
+    case Node.Field(key, separator, value, _) => s"$indent$key$separator${render(value, indent)}"
+    case Node.Comment(marker, text)           => s"$indent$marker $text"
+    case Node.Include(statement, _)           => s"$indent$statement"
   }
 
   def render(value: Value, indent: String): String = value match {
@@ -75,8 +129,8 @@ object HoconGen {
 
   def lists(nodes: List[Node]): List[List[Node]] =
     nodes :: nodes.flatMap {
-      case Node.Field(_, _, value) => listsIn(value)
-      case _                       => Nil
+      case Node.Field(_, _, value, _) => listsIn(value)
+      case _                          => Nil
     }
 
   def listsIn(value: Value): List[List[Node]] = value match {
@@ -92,8 +146,8 @@ object HoconGen {
       case Value.Scalar(_)     => Nil
     }
     nodes.flatMap {
-      case Node.Field(_, _, value) => in(value)
-      case _                       => Nil
+      case Node.Field(_, _, value, _) => in(value)
+      case _                          => Nil
     }
   }
 
@@ -104,8 +158,8 @@ object HoconGen {
       case Value.Object(inner) => holdsSubstitution(inner)
     }
     nodes.exists {
-      case Node.Field(_, _, value) => in(value)
-      case _                       => false
+      case Node.Field(_, _, value, _) => in(value)
+      case _                          => false
     }
   }
 
@@ -174,17 +228,22 @@ object HoconGen {
             )
   } yield Node.Comment(marker, text)
 
-  val include: Gen[Node] = word.flatMap { name =>
-    Gen
-      .oneOf(
-        s"\"$name.conf\"",
-        s"required(\"$name.conf\")",
-        s"file(\"$name.conf\")",
-        s"classpath(\"$name.conf\")",
-        s"url(\"https://example.com/$name.conf\")"
-      )
-      .map(target => Node.Include(s"include $target"))
-  }
+  val include: Gen[Node] = for {
+    name   <- word
+    target <- Gen.oneOf(
+                s"\"$name.conf\"",
+                s"required(\"$name.conf\")",
+                s"file(\"$name.conf\")",
+                s"classpath(\"$name.conf\")",
+                s"url(\"https://example.com/$name.conf\")"
+              )
+    joined <- joinedFlag(includes = true)
+  } yield Node.Include(s"include $target", joined)
+
+  // Only where includes are generated: fields sharing a line with each other is a defect of its
+  // own, which would trip the properties that have nothing to do with includes.
+  def joinedFlag(includes: Boolean): Gen[Boolean] =
+    if (includes) Gen.frequency(3 -> false, 1 -> true) else Gen.const(false)
 
   def value(depth: Int): Gen[Value] =
     if (depth <= 0) scalar
@@ -202,7 +261,8 @@ object HoconGen {
                    case Value.Object(_) => Gen.oneOf(" ", " : ", ":", " = ", "  =  ")
                    case _               => Gen.oneOf(" : ", ":", " = ", "=", "  :  ")
                  }
-  } yield Node.Field(k, separator, v)
+    joined <- joinedFlag(includes)
+  } yield Node.Field(k, separator, v, joined)
 
   def node(depth: Int, includes: Boolean): Gen[Node] =
     if (includes) Gen.frequency(8 -> field(depth, includes), 2 -> comment, 1 -> include)
@@ -211,8 +271,8 @@ object HoconGen {
   def withoutIncludes(value: Value): Value = value match {
     case Value.Object(nodes) =>
       Value.Object(nodes.collect {
-        case Node.Field(k, s, v) => Node.Field(k, s, withoutIncludes(v))
-        case c: Node.Comment     => c
+        case Node.Field(k, s, v, _) => Node.Field(k, s, withoutIncludes(v))
+        case c: Node.Comment        => c
       })
     case Value.Array(items) => Value.Array(items.map(withoutIncludes))
     case scalar             => scalar
@@ -230,9 +290,9 @@ object HoconGen {
   /** Renames fields so no two at one level share the first segment of their path. */
   def withDistinctKeys(nodes: List[Node]): List[Node] =
     nodes.zipWithIndex.map {
-      case (Node.Field(key, separator, value), i) =>
+      case (Node.Field(key, separator, value, joined), i) =>
         val (first, rest) = firstSegment(key)
-        Node.Field(s"${first}_$i$rest", separator, distinctKeysIn(value))
+        Node.Field(s"${first}_$i$rest", separator, distinctKeysIn(value), joined)
       case (other, _) => other
     }
 
