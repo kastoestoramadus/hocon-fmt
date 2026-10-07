@@ -1,8 +1,8 @@
 # Releasing
 
 Every channel ships the same core, so all of them are released together, at one version. Nothing
-has been released yet: the one-time setup below is still to do, and the `Release` workflow has
-never run.
+has been released yet: Maven Central is set up (below), the other registries are still to do, and
+the `Release` workflow has never run.
 
 | artifact | built by | published to | users get it through |
 |---|---|---|---|
@@ -10,7 +10,7 @@ never run.
 | `sbt-hocon-fmt` | sbt | Maven Central | `addSbtPlugin` |
 | `hocon-fmt-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
 | `mill-hocon-fmt_mill1_3` | `mill-plugin/` | Maven Central | `//| mvnDeps` |
-| `io.github.kastoestoramadus.hocon-fmt` | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
+| `eu.ww86.hocon-fmt` | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
 | native binaries, `hocon-fmt.js` | `Release` workflow | GitHub release | a download; the playground |
 | wheels carrying the native binary | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
 | npm package carrying the Node build | `Release` workflow | npm | the `-node` pre-commit hooks, `npx` |
@@ -24,30 +24,38 @@ needs, which is a pull request of its own.
 
 ### Maven Central
 
-1. Sign in to [central.sonatype.com](https://central.sonatype.com) with GitHub. That verifies the
-   namespace `io.github.kastoestoramadus` on the spot; no DNS record or ticket.
-2. Generate a user token (account menu → Generate User Token). Its username and password, not the
-   account's, are what publishing uses.
-3. Create a signing key and publish its public half:
-   ```bash
-   gpg --gen-key
-   gpg --keyserver keyserver.ubuntu.com --send-keys <key id>
-   gpg --armor --export-secret-keys <key id> | base64 -w0   # the value of PGP_SECRET
-   ```
-4. Add repository secrets (Settings → Secrets and variables → Actions): `SONATYPE_USERNAME`,
-   `SONATYPE_PASSWORD`, `PGP_SECRET`, `PGP_PASSPHRASE`.
+Done; recorded here so it can be redone. Artifacts are published under the group `eu.ww86`.
 
-Code still needed: sbt-ci-release (1.11 or later, which publishes through the Central Portal) for
-`coreJVM`, `cliJVM` and `sbtPlugin`; `central-publishing-maven-plugin`, `maven-gpg-plugin` and
-source and javadoc jars in `maven-plugin`; for Mill, `mill.javalib.SonatypeCentralPublishModule/`,
-which reads the same secrets as `MILL_SONATYPE_USERNAME`, `MILL_SONATYPE_PASSWORD`,
-`MILL_PGP_SECRET_BASE64` and `MILL_PGP_PASSPHRASE`; and a release job running them.
+1. The namespace `eu.ww86` is verified at [central.sonatype.com](https://central.sonatype.com)
+   through a TXT record on `ww86.eu` (Publishing → Namespaces). The record has served its purpose
+   and may be removed. A group id cannot change after the first release.
+2. The portal's user token (account menu → Generate User Token), not the account's own password,
+   is what publishing uses.
+3. The signing key is RSA 4096, key id `C273E77F6DDCBD56`, valid until 2028-10-06 and published on
+   `keyserver.ubuntu.com`. Its public half must stay there, since Central checks signatures against
+   it. To extend it, run `gpg --edit-key C273E77F6DDCBD56 expire`, send the key to the keyserver
+   again and replace `PGP_SECRET`:
+   ```bash
+   gpg --keyserver keyserver.ubuntu.com --send-keys C273E77F6DDCBD56
+   gpg --armor --export-secret-keys C273E77F6DDCBD56 | base64 -w0   # the value of PGP_SECRET
+   ```
+4. The repository secrets are `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `PGP_SECRET` and
+   `PGP_PASSPHRASE`.
+
+The `central` job in `release.yml` does the rest. sbt-ci-release is not used: it publishes without
+a pause and takes the version from tags, where this repository sets it by hand. Instead, sbt's own
+Central Portal support (`publishRelease`, which signs and calls `sonaUpload`), the `release`
+profile of `maven-plugin/pom.xml` (`central-publishing-maven-plugin` with `autoPublish` off) and
+`mill.javalib.SonatypeCentralPublishModule/publishAll --shouldRelease false` each leave their
+deployment in the portal, validated, until someone clicks Publish under Publish → Deployments in the portal.
 
 ### Gradle Plugin Portal
 
 1. Sign in to [plugins.gradle.org](https://plugins.gradle.org) with GitHub. The portal only takes
-   new plugins under a namespace it can verify, which `io.github.kastoestoramadus.hocon-fmt`
-   is.
+   new plugins under a namespace it can verify. The plugin id is `eu.ww86.hocon-fmt`; if the portal
+   will not verify that domain, it falls back to `io.github.kastoestoramadus.hocon-fmt`, which
+   signing in with GitHub verifies, and the id changes in `gradle-plugin/`, the README and
+   [usage](usage.md).
 2. Copy the API key and secret from your profile into the secrets `GRADLE_PUBLISH_KEY` and
    `GRADLE_PUBLISH_SECRET`.
 
@@ -93,13 +101,18 @@ workflow" for workflows on the default branch.
    and the `additional_dependencies` of all four hooks in `.pre-commit-hooks.yaml`. The npm and
    wheel versions follow `build.sbt`.
 2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
-   artifact without releasing anything, which is how to find out the matrix works.
-3. Push a tag `v<version>`. The workflow links native binaries for Linux (x86_64, aarch64) and
+   artifact without releasing anything, which is how to find out the matrix works. Its `central`
+   job also signs with the real key and passphrase, uploading nothing: the passphrase is checked
+   there, because a typo cannot be seen from outside.
+3. Push a tag `v<version>`. `scripts/check-release-version.sh <version>` runs first and stops the
+   job if any place that carries the version disagrees with the tag. The workflow links native binaries for Linux (x86_64, aarch64) and
    macOS (aarch64), smoke-tests them, wraps each in a wheel, packs the npm package, builds the web
    script, and attaches all of it to a GitHub release.
 4. Publish, in dependency order:
    - Maven Central, first: the Gradle, Maven and Mill plugins and the sbt plugin all resolve the
-     core from there.
+     core from there. The tag leaves three deployments in the portal (sbt, Maven, Mill). Look each
+     over in Publish → Deployments, then publish the sbt one, which carries the core, first. A
+     release cannot be undone.
    - The Gradle Plugin Portal.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).
