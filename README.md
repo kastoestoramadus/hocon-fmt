@@ -48,10 +48,10 @@ with the formatter version and a minimal example.
 |---|---|
 | command line | `hocon-fmt [--check] <file>...`: `pipx install hocon-fmt` (native), `npx hocon-fmt` (Node), binaries on GitHub releases |
 | pre-commit | hooks `hocon-fmt` and `hocon-fmt-check` from this repository, running the native binary |
-| sbt | `addSbtPlugin("io.github.kastoestoramadus" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
-| Gradle | `id("io.github.kastoestoramadus.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
+| sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
+| Gradle | `id("eu.ww86.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
 | Maven | `hocon-fmt-maven-plugin`, goals `format` / `check` (bound to `verify`) |
-| Mill | `io.github.kastoestoramadus::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |
+| Mill | `eu.ww86::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |
 
 Configuration for each: [usage](docs/usage.md). A browser build for web pages is on its way:
 see [playground](docs/playground.md).
@@ -109,7 +109,7 @@ and Node, the same way in a throwaway repository.
 
 ```scala
 // project/plugins.sbt
-addSbtPlugin("io.github.kastoestoramadus" % "sbt-hocon-fmt" % "0.1.0-SNAPSHOT")
+addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0-SNAPSHOT")
 ```
 
 **Gradle**: `(cd gradle-plugin && ./gradlew publishToMavenLocal)`, then in a project with
@@ -122,7 +122,7 @@ a Gradle of your own, this checkout's wrapper works from the project:
 pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }
 
 // build.gradle.kts
-plugins { id("io.github.kastoestoramadus.hocon-fmt") version "0.1.0-SNAPSHOT" }
+plugins { id("eu.ww86.hocon-fmt") version "0.1.0-SNAPSHOT" }
 repositories { mavenLocal(); mavenCentral() }
 ```
 
@@ -132,7 +132,7 @@ or `/path/to/hocon-fmt/maven-plugin/mvnw` in place of `mvn`.
 
 ```xml
 <plugin>
-  <groupId>io.github.kastoestoramadus</groupId>
+  <groupId>eu.ww86</groupId>
   <artifactId>hocon-fmt-maven-plugin</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </plugin>
@@ -144,7 +144,7 @@ a build with `app/resources/application.conf`, and run `./mill __.hoconFormatChe
 
 ```scala
 //| mvnDeps:
-//| - io.github.kastoestoramadus::mill-hocon-fmt::0.1.0-SNAPSHOT
+//| - eu.ww86::mill-hocon-fmt::0.1.0-SNAPSHOT
 package build
 import mill.*, javalib.*
 import ww86.hocon_fmt.mill.HoconFormatterModule

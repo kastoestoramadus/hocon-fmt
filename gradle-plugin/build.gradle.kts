@@ -5,7 +5,7 @@ plugins {
     `maven-publish`
 }
 
-group = "io.github.kastoestoramadus"
+group = "eu.ww86"
 version = "0.1.0-SNAPSHOT"
 
 repositories {
@@ -22,7 +22,7 @@ tasks.withType<JavaCompile>().configureEach {
 gradlePlugin {
     plugins {
         create("hoconFormatter") {
-            id = "io.github.kastoestoramadus.hocon-fmt"
+            id = "eu.ww86.hocon-fmt"
             implementationClass = "ww86.hocon_fmt.gradle.HoconFormatterPlugin"
             displayName = "HOCON formatter"
             description = "Formats HOCON configuration files, or checks that they are formatted."
@@ -35,7 +35,7 @@ val functionalTestSourceSet = sourceSets.create("functionalTest")
 dependencies {
     // Compile only: at run time the formatter is resolved in the consumer's build and loaded in an
     // isolated worker class loader, so its Scala library never lands on the buildscript classpath.
-    compileOnly("io.github.kastoestoramadus:hocon-fmt-core_3:$version")
+    compileOnly("eu.ww86:hocon-fmt-core_3:$version")
     "functionalTestImplementation"(platform("org.junit:junit-bom:6.0.1"))
     "functionalTestImplementation"("org.junit.jupiter:junit-jupiter")
     "functionalTestRuntimeOnly"("org.junit.platform:junit-platform-launcher")
