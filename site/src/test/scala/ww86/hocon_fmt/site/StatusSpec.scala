@@ -22,8 +22,8 @@ class StatusSpec extends munit.FunSuite:
   }
 
   test("a refusal leaves the text alone and says why, with the limitations section to read") {
-    val Verdict.Refused(why) = Verdict.of("server {\n    listen 80;\n}"): @unchecked
-    val status               = Status.of(Verdict.Refused(why), "server {\n    listen 80;\n}")
+    val Verdict.Refused(why)                                       = Verdict.of("server {\n    listen 80;\n}"): @unchecked
+    val status                                                     = Status.of(Verdict.Refused(why), "server {\n    listen 80;\n}")
     val Status.LeftUnchanged(kind, reason, explanation, learnMore) = status: @unchecked
     assertEquals(kind, RefusalKind.NotHocon)
     assertEquals(reason, why.reason)

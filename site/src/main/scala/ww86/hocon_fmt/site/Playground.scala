@@ -12,7 +12,8 @@ object Playground:
   def apply(): HtmlElement =
     val input = Var(Examples.messy.source)
     // Formatting as you type, with a pause: a verdict per settled input, not per keystroke.
-    val verdict = input.signal.changes.debounce(150).startWith(Examples.messy.source).map(text => text -> Verdict.of(text))
+    val verdict =
+      input.signal.changes.debounce(150).startWith(Examples.messy.source).map(text => text -> Verdict.of(text))
 
     div(
       sectionTag(
@@ -21,22 +22,36 @@ object Playground:
         p(
           "HOCON is the configuration format of lightbend/config and its Scala port sconfig: JSON ",
           "with a friendlier face — comments, ",
-          code("include"), " directives, substitutions, and fields written without quotes or braces. ",
-          "Real files drift: indentation wanders, ", code("="), " and ", code(":"), " mix, nested ",
+          code("include"),
+          " directives, substitutions, and fields written without quotes or braces. ",
+          "Real files drift: indentation wanders, ",
+          code("="),
+          " and ",
+          code(":"),
+          " mix, nested ",
           "objects grow inconsistent. hocon-fmt tidies a file by parsing it with sconfig and ",
-          "rendering it back with fixed options: ", code("//"), " comments become ", code("#"),
-          ", ", code("="), " becomes ", code(":"),
+          "rendering it back with fixed options: ",
+          code("//"),
+          " comments become ",
+          code("#"),
+          ", ",
+          code("="),
+          " becomes ",
+          code(":"),
           ", nested objects flatten to dotted paths. The meaning stays; the spelling does not."
         ),
         p("Two things it does that a plain parse-render round trip does not:"),
         ul(
           li(
-            strong("Includes survive."), " Parsing resolves an ", code("include"),
+            strong("Includes survive."),
+            " Parsing resolves an ",
+            code("include"),
             " directive and keeps nothing to render, so a plain round trip deletes it. The ",
             "formatter carries each whole statement across the round trip and puts it back."
           ),
           li(
-            strong("It refuses rather than corrupts."), " Before handing text back it checks that ",
+            strong("It refuses rather than corrupts."),
+            " Before handing text back it checks that ",
             "the output parses again, that a second pass would not change it, and that no comment ",
             "or include went missing. A file that fails any of this is left byte for byte as it ",
             "was, reported with the reason, without failing the run."
@@ -55,7 +70,8 @@ object Playground:
         p(
           "Nothing is published yet, so there are no installation commands to show; they will ",
           "appear here with the first release. Until then, the source is on GitHub: ",
-          a(href := Repo.url, "kastoestoramadus/hocon-fmt"), "."
+          a(href := Repo.url, "kastoestoramadus/hocon-fmt"),
+          "."
         )
       ),
       sectionTag(
@@ -69,9 +85,9 @@ object Playground:
           cls := "examples",
           Examples.all.map { example =>
             button(
-              cls     := "example",
-              tpe     := "button",
-              title   := example.shows,
+              cls   := "example",
+              tpe   := "button",
+              title := example.shows,
               example.label,
               onClick.mapTo(example.source) --> input
             )
@@ -86,7 +102,7 @@ object Playground:
               cls         := "conf",
               spellCheck  := false,
               placeholder := "paste HOCON here",
-              value       <-- input.signal,
+              value <-- input.signal,
               onInput.mapToValue --> input
             )
           ),
@@ -96,7 +112,7 @@ object Playground:
             textArea(
               cls      := "conf",
               readOnly := true,
-              value    <-- verdict.map(out)
+              value <-- verdict.map(out)
             )
           )
         ),

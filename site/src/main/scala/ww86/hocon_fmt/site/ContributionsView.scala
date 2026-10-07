@@ -41,7 +41,7 @@ object ContributionsView:
         "reads “merged upstream, not yet in a release”."
       ),
       p(
-        cls := "muted state-line",
+        cls       := "muted state-line",
         aria.live := "polite",
         child <-- board.signal.map(stateLine)
       ),
@@ -70,7 +70,7 @@ object ContributionsView:
       .sequence(Library.values.toList.map(refreshLibrary))
       .map { results =>
         val answered = results.collect { case Right(answered) => answered }
-        val failed   = results.collect { case Left(library)   => library }
+        val failed   = results.collect { case Left(library) => library }
         Board(
           entries = Contributions.all.map { entry =>
             answered
@@ -89,14 +89,14 @@ object ContributionsView:
       http: GitHubApi.Http,
       storage: GitHubApi.Storage
   ): Future[Either[Library, (Library, Map[Int, Contribution], List[LivePr])]] =
-    val key = s"hocon-fmt-github:${library.repo}"
+    val key                         = s"hocon-fmt-github:${library.repo}"
     def merged(items: List[LivePr]) =
       val result = Merge(Contributions.all.filter(_.library == library), items)
       (library, result.entries.map(e => e.number -> e).toMap, result.others)
 
     GitHubApi.readCache(storage, key, js.Date.now()) match {
       case Some(items) => Future.successful(Right(merged(items)))
-      case None =>
+      case None        =>
         GitHubApi
           .authorPrs(library.repo)
           .map { items =>

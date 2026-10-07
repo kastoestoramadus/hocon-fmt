@@ -54,5 +54,8 @@ class ContributionsSpec extends munit.FunSuite:
 
   test("the entries the groups produce are the snapshot, once each") {
     val grouped = Groups(Contributions.all).flatMap(_.groups).flatMap(_.entries)
-    assertEquals(grouped.sortBy(c => (c.library.toString, c.number)), Contributions.all.sortBy(c => (c.library.toString, c.number)))
+    assertEquals(
+      grouped.sortBy(c => (c.library.toString, c.number)),
+      Contributions.all.sortBy(c => (c.library.toString, c.number))
+    )
   }

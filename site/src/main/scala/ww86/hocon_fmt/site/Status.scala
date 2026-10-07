@@ -38,7 +38,7 @@ object Status:
   def of(verdict: Verdict, source: String): Status = verdict match {
     case Verdict.AlreadyFormatted           => Status.AlreadyFormatted
     case Verdict.NeedsFormatting(formatted) => Status.Formatted(changedLines(source, formatted))
-    case Verdict.Refused(refusal) =>
+    case Verdict.Refused(refusal)           =>
       val kind = RefusalKind.of(refusal)
       Status.LeftUnchanged(kind, refusal.reason, explanation(kind), learnMore(kind))
   }
@@ -53,18 +53,20 @@ object Status:
       .count(i => beforeLines.lift(i) != afterLines.lift(i))
 
   private def explanation(kind: RefusalKind): String = kind match {
-    case RefusalKind.NotHocon       => "sconfig cannot read this text as HOCON, so there is nothing to format."
-    case RefusalKind.BrokenOutput   => "the configuration library renders this as text it cannot read back, so the formatter leaves it alone rather than hand it on."
-    case RefusalKind.LostComment    => "the configuration library would drop a comment, so the formatter leaves the file alone."
-    case RefusalKind.LostInclude    => "the configuration library would drop an include directive, so the formatter leaves the file alone."
+    case RefusalKind.NotHocon     => "sconfig cannot read this text as HOCON, so there is nothing to format."
+    case RefusalKind.BrokenOutput =>
+      "the configuration library renders this as text it cannot read back, so the formatter leaves it alone rather than hand it on."
+    case RefusalKind.LostComment =>
+      "the configuration library would drop a comment, so the formatter leaves the file alone."
+    case RefusalKind.LostInclude =>
+      "the configuration library would drop an include directive, so the formatter leaves the file alone."
     case RefusalKind.UnstableOutput => "the output would not settle: formatting it again would change it again."
     case RefusalKind.NotUtf8        => "the bytes are not valid UTF-8."
   }
 
   private def learnMore(kind: RefusalKind): Option[String] = kind match {
-    case RefusalKind.NotUtf8  => None
-    case RefusalKind.NotHocon => Some(limitationsPage)
-    case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude |
-        RefusalKind.UnstableOutput =>
+    case RefusalKind.NotUtf8                                                                                       => None
+    case RefusalKind.NotHocon                                                                                      => Some(limitationsPage)
+    case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude | RefusalKind.UnstableOutput =>
       Some(defectsSection)
   }

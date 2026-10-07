@@ -42,7 +42,8 @@ class GitHubApiSpec extends munit.FunSuite:
   }
 
   test("a rate limit or any other non-200 fails, it does not empty the list") {
-    GitHubApi.authorPrs("ekrich/sconfig")(using ok(body, status = 403))
+    GitHubApi
+      .authorPrs("ekrich/sconfig")(using ok(body, status = 403))
       .map(items => fail(s"expected a failure, got $items"))
       .recover { case GitHubError.Http(403) => () }
   }
@@ -73,7 +74,7 @@ class GitHubApiSpec extends munit.FunSuite:
   }
 
   test("a written cache answers within the window and goes stale after it") {
-    val memory = scala.collection.mutable.Map.empty[String, String]
+    val memory  = scala.collection.mutable.Map.empty[String, String]
     val storage = new GitHubApi.Storage:
       def get(key: String): Option[String]      = memory.get(key)
       def set(key: String, value: String): Unit = memory(key) = value

@@ -29,7 +29,7 @@ object LivePr:
     if js.isUndefined(pr) || (pr: Any) == null then None
     else
       asString(item.state).flatMap {
-        case "open" => Some(LiveState.Open)
+        case "open"   => Some(LiveState.Open)
         case "closed" =>
           val mergedAt = pr.merged_at
           if js.isUndefined(mergedAt) || (mergedAt: Any) == null then Some(LiveState.ClosedUnmerged)
@@ -59,7 +59,7 @@ object Merge:
     */
   def apply(snapshot: List[Contribution], live: List[LivePr]): MergeResult =
     val byNumber = live.map(pr => pr.number -> pr).toMap
-    val entries = snapshot.map { entry =>
+    val entries  = snapshot.map { entry =>
       byNumber.get(entry.number) match {
         case Some(LivePr(_, _, LiveState.Merged)) if entry.state == PrState.Open =>
           entry.copy(state = PrState.MergedUnreleased)

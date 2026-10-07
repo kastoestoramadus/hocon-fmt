@@ -38,8 +38,8 @@ object GitHubApi:
     * array; tolerates a malformed item by dropping it.
     */
   def parse(body: String): Either[GitHubError, List[LivePr]] =
-    Try(js.JSON.parse(body)).toEither
-      .left.map(t => GitHubError.Malformed(Option(t.getMessage).getOrElse("unreadable response")))
+    Try(js.JSON.parse(body)).toEither.left
+      .map(t => GitHubError.Malformed(Option(t.getMessage).getOrElse("unreadable response")))
       .flatMap { json =>
         val items = json.selectDynamic("items")
         if js.isUndefined(items) || (items: Any) == null || !js.Array.isArray(items)
@@ -55,9 +55,7 @@ object GitHubApi:
   /** Stored as JSON so a guarded `try` and a fresh page can both read it back. */
   def encode(items: List[LivePr], fetchedAtMs: Double): String =
     val itemsJson = items
-      .map(pr =>
-        s"""{"number":${pr.number},"title":${js.JSON.stringify(pr.title)},"state":"${stateName(pr.state)}"}"""
-      )
+      .map(pr => s"""{"number":${pr.number},"title":${js.JSON.stringify(pr.title)},"state":"${stateName(pr.state)}"}""")
       .mkString(",")
     s"""{"fetchedAt":$fetchedAtMs,"items":[$itemsJson]}"""
 
@@ -83,16 +81,16 @@ object GitHubApi:
       number <- LivePr.asInt(item.number)
       title  <- LivePr.asString(item.title)
       state  <- LivePr.asString(item.state).flatMap {
-        case "open"   => Some(LiveState.Open)
-        case "merged" => Some(LiveState.Merged)
-        case "closed" => Some(LiveState.ClosedUnmerged)
-        case _        => None
-      }
+                 case "open"   => Some(LiveState.Open)
+                 case "merged" => Some(LiveState.Merged)
+                 case "closed" => Some(LiveState.ClosedUnmerged)
+                 case _        => None
+               }
     yield LivePr(number, title, state)
 
   private def stateName(state: LiveState): String = state match {
-    case LiveState.Open          => "open"
-    case LiveState.Merged        => "merged"
+    case LiveState.Open           => "open"
+    case LiveState.Merged         => "merged"
     case LiveState.ClosedUnmerged => "closed"
   }
 
