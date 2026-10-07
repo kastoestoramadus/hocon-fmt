@@ -10,7 +10,7 @@ class StatusSpec extends munit.FunSuite:
   }
 
   test("an already formatted verdict reports no change") {
-    assertEquals(Status.of(Verdict.of("a: 1"), "a: 1"), Status.AlreadyFormatted)
+    assertEquals(Status.of(Verdict.of("a: 1\n"), "a: 1\n"), Status.AlreadyFormatted)
   }
 
   test("lines are compared from the top, so a reordering counts each moved line once") {

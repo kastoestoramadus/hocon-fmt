@@ -1,5 +1,6 @@
 package ww86.hocon_fmt.site
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.util.Try
@@ -13,22 +14,38 @@ object GitHubApi:
   final case class Response(status: Int, body: String)
   type Http = String => Future[Response]
 
-  /** A failed `Future` needs a `Throwable`, so the two failures carry their detail as one. */
+  /** A failed `Future` needs a `Throwable`, so both failures carry their detail as one. */
   enum GitHubError(detail: String) extends RuntimeException(detail):
-    case Http(status: Int)     extends GitHubError(s"HTTP $status")
+    case Http(status: Int)         extends GitHubError(s"HTTP $status")
     case Malformed(detail: String) extends GitHubError(detail)
 
-  def searchUrl(repo: String): String = ???
+  def searchUrl(repo: String): String =
+    s"https://api.github.com/search/issues?q=author:kastoestoramadus+type:pr+repo:$repo&per_page=100"
 
   /** The author's pull requests of one repository. Any non-200 and any malformed body fail; a
     * malformed item inside a well-formed body is merely dropped, by `LivePr.read`.
     */
-  def authorPrs(repo: String)(using http: Http): Future[List[LivePr]] = ???
+  def authorPrs(repo: String)(using http: Http): Future[List[LivePr]] =
+    http(searchUrl(repo)).flatMap { response =>
+      if response.status != 200 then Future.failed(GitHubError.Http(response.status))
+      else
+        parse(response.body) match
+          case Right(items) => Future.successful(items)
+          case Left(detail) => Future.failed(detail)
+    }
 
   /** The `items` of a search/issues response body. Fails when the body is not JSON or carries no
     * array; tolerates a malformed item by dropping it.
     */
-  def parse(body: String): Either[GitHubError.Malformed, List[LivePr]] = ???
+  def parse(body: String): Either[GitHubError, List[LivePr]] =
+    Try(js.JSON.parse(body)).toEither
+      .left.map(t => GitHubError.Malformed(Option(t.getMessage).getOrElse("unreadable response")))
+      .flatMap { json =>
+        val items = json.selectDynamic("items")
+        if js.isUndefined(items) || (items: Any) == null || !js.Array.isArray(items)
+        then Left(GitHubError.Malformed("no items array"))
+        else Right(items.asInstanceOf[js.Array[js.Dynamic]].flatMap(LivePr.read).toList)
+      }
 
   // --- the cache -------------------------------------------------------------------------------
 
@@ -36,10 +53,48 @@ object GitHubApi:
   val cacheTtlMs: Double = 10 * 60 * 1000
 
   /** Stored as JSON so a guarded `try` and a fresh page can both read it back. */
-  def encode(items: List[LivePr], fetchedAtMs: Double): String = ???
+  def encode(items: List[LivePr], fetchedAtMs: Double): String =
+    val itemsJson = items
+      .map(pr =>
+        s"""{"number":${pr.number},"title":${js.JSON.stringify(pr.title)},"state":"${stateName(pr.state)}"}"""
+      )
+      .mkString(",")
+    s"""{"fetchedAt":$fetchedAtMs,"items":[$itemsJson]}"""
 
   /** `None` when the entry is stale, malformed, or not JSON at all. */
-  def decode(cached: String, nowMs: Double): Option[List[LivePr]] = ???
+  def decode(cached: String, nowMs: Double): Option[List[LivePr]] =
+    Try(js.JSON.parse(cached)).toOption.flatMap { json =>
+      val fetchedAt = json.selectDynamic("fetchedAt")
+      if js.typeOf(fetchedAt) != "number" then None
+      else if fetchedAt.asInstanceOf[Double] + cacheTtlMs <= nowMs then None
+      else
+        val items = json.selectDynamic("items")
+        if js.isUndefined(items) || (items: Any) == null || !js.Array.isArray(items) then None
+        else
+          val read = items.asInstanceOf[js.Array[js.Dynamic]].flatMap(readCachedItem).toList
+          Some(read)
+    }
+
+  /** The cache stores the same fields the live answer carries, state spelled out. A malformed
+    * entry invalidates only itself.
+    */
+  private def readCachedItem(item: js.Dynamic): Option[LivePr] =
+    for
+      number <- LivePr.asInt(item.number)
+      title  <- LivePr.asString(item.title)
+      state  <- LivePr.asString(item.state).flatMap {
+        case "open"   => Some(LiveState.Open)
+        case "merged" => Some(LiveState.Merged)
+        case "closed" => Some(LiveState.ClosedUnmerged)
+        case _        => None
+      }
+    yield LivePr(number, title, state)
+
+  private def stateName(state: LiveState): String = state match {
+    case LiveState.Open          => "open"
+    case LiveState.Merged        => "merged"
+    case LiveState.ClosedUnmerged => "closed"
+  }
 
   /** localStorage, hidden behind two methods so the tests can supply a fake — and so a page
     * opened where storage is unavailable formats the same, only without a cache.
@@ -48,6 +103,10 @@ object GitHubApi:
     def get(key: String): Option[String]
     def set(key: String, value: String): Unit
 
-  def readCache(storage: Storage, key: String, nowMs: Double): Option[List[LivePr]] = ???
+  def readCache(storage: Storage, key: String, nowMs: Double): Option[List[LivePr]] =
+    try storage.get(key).flatMap(decode(_, nowMs))
+    catch case _: Throwable => None
 
-  def writeCache(storage: Storage, key: String, nowMs: Double, items: List[LivePr]): Unit = ???
+  def writeCache(storage: Storage, key: String, nowMs: Double, items: List[LivePr]): Unit =
+    try storage.set(key, encode(items, nowMs))
+    catch case _: Throwable => ()
