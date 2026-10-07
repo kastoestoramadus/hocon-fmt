@@ -8,6 +8,6 @@ import org.scalajs.dom
   documentEvents(_.onDomContentLoaded).foreach { _ =>
     Option(dom.document.getElementById("root")).foreach { container =>
       container.innerHTML = ""
-      render(container, div("hocon-fmt"))
+      render(container, Page())
     }
-  }(unsafeWindowOwner)
+  }(using unsafeWindowOwner)

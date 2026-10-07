@@ -8,10 +8,283 @@
       content="hocon-fmt formats HOCON configuration files and refuses a file rather than corrupting it. Try it in the page: what you paste never leaves your browser."
     />
     <title>hocon-fmt — a formatter for HOCON files</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1f2430;
+        --muted: #626a78;
+        --line: #d9dde5;
+        --wash: #f5f6f9;
+        --accent: #0b5394;
+        --accent-ink: #ffffff;
+        --open: #e8f0fb;
+        --open-ink: #0b5394;
+        --released: #e7f3ea;
+        --released-ink: #1e6b34;
+        --merged: #f3ecfa;
+        --merged-ink: #6b3fa0;
+        --closed: #eef0f3;
+        --closed-ink: #5c6470;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #ffffff;
+        color: var(--ink);
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      .page {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 3rem;
+      }
+      h1 {
+        font-size: 2rem;
+        margin: 0 0 0.25rem;
+        letter-spacing: -0.01em;
+      }
+      .tagline {
+        margin: 0 0 2rem;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+      h2 {
+        font-size: 1.35rem;
+        margin: 2.5rem 0 0.75rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+      }
+      h3 {
+        font-size: 1.1rem;
+        margin: 1.5rem 0 0.5rem;
+      }
+      h4 {
+        font-size: 0.95rem;
+        margin: 1.1rem 0 0.35rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      p {
+        margin: 0.6rem 0;
+      }
+      a {
+        color: var(--accent);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.88em;
+        background: var(--wash);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 0 0.25rem;
+        overflow-wrap: anywhere;
+      }
+      ul {
+        padding-left: 1.4rem;
+      }
+      li {
+        margin: 0.35rem 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .privacy {
+        border-left: 3px solid var(--line);
+        padding-left: 0.75rem;
+        color: var(--muted);
+      }
+
+      /* the playground */
+      .examples {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0.75rem 0;
+      }
+      button.example {
+        font: inherit;
+        font-size: 0.9rem;
+        padding: 0.3rem 0.7rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--wash);
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button.example:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .panes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.9rem;
+      }
+      .pane {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .pane-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      textarea.conf {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 0.85rem;
+        line-height: 1.45;
+        width: 100%;
+        min-height: 14rem;
+        padding: 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #ffffff;
+        color: var(--ink);
+        resize: vertical;
+        white-space: pre;
+        overflow-wrap: normal;
+        overflow-x: auto;
+      }
+      textarea.conf:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .status {
+        min-height: 1.6rem;
+        margin: 0.6rem 0 0;
+      }
+
+      /* the contributions */
+      .state-line {
+        font-size: 0.9rem;
+      }
+      .library {
+        margin: 1.25rem 0;
+      }
+      .library > h3 {
+        margin-bottom: 0;
+      }
+      .library > .muted {
+        margin-top: 0.15rem;
+        font-size: 0.95rem;
+      }
+      ul.entries {
+        list-style: none;
+        padding-left: 0;
+        margin: 0.35rem 0;
+      }
+      ul.entries li {
+        margin: 0.45rem 0;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.78rem;
+        line-height: 1.4;
+        padding: 0 0.45rem;
+        border-radius: 999px;
+        white-space: nowrap;
+        vertical-align: baseline;
+      }
+      .badge.open {
+        background: var(--open);
+        color: var(--open-ink);
+      }
+      .badge.released {
+        background: var(--released);
+        color: var(--released-ink);
+      }
+      .badge.merged {
+        background: var(--merged);
+        color: var(--merged-ink);
+      }
+      .badge.closed {
+        background: var(--closed);
+        color: var(--closed-ink);
+      }
+
+      /* the defect table */
+      .defects table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        margin-top: 0.6rem;
+      }
+      .defects th,
+      .defects td {
+        text-align: left;
+        vertical-align: top;
+        padding: 0.45rem 0.6rem 0.45rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .defects th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      footer.footer {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 46rem) {
+        .page {
+          padding: 1.5rem 1rem 2rem;
+        }
+        .panes {
+          grid-template-columns: 1fr;
+        }
+        textarea.conf {
+          min-height: 10rem;
+        }
+        .defects table,
+        .defects thead,
+        .defects tbody,
+        .defects tr,
+        .defects th,
+        .defects td {
+          display: block;
+        }
+        .defects thead {
+          display: none;
+        }
+        .defects td {
+          border-bottom: none;
+          padding: 0.15rem 0;
+        }
+        .defects tr {
+          border-bottom: 1px solid var(--line);
+          padding: 0.5rem 0;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <noscript>This page needs JavaScript: the playground runs entirely in your browser.</noscript>
+    <noscript>
+      This page needs JavaScript: the playground runs entirely in your browser.
+    </noscript>
     <script src="main.js"></script>
   </body>
 </html>

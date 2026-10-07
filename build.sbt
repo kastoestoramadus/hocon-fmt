@@ -271,9 +271,11 @@ lazy val site = project
       IO.delete(out)
       IO.createDirectory(out)
       // The default NoModule kind links one classic script, so a `<script>` tag loads it and the
-      // page works from file:// as well.
+      // page works from file:// as well. The source map is not shipped, so neither is the comment
+      // that points to it.
       val linked = (Compile / fullLinkJSOutput).value / "main.js"
-      IO.copyFile(linked, out / "main.js")
+      val code   = IO.readLines(linked).filterNot(_.startsWith("//# sourceMappingURL=")).mkString("\n")
+      IO.write(out / "main.js", code)
       val index = (Compile / resources).value.find(_.getName == "index.html")
       IO.copyFile(index.getOrElse(sys.error("site resources are missing index.html")), out / "index.html")
       IO.write(out / "CNAME", "hocon-fmt.ww86.eu\n")
