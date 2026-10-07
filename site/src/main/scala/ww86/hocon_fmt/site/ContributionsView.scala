@@ -153,7 +153,7 @@ object ContributionsView:
         )
           ++ rich(contribution.note)
           :+ span(" ")
-          :+ badge(contribution.state.label)
+          :+ badge(contribution.state)
       )*
     )
 
@@ -165,14 +165,17 @@ object ContributionsView:
       pr.title
     )
 
-  private def badge(text: String): HtmlElement =
-    val style = text match {
-      case "open"                                  => "badge open"
-      case "in a release"                          => "badge released"
-      case "merged upstream, not yet in a release" => "badge merged"
-      case _                                       => "badge closed"
+  /** The state decides the colour; matching on the label would let a reworded state fall through
+    * to "closed" without the compiler saying a word.
+    */
+  private def badge(state: PrState): HtmlElement =
+    val style = state match {
+      case PrState.Open             => "badge open"
+      case PrState.Released         => "badge released"
+      case PrState.MergedUnreleased => "badge merged"
+      case PrState.Closed           => "badge closed"
     }
-    span(cls := style, text)
+    span(cls := style, state.label)
 
   /** The defect rows: what the formatter refuses, and what aims to fix it upstream. */
   private def defectTable(): HtmlElement =
@@ -206,7 +209,7 @@ object ContributionsView:
         span(
           a(href := prUrl(link.library, link.number), s"${link.library.label} #${link.number}"),
           " ",
-          badge(entry.state.label),
+          badge(entry.state),
           " "
         )
       case None =>
