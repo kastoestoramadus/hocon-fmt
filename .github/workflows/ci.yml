@@ -33,6 +33,11 @@ jobs:
       # Ubuntu runners ship Node for Scala.js and clang for Scala Native.
       - name: Compile and test
         run: sbt test
+        env:
+          # Every platform builds and tests in one JVM here, and the Scala Native linker runs last
+          # in it; sbt's default heap is not enough for that run (cliNative/Test/nativeLink ran
+          # out of heap once the site module linked alongside the rest).
+          SBT_OPTS: -Xmx4g
 
       # Runs even when the tests fail, so one run reports both signals.
       - name: Check formatting
