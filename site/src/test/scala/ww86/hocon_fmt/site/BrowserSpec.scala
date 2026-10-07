@@ -85,6 +85,15 @@ class BrowserSpec extends munit.FunSuite:
     ContributionsView.refreshBoard.map(assertSnapshotStands)
   }
 
+  test("a search that never answers is abandoned at its deadline, not waited on") {
+    val browser = fakeBrowser()
+    install(browser.window(Some(browser.neverAnswers)))
+    Browser
+      .withDeadline(50)("https://api.github.com/search/issues")
+      .map(response => fail(s"expected the deadline to fail the request, got $response"))
+      .recover { case _ => () }
+  }
+
   test("a native member read as a value is never a function, which is why the probe is gone") {
     // `js.typeOf(dom.window.fetch)` is "object": Scala.js hands over a function object, not the
     // function. The shipped page probed exactly that and concluded every browser lacks fetch, so
@@ -105,15 +114,24 @@ class BrowserSpec extends munit.FunSuite:
     js.Dynamic.global.globalThis.updateDynamic("window")(window)
 
   /** A window Node does not have: a recording `fetch` and a localStorage in memory. */
-  private final class FakeBrowser:
+  final private class FakeBrowser:
     val searched: scala.collection.mutable.ListBuffer[String] = scala.collection.mutable.ListBuffer.empty
-    private val store = scala.collection.mutable.Map.empty[String, String]
+    private val store                                         = scala.collection.mutable.Map.empty[String, String]
 
     def answering(body: String, status: Int = 200): js.Any = js.Any.fromFunction1 { (url: String) =>
       searched += url
       js.Promise.resolve(
         js.Dynamic.literal(status = status, text = js.Any.fromFunction0(() => js.Promise.resolve(body)))
       )
+    }
+
+    /** What a connection that has gone nowhere looks like: the promise settles only when the
+      * page's own deadline aborts the request.
+      */
+    def neverAnswers: js.Any = js.Any.fromFunction2 { (url: String, request: js.Dynamic) =>
+      new js.Promise[js.Any]((_, reject) => {
+        request.signal.addEventListener("abort", js.Any.fromFunction0(() => reject(new js.Error("aborted"))))
+      })
     }
 
     def window(fetch: Option[js.Any]): js.Any =

@@ -12,20 +12,30 @@ import org.scalajs.dom
   */
 object Browser:
 
-  // A GET through `fetch`, with every failure — no fetch at all included — a failed future, so
-  // the refresh completes and the snapshot stands.
-  given GitHubApi.Http = url =>
-    def viaFetch: Future[GitHubApi.Response] =
+  /** Long enough for the search on a slow connection, short enough that the state line does not
+    * sit on "checking GitHub…" while the browser waits on a request that is going nowhere.
+    */
+  val searchDeadlineMs: Double = 8000
+
+  // A GET through `fetch`, with every failure — no `fetch` at all included — a failed future, so
+  // the refresh completes and the snapshot stands. A browser without `fetch` throws on the call
+  // itself, which the `try` turns into that failure; nothing probes for the function, because a
+  // typed native member read as a value is a Scala function object whose `typeof` is "object",
+  // never "function".
+  given GitHubApi.Http = withDeadline(searchDeadlineMs)
+
+  /** The deadline is a parameter so a test can use one short enough to wait for. */
+  private[site] def withDeadline(deadlineMs: Double): GitHubApi.Http = url =>
+    try
+      val controller = new dom.AbortController()
+      val deadline   = js.timers.setTimeout(deadlineMs)(controller.abort())
+      val request    = js.Dynamic.literal(signal = controller.signal).asInstanceOf[dom.RequestInit]
       dom.window
-        .fetch(url)
+        .fetch(url, request)
         .toFuture
         .flatMap(response => response.text().toFuture.map(body => GitHubApi.Response(response.status, body)))
-
-    if js.typeOf(dom.window.fetch) != "function" then
-      Future.failed(new RuntimeException("fetch is not available in this browser"))
-    else
-      try viaFetch
-      catch case e: Throwable => Future.failed(e)
+        .andThen { case _ => js.timers.clearTimeout(deadline) }
+    catch case e: Throwable => Future.failed(e)
 
   // Storage is an optional browser facility: a page opened where it is denied works without it.
   given GitHubApi.Storage = new GitHubApi.Storage:
