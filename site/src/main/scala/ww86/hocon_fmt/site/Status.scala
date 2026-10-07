@@ -6,7 +6,20 @@ import ww86.hocon_fmt.{Refusal, Verdict}
   * decoding, so `NotUtf8` exists here only to make the mapping total.
   */
 enum RefusalKind:
+
   case NotHocon, BrokenOutput, LostComment, LostInclude, UnstableOutput, NotUtf8
+
+  /** The name the `web` script publishes in its JavaScript API, which `HoconFormatterJsSpec`
+    * pins there; the defect table lists refusals by it, and `ContributionsSpec` pins the set.
+    */
+  def name: String = this match {
+    case NotHocon       => "notHocon"
+    case BrokenOutput   => "brokenOutput"
+    case LostComment    => "lostComment"
+    case LostInclude    => "lostInclude"
+    case UnstableOutput => "unstableOutput"
+    case NotUtf8        => "notUtf8"
+  }
 
 object RefusalKind:
   def of(refusal: Refusal): RefusalKind = refusal match {

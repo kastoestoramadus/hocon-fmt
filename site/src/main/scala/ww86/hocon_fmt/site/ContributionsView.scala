@@ -193,7 +193,7 @@ object ContributionsView:
         tbody(DefectTable.rows.map { row =>
           tr(
             td(rich(row.defect)*),
-            td(code(row.refusal)),
+            td(code(row.refusal.name)),
             td(
               if row.fixes.isEmpty then span(cls := "muted", row.whenNoFix)
               else span(row.fixes.map(fix)*)

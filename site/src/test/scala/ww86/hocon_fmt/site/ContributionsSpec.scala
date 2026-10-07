@@ -51,11 +51,13 @@ class ContributionsSpec extends munit.FunSuite:
     }
   }
 
-  test("the refusal names are the ones the page and the JavaScript API use") {
-    val known = Set("notHocon", "brokenOutput", "lostComment", "lostInclude", "unstableOutput")
-    DefectTable.rows.foreach { row =>
-      assert(known.contains(row.refusal), s"[${row.defect}] names unknown refusal ${row.refusal}")
-    }
+  test("the refusal names the defect table lists are the ones the web script's API publishes") {
+    // `HoconFormatterJs.nameOf` is the API; the site spells the names out here so that renaming
+    // one there cannot leave the page naming a refusal nothing answers to.
+    assertEquals(
+      RefusalKind.values.map(_.name).toSet,
+      Set("notUtf8", "notHocon", "brokenOutput", "lostComment", "lostInclude", "unstableOutput")
+    )
   }
 
   test("the merge of the empty live answer is the snapshot, unchanged") {

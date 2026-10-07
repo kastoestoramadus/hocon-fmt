@@ -57,7 +57,7 @@ final case class Contribution(
 /** A defect the formatter refuses, tied to the pull requests that aim to fix it upstream. */
 final case class DefectRow(
     defect: String,
-    refusal: String,
+    refusal: RefusalKind,
     fixes: List[PrLink],
     whenNoFix: String
 )
