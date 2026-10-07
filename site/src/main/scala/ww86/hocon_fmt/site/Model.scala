@@ -42,7 +42,7 @@ enum PrState(val label: String):
   case Closed           extends PrState("closed without a merge")
 
 /** One pull request of the snapshot: the number to link, the GitHub title for the refresh
-  * script's diff, the theme it is listed under, and one sentence in domain terms on what was
+  * script's report, the theme it is listed under, and one sentence in domain terms on what was
   * wrong and what the PR fixes.
   */
 final case class Contribution(
