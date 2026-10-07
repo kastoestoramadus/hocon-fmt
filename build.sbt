@@ -5,6 +5,8 @@ val sconfig   = "1.12.4"
 val munit     = "1.2.4"
 val osLib     = "0.11.8"
 val sjavatime = "1.5.0"
+// The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
+val laminar   = "17.2.1"
 
 val catsEffect      = "3.7.1"
 val fs2             = "3.14.0"
@@ -56,6 +58,7 @@ lazy val root = project
     cliNative,
     acceptance,
     web,
+    site,
     benchJVM,
     benchJS,
     benchNative,
@@ -75,6 +78,7 @@ lazy val root = project
         coreJS / Test / test,
         cliJS / Test / test,
         web / Test / test,
+        site / Test / test,
         coreNative / Test / test,
         cliNative / Test / test
       )
@@ -235,9 +239,51 @@ lazy val web = project
     }
   )
 
+/** The project site: the formatter presented, a playground on the core directly, and the author's
+  * contributions to the libraries it depends on. One static page served by GitHub Pages from this
+  * repository (hocon-fmt.ww86.eu); the Laminar app calls `coreJS` itself, with no JavaScript API
+  * in between. Not published; see docs/site.md.
+  */
+val build = taskKey[File]("Assembles the Pages output into site/target/site: index.html, the optimised script, CNAME.")
+
+lazy val site = project
+  .in(file("site"))
+  .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
+  .dependsOn(coreJS)
+  .settings(
+    name           := "hocon-fmt-site",
+    publish / skip := true,
+    announceRuntime("site on Scala.js"),
+    // sconfig reaches for java.time, which the Scala.js javalib does not carry; the site is the
+    // application here, so it supplies the one implementation, the way `web` does.
+    libraryDependencies ++= Seq(
+      "com.raquo"     %%% "laminar"   % laminar,
+      "org.ekrich"    %%% "sjavatime" % sjavatime,
+      "org.scalameta" %%% "munit"     % munit % Test
+    ),
+    buildInfoPackage := "ww86.hocon_fmt.site",
+    buildInfoKeys    := Seq[BuildInfoKey](version),
+    // The linked script runs the page itself on load; tests link their own module without it.
+    Compile / scalaJSUseMainModuleInitializer := true,
+    Compile / fullLinkJS / scalaJSLinkerConfig ~= (_.withClosureCompilerIfAvailable(true)),
+    build := {
+      val out = target.value / "site"
+      IO.delete(out)
+      IO.createDirectory(out)
+      // The default NoModule kind links one classic script, so a `<script>` tag loads it and the
+      // page works from file:// as well.
+      val linked = (Compile / fullLinkJSOutput).value / "main.js"
+      IO.copyFile(linked, out / "main.js")
+      val index = (Compile / resources).value.find(_.getName == "index.html")
+      IO.copyFile(index.getOrElse(sys.error("site resources are missing index.html")), out / "index.html")
+      IO.write(out / "CNAME", "hocon-fmt.ww86.eu\n")
+      out
+    }
+  )
+
 addCommandAlias(
   "crossCompile",
-  Seq(coreJVM, coreJS, coreNative, cliJVM, cliJS, cliNative, web)
+  Seq(coreJVM, coreJS, coreNative, cliJVM, cliJS, cliNative, web, site)
     .map(p => s"${p.id}/Test/compile")
     .mkString("; ")
 )
