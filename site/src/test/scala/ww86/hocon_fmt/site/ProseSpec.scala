@@ -19,6 +19,10 @@ class ProseSpec extends munit.FunSuite:
     assertEquals(Prose.parts("see `docs"), List(Part.Text("see "), Part.Code("docs")))
   }
 
-  test("an empty text renders as nothing rather than failing") {
-    assertEquals(Prose.parts(""), List(Part.Text("")))
+  test("an empty text renders as nothing at all") {
+    assertEquals(Prose.parts(""), Nil)
+  }
+
+  test("a fragment with no words in it is dropped, not drawn as an empty box") {
+    assertEquals(Prose.parts("a``b"), List(Part.Text("a"), Part.Text("b")))
   }

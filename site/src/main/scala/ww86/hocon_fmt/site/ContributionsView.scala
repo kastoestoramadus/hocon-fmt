@@ -189,7 +189,7 @@ object ContributionsView:
         thead(tr(th("the input"), th("the refusal"), th("upstream"))),
         tbody(DefectTable.rows.map { row =>
           tr(
-            td(code(row.defect)),
+            td(rich(row.defect)*),
             td(code(row.refusal)),
             td(
               if row.fixes.isEmpty then span(cls := "muted", row.whenNoFix)
@@ -215,11 +215,12 @@ object ContributionsView:
         span(cls := "muted", s"${link.library.label} #${link.number}")
     }
 
-  /** `backtick` spans in the snapshot notes become code on the page; the rest stays text. */
+  /** The `backticked` parts of a snapshot note or defect row become code on the page. */
   private def rich(text: String): List[Modifier[HtmlElement]] =
-    text.split('`').zipWithIndex.toList.map { case (part, i) =>
-      val fragment: Modifier[HtmlElement] =
-        if i % 2 == 1 then code(part)
-        else span(part)
+    Prose.parts(text).map { part =>
+      val fragment: Modifier[HtmlElement] = part match {
+        case Prose.Part.Code(part) => code(part)
+        case Prose.Part.Text(part) => span(part)
+      }
       fragment
     }

@@ -27,6 +27,17 @@ class ContributionsSpec extends munit.FunSuite:
     }
   }
 
+  test("every note and every defect input splits into prose and code, never into a stray snippet") {
+    val written = Contributions.all.map(_.note) ++ DefectTable.rows.map(_.defect)
+    written.foreach { text =>
+      assertEquals(text.count(_ == '`') % 2, 0, s"[$text] has an unclosed backtick")
+      Prose.parts(text).foreach {
+        case Prose.Part.Code(part) => assert(part.nonEmpty, s"[$text] has an empty code span")
+        case Prose.Part.Text(_)    => ()
+      }
+    }
+  }
+
   test("every defect row's fix resolves to a snapshot entry, in that library") {
     DefectTable.rows.flatMap(_.fixes).foreach { link =>
       val found = Contributions.byNumber(link.library, link.number)
