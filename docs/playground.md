@@ -7,8 +7,8 @@ repository ships the engine; the page lives in the site's repository,
 
 ## The engine
 
-`sbt web/bundle` writes `web/target/bundle/hocon-formatter.js`; every GitHub release carries the
-same file as `hocon-formatter.js`. It is a classic script, not an ES module, so a page that loads
+`sbt web/bundle` writes `web/target/bundle/hocon-fmt.js`; every GitHub release carries the
+same file as `hocon-fmt.js`. It is a classic script, not an ES module, so a page that loads
 it also works opened from `file://`, as every ww86.eu page must. Closure-compiled, it is 440 KB,
 130 KB gzipped; in Node it loads in about 30 ms and formats a 281-line file in about 13 ms.
 
@@ -42,8 +42,8 @@ directly, without the JavaScript API.
 
 ## The page
 
-`lab/hocon-formatter/` in ww86.eu: `index.html` (markup, styles, a few dozen lines of script) and
-`hocon-formatter.js` from a release, unchanged.
+`lab/hocon-fmt/` in ww86.eu: `index.html` (markup, styles, a few dozen lines of script) and
+`hocon-fmt.js` from a release, unchanged.
 
 1. **Intro**: what HOCON is and what a formatter adds, in two sentences; the promise that a file
    is refused rather than corrupted.
@@ -72,13 +72,13 @@ In this repository:
 
 In ww86.eu:
 
-2. `mkdir lab/hocon-formatter`, then fetch the script:
-   `curl -fL -o lab/hocon-formatter/hocon-formatter.js https://github.com/kastoestoramadus/hocon-formatter/releases/download/v<version>/hocon-formatter.js`
-3. Write `index.html`, loading `<script src="hocon-formatter.js"></script>` before its own script.
+2. `mkdir lab/hocon-fmt`, then fetch the script:
+   `curl -fL -o lab/hocon-fmt/hocon-fmt.js https://github.com/kastoestoramadus/hocon-fmt/releases/download/v<version>/hocon-fmt.js`
+3. Write `index.html`, loading `<script src="hocon-fmt.js"></script>` before its own script.
 4. Add the `LabItem`, run `sbt buildSite`, and try the page both served
    (`python3 -m http.server -d target/site 4001`) and from `file://`.
 5. Open the pull request and link its preview,
-   `https://ww86.eu/preview/pr-<N>/lab/hocon-formatter/index.html`.
+   `https://ww86.eu/preview/pr-<N>/lab/hocon-fmt/index.html`.
 
 A new formatter version is step 2 again.
 

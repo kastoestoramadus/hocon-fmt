@@ -14,9 +14,9 @@ All JVM channels need Java 17 or newer, as Scala 3.8 does.
 ## Command line
 
 ```
-hocon-formatter [--check] <file>...
-hocon-formatter --stdin [--stdin-filename <name>]
-hocon-formatter --version
+hocon-fmt [--check] <file>...
+hocon-fmt --stdin [--stdin-filename <name>]
+hocon-fmt --version
 ```
 
 | exit code | meaning |
@@ -32,8 +32,8 @@ prints the reason to stderr, and exits 1 so an editor can keep its original buff
 Do not combine stdin mode with file arguments or `--check`.
 
 ```sh
-hocon-formatter --stdin --stdin-filename application.conf < input.conf > output.conf
-hocon-formatter --version
+hocon-fmt --stdin --stdin-filename application.conf < input.conf > output.conf
+hocon-fmt --version
 ```
 
 `--version` prints the build version shared by all CLI runtimes and needs no input.
@@ -42,8 +42,8 @@ Three builds of the same program:
 
 | build | get it | start-up per run* |
 |---|---|---|
-| native binary | `pipx install hocon-formatter`, or `hocon-formatter-<os>-<arch>` from a GitHub release | 31 ms |
-| Node | `npx hocon-formatter` | 140 ms |
+| native binary | `pipx install hocon-fmt`, or `hocon-fmt-<os>-<arch>` from a GitHub release | 31 ms |
+| Node | `npx hocon-fmt` | 140 ms |
 | JVM | `sbt "cliJVM/run <args>"` from a checkout | 720 ms |
 
 \* `--check` on one small file, averaged over 10 runs on one Linux machine.
@@ -52,16 +52,16 @@ Three builds of the same program:
 
 ```yaml
 repos:
-  - repo: https://github.com/kastoestoramadus/hocon-formatter
+  - repo: https://github.com/kastoestoramadus/hocon-fmt
     rev: v0.1.0
     hooks:
-      - id: hocon-formatter        # rewrites files; the commit stops so you can stage them
-      # - id: hocon-formatter-check  # or only report
+      - id: hocon-fmt            # rewrites files; the commit stops so you can stage them
+      # - id: hocon-fmt-check    # or only report
 ```
 
-The hooks run the native binary, installed from the `hocon-formatter` wheel as ruff's hooks
+The hooks run the native binary, installed from the `hocon-fmt` wheel as ruff's hooks
 install ruff, so they need nothing but the Python pre-commit already runs on. Where there is no
-native build, such as Windows, use `hocon-formatter-node` and `hocon-formatter-check-node`, which
+native build, such as Windows, use `hocon-fmt-node` and `hocon-fmt-check-node`, which
 run the Node build. On 20 files a hook run takes about 155 ms native against 290 ms on Node, and
 its environment is 29 MB against 233 MB, mostly the Node that pre-commit downloads.
 
@@ -69,7 +69,7 @@ its environment is 29 MB against 233 MB, mostly the Node that pre-commit downloa
 
 ```scala
 // project/plugins.sbt
-addSbtPlugin("io.github.kastoestoramadus" % "sbt-hocon-formatter" % "0.1.0")
+addSbtPlugin("io.github.kastoestoramadus" % "sbt-hocon-fmt" % "0.1.0")
 ```
 
 | key | |
@@ -90,7 +90,7 @@ hoconFormatSources := (baseDirectory.value / "conf" ** "*.conf").get
 
 ```kotlin
 plugins {
-    id("io.github.kastoestoramadus.hocon-formatter") version "0.1.0"
+    id("io.github.kastoestoramadus.hocon-fmt") version "0.1.0"
 }
 repositories { mavenCentral() } // the plugin resolves the formatter through the project
 
@@ -102,13 +102,13 @@ hoconFormatter {
 `hoconFormat` rewrites; `hoconFormatCheck` fails on an unformatted file and runs as part of
 `check`. Both are configuration-cache compatible, and the check is up to date while neither the
 files nor the formatter change. To pin another formatter version:
-`dependencies { hoconFormatter("io.github.kastoestoramadus:hocon-formatter-core_3:<version>") }`.
+`dependencies { hoconFormatter("io.github.kastoestoramadus:hocon-fmt-core_3:<version>") }`.
 
 ## Mill
 
 ```scala
 //| mvnDeps:
-//| - io.github.kastoestoramadus::mill-hocon-formatter::0.1.0
+//| - io.github.kastoestoramadus::mill-hocon-fmt::0.1.0
 package build
 
 import mill.*, javalib.*
@@ -133,7 +133,7 @@ override def hoconFormatSources = Task.Sources("conf")
 ```xml
 <plugin>
   <groupId>io.github.kastoestoramadus</groupId>
-  <artifactId>hocon-formatter-maven-plugin</artifactId>
+  <artifactId>hocon-fmt-maven-plugin</artifactId>
   <version>0.1.0</version>
   <executions>
     <execution>
@@ -143,10 +143,10 @@ override def hoconFormatSources = Task.Sources("conf")
 </plugin>
 ```
 
-`mvn hocon-formatter:format` rewrites. Parameters, relative to the project directory:
+`mvn hocon-fmt:format` rewrites. Parameters, relative to the project directory:
 
 | parameter | default |
 |---|---|
 | `includes` | `src/**/*.conf`, `src/**/*.hocon` |
 | `excludes` | none |
-| `skip` (`-Dhocon-formatter.skip`) | `false` |
+| `skip` (`-Dhocon-fmt.skip`) | `false` |

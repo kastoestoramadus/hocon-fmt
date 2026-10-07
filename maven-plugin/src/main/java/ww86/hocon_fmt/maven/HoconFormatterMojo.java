@@ -27,7 +27,7 @@ abstract class HoconFormatterMojo extends AbstractMojo {
   @Parameter
   private String[] excludes;
 
-  @Parameter(property = "hocon-formatter.skip", defaultValue = "false")
+  @Parameter(property = "hocon-fmt.skip", defaultValue = "false")
   private boolean skip;
 
   /** A matching file, the path it is reported under, and what the formatter makes of it. */

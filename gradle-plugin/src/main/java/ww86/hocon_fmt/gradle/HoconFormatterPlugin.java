@@ -43,7 +43,7 @@ public final class HoconFormatterPlugin implements Plugin<Project> {
         });
         TaskProvider<HoconFormatCheck> check = project.getTasks().register("hoconFormatCheck", HoconFormatCheck.class, task -> {
             task.setDescription("Fails if any HOCON file is not formatted, naming each one.");
-            task.getReport().set(project.getLayout().getBuildDirectory().file("hocon-formatter/check.txt"));
+            task.getReport().set(project.getLayout().getBuildDirectory().file("hocon-fmt/check.txt"));
         });
 
         // Whenever `base` arrives, before or after this plugin: `check` is where Gradle users look.

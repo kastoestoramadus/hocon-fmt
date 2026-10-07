@@ -100,7 +100,7 @@ class CliAcceptanceSuite extends munit.FunSuite {
     test(s"[$runtime] --version prints the version") {
       val r = redirected(cli, "C", Array.emptyByteArray, "--version")
       assertEquals(r.exitCode, 0)
-      assert(r.stdoutText.matches("""hocon-formatter \d.*\s*"""), r.stdoutText)
+      assert(r.stdoutText.matches("""hocon-fmt \d.*\s*"""), r.stdoutText)
     }
 
     for (

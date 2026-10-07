@@ -26,7 +26,7 @@ public final class CheckMojo extends HoconFormatterMojo {
       throw new MojoFailureException(
           "HOCON files not formatted: "
               + unformatted.size()
-              + ". Run mvn hocon-formatter:format to fix them.");
+              + ". Run mvn hocon-fmt:format to fix them.");
     }
   }
 }

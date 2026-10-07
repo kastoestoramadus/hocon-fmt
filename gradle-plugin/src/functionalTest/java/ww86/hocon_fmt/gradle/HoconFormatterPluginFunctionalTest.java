@@ -172,7 +172,7 @@ class HoconFormatterPluginFunctionalTest {
         write(
                 "build.gradle.kts",
                 "plugins {\n"
-                        + "    id(\"io.github.kastoestoramadus.hocon-formatter\")\n"
+                        + "    id(\"io.github.kastoestoramadus.hocon-fmt\")\n"
                         + extraPlugins
                         + "}\n"
                         + "\n"

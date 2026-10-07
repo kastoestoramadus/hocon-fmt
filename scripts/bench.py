@@ -65,8 +65,8 @@ def startup_results(runs: int = 20) -> list:
     sbt("cliNative/nativeLink", "cliJS/fullLinkJS")
     classpath = sbt("export cliJVM/Runtime/fullClasspath").strip().splitlines()[-1]
     commands = {
-        "native": [str(ROOT / "cli/.native/target/scala-3.8.2/hocon-formatter")],
-        "js": ["node", str(ROOT / "cli/.js/target/scala-3.8.2/hocon-formatter-cli-opt/main.js")],
+        "native": [str(ROOT / "cli/.native/target/scala-3.8.2/hocon-fmt")],
+        "js": ["node", str(ROOT / "cli/.js/target/scala-3.8.2/hocon-fmt-cli-opt/main.js")],
         "jvm": ["java", "-cp", classpath, "ww86.hocon_fmt.CmdApi"],
     }
     results = []

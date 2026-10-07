@@ -6,12 +6,12 @@ never run.
 
 | artifact | built by | published to | users get it through |
 |---|---|---|---|
-| `hocon-formatter-core_3`, `hocon-formatter-cli_3` | sbt | Maven Central | a library dependency; the JVM command line |
-| `sbt-hocon-formatter` | sbt | Maven Central | `addSbtPlugin` |
-| `hocon-formatter-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
-| `mill-hocon-formatter_mill1_3` | `mill-plugin/` | Maven Central | `//| mvnDeps` |
-| `io.github.kastoestoramadus.hocon-formatter` | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
-| native binaries, `hocon-formatter.js` | `Release` workflow | GitHub release | a download; the playground |
+| `hocon-fmt-core_3`, `hocon-fmt-cli_3` | sbt | Maven Central | a library dependency; the JVM command line |
+| `sbt-hocon-fmt` | sbt | Maven Central | `addSbtPlugin` |
+| `hocon-fmt-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
+| `mill-hocon-fmt_mill1_3` | `mill-plugin/` | Maven Central | `//| mvnDeps` |
+| `io.github.kastoestoramadus.hocon-fmt` | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
+| native binaries, `hocon-fmt.js` | `Release` workflow | GitHub release | a download; the playground |
 | wheels carrying the native binary | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
 | npm package carrying the Node build | `Release` workflow | npm | the `-node` pre-commit hooks, `npx` |
 
@@ -46,7 +46,7 @@ which reads the same secrets as `MILL_SONATYPE_USERNAME`, `MILL_SONATYPE_PASSWOR
 ### Gradle Plugin Portal
 
 1. Sign in to [plugins.gradle.org](https://plugins.gradle.org) with GitHub. The portal only takes
-   new plugins under a namespace it can verify, which `io.github.kastoestoramadus.hocon-formatter`
+   new plugins under a namespace it can verify, which `io.github.kastoestoramadus.hocon-fmt`
    is.
 2. Copy the API key and secret from your profile into the secrets `GRADLE_PUBLISH_KEY` and
    `GRADLE_PUBLISH_SECRET`.
@@ -59,7 +59,7 @@ requires, and `./gradlew publishPlugins` in the release job.
 1. Create an account with two-factor authentication.
 2. Add a *pending* trusted publisher at
    [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/): project
-   `hocon-formatter`, owner `kastoestoramadus`, repository `hocon-formatter`, workflow
+   `hocon-fmt`, owner `kastoestoramadus`, repository `hocon-fmt`, workflow
    `release.yml`, environment `pypi`. It reserves the name and needs no token; the first upload
    turns it into the project's publisher.
 3. Create the environment `pypi` (Settings → Environments). Requiring yourself as a reviewer
@@ -72,10 +72,10 @@ and `pypa/gh-action-pypi-publish`, uploading the wheels the `native` jobs build.
 
 1. Create an account with two-factor authentication, and `npm login`.
 2. Publish the first version by hand, from the tarball the release attaches:
-   `npm publish --access public hocon-formatter-<version>.tgz`. npm lets you configure a trusted
+   `npm publish --access public hocon-fmt-<version>.tgz`. npm lets you configure a trusted
    publisher only for a package that already exists.
 3. On npmjs.com, in the package's settings, add a trusted publisher: repository
-   `kastoestoramadus/hocon-formatter`, workflow `release.yml`.
+   `kastoestoramadus/hocon-fmt`, workflow `release.yml`.
 
 Code still needed: a job publishing later versions from `release.yml`, with
 `permissions: id-token: write` and npm 11.5.1 or later.
@@ -89,7 +89,7 @@ workflow" for workflows on the default branch.
 
 1. Set the version in the five places that carry it: `build.sbt` (`ThisBuild / version`),
    `gradle-plugin/build.gradle.kts` (`version`), `maven-plugin/pom.xml` (the plugin's own version
-   and the `hocon-formatter-core_3` dependency), `mill-plugin/build.mill` (`formatterVersion`),
+   and the `hocon-fmt-core_3` dependency), `mill-plugin/build.mill` (`formatterVersion`),
    and the `additional_dependencies` of all four hooks in `.pre-commit-hooks.yaml`. The npm and
    wheel versions follow `build.sbt`.
 2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
@@ -114,10 +114,10 @@ A user's configuration names this repository and a tag:
 
 ```yaml
 repos:
-  - repo: https://github.com/kastoestoramadus/hocon-formatter
+  - repo: https://github.com/kastoestoramadus/hocon-fmt
     rev: v0.1.0
     hooks:
-      - id: hocon-formatter
+      - id: hocon-fmt
 ```
 
 pre-commit clones the tag, reads `.pre-commit-hooks.yaml` and installs the hook's
@@ -133,14 +133,14 @@ way in.
 To check a release, in any repository with a `.conf` file:
 
 ```bash
-pre-commit try-repo https://github.com/kastoestoramadus/hocon-formatter hocon-formatter --ref v<version> --all-files
+pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --ref v<version> --all-files
 ```
 
 ## Trying a release
 
 ```bash
-pipx run hocon-formatter --check application.conf          # the wheel, native
-npx hocon-formatter@<version> --check application.conf     # the npm package
+pipx run hocon-fmt --check application.conf          # the wheel, native
+npx hocon-fmt@<version> --check application.conf     # the npm package
 ```
 
 Then the plugins as [usage](usage.md) shows them, with the released version, in a project that

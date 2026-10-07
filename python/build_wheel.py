@@ -17,7 +17,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-NAME = "hocon-formatter"
+NAME = "hocon-fmt"
 DISTRIBUTION = NAME.replace("-", "_")
 README = Path(__file__).with_name("README.md")
 
@@ -56,7 +56,7 @@ def build(binary_path: Path, version: str, tag: str, out: Path) -> Path:
             f"Name: {NAME}\n"
             f"Version: {version}\n"
             "Summary: Formats HOCON configuration files, or checks that they are formatted.\n"
-            "Project-URL: Homepage, https://github.com/kastoestoramadus/hocon-formatter\n"
+            "Project-URL: Homepage, https://github.com/kastoestoramadus/hocon-fmt\n"
             "License: GPL-3.0-only\n"
             "Requires-Python: >=3.8\n"
             "Description-Content-Type: text/markdown\n"
@@ -64,7 +64,7 @@ def build(binary_path: Path, version: str, tag: str, out: Path) -> Path:
         ).encode(),
         f"{dist_info}/WHEEL": (
             "Wheel-Version: 1.0\n"
-            "Generator: hocon-formatter build_wheel.py\n"
+            "Generator: hocon-fmt build_wheel.py\n"
             "Root-Is-Purelib: false\n"
             f"Tag: py3-none-{tag}\n"
         ).encode(),

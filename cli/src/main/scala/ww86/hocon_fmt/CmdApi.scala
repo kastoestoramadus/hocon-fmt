@@ -25,7 +25,7 @@ object CmdApi extends IOApp {
 
   val command: Command[Invocation] =
     Command(
-      name = "hocon-formatter",
+      name = "hocon-fmt",
       header = "Formats HOCON files in place. Files it cannot format safely are left alone."
     ) {
       (
@@ -77,7 +77,7 @@ object CmdApi extends IOApp {
     command.parse(PlatformApp.ambientArgs.getOrElse(args)) match {
       case Right(Invocation.FileMode(arguments)) =>
         examineAll(arguments).flatTap(run => IO.print(run.rendered)).map(_.exitCode)
-      case Right(Invocation.Version)         => IO.println(s"hocon-formatter ${BuildInfo.version}").as(ExitCode.Success)
+      case Right(Invocation.Version)         => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
       case Right(Invocation.Stdin(filename)) =>
         StdStreams.readStdin
           .map(formatStdin(_, filename))

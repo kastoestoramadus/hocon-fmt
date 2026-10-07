@@ -21,9 +21,9 @@ scripts/pre-commit-e2e.sh # pre-commit hooks as installed from HEAD; needs pre-c
 scripts/bench.py run      # time every phase on every platform, attach to HEAD in git notes
 scripts/bench.py report   # medians per commit, slowdowns flagged
 
-sbt cliNative/nativeLink  # cli/.native/target/scala-3.8.2/hocon-formatter
+sbt cliNative/nativeLink  # cli/.native/target/scala-3.8.2/hocon-fmt
 sbt cliJS/npmPackage      # cli/.js/target/npm-package
-sbt web/bundle            # web/target/bundle/hocon-formatter.js, the playground's script
+sbt web/bundle            # web/target/bundle/hocon-fmt.js, the playground's script
 sbt "cliJVM/run --check path/to/file.conf"
 sbt "coreJVM/testOnly ww86.hocon_fmt.HoconFormatterInvariantsSpec -- *idempotent*"
 UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hocon_fmt.GoldenFileSpec"
