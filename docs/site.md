@@ -58,10 +58,11 @@ be embedded in a public page. Each answer is cached in localStorage for ten minu
 guarded `try`, so reloading does not burn the limit and a browser without storage formats the
 same.
 
-Failure is quiet and visible: any non-200, a malformed body, or no `fetch` at all leaves that
-repository's snapshot standing and the state line says what happened — "refreshed from GitHub",
-"snapshot; GitHub did not answer for …", or "the shipped snapshot". The "checking GitHub…" line
-always resolves, because every failure is an answer.
+Failure is quiet and visible: any non-200, a malformed body, no `fetch` at all, or a search that
+does not answer within eight seconds leaves that repository's snapshot standing and the state line
+says what happened — "refreshed from GitHub", "snapshot; GitHub did not answer for …", or "the
+shipped snapshot". The "checking GitHub…" line always resolves, because every failure is an
+answer, the deadline included.
 
 ## Refreshing the snapshot
 
@@ -71,24 +72,30 @@ Run by hand, never in the build:
 scripts/refresh-contributions.py
 ```
 
-It asks the same searches through `gh`, diffs them against the shipped entries, and prints
-ready-made Scala blocks for new pull requests, with the theme left to place. Move the release
-dates forward when either repository publishes; that is what turns "merged upstream, not yet in a
-release" into "in a release". Also update `Contributions.readOn` when you re-read the data.
+It asks the same searches through `gh` and diffs them against the shipped entries, which it reads
+out of `Contributions.scala` — the one place the snapshot lives, since the copy it used to keep
+drifted from it. It prints ready-made Scala blocks for new pull requests, with the theme left to
+place. Move the release dates forward when either repository publishes; that is what turns "merged
+upstream, not yet in a release" into "in a release". Also update `Contributions.readOn` when you
+re-read the data; the script says so when it reports anything.
 
 ## Testing
 
 `sbt site/test` runs the suite on Node: the status model, the changed-line count, the refusal
 sentences, the snapshot/live merge, the grouping, the fetch path against a fake `Http` and a fake
 `Storage` (success, a 403, malformed bodies, a throwing storage), and the five examples against
-the real core. The snapshot has integrity tests: every defect row resolves to an entry, every
-note is a sentence.
+the real core. `BrowserSpec` goes a step further and fakes the browser itself: `dom.window` is one
+global, so the test installs a window with its own `fetch` and localStorage and drives the real
+`refreshBoard` — the search answering, a browser without `fetch`, a search that fails, a search
+that never answers, and the ten-minute cache. That path is where the page was broken once while
+every unit test was green. The snapshot has integrity tests: every defect row resolves to an
+entry, every note is a sentence, every backticked input is balanced.
 
 The Laminar components themselves are not covered by jsdom tests: wiring the jsdom npm module
 into `sbt test` would add a network-time npm dependency to a build that must not silently skip a
-platform, for coverage that a real browser check gives back with interest. The page is therefore
-verified by running it: served (`python3 -m http.server -d site/target/site 4001`) with the live
-search answering, and from `file://` in a fetch-less browser where the snapshot must stand.
+platform, for coverage that a real browser check gives back with interest. Rendering is therefore
+verified by running the page: served (`python3 -m http.server -d site/target/site 4001`) with the
+live search answering, and from `file://` in a fetch-less browser where the snapshot must stand.
 
 ## Publishing
 
