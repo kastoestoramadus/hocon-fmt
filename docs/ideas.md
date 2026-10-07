@@ -227,3 +227,16 @@ slowdown fail a pull request.
 
 Sharing an input by link, a diff view and a "report this refusal" button: see
 [playground](playground.md#later).
+
+### A site whose contribution list refreshes itself (S)
+
+The project site lists the author's pull requests to sconfig and lightbend/config. The list ships
+as a snapshot in the page and the browser refreshes each state from `api.github.com` after load,
+which is free and needs no token, but it only shows the right state to a visitor who is not rate
+limited and whose browser reaches the API. A scheduled workflow that regenerates the snapshot from
+`gh` and redeploys Pages would keep the page itself current, so the live fetch becomes a bonus
+rather than the only freshness. Public repositories pay nothing for it, GitHub Actions minutes on
+standard runners being free for them. **Your part:** deciding the cadence, and whether the redeploy
+may commit the refreshed snapshot to `main` or only publish it. **Code:** a `schedule` trigger in
+the Pages workflow, a refresh script run by hand today, and a check that a changed snapshot is the
+only difference before it deploys.
