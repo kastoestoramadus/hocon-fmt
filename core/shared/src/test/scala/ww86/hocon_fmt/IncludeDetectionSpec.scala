@@ -65,10 +65,11 @@ class IncludeDetectionSpec extends munit.FunSuite with HoconTestSupport {
     assert(out.contains("""include "f.conf""""), out)
   }
 
-  test("same line: entries after an include are formatted, not passed through") {
-    val out = formatted("""o { include "f.conf", b   :    1 }""")
+  // The other way round, `o { include "f.conf", b : 1 }`, is refused: see IncludeOrderSpec.
+  test("same line: entries before an include are formatted, not passed through") {
+    val out = formatted("""o { b   :    1, include "f.conf" }""")
     assert(out.contains("""include "f.conf""""), out)
-    assert(out.contains("b: 1"), s"entry after the include was not formatted: $out")
+    assert(out.contains("b: 1"), s"entry before the include was not formatted: $out")
   }
 
   test("same line: closing brace survives so the result re-parses") {
@@ -84,7 +85,7 @@ class IncludeDetectionSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("include function forms survive sharing a line") {
-    val out = formatted("""o { include required(file("f.conf")), b : 1 }""")
+    val out = formatted("""o { b : 1, include required(file("f.conf")) }""")
     assert(out.contains("required"), out)
     assert(out.contains("b: 1"), out)
   }
