@@ -36,6 +36,13 @@ ThisBuild / developers := List(
   )
 )
 
+// Releases are staged locally and uploaded to the Central Portal bundle by `sonaUpload`; snapshots
+// go to the portal's snapshot repository. sbt reads SONATYPE_USERNAME and SONATYPE_PASSWORD itself.
+ThisBuild / publishTo := {
+  if (isSnapshot.value) Some("central-snapshots" at "https://central.sonatype.com/repository/maven-snapshots/")
+  else localStaging.value
+}
+
 /** sbt prints one unlabelled "Passed: Total N" per aggregated project, and the Scala.js block
   * arrives without the `[info]` prefix, so nothing says which runtime a result came from. The
   * banner goes in a Cleanup hook rather than Setup so it lands next to that project's summary
@@ -303,3 +310,11 @@ lazy val sbtPlugin = project
   )
 
 addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
+
+// What a release uploads: the libraries and the sbt plugin, signed. Stops at the upload, so the
+// deployment waits in the portal until someone clicks Publish.
+addCommandAlias(
+  "publishRelease",
+  // `sbtPlugin` is also an sbt key, so the plugin's project is named by its id.
+  Seq(coreJVM.id, cliJVM.id, "sbtPlugin").map(id => s"$id/publishSigned").mkString("; ") + "; sonaUpload"
+)
