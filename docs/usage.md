@@ -69,7 +69,7 @@ its environment is 29 MB against 233 MB, mostly the Node that pre-commit downloa
 
 ```scala
 // project/plugins.sbt
-addSbtPlugin("io.github.kastoestoramadus" % "sbt-hocon-fmt" % "0.1.0")
+addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")
 ```
 
 | key | |
@@ -90,7 +90,7 @@ hoconFormatSources := (baseDirectory.value / "conf" ** "*.conf").get
 
 ```kotlin
 plugins {
-    id("io.github.kastoestoramadus.hocon-fmt") version "0.1.0"
+    id("eu.ww86.hocon-fmt") version "0.1.0"
 }
 repositories { mavenCentral() } // the plugin resolves the formatter through the project
 
@@ -102,13 +102,13 @@ hoconFormatter {
 `hoconFormat` rewrites; `hoconFormatCheck` fails on an unformatted file and runs as part of
 `check`. Both are configuration-cache compatible, and the check is up to date while neither the
 files nor the formatter change. To pin another formatter version:
-`dependencies { hoconFormatter("io.github.kastoestoramadus:hocon-fmt-core_3:<version>") }`.
+`dependencies { hoconFormatter("eu.ww86:hocon-fmt-core_3:<version>") }`.
 
 ## Mill
 
 ```scala
 //| mvnDeps:
-//| - io.github.kastoestoramadus::mill-hocon-fmt::0.1.0
+//| - eu.ww86::mill-hocon-fmt::0.1.0
 package build
 
 import mill.*, javalib.*
@@ -132,7 +132,7 @@ override def hoconFormatSources = Task.Sources("conf")
 
 ```xml
 <plugin>
-  <groupId>io.github.kastoestoramadus</groupId>
+  <groupId>eu.ww86</groupId>
   <artifactId>hocon-fmt-maven-plugin</artifactId>
   <version>0.1.0</version>
   <executions>
