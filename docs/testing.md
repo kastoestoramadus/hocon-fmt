@@ -14,6 +14,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `JvmFacadeSpec` | `core/jvm` | the JDK-typed boundary, called from Java (`JavaCaller.java`) and reflectively |
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
+| site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake, the five playground examples against the core; see [site](site.md#testing) |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
 | scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
