@@ -2,8 +2,8 @@ name: Release
 
 # A version tag builds the native binaries, their wheels, the npm package and the web script and
 # attaches them to a GitHub release. Run by hand, it builds the same artifacts without releasing anything, which is
-# how to try the matrix before tagging. Publishing to Maven Central, PyPI, npm and the Gradle Plugin
-# Portal needs credentials this repository does not hold yet, so it is not automated here.
+# how to try the matrix before tagging. A tag also uploads to Maven Central, where every deployment
+# waits for a click on Publish; the Gradle Plugin Portal, PyPI and npm are not automated here yet.
 on:
   push:
     tags: ['v*']
@@ -98,3 +98,69 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-fmt-* hocon_fmt-*.whl hocon-fmt.js
+
+  # Signs everything bound for Maven Central. Run by hand it only proves the signing key and its
+  # passphrase work, and uploads nothing; a tag goes on to upload, and each of the three deployments
+  # (sbt, Maven, Mill) is left in the portal, validated, until someone clicks Publish. The Maven
+  # and Mill builds resolve the core from the local repositories sbt fills here, since it is not on
+  # Central until the first deployment is published.
+  central:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - name: Tag matches the versions in the build
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: scripts/check-release-version.sh "${GITHUB_REF_NAME#v}"
+      - name: Import the signing key
+        env:
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+        run: printf '%s' "$PGP_SECRET" | base64 -d | gpg --batch --import
+      - name: Signing check, sbt
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: sbt coreJVM/publishSigned && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
+      - name: Signing check, Maven
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          sbt coreJVM/publishM2
+          (cd maven-plugin && ./mvnw -B -Prelease -DskipTests -Dinvoker.skip verify && ls target/*.asc)
+      - name: Upload, sbt
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: sbt publishRelease
+      - name: Upload, Maven
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          # Quoted, so Maven and not the shell expands the variables.
+          cat > "$RUNNER_TEMP/settings.xml" <<'XML'
+          <settings><servers><server>
+            <id>central</id>
+            <username>${env.SONATYPE_USERNAME}</username>
+            <password>${env.SONATYPE_PASSWORD}</password>
+          </server></servers></settings>
+          XML
+          cd maven-plugin && ./mvnw -B -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
+      - name: Upload, Mill
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          MILL_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MILL_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MILL_PGP_SECRET_BASE64: ${{ secrets.PGP_SECRET }}
+          MILL_PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          sbt coreJVM/publishLocal
+          cd mill-plugin && ./mill mill.javalib.SonatypeCentralPublishModule/publishAll --publishArtifacts __.publishArtifacts --shouldRelease false
