@@ -9,7 +9,7 @@ Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought
 expected text is not guessed: each case is paired with a plainly written config that means the same
 thing and renders correctly, and the test first asserts both `resolve()` to the same value. A
 failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 13 failures on the JVM and Native, 14 on Scala.js. When a
+`sbt libraryDefects`, on all three platforms: 15 failures on the JVM and Native, 16 on Scala.js. When a
 sconfig release fixes one, its test turns green: that is the signal to drop the refusal and the
 entry below. sconfig 2.0.0 was tried on 2026-09-25: the regular suites pass on it, and the nine
 defects then known remain.

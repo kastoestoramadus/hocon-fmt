@@ -63,7 +63,15 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
     // The specification lets an implementation resolve this cycle to 1, to 2, or to an error,
     // requiring only that a and b end up equal. sconfig picks 1, which is a legal choice, so
     // that is what its rendering has to reflect.
-    ("substitution cycle", "a : 1\nb : 2\na : ${b}\nb : ${a}", "a : 1\nb : 1")
+    ("substitution cycle", "a : 1\nb : 2\na : ${b}\nb : ${a}", "a : 1\nb : 1"),
+    // keepOriginOrder sorts by the line a field starts on and leaves fields sharing a line in no
+    // defined order. A later definition wins, so this can change what a key resolves to.
+    ("fields sharing a line", "z = 1, y = 2, x = 3", "z = 1\ny = 2\nx = 3"),
+    (
+      "fields of a one-line object",
+      "app { name = svc, port = 8080 }",
+      "app {\n  name = svc\n  port = 8080\n}"
+    )
   )
 
   shouldRenderLike.foreach { case (name, broken, equivalent) =>
