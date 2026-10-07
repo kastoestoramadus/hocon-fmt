@@ -12,11 +12,20 @@ import org.scalajs.dom
   */
 object Browser:
 
+  // A GET through `fetch`, with every failure — no fetch at all included — a failed future, so
+  // the refresh completes and the snapshot stands.
   given GitHubApi.Http = url =>
-    dom.window
-      .fetch(url)
-      .toFuture
-      .flatMap(response => response.text().toFuture.map(body => GitHubApi.Response(response.status, body)))
+    def viaFetch: Future[GitHubApi.Response] =
+      dom.window
+        .fetch(url)
+        .toFuture
+        .flatMap(response => response.text().toFuture.map(body => GitHubApi.Response(response.status, body)))
+
+    if js.typeOf(dom.window.fetch) != "function" then
+      Future.failed(new RuntimeException("fetch is not available in this browser"))
+    else
+      try viaFetch
+      catch case e: Throwable => Future.failed(e)
 
   // Storage is an optional browser facility: a page opened where it is denied works without it.
   given GitHubApi.Storage = new GitHubApi.Storage:
