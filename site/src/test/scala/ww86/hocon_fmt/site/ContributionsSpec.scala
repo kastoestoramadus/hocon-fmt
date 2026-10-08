@@ -56,7 +56,16 @@ class ContributionsSpec extends munit.FunSuite {
     // one there cannot leave the page naming a refusal nothing answers to.
     assertEquals(
       RefusalKind.values.map(_.name).toSet,
-      Set("notUtf8", "notHocon", "brokenOutput", "lostComment", "lostInclude", "movedInclude", "unstableOutput")
+      Set(
+        "notUtf8",
+        "notHocon",
+        "otherFormat",
+        "brokenOutput",
+        "lostComment",
+        "lostInclude",
+        "movedInclude",
+        "unstableOutput"
+      )
     )
   }
 

@@ -18,8 +18,9 @@ enum FormatOutcome derives CanEqual {
   */
 final class FileFormatter[F[_]: Async](using files: Files[F]) {
 
+  /** The path is what the file's verdict is named by, and what a refusal reports. */
   def verdict(path: Path): F[Verdict] =
-    files.readAll(path).compile.to(Array).map(Verdict.of)
+    files.readAll(path).compile.to(Array).map(Verdict.of(_, path.toString))
 
   /** Canonicalises and deduplicates aliases before parallel work. Missing paths are retained so
     * callers can report their IO errors alongside the other files.

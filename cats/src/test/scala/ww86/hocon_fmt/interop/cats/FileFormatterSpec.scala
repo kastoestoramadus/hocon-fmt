@@ -81,6 +81,38 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   tmp.test("unreadable files stay in the IO error channel") { dir =>
     formatter.verdict(dir / "missing.conf").attempt.map(result => assert(result.isLeft))
   }
+
+  // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
+  // file its name promises, so the name alone decides.
+  tmp.test("a file whose extension is another format is refused, whatever it contains") { dir =>
+    for {
+      json         <- write(dir, "application.json", """{"a": 1}""".getBytes(UTF_8))
+      properties   <- write(dir, "application.properties", "a=1".getBytes(UTF_8))
+      jsonVerdict  <- formatter.verdict(json)
+      propsVerdict <- formatter.verdict(properties)
+    } yield {
+      jsonVerdict match {
+        case Verdict.Refused(Refusal.OtherFormat(format)) => assertEquals(format, "JSON")
+        case other                                        => fail(s"expected OtherFormat, got $other")
+      }
+      propsVerdict match {
+        case Verdict.Refused(Refusal.OtherFormat(format)) => assertEquals(format, "Java properties")
+        case other                                        => fail(s"expected OtherFormat, got $other")
+      }
+    }
+  }
+
+  // The origin a parse failure names is the path the caller knows the file by.
+  tmp.test("a refusal says which file failed to parse") { dir =>
+    for {
+      file    <- write(dir, "broken.conf", "a : ${".getBytes(UTF_8))
+      verdict <- formatter.verdict(file)
+    } yield verdict match {
+      case Verdict.Refused(Refusal.NotHocon(detail)) => assert(detail.startsWith(file.toString + ":"), detail)
+      case other                                     => fail(s"expected NotHocon, got $other")
+    }
+  }
+
   tmp.test("canonical paths deduplicate aliases and retain missing files for reporting") { dir =>
     for {
       file      <- write(dir, "a.conf", "a=1".getBytes(UTF_8))

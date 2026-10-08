@@ -14,6 +14,7 @@ around it in `HoconFormatter`.
 |---|---|---|---|
 | `core` | `HoconFormatter.format: String => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
 | `cats` | `FileFormatter[F]`: file verdicts, identity-preserving formatting, streaming checks, opt-in refusal errors | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io |
+| `zio` | `ZioFormatter`, blocking `ZioFiles`, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
 | `cli` | `CmdApi`, an `IOApp`: arguments, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |
@@ -26,7 +27,8 @@ around it in `HoconFormatter`.
 | `bench` | times each formatter phase; see [testing](testing.md#benchmarks) | JVM, Scala.js, Scala Native | core |
 
 `core` stays pure and depends on nothing but sconfig because the build-tool plugins load it into
-their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delegates to it.
+their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delegates to it. The independent
+`zio` library adapter offers text and file formatting on ZIO.
 
 ## The pipeline
 
@@ -52,7 +54,10 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 `Verdict.of(bytes)` wraps this for one file: it decodes strictly as UTF-8 (`Refusal.NotUtf8`
 rather than replacing bytes it cannot decode) and says whether the file is already formatted,
 needs formatting, or must be left alone. Every integration acts on a `Verdict`; they differ only
-in how they find files and report.
+in how they find files and report — and in the name they pass (`Verdict.of(bytes, name)`,
+`HoconFormatter.format(text, origin)`), which a refusal reports as where a parse tripped and which
+rules out a file named `.json` or `.properties`. Formatting those writes HOCON where the name
+promises another format, so nothing here touches them (`Refusal.OtherFormat`).
 
 ## Include masking
 

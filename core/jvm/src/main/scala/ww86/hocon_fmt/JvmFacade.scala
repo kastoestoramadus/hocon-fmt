@@ -9,11 +9,22 @@ import java.util.Optional
   */
 object JvmFacade {
 
-  /** The text the file should contain, or empty when it already does. */
+  /** The text the file should contain, or empty when it already does. The name is how the caller
+    * knows the file: a refusal reports it as the place a parse failed, and a name promising
+    * another format is refused outright.
+    */
   @throws[FormatRefusedException]("when the file must be left alone; the message says why")
-  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  def reformat(content: Array[Byte], name: String): Optional[String] =
+    verdict(Verdict.of(content, name))
+
+  /** As [[reformat(Array[Byte], String)]] for content the caller has no name for. */
+  @throws[FormatRefusedException]("when the file must be left alone; the message says why")
   def reformat(content: Array[Byte]): Optional[String] =
-    Verdict.of(content) match {
+    verdict(Verdict.of(content))
+
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  private def verdict(decided: Verdict): Optional[String] =
+    decided match {
       case Verdict.AlreadyFormatted           => Optional.empty
       case Verdict.NeedsFormatting(formatted) => Optional.of(formatted)
       case Verdict.Refused(refusal)           => throw FormatRefusedException(refusal)

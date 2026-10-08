@@ -51,8 +51,10 @@ object HoconFormatterModule {
     def needsFormatting: Boolean = verdict.isInstanceOf[Verdict.NeedsFormatting]
   }
 
+  // The name each file is decided and reported by, so a refusal reads "Leaving app.json
+  // unchanged: a JSON file, ..." rather than naming a path twice.
   private def examine(sources: Seq[PathRef]): Seq[Examined] =
-    hoconFiles(sources).map(file => Examined(file, Verdict.of(os.read.bytes(file))))
+    hoconFiles(sources).map(file => Examined(file, Verdict.of(os.read.bytes(file), shown(file))))
 
   private def hoconFiles(sources: Seq[PathRef]): Seq[os.Path] =
     sources

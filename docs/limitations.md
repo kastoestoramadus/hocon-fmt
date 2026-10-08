@@ -111,6 +111,9 @@ not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpe
 - `=` becomes `:`
 - nested objects are flattened to path keys (`setSimplifyNestedObjects`)
 - triple-quoted strings become escaped single-line strings
+- `+=` appends become the specification's expansion (`a += 2` renders as `a: ${?a}[2]`), the same
+  value: sconfig renders the expanded form, keeping no trace of the shorthand (an append after an
+  earlier definition of the key is instead the `+=` field-separator defect above, and is refused)
 - number literals are canonicalised (`1.5e3` becomes `1500`)
 - unicode escapes are resolved (`\u0041` becomes `A`)
 - line endings become `\n`, and a UTF-8 byte-order mark is dropped
@@ -120,6 +123,17 @@ not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpe
 
 - **A value starting with the word `include` followed by a quoted string**, `a : include "x"`:
   the concatenation is read as a directive, and the file is refused as `Refusal.NotHocon`.
+
+## Other formats a file's name promises
+
+Lightbend's loader reads `.conf`, `.json` and `.properties` by extension, and the last two are
+formats of their own. A round trip through sconfig hands back HOCON: a `.json` file comes back with
+its objects reordered and its quoting gone, and a `.properties` value such as
+`spring.datasource.url=jdbc:mysql://localhost:3306/db` is not readable as HOCON at all. A file whose
+name ends in `.json` or `.properties` is refused whatever its content — `Refusal.OtherFormat` says
+`a JSON file, and hocon-fmt formats HOCON only` — because formatting it would write a different
+format under the name it has. Plugin file filters default to `.conf` and `.hocon`; a configured
+include that reaches one of these is reported and left alone.
 
 ## Speed
 

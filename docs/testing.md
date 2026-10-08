@@ -12,18 +12,22 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
-| `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8 |
+| `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
+| `OptionsSpec` | `core/shared` | the parse and render options the formatter pins explicitly: the final newline, empty text, and how env-variable values render |
 | `JvmFacadeSpec` | `core/jvm` | the JDK-typed boundary, called from Java (`JavaCaller.java`) and reflectively |
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
 | `FileFormatterSpec` | `cats` | file verdicts, no-write checks and refusals, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and canonical paths on JVM, Node and Native |
 | `FileFormatterFailureSpec` | `cats/.jvm` | a failure or cancellation after a partial staged write preserves the original bytes and cleans up staging |
+| `ZioFormatterSpec`, `ZioFilesSpec`, adapter `FormatterPropertiesSpec` | `zio/shared`, `zio/jvm-native` | typed text refusals on all runtimes; file decisions, untouched refusals, atomic replacement cleanup, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and permissions, plus 1000 arbitrary byte sequences on JVM / Native |
+| `ZioFilesJvmSpec` | `zio/jvm` | a path on a closed ZIP filesystem, whose unchecked `ClosedFileSystemException` must stay that file's outcome; Scala Native serves no jar provider, so the mechanism is JVM-only |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
 | scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
 | invoker | `maven-plugin/src/it` | the Maven plugin in real Maven builds |
 | unit, integration | `mill-plugin/test`, `mill-plugin/integration` | the Mill plugin in process through `UnitTester`, and in a real Mill: 1.1.4, the oldest supported, and 1.1.10 |
+| `HoconFmtTest`, `KotlinInteropTest` | `java-api/src/test` | the Java API for Java and Kotlin callers: the mirrored verdicts and refusal kinds and the parity tests that pin the mirror to the core, file checks and the write only on `NeedsFormatting`, `formatOrThrow`, and what Kotlin sees — a value-used `when` with no `else` and JSpecify's non-null returns |
 | e2e | `scripts/pre-commit-e2e.sh` | both families of pre-commit hooks, native and Node, installed from this repository as a user would |
 | `CliAcceptanceSuite` | `acceptance` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, redirected files and pipes, input beyond one read, refusals, `--version`, argument errors; `sbt acceptance/test` |
 
@@ -66,7 +70,7 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
   to ignore it. `sbt libraryDefects` runs it on all three platforms, since sconfig's Scala.js and
   Native builds have defects of their own.
-- **Order.** `sbt test` runs core, cats and cli on the JVM, Scala.js and Scala Native, one project at a
+- **Order.** `sbt test` runs core, cats, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
 
@@ -85,8 +89,9 @@ in core test and site Scala data; tests and the site use it without runtime file
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
 `target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
 Verdicts are `formatted`, `already-formatted` (only for now or pending), or
-`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `broken-output`, `lost-comment`,
-`lost-include`, `moved-include`, and `unstable-output`. The generator embeds the kinds it
+`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `other-format`, `broken-output`,
+`lost-comment`, `lost-include`, `moved-include`, and `unstable-output`. The generator embeds the
+kinds it
 accepts as `ExampleData.kinds`, and `ExamplesSpec` maps every `Refusal` case through an
 exhaustive `kindOf` and requires the result to be exactly that set, so the next `Refusal`
 case cannot drift. When `now != target`, `reason-if-different` is
@@ -97,5 +102,7 @@ does not compute it and the suite does not assert it. Optional `findings: [...]`
 reserves identifiers for a later duplicate report.
 
 `source` records `kind: synthetic | distilled | verbatim` and `pattern`; verbatim
-examples also require `url` and `licence`. Add fixtures only after reviewing their
+examples also require `url` and `licence`. A distilled entry may carry
+`source.seen-in`, the number of corpus files containing the pattern; the generator
+ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.

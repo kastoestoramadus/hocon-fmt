@@ -55,8 +55,20 @@ class StatusSpec extends munit.FunSuite {
   private def statusFor(kind: RefusalKind): Status =
     Status.of(Verdict.Refused(refusalOf(kind)), "source")
 
+  test("a file whose name promises another format is its own refusal, not NotHocon") {
+    // sconfig reads .json and .properties fine, so "cannot read this text as HOCON" would be
+    // false; the file is a format of its own that this formatter does not format.
+    val Status.LeftUnchanged(kind, reason, explanation, learnMore) =
+      statusFor(RefusalKind.OtherFormat): @unchecked
+    assertEquals(kind, RefusalKind.OtherFormat)
+    assert(reason.contains("JSON"), reason)
+    assert(explanation.nonEmpty, "the sentence must say what happened")
+    assertEquals(learnMore, Some(Status.limitationsPage))
+  }
+
   private def refusalOf(kind: RefusalKind): ww86.hocon_fmt.Refusal = kind match {
     case RefusalKind.NotHocon       => ww86.hocon_fmt.Refusal.NotHocon("no")
+    case RefusalKind.OtherFormat    => ww86.hocon_fmt.Refusal.OtherFormat("JSON")
     case RefusalKind.BrokenOutput   => ww86.hocon_fmt.Refusal.BrokenOutput("no")
     case RefusalKind.LostComment    => ww86.hocon_fmt.Refusal.LostComment("# gone")
     case RefusalKind.LostInclude    => ww86.hocon_fmt.Refusal.LostInclude("include \"x.conf\"")

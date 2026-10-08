@@ -126,6 +126,21 @@ class HoconFormatterPluginFunctionalTest {
         assertEquals(UNFORMATTED, read(notChosen));
     }
 
+    // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
+    // file its name promises, so the name alone decides.
+    @Test
+    void aFileWhoseExtensionIsAnotherFormatIsRefusedNotRewrittenAsHocon() throws IOException {
+        writeBuild("", "hoconFormatter {\n    source.setFrom(fileTree(\"config\") { include(\"**/*.json\") })\n}\n");
+        byte[] json = "{\n    \"b\": 1,\n    \"a\": 2\n}\n".getBytes(UTF_8);
+        Path file = write("config/application.json", json);
+
+        BuildResult result = build("hoconFormat");
+
+        assertArrayEquals(json, Files.readAllBytes(file));
+        assertTrue(result.getOutput().contains("config/application.json"), result.getOutput());
+        assertTrue(result.getOutput().contains("a JSON file, and hocon-fmt formats HOCON only"), result.getOutput());
+    }
+
     @Test
     void checkRunsTheFormatCheckWhenBaseIsAppliedAfterThePlugin() throws IOException {
         writeBuild("    base\n", "");
