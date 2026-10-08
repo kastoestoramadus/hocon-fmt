@@ -71,6 +71,7 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
   to ignore it. `sbt libraryDefects` runs it on all three platforms, since sconfig's Scala.js and
   Native builds have defects of their own.
+<!-- UPSTREAM-SCONFIG: delete this bullet with the fork and `coreSite`; docs/site.md has the steps. -->
 - **`coreSite` runs core's shared suite** with `Variant.ledger`: the tests that pin a refusal the
   fork does not produce (comments it keeps, merges its base renders) are listed in
   `core/site-shared/src/test` with a reason each, and `CommentCarrierSpec` pins the outcome there

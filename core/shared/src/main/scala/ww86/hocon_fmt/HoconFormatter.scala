@@ -67,6 +67,7 @@ object HoconFormatter {
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked  = IncludeMasking.mask(source)
+    // UPSTREAM-SCONFIG: the seam call; inline `restore`'s absence once the option is released.
     val carried = CommentCarrier.mask(masked.text)
     for {
       rendered <- attempt(render(carried.text, options))(unreadable)

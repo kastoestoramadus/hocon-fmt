@@ -169,9 +169,13 @@ it is red until released sconfig has `setKeepDetachedComments`, and green once t
    `HoconFormatter`, and `Variant` in the tests with its ledger. Then the four pinned refusals
    (`detached-header-comment`, `trailing-comment-in-object`, the two `commentAboveBlankLine`
    cases) flip for the command line as well.
-4. Delete the muted line under the playground (`Playground.scala`), reword showcase 05, drop the
-   ledger-related text in [limitations](limitations.md) and [architecture](architecture.md), and
-   delete `KeepDetachedCommentsGuardSpec` with its `libraryDefects` entry and `testOptions` exclusion.
+4. Delete the muted line under the playground (`Playground.scala`), reword showcase 05, and drop the
+   fork-only text where the marker sits: the "Comment carrier" section and the `coreSite` row in
+   [architecture](architecture.md), the paragraph in [limitations](limitations.md), the `coreSite`
+   bullet in [testing](testing.md), the script line in [README](../README.md), and the rule and
+   `coreSite` mention in [AGENTS](../AGENTS.md); retitle the idea in [ideas](ideas.md) and refresh
+   the closing note of [the investigation](investigations/blank-line-comments.md). Then delete
+   `KeepDetachedCommentsGuardSpec` with its `libraryDefects` entry and `testOptions` exclusion.
 5. Keep the Scala.js 1.22 bump and the #647 entry in the snapshot, and update `Contributions.readOn`.
 
 ## Publishing

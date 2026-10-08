@@ -67,6 +67,7 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   Maven plugins share; Mill runs Scala 3, and its plugin matches on `Verdict`.
 - **Do not "fix" the intentional normalisations** (`//` to `#`, `=` to `:`, flattened paths, …)
   listed in [docs/limitations.md](docs/limitations.md).
+<!-- UPSTREAM-SCONFIG: delete this rule and the `coreSite` mention under Layout when the fork goes; docs/site.md has the steps. -->
 - **The page runs on a sconfig fork, temporarily.** `coreSite` is the core's sources against
   `scripts/fetch-sconfig-fork.sh`'s artifact, with the real `CommentCarrier` from
   `core/site-shared`; everything published uses released sconfig and the no-op carrier. Code that
