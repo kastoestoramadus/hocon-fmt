@@ -18,6 +18,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
 | `ZioFormatterSpec`, `ZioFilesSpec`, adapter `FormatterPropertiesSpec` | `zio/shared`, `zio/jvm-native` | typed text refusals on all runtimes; file decisions, untouched refusals, atomic replacement cleanup, symlinks and permissions, plus 1000 arbitrary byte sequences on JVM / Native |
+| `ZioFilesJvmSpec` | `zio/jvm` | a path on a closed ZIP filesystem, whose unchecked `ClosedFileSystemException` must stay that file's outcome; Scala Native serves no jar provider, so the mechanism is JVM-only |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
 | scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
