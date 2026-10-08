@@ -2,7 +2,11 @@ package ww86.hocon_fmt
 
 import java.util.regex.{Matcher, Pattern}
 
+import org.ekrich.config.{ConfigList, ConfigObject, ConfigValue}
+
 import scala.annotation.tailrec
+import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 /** Carries `include` directives across a parse-render round trip.
   *
@@ -28,7 +32,10 @@ private[hocon_fmt] object IncludeMasking {
     * source that way. The text is for reading only, never rendered; a comma after the statement
     * stays on the placeholder's line, since a line may not begin with one.
     */
-  def mask(source: String, onOwnLines: Boolean = false): Masked = {
+  def mask(source: String, onOwnLines: Boolean = false): Masked =
+    maskWithPrefix(source, onOwnLines, PlaceholderPrefix)
+
+  private def maskWithPrefix(source: String, onOwnLines: Boolean, prefix: String): Masked = {
     val masked       = new StringBuilder
     val originals    = Map.newBuilder[Int, String]
     val keywords     = IncludeKeyword.matcher(source)
@@ -41,7 +48,7 @@ private[hocon_fmt] object IncludeMasking {
         targetAfterKeyword(source, keywords.end).foreach { target =>
           masked.append(source.substring(copiedUpTo, keywords.start))
           if (onOwnLines) masked.append('\n')
-          masked.append(placeholderFor(nextIndex))
+          masked.append(placeholderFor(nextIndex, prefix))
           originals += nextIndex -> s"include ${target.text}"
           nextIndex += 1
           copiedUpTo = target.endIndex
@@ -76,19 +83,79 @@ private[hocon_fmt] object IncludeMasking {
     replaceEachMatch(withoutOwnLineGuards, GuardInline)(dropOurs)
   }
 
-  /** Whether the user's own text can be mistaken for our placeholders: the reserved prefix turns up
-    * other than in the three places each placeholder writes it (its key, its value, its guard
-    * key), or an escape could spell it. Judged on the masked text, where an include's own target
-    * is already out of the way, and again on what sconfig rendered, where an escape such as
-    * `\u005f` has been resolved. Restoration then needs no guess about whose text a match is.
+  /** A cheap source check also protects comments, which are outside the parsed value tree.
+    * The underscore escape check is deliberately broad, including comments and triple quotes.
     */
   def collides(masked: Masked): Boolean =
     masked.originals.nonEmpty && (occurrences(masked.text) != ours(masked) || masked.text.toLowerCase.contains(
       "\\u005f"
     ))
 
-  def collides(masked: Masked, rendered: String): Boolean =
-    masked.originals.nonEmpty && occurrences(rendered) > ours(masked)
+  /** Check field pairs, not independent allowed strings: a placeholder value under a user key
+    * is still the user's value. Unresolved values cannot be unwrapped, but their rendering exposes
+    * substitution paths and the pieces of unresolved concatenations and merges.
+    */
+  def collides(masked: Masked, parsed: ConfigObject): Boolean =
+    masked.originals.nonEmpty && reservedIn(
+      parsed,
+      masked.originals.keysIterator.flatMap { index =>
+        List(s"$PlaceholderPrefix$index" -> s"$PlaceholderPrefix$index", s"$GuardPrefix$index" -> GuardValue)
+      }.toMap
+    )
+
+  private def reservedIn(value: ConfigValue, allowed: Map[String, String]): Boolean = value match {
+    case obj: ConfigObject =>
+      obj.entrySet.asScala.exists { entry =>
+        val key       = entry.getKey
+        val child     = entry.getValue
+        val generated = allowed.get(key).exists(expected => Try(child.unwrapped).toOption.contains(expected))
+        !generated && (key.contains(PlaceholderPrefix) || reservedIn(child, allowed))
+      }
+    case list: ConfigList => list.asScala.exists(reservedIn(_, allowed))
+    case other            =>
+      Try(other.unwrapped).toOption match {
+        case Some(text: String) => text.contains(PlaceholderPrefix)
+        case Some(_)            => false
+        case None               => other.render(HoconFormatter.renderOptions).contains(PlaceholderPrefix)
+      }
+  }
+
+  /** An identical user field can overwrite a generated field before we see the tree. Parse again
+    * with generated names absent from the first rendering: user reserved names then remain visible,
+    * even when spelled as concatenated tokens. No generated reserved names are allowed in this tree.
+    */
+  def collisionProbe(source: String, rendered: String): Masked = {
+    @tailrec
+    def unused(index: Int): String = {
+      val prefix = s"__HOCON_MASK_${index}_"
+      if (rendered.contains(prefix) || source.contains(prefix)) unused(index + 1) else prefix
+    }
+    maskWithPrefix(source, onOwnLines = false, unused(0))
+  }
+
+  def probeCollides(parsed: ConfigObject): Boolean = reservedIn(parsed, Map.empty)
+
+  /** Each index must have exactly one complete placeholder and guard, with no other reserved text.
+    * A total alone cannot detect one index replacing another.
+    */
+  def collides(masked: Masked, rendered: String): Boolean = {
+    def indices(pattern: Pattern, placeholder: Boolean): List[String] = {
+      val matcher = pattern.matcher(rendered)
+      @tailrec
+      def collect(from: Int, found: List[String]): List[String] =
+        if (!matcher.find(from)) found
+        else {
+          val index = matcher.group(1)
+          val valid = !placeholder || index == matcher.group(2)
+          collect(matcher.start + 1, if (valid) index :: found else found)
+        }
+      collect(0, Nil)
+    }
+    val expected = masked.originals.keys.toList.map(_.toString).sorted
+    masked.originals.nonEmpty && (occurrences(rendered) != ours(masked) ||
+      indices(PlaceholderField, placeholder = true).sorted != expected ||
+      indices(GuardField, placeholder = false).sorted != expected)
+  }
 
   private def ours(masked: Masked): Int = 3 * masked.originals.size
 
@@ -134,9 +201,9 @@ private[hocon_fmt] object IncludeMasking {
   val GuardPrefix       = "__INCLUDE_GUARD_"
   val GuardValue        = "g"
 
-  private def placeholderFor(index: Int): String =
-    s"""$PlaceholderPrefix$index : "$PlaceholderPrefix$index", """ +
-      s"""$GuardPrefix$index : "$GuardValue""""
+  private def placeholderFor(index: Int, prefix: String): String =
+    s"""$prefix$index : "$prefix$index", """ +
+      s"""${prefix}GUARD_$index : "$GuardValue""""
 
   private val OptionalQuote = """["]?"""
 
@@ -155,6 +222,7 @@ private[hocon_fmt] object IncludeMasking {
   // The renderer may or may not quote the guard value, so both spellings have to match.
   private val guardField =
     s"""$OptionalQuote$GuardPrefix(\\d+)$OptionalQuote[ \\t]*[:=][ \\t]*$OptionalQuote$GuardValue$OptionalQuote"""
+  private val GuardField        = Pattern.compile(guardField)
   private val GuardOnItsOwnLine = Pattern.compile(s"""\\n[ \\t]*$guardField""")
   private val GuardInline       = Pattern.compile(s""",?[ \\t]*$guardField""")
 
