@@ -76,10 +76,12 @@ whose exception carries the original `Refusal` in `.refusal`.
 
 Formatting stages the complete output in a managed temporary directory beside the original,
 then atomically replaces the original; a failed or cancelled staged write leaves the original
-intact and cleans up staging. If atomic replacement is unsupported, the operation fails without a
-non-atomic fallback. Symlinks are followed and file permissions preserved. Replacement changes
-file identity, so other hard links retain the old content. Calls on the same file must be
-serialised; `distinctPaths` canonicalises and deduplicates a list before parallel work.
+intact and cleans up staging. The staged file is only renamed over the original when it can be
+given the original's owner, group and every mode bit, setgid included, and when both the file and
+its directory can be written; otherwise the formatted text is written in place, which keeps the
+file but loses the crash-atomicity of the rename. Symlinks are followed. A replacement is a new
+file, so other hard links keep the old content; an in-place write keeps them too. Calls on the same
+file must be serialised; `distinctPaths` canonicalises and deduplicates a list before parallel work.
 
 ## pre-commit
 

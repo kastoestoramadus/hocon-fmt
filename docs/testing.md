@@ -17,7 +17,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
-| `FileFormatterSpec` | `cats` | file verdicts, no-write checks and refusals, atomic formatting, symlinks, permissions and canonical paths on JVM, Node and Native |
+| `FileFormatterSpec` | `cats` | file verdicts, no-write checks and refusals, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and canonical paths on JVM, Node and Native |
 | `FileFormatterFailureSpec` | `cats/.jvm` | a failure or cancellation after a partial staged write preserves the original bytes and cleans up staging |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
 | scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |

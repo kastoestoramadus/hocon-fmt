@@ -34,9 +34,11 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
   def check: Pipe[F, Path, (Path, Verdict)] =
     _.evalMap(path => verdict(path).tupleLeft(path))
 
-  /** Only NeedsFormatting is written. The original survives failed or cancelled staged writes;
-    * replacement requires an atomic move, with no fallback to a non-atomic overwrite.
-    * Symlinks are followed so the link itself survives.
+  /** Only NeedsFormatting is written. The original is replaced by a staged copy only when that
+    * copy provably keeps the file's identity — its owner, group and every mode bit; otherwise the
+    * formatted text is written in place, which loses the crash-atomicity of a rename but keeps the
+    * file the same inode, as it was before this adapter. Symlinks are followed so the link itself
+    * survives.
     */
   def format(path: Path): F[FormatOutcome] =
     files.realPath(path).flatMap { target =>
@@ -55,15 +57,46 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
     }
 
   private def replace(target: Path, content: String): F[Unit] =
-    files.tempDirectory(target.parent, ".hocon-fmt-", None).use { directory =>
+    replaceWithStaged(target, content).flatMap {
+      case true  => ().pure[F]
+      case false => writeInPlace(target, content)
+    }
+
+  /** True when the target was replaced by a staged copy carrying its identity. A file or
+    * directory that cannot be written is not replaced: the write in place then fails the way it
+    * always did, rather than a read-only file changing under its owner.
+    */
+  private def replaceWithStaged(target: Path, content: String): F[Boolean] =
+    target.parent match {
+      case None         => false.pure[F]
+      case Some(parent) =>
+        for {
+          writable       <- files.isWritable(target)
+          parentWritable <- files.isWritable(parent)
+          identity       <- AtomicFiles.identity(target)
+          replaced       <- (writable, parentWritable, identity) match {
+                        case (true, true, Some(kept)) => stage(parent, target, content, kept)
+                        case _                        => false.pure[F]
+                      }
+        } yield replaced
+    }
+
+  private def stage(parent: Path, target: Path, content: String, identity: FileIdentity): F[Boolean] =
+    files.tempDirectory(Some(parent), ".hocon-fmt-", None).use { directory =>
       val temporary = directory / target.fileName
 
-      // Copy attributes before writing so replacement retains the original file's permissions.
-      files.createFile(temporary) *>
-        AtomicFiles.copyAttributes(files, target, temporary) *>
-        Stream.emit(content).through(files.writeUtf8(temporary)).compile.drain *>
-        AtomicFiles.move(files, temporary, target)
+      for {
+        _    <- files.createFile(temporary)
+        _    <- Stream.emit(content).through(files.writeUtf8(temporary)).compile.drain
+        kept <- AtomicFiles.keepIdentity(temporary, identity)
+        _    <- if kept then AtomicFiles.move(files, temporary, target) else ().pure[F]
+      } yield kept
     }
+
+  // Truncate and write, as the CLI did before this adapter. The formatted text was verified
+  // before either write, so a refusal never reaches here.
+  private def writeInPlace(target: Path, content: String): F[Unit] =
+    Stream.emit(content).through(files.writeUtf8(target)).compile.drain
 }
 
 object FileFormatter {

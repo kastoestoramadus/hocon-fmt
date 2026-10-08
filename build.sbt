@@ -177,9 +177,6 @@ lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
       "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % Test
     )
   )
-  .platformsSettings(JVMPlatform, NativePlatform)(
-    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cats" / "jvm-native" / "src" / "main" / "scala"
-  )
   .platformsSettings(JSPlatform)(
     // Node applications supply java.time, as for core; standalone tests need it too.
     libraryDependencies += "org.ekrich" %%% "sjavatime" % sjavatime % Test
@@ -187,7 +184,6 @@ lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .jvmSettings(announceRuntime("cats on the JVM"))
   .jsSettings(
     announceRuntime("cats on Scala.js"),
-    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cats" / "js" / "src" / "main" / "scala",
     scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule))
   )
   .nativeSettings(
