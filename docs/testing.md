@@ -77,9 +77,11 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **Coverage.** `sbt coverageJvm` measures what the JVM tests reach, statement and branch, per
   module; the HTML lands under `*/target/scala-*/scoverage-report` and CI's `coverage` job
   publishes it as an artifact with a per-module table in the job summary. It runs separately
-  from `sbt test`, which stays uninstrumented. Scala.js and Scala Native cannot be measured:
-  dotty's coverage runtime needs `java.util.UUID` over `java.security.SecureRandom`, which
-  neither javalib carries, so the instrumented code stops at link time. No number fails
+  from `sbt test`, which stays uninstrumented, and ends with `coverageOff`; publish, publishLocal,
+  publishM2 and publishSigned refuse to run while coverage is on, so a jar carrying the coverage
+  runtime's calls cannot ship even when the run fails midway. Scala.js and Scala Native cannot be
+  measured: dotty's coverage runtime needs `java.util.UUID` over `java.security.SecureRandom`,
+  which neither javalib carries, so the instrumented code stops at link time. No number fails
   anything — coverage says what ran, not what the assertions check; mutation testing is the
   follow-up in [ideas](ideas.md).
 
