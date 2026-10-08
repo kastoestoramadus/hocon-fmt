@@ -27,10 +27,12 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   def textOf(file: Path): IO[String] = bytesOf(file).map(bytes => String(bytes.toArray, UTF_8))
 
   def check(files: Path*): IO[CmdApi.Run] =
-    CmdApi.examineAll(files.toList.map(_ -> FormatOptions.default), checkOnly = true)
+    CmdApi.examineAll(Arguments(files.toList, checkOnly = true, config = None, style = StyleOverrides.none))
+      .map(_.fold(e => fail(e), identity))
 
   def rewrite(files: Path*): IO[CmdApi.Run] =
-    CmdApi.examineAll(files.toList.map(_ -> FormatOptions.default), checkOnly = false)
+    CmdApi.examineAll(Arguments(files.toList, checkOnly = false, config = None, style = StyleOverrides.none))
+      .map(_.fold(e => fail(e), identity))
 
   def arguments(config: Option[Path] = None, style: StyleOverrides = StyleOverrides.none): Arguments =
     Arguments(files = Nil, checkOnly = false, config = config, style = style)
@@ -147,15 +149,27 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   test("arguments: files, with --check or -c") {
     assertEquals(
       CmdApi.command.parse(List("--check", "a.conf", "b.conf")),
-      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf"), Path("b.conf")), checkOnly = true)))
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(List(Path("a.conf"), Path("b.conf")), checkOnly = true, config = None, style = StyleOverrides.none)
+        )
+      )
     )
     assertEquals(
       CmdApi.command.parse(List("-c", "a.conf")),
-      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf")), checkOnly = true)))
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(List(Path("a.conf")), checkOnly = true, config = None, style = StyleOverrides.none)
+        )
+      )
     )
     assertEquals(
       CmdApi.command.parse(List("a.conf")),
-      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf")), checkOnly = false)))
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(List(Path("a.conf")), checkOnly = false, config = None, style = StyleOverrides.none)
+        )
+      )
     )
   }
 
@@ -164,10 +178,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   }
 
   test("arguments: stdin and version need no files") {
-    assertEquals(CmdApi.command.parse(List("--stdin")), Right(CmdApi.Invocation.Stdin("<stdin>")))
+    assertEquals(CmdApi.command.parse(List("--stdin")), Right(CmdApi.Invocation.Stdin("<stdin>", StyleOverrides.none)))
     assertEquals(
       CmdApi.command.parse(List("--stdin", "--stdin-filename", "editor.conf")),
-      Right(CmdApi.Invocation.Stdin("editor.conf"))
+      Right(CmdApi.Invocation.Stdin("editor.conf", StyleOverrides.none))
     )
     assertEquals(CmdApi.command.parse(List("--version")), Right(CmdApi.Invocation.Version))
   }
@@ -205,7 +219,7 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
   // file its name promises, so the name alone decides.
   test("stdin under a name that promises another format is refused, naming what it is") {
-    val result = CmdApi.formatStdin("""{"a": 1}""".getBytes(UTF_8), "application.json")
+    val result = CmdApi.formatStdin("""{"a": 1}""".getBytes(UTF_8), "application.json", StyleOverrides.none)
     assertEquals(result.stdout, "")
     assertEquals(result.exitCode, ExitCode(1))
     assert(result.stderr.contains("application.json"), result.stderr)
@@ -356,11 +370,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
 
   tmp.test("write mode formats in the style the config file asks for") { dir =>
     for {
-      _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
-      file   <- write(dir, "a.conf", "a = 1\n")
-      styled <- styleFor()(file)
-      run    <- CmdApi.examineAll(styled.fold(e => fail(e), identity), checkOnly = false)
-      text   <- textOf(file)
+      _    <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file <- write(dir, "a.conf", "a = 1\n")
+      run  <- rewrite(file)
+      text <- textOf(file)
     } yield {
       assertEquals(run.exitCode, ExitCode.Success)
       assertEquals(text, "a: 1\n")
@@ -369,10 +382,9 @@ class CmdApiSpec extends munit.CatsEffectSuite {
 
   tmp.test("--check counts a default-formatted file as unformatted when the style asks for :") { dir =>
     for {
-      _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
-      file   <- write(dir, "a.conf", "a = 1\n")
-      styled <- styleFor()(file)
-      run    <- CmdApi.examineAll(styled.fold(e => fail(e), identity), checkOnly = true)
+      _    <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file <- write(dir, "a.conf", "a = 1\n")
+      run  <- check(file)
     } yield assertEquals(run.exitCode, ExitCode(1))
   }
 
