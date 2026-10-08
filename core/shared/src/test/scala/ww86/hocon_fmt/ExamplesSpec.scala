@@ -9,6 +9,7 @@ class ExamplesSpec extends munit.FunSuite {
   def kindOf(refusal: Refusal): String = refusal match {
     case Refusal.NotUtf8         => "not-utf8"
     case Refusal.NotHocon(_)     => "not-hocon"
+    case Refusal.OtherFormat(_)  => "other-format"
     case Refusal.BrokenOutput(_) => "broken-output"
     case Refusal.LostComment(_)  => "lost-comment"
     case Refusal.LostInclude(_)  => "lost-include"
@@ -23,6 +24,7 @@ class ExamplesSpec extends munit.FunSuite {
     val cases = List(
       Refusal.NotUtf8,
       Refusal.NotHocon("detail"),
+      Refusal.OtherFormat("JSON"),
       Refusal.BrokenOutput("detail"),
       Refusal.LostComment("# gone"),
       Refusal.LostInclude("include \"x.conf\""),

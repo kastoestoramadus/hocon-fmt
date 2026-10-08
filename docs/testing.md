@@ -12,7 +12,8 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
-| `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8 |
+| `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
+| `OptionsSpec` | `core/shared` | the parse and render options the formatter pins explicitly: the final newline, empty text, and how env-variable values render |
 | `JvmFacadeSpec` | `core/jvm` | the JDK-typed boundary, called from Java (`JavaCaller.java`) and reflectively |
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
@@ -85,8 +86,9 @@ in core test and site Scala data; tests and the site use it without runtime file
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
 `target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
 Verdicts are `formatted`, `already-formatted` (only for now or pending), or
-`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `broken-output`, `lost-comment`,
-`lost-include`, `moved-include`, and `unstable-output`. The generator embeds the kinds it
+`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `other-format`, `broken-output`,
+`lost-comment`, `lost-include`, `moved-include`, and `unstable-output`. The generator embeds the
+kinds it
 accepts as `ExampleData.kinds`, and `ExamplesSpec` maps every `Refusal` case through an
 exhaustive `kindOf` and requires the result to be exactly that set, so the next `Refusal`
 case cannot drift. When `now != target`, `reason-if-different` is

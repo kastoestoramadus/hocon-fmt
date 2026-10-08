@@ -17,6 +17,11 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     lazy val millDiscover           = Discover[this.type]
   }
 
+  object directFile extends TestRootModule, HoconFormatterModule {
+    override def hoconFormatSources = Task.Sources("application.json")
+    lazy val millDiscover           = Discover[this.type]
+  }
+
   final case class Run(eval: UnitTester, output: ByteArrayOutputStream) {
     def log: String = output.toString("UTF-8")
   }
@@ -128,6 +133,18 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       assertEquals(read(project, "resources/service.hocon"), "a: 1\n")
       assertEquals(read(project, "resources/data.json"), "{ \"a\" :   1 }\n")
       assertEquals(read(project, "resources/app.properties"), "a   =   1\n")
+    }
+  }
+
+  test("a file named as another format, offered directly, is refused and left alone") {
+    // A directory is filtered to .conf and .hocon, but a file given as a source is taken as it
+    // is: Lightbend's loader reads .json and .properties too, and a round trip would hand back
+    // HOCON, not the file its name promises.
+    withFiles(directFile, "application.json" -> text("""{"a": 1}""")) { run =>
+      val result = run.eval(directFile.hoconFormat())
+      assert(result.isRight, result)
+      assertEquals(read(directFile, "application.json"), """{"a": 1}""")
+      assert(run.log.contains("Leaving application.json unchanged: a JSON file, and hocon-fmt formats HOCON only"), run.log)
     }
   }
 

@@ -99,6 +99,22 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // Lightbend's loader reads .json and .properties too, and a round trip hands back HOCON with
+  // the objects reordered, not the file its name promises: the name alone decides, however valid
+  // the content is as HOCON.
+  tmp.test("write mode leaves a file named as another format untouched") { dir =>
+    val json = "{\n    \"b\": 1,\n    \"a\": 2\n}\n"
+    for {
+      file <- write(dir, "application.json", json)
+      run  <- rewrite(file)
+      text <- textOf(file)
+    } yield {
+      assertEquals(text, json)
+      assert(run.rendered.contains("cannot format, leaving unchanged"), run.rendered)
+      assert(run.rendered.contains("a JSON file, and hocon-fmt formats HOCON only"), run.rendered)
+    }
+  }
+
   tmp.test("a file that cannot be read is reported without stopping the others") { dir =>
     for {
       file <- write(dir, "a.conf", unformatted)
@@ -178,5 +194,15 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       assertEquals(result.exitCode, ExitCode(1))
       assert(result.stderr.contains("editor.conf"), result.stderr)
     }
+  }
+
+  // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
+  // file its name promises, so the name alone decides.
+  test("stdin under a name that promises another format is refused, naming what it is") {
+    val result = CmdApi.formatStdin("""{"a": 1}""".getBytes(UTF_8), "application.json")
+    assertEquals(result.stdout, "")
+    assertEquals(result.exitCode, ExitCode(1))
+    assert(result.stderr.contains("application.json"), result.stderr)
+    assert(result.stderr.contains("JSON"), result.stderr)
   }
 }
