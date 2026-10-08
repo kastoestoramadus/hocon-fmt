@@ -73,6 +73,7 @@ class StatusSpec extends munit.FunSuite {
     case RefusalKind.LostComment    => ww86.hocon_fmt.Refusal.LostComment("# gone")
     case RefusalKind.LostInclude    => ww86.hocon_fmt.Refusal.LostInclude("include \"x.conf\"")
     case RefusalKind.MovedInclude   => ww86.hocon_fmt.Refusal.MovedInclude("include \"x.conf\"")
+    case RefusalKind.ReservedName   => ww86.hocon_fmt.Refusal.ReservedName
     case RefusalKind.UnstableOutput => ww86.hocon_fmt.Refusal.UnstableOutput
     case RefusalKind.NotUtf8        => ww86.hocon_fmt.Refusal.NotUtf8
   }

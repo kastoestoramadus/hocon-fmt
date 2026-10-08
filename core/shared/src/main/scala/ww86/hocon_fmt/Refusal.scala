@@ -36,6 +36,11 @@ enum Refusal derives CanEqual {
     */
   case MovedInclude(statement: String)
 
+  /** The text spells the name the include placeholders are written with, in a file that has an
+    * include. Restoring the placeholders could not tell it from ours.
+    */
+  case ReservedName
+
   /** Formatting the output again would change it, so the file would never settle. sconfig renders
     * an unresolved merge as a comment banner that parses but grows on every pass.
     */
@@ -49,6 +54,7 @@ enum Refusal derives CanEqual {
     case LostComment(text)    => s"a comment would be lost: $text"
     case LostInclude(text)    => s"an include would be lost: $text"
     case MovedInclude(text)   => s"an include would change places with a field: $text"
+    case ReservedName         => "the text uses __INCLUDE_, which the formatter reserves for include placeholders"
     case UnstableOutput       => "a second formatting pass would change the output again"
   }
 }

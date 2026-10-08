@@ -65,6 +65,7 @@ class HoconFormatterJsSpec extends munit.FunSuite {
       Refusal.LostComment("")     -> "lostComment",
       Refusal.LostInclude("")     -> "lostInclude",
       Refusal.MovedInclude("")    -> "movedInclude",
+      Refusal.ReservedName        -> "reservedName",
       Refusal.UnstableOutput      -> "unstableOutput"
     )
     names.foreach((refusal, name) => assertEquals(HoconFormatterJs.nameOf(refusal), name))

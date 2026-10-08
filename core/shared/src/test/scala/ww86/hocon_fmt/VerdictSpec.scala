@@ -107,6 +107,7 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
       Refusal.LostComment("detail"),
       Refusal.LostInclude("detail"),
       Refusal.MovedInclude("detail"),
+      Refusal.ReservedName,
       Refusal.UnstableOutput
     )
     refusals.foreach(r => assert(r.reason.nonEmpty, s"$r has no reason"))

@@ -54,6 +54,7 @@ object HoconFormatterJs {
     case Refusal.LostComment(_)  => "lostComment"
     case Refusal.LostInclude(_)  => "lostInclude"
     case Refusal.MovedInclude(_) => "movedInclude"
+    case Refusal.ReservedName    => "reservedName"
     case Refusal.UnstableOutput  => "unstableOutput"
   }
 }

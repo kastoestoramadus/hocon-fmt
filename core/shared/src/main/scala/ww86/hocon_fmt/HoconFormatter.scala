@@ -84,8 +84,10 @@ object HoconFormatter {
   ): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
     for {
+      _        <- Either.cond(!IncludeMasking.collides(masked), (), Refusal.ReservedName)
       rendered <- attempt(render(masked.text, parse, options))(unreadable)
       _        <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
+      _        <- Either.cond(!IncludeMasking.collides(masked, rendered), (), Refusal.ReservedName)
     } yield Pass(IncludeMasking.unmask(rendered, masked.originals), rendered, masked.originals)
   }
 

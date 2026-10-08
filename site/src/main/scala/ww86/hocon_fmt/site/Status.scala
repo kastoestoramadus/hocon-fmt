@@ -7,7 +7,8 @@ import ww86.hocon_fmt.{Refusal, Verdict}
   */
 enum RefusalKind derives CanEqual {
 
-  case NotHocon, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, UnstableOutput, NotUtf8
+  case NotHocon, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, ReservedName, UnstableOutput,
+    NotUtf8
 
   /** The name the `web` script publishes in its JavaScript API, which `HoconFormatterJsSpec`
     * pins there; the defect table lists refusals by it, and `ContributionsSpec` pins the set.
@@ -19,6 +20,7 @@ enum RefusalKind derives CanEqual {
     case LostComment    => "lostComment"
     case LostInclude    => "lostInclude"
     case MovedInclude   => "movedInclude"
+    case ReservedName   => "reservedName"
     case UnstableOutput => "unstableOutput"
     case NotUtf8        => "notUtf8"
   }
@@ -33,6 +35,7 @@ object RefusalKind {
     case Refusal.LostComment(_)  => RefusalKind.LostComment
     case Refusal.LostInclude(_)  => RefusalKind.LostInclude
     case Refusal.MovedInclude(_) => RefusalKind.MovedInclude
+    case Refusal.ReservedName    => RefusalKind.ReservedName
     case Refusal.UnstableOutput  => RefusalKind.UnstableOutput
   }
 }
@@ -85,13 +88,15 @@ object Status {
       "the configuration library would drop an include directive, so the formatter leaves the file alone."
     case RefusalKind.MovedInclude =>
       "formatting would put an include on the other side of a field, and a later definition wins, so the formatter leaves the file alone."
+    case RefusalKind.ReservedName =>
+      "the text uses __INCLUDE_, a name the formatter writes include placeholders with, so it cannot tell your text from its own."
     case RefusalKind.UnstableOutput => "the output would not settle: formatting it again would change it again."
     case RefusalKind.NotUtf8        => "the bytes are not valid UTF-8."
   }
 
   private def learnMore(kind: RefusalKind): Option[String] = kind match {
-    case RefusalKind.NotUtf8                            => None
-    case RefusalKind.NotHocon | RefusalKind.OtherFormat => Some(limitationsPage)
+    case RefusalKind.NotUtf8                                                       => None
+    case RefusalKind.NotHocon | RefusalKind.OtherFormat | RefusalKind.ReservedName => Some(limitationsPage)
     case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude | RefusalKind.MovedInclude |
         RefusalKind.UnstableOutput =>
       Some(defectsSection)

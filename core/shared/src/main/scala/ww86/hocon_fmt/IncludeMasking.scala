@@ -64,17 +64,48 @@ private[hocon_fmt] object IncludeMasking {
       // Compared as text, as a backreference would: `__INCLUDE_01` is not placeholder 1.
       val sameIndex = field.group(1) == field.group(2)
       // An index we never handed out belongs to the user's own text: leave it untouched.
-      Option.when(sameIndex)(field.group(1).toInt).flatMap(originals.get)
+      Option.when(sameIndex)(indexOf(field)).flatten.flatMap(originals.get)
     }
     // Own-line first: it consumes the newline and indentation, which the inline pattern leaves
     // behind. The other order turns every guard on its own line into a blank one. sconfig may
     // render a guard on the very first line, with no newline before it, so one is lent for the
     // pass; a multiline `^` would do instead, but Scala.js supports it only from ES2018.
     val ours                     = originals.keySet
-    def dropOurs(guard: Matcher) = Option.when(ours(guard.group(1).toInt))("")
+    def dropOurs(guard: Matcher) = Option.when(indexOf(guard).exists(ours))("")
     val withoutOwnLineGuards     = replaceEachMatch("\n" + restored, GuardOnItsOwnLine)(dropOurs).drop(1)
     replaceEachMatch(withoutOwnLineGuards, GuardInline)(dropOurs)
   }
+
+  /** Whether the user's own text can be mistaken for our placeholders: the reserved prefix turns up
+    * other than in the three places each placeholder writes it (its key, its value, its guard
+    * key), or an escape could spell it. Judged on the masked text, where an include's own target
+    * is already out of the way, and again on what sconfig rendered, where an escape such as
+    * `\u005f` has been resolved. Restoration then needs no guess about whose text a match is.
+    */
+  def collides(masked: Masked): Boolean =
+    masked.originals.nonEmpty && (occurrences(masked.text) != ours(masked) || masked.text.toLowerCase.contains(
+      "\\u005f"
+    ))
+
+  def collides(masked: Masked, rendered: String): Boolean =
+    masked.originals.nonEmpty && occurrences(rendered) > ours(masked)
+
+  private def ours(masked: Masked): Int = 3 * masked.originals.size
+
+  private def occurrences(text: String): Int = {
+    @tailrec
+    def count(from: Int, found: Int): Int = {
+      val at = text.indexOf(PlaceholderPrefix, from)
+      if (at < 0) found else count(at + PlaceholderPrefix.length, found + 1)
+    }
+    count(0, 0)
+  }
+
+  /** The index a match names, if it fits an `Int`: a longer run of digits is the user's, since we
+    * never hand out so many placeholders.
+    */
+  private def indexOf(matched: Matcher): Option[Int] =
+    Option(matched.group(1)).flatMap(_.toIntOption)
 
   /** The statements whose placeholder sconfig did not render, in source order. It drops a field
     * the way it drops everything in an object that a later definition of the same key replaces.
@@ -88,7 +119,7 @@ private[hocon_fmt] object IncludeMasking {
       if (!matcher.find(from)) found
       else {
         val index = matcher.group(1)
-        present(matcher.start + 1, if (index == matcher.group(2)) found + index.toInt else found)
+        present(matcher.start + 1, if (index == matcher.group(2)) found ++ indexOf(matcher) else found)
       }
     (originals.keySet -- present(0, Set.empty)).toList.sorted.map(originals)
   }

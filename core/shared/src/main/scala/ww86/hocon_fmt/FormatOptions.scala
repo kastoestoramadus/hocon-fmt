@@ -55,8 +55,12 @@ object FormatOptions {
     }
   }
 
+  // `hasPath` is false for an explicit null, which would then read as "not set"; a null is a
+  // mistake to report, not a way to say "default".
+  private def isSet(config: Config, key: String): Boolean = config.root.containsKey(key)
+
   private def separatorOf(config: Config, file: String): Either[String, Separator] =
-    if (!config.hasPath("separator")) { Right(default.separator) }
+    if (!isSet(config, "separator")) { Right(default.separator) }
     else {
       Try(config.getString("separator")).toEither match {
         case Right("=")   => Right(Separator.Equals)
@@ -67,7 +71,7 @@ object FormatOptions {
     }
 
   private def booleanOf(config: Config, file: String, key: String, fallback: Boolean): Either[String, Boolean] =
-    if (!config.hasPath(key)) { Right(fallback) }
+    if (!isSet(config, key)) { Right(fallback) }
     else {
       Try(config.getBoolean(key)).toEither.left
         .map(_ => s"$file: $key: expected true or false")

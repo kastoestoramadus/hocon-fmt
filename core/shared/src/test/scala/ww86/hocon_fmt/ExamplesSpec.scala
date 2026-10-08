@@ -14,6 +14,7 @@ class ExamplesSpec extends munit.FunSuite {
     case Refusal.LostComment(_)  => "lost-comment"
     case Refusal.LostInclude(_)  => "lost-include"
     case Refusal.MovedInclude(_) => "moved-include"
+    case Refusal.ReservedName    => "reserved-name"
     case Refusal.UnstableOutput  => "unstable-output"
   }
 
@@ -29,6 +30,7 @@ class ExamplesSpec extends munit.FunSuite {
       Refusal.LostComment("# gone"),
       Refusal.LostInclude("include \"x.conf\""),
       Refusal.MovedInclude("include \"x.conf\""),
+      Refusal.ReservedName,
       Refusal.UnstableOutput
     )
     assertEquals(cases.map(kindOf).toSet, ExampleData.kinds)
