@@ -1,10 +1,13 @@
 import scala.scalanative.build.{LTO, Mode}
 
-val scala3    = "3.8.2"
-val sconfig   = "1.12.4"
-val munit     = "1.2.4"
-val osLib     = "0.11.8"
-val sjavatime = "1.5.0"
+val scala3  = "3.8.2"
+val sconfig = "1.12.4"
+val munit   = "1.2.4"
+// UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
+// Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
+val sconfigFork = "2.0.0-hocon-fmt-efb66e0131"
+val osLib       = "0.11.8"
+val sjavatime   = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
 val laminar = "17.2.1"
 
@@ -103,6 +106,21 @@ def guardPublish(p: Project): Project =
       )
     }
 
+// UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
+// releases the option (#646/#647); see "Returning to upstream sconfig" in docs/site.md.
+val checkSconfigFork =
+  taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
+
+ThisBuild / checkSconfigFork := {
+  val ivyHome  = ivyPaths.value.ivyHome.getOrElse(Path.userHome / ".ivy2")
+  val artifact = ivyHome / "local" / "org.ekrich" / "sconfig_sjs1_3" / sconfigFork
+  if (!artifact.isDirectory)
+    sys.error(
+      s"The sconfig fork $sconfigFork is not published ($artifact is missing). " +
+        "Run scripts/fetch-sconfig-fork.sh once, then retry."
+    )
+}
+
 lazy val root = project
   .in(file("."))
   // Aggregation drives compile, scalafmt and the rest.
@@ -113,6 +131,7 @@ lazy val root = project
     coreJVM,
     coreJS,
     coreNative,
+    coreSite,
     catsJVM,
     catsJS,
     catsNative,
@@ -144,6 +163,7 @@ lazy val root = project
         zioJS / Test / test,
         zioNative / Test / test,
         coreJS / Test / test,
+        coreSite / Test / test,
         catsJS / Test / test,
         cliJS / Test / test,
         web / Test / test,
@@ -164,6 +184,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("core"))
   .settings(
     name := "hocon-fmt-core",
+    // UPSTREAM-SCONFIG: the no-op comment seam; `coreSite` swaps it for the real one. Delete both
+    // with the seam once ekrich/sconfig releases the option (#646/#647).
+    Seq(Compile -> "main", Test -> "test").map { case (configuration, dir) =>
+      configuration / unmanagedSourceDirectories +=
+        (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / dir / "scala"
+    },
     Test / sourceGenerators += Def.task {
       ExampleGenerator.generate(
         (ThisBuild / baseDirectory).value / "examples",
@@ -179,6 +205,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     // are open. Scoped to the `test` task only, so `testOnly` can still run it on demand.
     Test / test / testOptions += Tests.Exclude(Seq("ww86.hocon_fmt.SconfigDefectsSpec"))
   )
+  // UPSTREAM-SCONFIG: red until released sconfig has the option the page's fork carries; excluded
+  // from `test` like the defects spec. Delete with the fork (docs/site.md, "Returning to upstream").
+  .jvmSettings(
+    Test / test / testOptions += Tests.Exclude(Seq("ww86.hocon_fmt.KeepDetachedCommentsGuardSpec"))
+  )
   .jvmSettings(announceRuntime("core on the JVM"))
   .jsSettings(announceRuntime("core on Scala.js"))
   .nativeSettings(announceRuntime("core on Scala Native"))
@@ -193,6 +224,46 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
 lazy val coreJVM    = guardPublish(core.jvm)
 lazy val coreJS     = guardPublish(core.js)
 lazy val coreNative = guardPublish(core.native)
+
+/** UPSTREAM-SCONFIG: the core as the project page runs it, against the sconfig fork that keeps
+  * detached comments (ekrich/sconfig#646, draft #647). The same sources as `coreJS`, the real
+  * `CommentCarrier` from `core/site-shared` in place of the no-op one, and core's shared suite
+  * with an explicit ledger of what differs. Not published. When the option is released, delete
+  * this project, `sconfigFork`, `checkSconfigFork` and `scripts/fetch-sconfig-fork.sh`; the list
+  * of places is "Returning to upstream sconfig" in docs/site.md.
+  */
+lazy val coreSite = project
+  .in(file("core/site"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name           := "hocon-fmt-core-site",
+    publish / skip := true,
+    announceRuntime("core for the page on Scala.js"),
+    Compile / unmanagedSourceDirectories := Seq(
+      (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "main" / "scala",
+      (ThisBuild / baseDirectory).value / "core" / "site-shared" / "src" / "main" / "scala"
+    ),
+    Test / unmanagedSourceDirectories := Seq(
+      (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "test" / "scala",
+      (ThisBuild / baseDirectory).value / "core" / "site-shared" / "src" / "test" / "scala"
+    ),
+    Test / sourceGenerators += Def.task {
+      ExampleGenerator.generate(
+        (ThisBuild / baseDirectory).value / "examples",
+        (Test / sourceManaged).value
+      )
+    }.taskValue,
+    // Resolving the fork without it published would end in a bare "not found"; this names the fix.
+    update := update.dependsOn(ThisBuild / checkSconfigFork).value,
+    libraryDependencies ++= Seq(
+      "org.ekrich"    %%% "sconfig"          % sconfigFork,
+      "org.ekrich"    %%% "sjavatime"        % sjavatime       % Provided,
+      "org.scalameta" %%% "munit"            % munit           % Test,
+      "org.scalameta" %%% "munit-scalacheck" % munitScalaCheck % Test
+    ),
+    // The upstream defect suite describes released sconfig, which core's own suites run.
+    Test / test / testOptions += Tests.Exclude(Seq("ww86.hocon_fmt.SconfigDefectsSpec"))
+  )
 
 /** Effectful file operations shared by applications and the CLI. */
 lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
@@ -387,7 +458,7 @@ val build =
 lazy val site = project
   .in(file("site"))
   .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
-  .dependsOn(coreJS)
+  .dependsOn(coreSite)
   .settings(
     name := "hocon-fmt-site",
     Compile / sourceGenerators += Def.task {
@@ -436,6 +507,7 @@ addCommandAlias(
     coreJVM,
     coreJS,
     coreNative,
+    coreSite,
     catsJVM,
     catsJS,
     catsNative,
@@ -455,7 +527,9 @@ addCommandAlias(
 // On every platform: sconfig's Scala.js and Scala Native builds have defects of their own.
 addCommandAlias(
   "libraryDefects",
-  Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec").mkString("; ")
+  (Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec") :+
+    // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
+    s"${coreJVM.id}/testOnly ww86.hocon_fmt.KeepDetachedCommentsGuardSpec").mkString("; ")
 )
 
 // Statement and branch coverage for the JVM modules, aggregate last. Dotty's coverage runtime

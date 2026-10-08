@@ -14,7 +14,7 @@ object HoconFormatter {
 
   // Visible to the tests: a copy over there would drift, and a library test rendering with
   // options other than these would prove nothing about this formatter.
-  private[hocon_fmt] val parseOptions = ConfigParseOptions.defaults.setAllowMissing(true)
+  private[hocon_fmt] val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
 
   private def formattingOptions(options: FormatOptions): ConfigFormatOptions =
     ConfigFormatOptions.defaults
@@ -85,11 +85,15 @@ object HoconFormatter {
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
+    // UPSTREAM-SCONFIG: the seam call; inline `restore`'s absence once the option is released.
+    val carried = CommentCarrier.mask(masked.text)
     for {
       _         <- Either.cond(!IncludeMasking.collides(masked), (), Refusal.ReservedName)
-      parsed    <- attempt(ConfigFactory.parseString(masked.text, parse))(unreadable)
+      parsed    <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
       collision <- attempt(IncludeMasking.collides(masked, parsed.root))(unreadable)
       _         <- Either.cond(!collision, (), Refusal.ReservedName)
+      reserved  <- attempt(carried.collides(parsed.root))(unreadable)
+      _         <- Either.cond(!reserved, (), Refusal.ReservedName)
       rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
       _         <- if (!probe || masked.originals.isEmpty) Right(())
            else {
@@ -102,7 +106,11 @@ object HoconFormatter {
            }
       _ <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
       _ <- Either.cond(!IncludeMasking.collides(masked, rendered), (), Refusal.ReservedName)
-    } yield Pass(IncludeMasking.unmask(rendered, masked.originals), rendered, masked.originals)
+    } yield {
+      // The masked text with its carried parts back, so nothing downstream sees our placeholders.
+      val restored = carried.restore(rendered)
+      Pass(IncludeMasking.unmask(restored, masked.originals), restored, masked.originals)
+    }
   }
 
   /** Formatting the output again is the whole check. The CLI writes on success, so output that

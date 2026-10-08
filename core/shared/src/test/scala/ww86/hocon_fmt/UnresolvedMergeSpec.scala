@@ -48,9 +48,15 @@ class UnresolvedMergeSpec extends munit.FunSuite {
   for {
     (name, source) <- List("under an include" -> mergeUnderInclude, "at the root" -> mergeAtRoot)
     options        <- allOptions
-  } test(s"an unresolved object merge $name is blamed on its output, not the input ($options)") {
-    val expected = if (options.simplifyNestedObjects) "broken-output" else "unstable-output"
-    assertEquals(outputRefusal(refusalOf(source, options)), expected)
+  } test(s"an unresolved object merge $name follows the variant rendering ($options)") {
+    if (Variant.unresolvedMergesFormat) {
+      val formatted = HoconFormatter.format(source, options).fold(refusal => fail(refusal.reason), identity)
+      assert(formatted.contains(include.trim), "the include must survive")
+      assertEquals(HoconFormatter.format(formatted, options), Right(formatted), "the fork output must be stable")
+    } else {
+      val expected = if (options.simplifyNestedObjects) "broken-output" else "unstable-output"
+      assertEquals(outputRefusal(refusalOf(source, options)), expected)
+    }
   }
 
   for (options <- allOptions)
