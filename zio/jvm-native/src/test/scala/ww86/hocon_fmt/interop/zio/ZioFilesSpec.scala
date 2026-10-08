@@ -59,8 +59,10 @@ class ZioFilesSpec extends munit.FunSuite {
       withFile(original) { path =>
         val before = Files.getLastModifiedTime(path)
         run(ZioFiles.format(path).either) match {
-          case Left(FileError.Refused(reason)) => assertEquals(Verdict.Refused(reason), Verdict.of(original))
-          case other                           => fail(s"expected refusal, got $other")
+          // The file's own name is what the decision is made under, so the refusal reports it.
+          case Left(FileError.Refused(reason)) =>
+            assertEquals(Verdict.Refused(reason), Verdict.of(original, path.toString))
+          case other => fail(s"expected refusal, got $other")
         }
         assertEquals(Files.readAllBytes(path).toSeq, original.toSeq)
         assertEquals(Files.getLastModifiedTime(path), before)
