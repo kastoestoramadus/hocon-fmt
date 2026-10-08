@@ -111,6 +111,9 @@ not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpe
 - `=` becomes `:`
 - nested objects are flattened to path keys (`setSimplifyNestedObjects`)
 - triple-quoted strings become escaped single-line strings
+- `+=` appends become the specification's expansion (`a += 2` renders as `a: ${?a}[2]`), the same
+  value: sconfig renders the expanded form, keeping no trace of the shorthand (an append after an
+  earlier definition of the key is instead the `+=` field-separator defect above, and is refused)
 - number literals are canonicalised (`1.5e3` becomes `1500`)
 - unicode escapes are resolved (`\u0041` becomes `A`)
 - line endings become `\n`, and a UTF-8 byte-order mark is dropped

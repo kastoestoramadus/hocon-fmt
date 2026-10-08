@@ -232,6 +232,16 @@ Each `library:` test in `SconfigDefectsSpec` is a reproduction against bare scon
 at [ekrich/sconfig](https://github.com/ekrich/sconfig) helps everyone on sconfig and may shrink
 [limitations](limitations.md). **Your part:** filing them, or approving them to be filed.
 
+### Render `+=` back as `+=` upstream (S)
+
+Formatting expands the append shorthand to the specification's form, `a += 2` becoming
+`a: ${?a}[2]`, recorded as an intentional normalisation in [limitations](limitations.md). The value
+is the same, but the spelling the author wrote is not kept, and sconfig is why: its parse tree
+desugars `+=` at parse time, so the renderer cannot tell the shorthand from the expansion written
+out. A render option that keeps the shorthand needs the parser to mark what it built.
+**Your part:** proposing it at [ekrich/sconfig](https://github.com/ekrich/sconfig). **Code:** none
+here; the normalisation entry goes away with the fix.
+
 ## The project
 
 ### Java style in the Gradle and Maven plugins (S)
