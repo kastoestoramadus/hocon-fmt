@@ -115,7 +115,7 @@ A formatter written in Scala 3 has to reach hosts that are not:
 - **Gradle** compiles against the Java API but does not ship it: `eu.ww86:hocon-fmt-java-api` (the
   core comes transitively) is resolved through a `hoconFormatter` configuration in the consumer's
   build and runs in a Worker API class loader, so a Scala 3 library never lands on a buildscript
-  classpath shared with other plugins. The worker switches exhaustively over the API's `Verdict`
+  classpath shared with other plugins. The worker reads the API's sealed `Verdict`
   records; it no longer calls `JvmFacade`.
 - **Maven** gives every plugin its own class loader, so the plugin depends on the core directly.
 
