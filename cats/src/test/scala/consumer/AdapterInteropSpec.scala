@@ -1,7 +1,7 @@
 package consumer
 
 import ww86.hocon_fmt.*
-import ww86.hocon_fmt.cats.{FileFormatter, FormatOutcome}
+import ww86.hocon_fmt.interop.cats.{FileFormatter, FormatOutcome}
 
 import cats.effect.IO
 import fs2.Stream
@@ -21,9 +21,9 @@ class AdapterInteropSpec extends munit.CatsEffectSuite {
   tmp.test("a consumer reaches the core and the adapter in one file") { dir =>
     val file = dir / "a.conf"
     for {
-      _         <- write(file)
-      outcome   <- formatter.format(file)
-      verdict   <- formatter.verdict(file)
+      _       <- write(file)
+      outcome <- formatter.format(file)
+      verdict <- formatter.verdict(file)
     } yield {
       assertEquals(outcome, FormatOutcome.Formatted)
       assertEquals(verdict, Verdict.AlreadyFormatted)

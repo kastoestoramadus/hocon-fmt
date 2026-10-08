@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import java.nio.file.Files as NioFiles
 
@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
 /** Owner, group and mode bits through the JVM's unix view, which Windows does not have: there a
   * file has no such identity to keep, and the caller writes in place instead.
   */
-private[cats] object AtomicFiles {
+private[interop] object AtomicFiles {
 
   def identity[F[_]: Sync](path: Path): F[Option[FileIdentity]] =
     Sync[F].blocking {

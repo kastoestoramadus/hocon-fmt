@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import _root_.cats.effect.Async
 import _root_.cats.syntax.all.*

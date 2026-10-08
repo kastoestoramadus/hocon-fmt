@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import java.nio.file.Files as NioFiles
 

@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import java.lang.reflect.{InvocationHandler, Method, Proxy}
 import java.nio.charset.StandardCharsets.UTF_8

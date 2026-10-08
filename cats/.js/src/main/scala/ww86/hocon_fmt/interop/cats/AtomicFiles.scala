@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import _root_.cats.effect.Sync
 import _root_.cats.syntax.all.*
@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
 /** Owner, group and mode bits through Node's fs: fs2's permission API carries neither owner nor
   * group, and only the nine permission bits, so a staged copy would lose setuid, setgid and sticky.
   */
-private[cats] object AtomicFiles {
+private[interop] object AtomicFiles {
 
   @js.native
   @JSImport("fs", JSImport.Namespace)

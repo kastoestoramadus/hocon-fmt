@@ -59,7 +59,7 @@ Node applications also supply one `java.time` implementation, for example
 import cats.effect.IO
 import fs2.Stream
 import fs2.io.file.Path
-import ww86.hocon_fmt.cats.FileFormatter
+import ww86.hocon_fmt.interop.cats.FileFormatter
 
 val formatter = FileFormatter[IO]
 val file = Path("application.conf")

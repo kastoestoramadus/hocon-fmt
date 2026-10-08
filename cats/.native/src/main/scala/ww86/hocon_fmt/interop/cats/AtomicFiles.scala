@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import _root_.cats.effect.Sync
 import _root_.cats.syntax.all.*
@@ -14,7 +14,7 @@ import scala.util.control.NonFatal
 /** Owner, group and mode bits through the C library: the javalib exposes only the nine permission
   * bits, so a staged copy would lose setuid, setgid and sticky.
   */
-private[cats] object AtomicFiles {
+private[interop] object AtomicFiles {
 
   def identity[F[_]: Sync](path: Path): F[Option[FileIdentity]] =
     Sync[F].blocking {

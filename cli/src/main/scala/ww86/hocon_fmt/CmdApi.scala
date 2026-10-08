@@ -8,7 +8,7 @@ import _root_.cats.effect.{ExitCode, IO, IOApp}
 import _root_.cats.syntax.all.*
 import com.monovore.decline.{Command, Help, Opts, PlatformApp}
 import fs2.io.file.Path
-import ww86.hocon_fmt.cats.{FileFormatter, FormatOutcome}
+import ww86.hocon_fmt.interop.cats.{FileFormatter, FormatOutcome}
 
 /** Command line entry point: parses arguments, delegates file operations to [[FileFormatter]],
   * and prints the results. The same code runs as a native binary, a Node script and a JVM program.

@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.cats
+package ww86.hocon_fmt.interop.cats
 
 import _root_.cats.effect.IO
 import fs2.io.file.Path
