@@ -71,7 +71,7 @@ but does no lookup, keeping the promise that `--stdin-filename` reads nothing.
 
 ```sh
 hocon-fmt --separator : application.conf   # one file, the : spelling
-hocon-fmt --check                          # the whole repository, styled by its .hocon-fmt.conf
+git ls-files '*.conf' | xargs hocon-fmt --check   # the repository, each file styled by its .hocon-fmt.conf
 ```
 
 The build-tool plugins below format with the default style; plugin settings and config-file

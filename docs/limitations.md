@@ -89,6 +89,21 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
   (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
   files from GitHub are refused for it. Fixed by ekrich/sconfig#600, not yet released.
 
+Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
+tree renders differently with `simplify-nested-objects = false`. Pinned over the examples in
+`ExamplesSpec`; a file that is refused under one style is not thereby shown to format wrongly under
+another, but nothing here promises the options agree:
+
+- `showcase/05-sconfig-defect` and `catalogue/env-override-root-not-parseable` are
+  `Refusal.BrokenOutput` with the default nesting and `Refusal.UnstableOutput` without it.
+- `catalogue/object-substitution-then-field` (`x = ${t} { b = 2 }`) is `Refusal.BrokenOutput` with
+  the default nesting and formats without it.
+
+`Refusal.ReservedName`: a file with an `include` is refused when the rest of its text spells
+`__INCLUDE_`, the name the include placeholders are written with (see
+[architecture](architecture.md#include-masking)). Restoring placeholders cannot tell such text
+from ours, and guessing corrupted it silently. A file without an include is not affected.
+
 Rejected at parse time although the specification allows them (`Refusal.NotHocon`):
 
 - **An array at the file root**: `[ "a", "b" ]`

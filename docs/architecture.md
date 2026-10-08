@@ -81,6 +81,11 @@ Each **whole statement** is swapped for a placeholder field before parsing and s
    consume the preceding newline, so the other order leaves blank lines behind. sconfig may render
    a guard on the very first line, so a newline is lent for that pass.
 
+3. The reserved name is checked, not trusted: if the masked text, or sconfig's rendering of it, has
+   `__INCLUDE_` anywhere but in the three places each placeholder writes it (or an escape could
+   spell it), the file is refused with `Refusal.ReservedName` instead of restored on a guess.
+   Indices too long for an `Int` are the user's, never an exception.
+
 **Why a guard field:** `setSimplifyNestedObjects` collapses a single-field object into a dotted
 path, so `o { __INCLUDE_0: v }` would become `o.__INCLUDE_0: v`, moving the placeholder out of its
 object. A second field keeps the object from collapsing.

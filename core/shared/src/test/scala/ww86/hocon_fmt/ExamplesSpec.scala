@@ -70,6 +70,45 @@ class ExamplesSpec extends munit.FunSuite {
     }
   }
 
+  // A refusal can depend on the style asked for: sconfig renders the same tree differently with
+  // and without simplified nesting, and a defect that shows in one rendering may not in the other.
+  // This pins which examples are refused differently by option, so a change in either direction is
+  // seen; docs/limitations.md explains why.
+  test("which examples are refused differently depending on the options") {
+    val allOptions =
+      for {
+        separator <- List(Separator.Equals, Separator.Colon)
+        double    <- List(false, true)
+        simplify  <- List(true, false)
+      } yield FormatOptions(separator, double, simplify)
+    val differing = ExampleData.all.flatMap { example =>
+      val outcomes = allOptions.map { options =>
+        HoconFormatter.format(example.input, options).fold(r => s"refused:${kindOf(r)}", _ => "formatted")
+      }
+      val bySimplify = allOptions.zip(outcomes).groupMap(_._1.simplifyNestedObjects)(_._2).view.mapValues(_.toSet).toMap
+      Option.when(outcomes.toSet.size > 1)(
+        example.id -> bySimplify.toList.sortBy(!_._1).map((k, v) => s"simplify=$k: ${v.toList.sorted.mkString(",")}")
+      )
+    }
+    assertEquals(
+      differing,
+      List(
+        "showcase/05-sconfig-defect" -> List(
+          "simplify=true: refused:broken-output",
+          "simplify=false: refused:unstable-output"
+        ),
+        "catalogue/env-override-root-not-parseable" -> List(
+          "simplify=true: refused:broken-output",
+          "simplify=false: refused:unstable-output"
+        ),
+        "catalogue/object-substitution-then-field" -> List(
+          "simplify=true: refused:broken-output",
+          "simplify=false: formatted"
+        )
+      )
+    )
+  }
+
   test("showcase follows directory order and excludes catalogue") {
     assertEquals(ExampleData.showcase.map(_.id), ExampleData.showcase.map(_.id).sorted)
     assert(ExampleData.showcase.forall(_.id.startsWith("showcase/")))
