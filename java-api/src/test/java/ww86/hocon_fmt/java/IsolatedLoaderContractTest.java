@@ -82,12 +82,11 @@ class IsolatedLoaderContractTest {
                             throw new IllegalStateException(e);
                         }
                     })
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(name -> name.matches("hocon-fmt-java-api-.+\\.jar"))
-                    .filter(name -> !name.contains("-sources") && !name.contains("-javadoc"))
+                    .filter(jar -> jar.getFileName().toString().matches("hocon-fmt-java-api-.+\\.jar"))
+                    .filter(jar -> !jar.getFileName().toString().contains("-sources")
+                            && !jar.getFileName().toString().contains("-javadoc"))
                     .findFirst()
-                    .map(name -> toUrl(group.resolve(name)))
+                    .map(IsolatedLoaderContractTest::toUrl)
                     .orElseThrow(() -> new AssertionError(
                             "no hocon-fmt-java-api jar under " + group + " — run `sbt javaApi/publishM2`"));
         }

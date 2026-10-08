@@ -89,6 +89,10 @@ jobs:
       # The library resolves the core from Maven Local until it is on Maven Central.
       - name: Publish the core locally
         run: sbt coreJVM/publishM2
+      # sbt builds and publishes the artifact itself; the run also compiles the javadoc jar, and
+      # the contract suite in the Gradle build loads exactly this published jar.
+      - name: Publish the Java API locally
+        run: sbt javaApi/publishM2
       - name: Java and Kotlin tests
         working-directory: java-api
         run: ./gradlew check

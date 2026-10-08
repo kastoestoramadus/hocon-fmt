@@ -16,9 +16,18 @@ public sealed interface Verdict
     /** The input already is the exact text the formatter would write. */
     record AlreadyFormatted() implements Verdict {}
 
-    /** The formatted text differs; {@link #formatted()} is what should replace the input. */
+    /**
+     * The formatted text differs; {@link #formatted()} is what should replace the input.
+     *
+     * @param formatted the text the input should become
+     */
     record NeedsFormatting(String formatted) implements Verdict {}
 
-    /** The formatter refuses the input; nothing may be written, and {@link #reason()} says why. */
+    /**
+     * The formatter refuses the input; nothing may be written, and {@link #reason()} says why.
+     *
+     * @param kind which refusal the core raised
+     * @param reason why the input is left alone, as a user reads it
+     */
     record Refused(RefusalKind kind, String reason) implements Verdict {}
 }
