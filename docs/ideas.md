@@ -232,6 +232,13 @@ A `.hocon-fmt.conf` choosing `:` or `=`, indentation, and whether to flatten sin
 objects. Every channel would read it from the project root. Pointless while sconfig decides the
 output.
 
+### Keep comments above a blank line (M)
+
+Licence headers and banners are the commonest refusal in real files. A probe masks them like
+includes and recovers 137 of 1,650 corpus files; sconfig's opt-in option would cover most of
+it. **Code:** the playground variant on the sconfig fork; see
+[the investigation](investigations/blank-line-comments.md).
+
 ### Skip unchanged files (S)
 
 A cache of content hashes, as scalafmt keeps, so a large repository checks in milliseconds. Only

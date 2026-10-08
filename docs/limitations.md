@@ -43,6 +43,8 @@ to no field is dropped:
   and a blank line — strip those comment blocks and 261 of the 265 format. Nothing on sconfig
   main, among its open pull requests, or on the sHOCON `bugs-comments` branch fixes it (checked
   2026-10-08), and the gap is the same on sconfig 2.0.0.
+  The investigation, with a probe that masks these comments, is in
+  [investigations/blank-line-comments.md](investigations/blank-line-comments.md).
 
 Blank lines meet the same blind spot: the parse tree holds values and their comments and nothing
 else, so blank lines are not kept at all — formatting the reference.conf corpus turns 1713 of its
