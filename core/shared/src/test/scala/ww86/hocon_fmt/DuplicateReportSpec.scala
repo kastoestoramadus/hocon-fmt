@@ -175,6 +175,43 @@ class DuplicateReportSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(pathOf(source).rendered, "a[0].b")
   }
 
+  test("array values have independent element scopes, including concatenation and self-reference") {
+    List(
+      "a = [{b=1}] [{b=2}]",
+      "a=[{b=1}]\na=${a} [{b=2}]"
+    ).foreach { source =>
+      assertEquals(source.parsedConfig.resolve(), "a=[{b=1},{b=2}]".parsedConfig.resolve())
+      assertEquals(report(source), Nil, source)
+    }
+    assertEquals(
+      report("a=[{b=1}]\na=[{b=2}]"),
+      List(Finding.KeyDefinedAgain(KeyPath.of("a"), 1, 2))
+    )
+    val local = "a=[{b=1,b=2}] [{b=3,b=4}]"
+    val path  = KeyPath(List(Segment.Name("a"), Segment.Index(0), Segment.Name("b")))
+    assertEquals(report(local), List.fill(2)(Finding.KeyDefinedAgain(path, 1, 1)))
+  }
+
+  test("an ancestor replacement cuts descendants before a fresh object defines them again") {
+    val source = "a {b=1}\na=0\na {b=2}"
+    assertEquals(source.parsedConfig.resolve(), "a {b=2}".parsedConfig.resolve())
+    assertEquals(
+      report(source),
+      List(
+        Finding.KeyDefinedAgain(KeyPath.of("a"), 1, 2),
+        Finding.KeyDefinedAgain(KeyPath.of("a"), 2, 3)
+      )
+    )
+    assertEquals(
+      report("a {\n b=1\n}\na=0\na {b=2}"),
+      List(
+        Finding.KeyDefinedAgain(KeyPath.of("a"), 1, 4),
+        Finding.KeyDefinedAgain(KeyPath.of("a", "b"), 2, 4),
+        Finding.KeyDefinedAgain(KeyPath.of("a"), 4, 5)
+      )
+    )
+  }
+
   test("every earlier definition of a path is reported, against the one that replaces it") {
     assertEquals(
       report("x = 1\nx = 2\nx = 3\n"),

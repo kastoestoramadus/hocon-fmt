@@ -457,6 +457,23 @@ class CmdApiSpec extends munit.CatsEffectSuite {
 
   // --- the duplicate report --------------------------------------------------------------------
 
+  test("a duplicate report that cannot run warns on stdin") {
+    val result = CmdApi.formatStdin("a : ${".getBytes(UTF_8), "broken.conf", StyleOverrides.none)
+    assert(result.stderr.contains("WARNING: duplicate report could not run for broken.conf"), result.stderr)
+  }
+
+  tmp.test("a duplicate report that cannot run warns for the file and preserves it") { dir =>
+    for {
+      file <- write(dir, "broken.conf", "a : ${")
+      run  <- rewrite(file)
+      text <- textOf(file)
+    } yield {
+      assert(run.rendered.contains(s"WARNING: duplicate report could not run for $file"), run.rendered)
+      assertEquals(text, "a : ${")
+      assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
   test("write mode warns about the dead definition, and the warning changes no exit code by default") {
     // A file with a dead duplicate is not formatted, so a run that rewrites it would exit 0 even
     // without the report; what the report adds is the line saying why.
