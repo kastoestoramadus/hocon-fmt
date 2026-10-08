@@ -2,7 +2,7 @@ package ww86.hocon_fmt
 
 import java.nio.charset.StandardCharsets.UTF_8
 
-import cats.effect.IO
+import _root_.cats.effect.IO
 
 /** The standard streams as bytes, through blocking `java.io`.
   *

@@ -17,6 +17,8 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
+| `FileFormatterSpec` | `cats` | file verdicts, no-write checks and refusals, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and canonical paths on JVM, Node and Native |
+| `FileFormatterFailureSpec` | `cats/.jvm` | a failure or cancellation after a partial staged write preserves the original bytes and cleans up staging |
 | `ZioFormatterSpec`, `ZioFilesSpec`, adapter `FormatterPropertiesSpec` | `zio/shared`, `zio/jvm-native` | typed text refusals on all runtimes; file decisions, untouched refusals, atomic replacement cleanup, symlinks and permissions, plus 1000 arbitrary byte sequences on JVM / Native |
 | `ZioFilesJvmSpec` | `zio/jvm` | a path on a closed ZIP filesystem, whose unchecked `ClosedFileSystemException` must stay that file's outcome; Scala Native serves no jar provider, so the mechanism is JVM-only |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
@@ -66,7 +68,7 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
   to ignore it. `sbt libraryDefects` runs it on all three platforms, since sconfig's Scala.js and
   Native builds have defects of their own.
-- **Order.** `sbt test` runs core, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
+- **Order.** `sbt test` runs core, cats, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
 

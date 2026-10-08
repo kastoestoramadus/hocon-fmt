@@ -162,7 +162,7 @@ node -e "require('vm').runInThisContext(require('fs').readFileSync('web/target/b
 ## Build from source
 
 ```bash
-sbt test                    # core and CLI on the JVM, Scala.js and Scala Native, and the web script
+sbt test                    # core, cats and CLI on JVM, Scala.js and Native, plus web and site
 ```
 
 The plugins build on their own; [AGENTS.md](AGENTS.md) lists every command. [Tests](docs/testing.md)

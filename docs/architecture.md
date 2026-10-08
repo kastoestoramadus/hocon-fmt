@@ -13,8 +13,9 @@ around it in `HoconFormatter`.
 | module | what it is | platforms | depends on |
 |---|---|---|---|
 | `core` | `HoconFormatter.format: String => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
+| `cats` | `FileFormatter[F]`: file verdicts, identity-preserving formatting, streaming checks, opt-in refusal errors | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io |
 | `zio` | `ZioFormatter`, blocking `ZioFiles`, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
-| `cli` | `CmdApi`, an `IOApp`: arguments, file IO, parallelism, report | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io, decline |
+| `cli` | `CmdApi`, an `IOApp`: arguments, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | core, at run time |
@@ -26,7 +27,8 @@ around it in `HoconFormatter`.
 | `bench` | times each formatter phase; see [testing](testing.md#benchmarks) | JVM, Scala.js, Scala Native | core |
 
 `core` stays pure and depends on nothing but sconfig because the build-tool plugins load it into
-their hosts. Effects live in `cli`, on cats-effect, and in the independent `zio` library adapter.
+their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delegates to it. The independent
+`zio` library adapter offers text and file formatting on ZIO.
 
 ## The pipeline
 
