@@ -234,6 +234,14 @@ A `.hocon-fmt.conf` choosing `:` or `=`, indentation, and whether to flatten sin
 objects. Every channel would read it from the project root. Pointless while sconfig decides the
 output.
 
+### Keep comments above a blank line in the command line too (M)
+
+Licence headers and banners are the commonest refusal in real files. The project page already
+keeps them on the sconfig fork; the command line and the plugins wait for sconfig to release the
+option (ekrich/sconfig#646/#647) and then flip. **Code:** see
+[the investigation](investigations/blank-line-comments.md) and `docs/site.md`, "Returning to
+upstream sconfig".
+
 ### Skip unchanged files (S)
 
 A cache of content hashes, as scalafmt keeps, so a large repository checks in milliseconds. Only
