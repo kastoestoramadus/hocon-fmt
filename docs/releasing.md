@@ -6,7 +6,9 @@ the `Release` workflow has never run.
 
 | artifact | built by | published to | users get it through |
 |---|---|---|---|
-| `hocon-fmt-core_3`, `hocon-fmt-cli_3` | sbt | Maven Central | a library dependency; the JVM command line |
+| `hocon-fmt-core_3`, `hocon-fmt-core_sjs1_3`, `hocon-fmt-core_native0.5_3` | sbt | Maven Central | the pure formatter on every platform |
+| `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | sbt | Maven Central | cats-effect file operations on every platform |
+| `hocon-fmt-cli_3` | sbt | Maven Central | the JVM command line |
 | `sbt-hocon-fmt` | sbt | Maven Central | `addSbtPlugin` |
 | `hocon-fmt-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
 | `mill-hocon-fmt_mill1_3` | `mill-plugin/` | Maven Central | `//| mvnDeps` |
@@ -99,11 +101,13 @@ workflow" for workflows on the default branch.
    `gradle-plugin/build.gradle.kts` (`version`), `maven-plugin/pom.xml` (the plugin's own version
    and the `hocon-fmt-core_3` dependency), `mill-plugin/build.mill` (`formatterVersion`),
    and the `additional_dependencies` of all four hooks in `.pre-commit-hooks.yaml`. The npm and
-   wheel versions follow `build.sbt`.
+   wheel versions follow `build.sbt`. All core and cats platform artifacts also inherit that
+   version; `signRelease` and `publishRelease` include all six library artifacts.
 2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
    artifact without releasing anything, which is how to find out the matrix works. Its `central`
    job also signs with the real key and passphrase, uploading nothing: the passphrase is checked
-   there, because a typo cannot be seen from outside.
+   there, because a typo cannot be seen from outside. `signRelease` checks every sbt artifact,
+   including the cross-built core and cats libraries, without uploading anything.
 3. Push a tag `v<version>`. `scripts/check-release-version.sh <version>` runs first and stops the
    job if any place that carries the version disagrees with the tag. The workflow links native binaries for Linux (x86_64, aarch64) and
    macOS (aarch64), smoke-tests them, wraps each in a wheel, packs the npm package, builds the web
@@ -111,8 +115,8 @@ workflow" for workflows on the default branch.
 4. Publish, in dependency order:
    - Maven Central, first: the Gradle, Maven and Mill plugins and the sbt plugin all resolve the
      core from there. The tag leaves three deployments in the portal (sbt, Maven, Mill). Look each
-     over in Publish → Deployments, then publish the sbt one, which carries the core, first. A
-     release cannot be undone.
+     over in Publish → Deployments, then publish the sbt one, which carries core and cats on all
+     three platforms, first. A release cannot be undone.
    - The Gradle Plugin Portal.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).

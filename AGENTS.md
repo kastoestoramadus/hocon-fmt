@@ -36,8 +36,8 @@ platform is how a port rots.
 
 ## Layout
 
-`core` (pure formatting, sconfig only) · `cli` (cats-effect `IOApp`) · `web` (script for web
-pages) · `site` (the project page on Scala.js/Laminar, on the core directly —
+`core` (pure formatting, sconfig only) · `cats` (effectful file adapter) · `cli` (cats-effect `IOApp`) ·
+`web` (script for web pages) · `site` (the project page on Scala.js/Laminar, on the core directly —
 [docs/site.md](docs/site.md)) · `sbt-plugin` (Scala 2.12) · `gradle-plugin`,
 `maven-plugin` (standalone Java builds) · `mill-plugin` (standalone Mill build) · `npm/` (package
 template) · `python/` (wheel carrying the native binary) · `bench` · `.pre-commit-hooks.yaml`.
@@ -58,8 +58,8 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   output check parses the *masked* text: sconfig cannot parse an `include` on Scala.js, so do not
   simplify it to parse the finished text.
 - **`core` depends on sconfig only.** The plugins load it into sbt, Gradle and Maven; effects and
-  libraries belong in `cli`. `JvmFacade` is the JDK-typed boundary the sbt, Gradle and Maven
-  plugins share; Mill runs Scala 3, and its plugin matches on `Verdict`.
+  libraries belong in `cats` and `cli`. `JvmFacade` is the JDK-typed boundary the sbt, Gradle and
+  Maven plugins share; Mill runs Scala 3, and its plugin matches on `Verdict`.
 - **Do not "fix" the intentional normalisations** (`//` to `#`, `=` to `:`, flattened paths, …)
   listed in [docs/limitations.md](docs/limitations.md).
 - **One version everywhere**: see [docs/releasing.md](docs/releasing.md) for the five places.
