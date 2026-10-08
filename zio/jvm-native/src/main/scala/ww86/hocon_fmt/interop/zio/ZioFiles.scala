@@ -19,10 +19,13 @@ object ZioFiles {
   /** The decision on one file's bytes. A refusal is `FileError.Refused`, never a returned value, so
     * `Verdict.Refused` is unreachable here; `Verdict` is the shared decision type `Verdict.of`
     * returns, and narrowing it would only move a cast into every caller.
+    *
+    * The path is the name the decision is made under: a refusal reports it, and a file named as
+    * another format is refused whatever it contains.
     */
   def verdict(path: Path): IO[FileError, Verdict] =
     BlockingIo(Files.readAllBytes(path)).mapError(FileError.Io(_)).flatMap { bytes =>
-      Verdict.of(bytes) match {
+      Verdict.of(bytes, path.toString) match {
         case Verdict.Refused(reason) => ZIO.fail(FileError.Refused(reason))
         case decision                => ZIO.succeed(decision)
       }
