@@ -244,6 +244,22 @@ here; the normalisation entry goes away with the fix.
 
 ## The project
 
+### A dependency-free shared file-identity module (M)
+
+The `cats` and `zio` adapters mirror about a hundred lines of file-identity code — stage a copy
+beside the original, give it the original's owner, group and every mode bit, prove it by reading
+them back, rename over the original, and write in place when any step fails — including the Scala
+Native C `stat`/`chown`/`chmod` interop both carry (`FileIdentity` and the per-platform attribute
+sources exist twice, `AtomicFiles` against `AtomicFile`/`PosixIdentity`). Calling one adapter from
+the other is no fix: it would put fs2 and cats-effect on the ZIO classpath, or ZIO on the cats
+one, against [architecture](architecture.md). A `file-identity` artifact depending on nothing but
+the standard library would delete the mirror and stop the two adapters drifting; the cost is a
+sixth published artifact — coordinates, release config, signing, a runbook line — for code with
+two consumers. **Your part:** deciding the artifact earns its publication. **Code:** move the
+identity record and the per-platform attribute sources, parameterise the write over the effect
+type, point both adapters at it; the rename and hard-link tests each adapter carries today move
+with it unchanged.
+
 ### Java style in the Gradle and Maven plugins (S)
 
 The two Java builds are formatted by hand, not quite alike. google-java-format through Spotless
