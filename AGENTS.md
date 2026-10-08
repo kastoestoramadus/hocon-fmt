@@ -9,7 +9,7 @@ sconfig, cross-built for the JVM, Scala.js and Scala Native. GPL-3.0.
 ```bash
 sbt test                  # core + cli on JVM, Scala.js, Scala Native, web, and site (needs Node and clang)
 sbt crossCompile          # compile every platform's tests; needs neither Node nor clang
-sbt scalafmtAll           # format; CI runs scalafmtCheckAll
+sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
 sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 17 (JVM, Native), 18 (JS)
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt coreJVM/publishM2     # needed before the Gradle and Maven builds
