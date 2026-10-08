@@ -49,16 +49,17 @@ plus the release histories: sconfig v2.0.0 (2026-08-24) and lightbend/config v1.
 predate the 2026-09/10 merges, so those read "merged upstream, not yet in a release". A pull
 request counts as fixed only in that released state.
 
-After the page loads it makes **one request per repository** to
-`https://api.github.com/search/issues?q=author:kastoestoramadus+type:pr+repo:<owner>/<repo>&per_page=100`
-and folds the answer into the snapshot (`Merge`, a pure function with tests: open stays open
+The contributions section asks for the list when it is mounted: **one request per repository**, to
+`https://api.github.com/search/issues?q=author:kastoestoramadus+type:pr+repo:<owner>/<repo>&per_page=100`,
+and it folds the answer into the snapshot (`Merge`, a pure function with tests: open stays open
 unless the search reports it merged or rejected, released and closed stand, an unknown pull
 request lands under "other recent work", a malformed item is dropped). The unauthenticated search
 limit is 10 requests a minute per IP, and the answers carry
 `access-control-allow-origin: *` (re-verified 2026-10-07), so no token is needed — and none may
 be embedded in a public page. Each answer is cached in localStorage for ten minutes, behind a
-guarded `try`, so reloading does not burn the limit and a browser without storage formats the
-same.
+guarded `try`, so a reload — or a remount of the section — inside that window is answered from the
+cache and asks nothing; a browser without storage, or one where the ten minutes have passed, asks
+again on every mount.
 
 Failure is quiet and visible: any non-200, a malformed body, no `fetch` at all, or a search that
 does not answer within eight seconds leaves that repository's snapshot standing and the state line
@@ -92,11 +93,14 @@ that never answers, and the ten-minute cache. That path is where the page was br
 every unit test was green. The snapshot has integrity tests: every defect row resolves to an
 entry, every note is a sentence, every backticked input is balanced.
 
-The Laminar components themselves are not covered by jsdom tests: wiring the jsdom npm module
-into `sbt test` would add a network-time npm dependency to a build that must not silently skip a
-platform, for coverage that a real browser check gives back with interest. Rendering is therefore
-verified by running the page: served (`python3 -m http.server -d site/target/site 4001`) with the
-live search answering, and from `file://` in a fetch-less browser where the snapshot must stand.
+The Laminar components themselves are mounted in `ComponentSpec` against `FakeDom`, a small
+hand-rolled document with no npm dependency: `document` and `window` are globals, so the test
+installs a fake browser and renders the real `Playground` and `ContributionsView` into it. That is
+what pins the wiring nothing else can see — the verdict the panes show for a burst of typing, and
+the refresh a section owns from mount to unmount. It is not a browser: no HTML parsing, no layout,
+no CSS. Rendering is still verified by running the page: served
+(`python3 -m http.server -d site/target/site 4001`) with the live search answering, and from
+`file://` in a fetch-less browser where the snapshot must stand.
 
 ## Laminar practices
 
@@ -109,7 +113,7 @@ Locations below are in `site/src/main/scala/ww86/hocon_fmt/site/` at the reviewe
 | Practice and source | Audit location | Decision and reason |
 |---|---|---|
 | [Ownership and memory safety](https://laminar.dev/documentation#ownership) | `ContributionsView.scala:26`, `apply` | Applied: replace the construction-time Future callback with a section-owned `-->` subscription. Detached sections must not receive late board updates. Unmount stops delivery; the existing request deadline still governs the underlying Future. |
-| [onMountBind vs onMountCallback](https://laminar.dev/documentation#onmountbind) and [Modifiers FAQ](https://laminar.dev/documentation#modifiers-faq) | `ContributionsView.scala:26`, `apply` | Applied: start the refresh in `onMountBind`, returning its binder. Do not add binders inside `onMountCallback`: remounting would accumulate subscriptions. Use callbacks for effects such as focus. |
+| [onMountBind vs onMountCallback](https://laminar.dev/documentation#onmountbind) and [Modifiers FAQ](https://laminar.dev/documentation#modifiers-faq) | `ContributionsView.scala:26`, `apply` | Applied: start the refresh in `onMountBind`, returning its binder. Do not add binders inside `onMountCallback`: remounting would accumulate subscriptions. Use callbacks for effects such as focus. Every mount therefore starts its own refresh — the ten-minute cache is what usually answers a remount — and `ComponentSpec` pins both. |
 | [Window ownership](https://laminar.dev/documentation#window--document-events) | `Main.scala:9`, `main` | Retained: `unsafeWindowOwner` is confined to the tab-lifetime DOM-ready bootstrap, as in the docs. Never use it for component subscriptions. No bootstrap redesign needed. |
 | [Var, Signal, EventStream](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#relationship-between-eventstream-and-signal) and [state placement](https://laminar.dev/documentation#redundant-vars) | `Playground.scala:14–20`, `ContributionsView.scala:22` | Retained: Vars hold input and board state at their component roots; derived Signals hold output/status; changes are events. Keep one source of state. If child components are extracted, pass Signals and Observers rather than copying state into child Vars. |
 | [Observers and arrows](https://laminar.dev/documentation#binding-observables) | `Playground.scala:96,109–110`, `ContributionsView.scala:26` | Retained for input, applied to refresh: `-->` sends events to observers; `<--` renders values. Element binders manage ownership without manual `foreach`. |
@@ -117,9 +121,9 @@ Locations below are in `site/src/main/scala/ww86/hocon_fmt/site/` at the reviewe
 | [Debounce and throttle](https://laminar.dev/documentation#compose-and-flatmap-events) | `Playground.scala:18`, `verdicts` | Retained: 150 ms debounce waits for typing to settle. Throttle would format intermediate text and change the page's timing; do not substitute it. |
 | [Effects belong in observers](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#tapeach) | `Playground.scala:20,119,123`, `ContributionsView.scala:102` | Retained: reactive maps derive verdicts and presentation, with no network/storage or Var writes. DOM factories in maps are intentional presentation. Cache writes remain at the Future-based IO boundary, not in an Airstream map. |
 | [Error recovery](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#recovering-from-errors) | `ContributionsView.scala:28,105`, `boardUpdates`; `Browser.scala:32` | Applied: recover an unexpected refresh-stream error to a settled snapshot board. Keep per-library recovery, fetch deadline and guarded cache; ordinary failures remain visible data, not unhandled stream errors. |
-| [Keyed split for dynamic lists](https://laminar.dev/documentation#performant-children-rendering--split) | `ContributionsView.scala:47,120`, `sections` | Deferred: the list is initially empty and inserted once after the refresh. There is no repeated list replacement to optimise today. Before adding polling/filtering, use library/theme keys and `(library, number)` PR keys, and bind item Signals so updates preserve DOM/focus. Showcase buttons and defect rows are static lists. |
+| [Keyed split for dynamic lists](https://laminar.dev/documentation#performant-children-rendering--split) | `ContributionsView.scala:47,120`, `sections` | Deferred: the list is empty until the answer arrives, and each mount rebuilds it from the board — a remount replaces the whole list and keeps no DOM or focus, which nothing on the page needs today. Before adding polling/filtering, use library/theme keys and `(library, number)` PR keys, and bind item Signals so updates preserve DOM/focus. Showcase buttons and defect rows are static lists. |
 | [Components as functions](https://laminar.dev/documentation#reusing-elements) | `Page.scala:8`, `Playground.scala:12`, `ContributionsView.scala:21` | Retained: functions return fresh elements; never reuse an element across parents. Splitting the page into more components now would add structure without a reuse need. |
-| [Testing observables](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#documentation) | `Playground.verdicts`, `ContributionsView.boardUpdates` | Applied: Node tests exercise the actual observable graph with explicit owners, including disposal and recovery. Keep pure-model/fake-browser suites and real-browser served/offline rendering checks; no jsdom dependency added. |
+| [Testing observables](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#documentation) | `Playground.verdicts`, `ContributionsView.boardUpdates`, `ComponentSpec` | Applied: Node tests exercise the actual observable graph with explicit owners, including disposal and recovery, and `ComponentSpec` mounts the real components in a fake document to pin what a helper test cannot see. Keep the pure-model and fake-browser suites and the real-browser served/offline rendering checks; no jsdom dependency added. |
 
 ## Publishing
 
