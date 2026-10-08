@@ -113,10 +113,14 @@ lines of an object, the end of the file, a file of comments only.
   runs after include masking. A block inside an array or parentheses is left alone, because no
   field can stand there, and the file is refused as a lost comment.
 
-The placeholder prefix is chosen to occur nowhere in the masked text (`__COMMENT_`, then
-`__COMMENT_X_`, ...), so a restore matches only what this pass generated: user text that looks like
-a placeholder is neither restored nor lost. `IncludeOrder` gets the text with the comments already
-restored, so it never sees a placeholder. The regex rules of include masking apply.
+The placeholder prefix is chosen to occur nowhere the parse could put it: not in the masked text,
+and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where `"__COMM""ENT_0"`
+spells `__COMMENT_0`. So the prefix steps aside for user text that could be rendered into it, and
+the restore matches only what this pass generated. Both `:` and `=` are matched, the renderer
+writing the asked-for separator. A rendering whose prefix occurrences are not exactly the three
+each placeholder writes is left unrestored: the block is then a lost comment and the file is
+refused, never altered. `IncludeOrder` gets the text with the comments already restored, so it
+never sees a placeholder. The regex rules of include masking apply.
 
 This is temporary: [site](site.md#returning-to-upstream-sconfig) lists what goes when sconfig
 releases the option.

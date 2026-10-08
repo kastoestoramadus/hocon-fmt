@@ -30,12 +30,14 @@ command line and the plugins use neither and refuse as before.
 ## Corpus, 1,650 files
 
 Measured with a throwaway Node harness over the linked `coreJS` (released sconfig 1.12.4) and
-`coreSite` (the fork, pinned sha efb66e0131), `Verdict.of(text, "corpus")` per file. The corpus is
-untrusted downloaded data; it was read, never executed.
+`coreSite` (the fork, pinned sha efb66e0131), `Verdict.of(text, "corpus")` per file, the
+intermediate columns by swapping the carrier for a no-op. The corpus is untrusted downloaded data;
+it was read, never executed. Re-measured after #54 made `=` the default separator: the
+already-formatted count rises by one (a file already written with `=`), no verdict changes.
 
 | verdict | released sconfig (CLI) | fork, no option, no masking | fork + option | fork + option + masking (the page) |
 |---|---:|---:|---:|---:|
-| already-formatted / needs-formatting | 28 / 298 | 28 / 662 | 28 / 915 | 28 / 1,384 |
+| already-formatted / needs-formatting | 29 / 297 | 29 / 661 | 29 / 914 | 29 / 1,383 |
 | refused: lost-comment | 818 | 819 | 565 | 85 |
 | refused: unstable-output | 200 | 0 | 0 | 8 |
 | refused: broken-output | 164 | 0 | 0 | 0 |
