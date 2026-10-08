@@ -110,4 +110,57 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // A replacement is only allowed to change the file's identity when it can be kept: the same
+  // owner, group and mode bits, setgid included. Otherwise the file is written in place.
+  tmp.test("a replacement keeps the owner, group and every mode bit of the file") { dir =>
+    for {
+      file   <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      other  <- TestPosix.otherGroup(file)
+      _      <- other.traverse_(TestPosix.chgrp(file, _))
+      _      <- TestPosix.chmod(file, 0x400 | 0x1b0) // 02660: setgid, rw-rw----
+      before <- TestPosix.stat(file)
+      _      <- formatter.format(file)
+      after  <- TestPosix.stat(file)
+      bytes  <- read(file)
+    } yield {
+      assertEquals(after, before)
+      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+    }
+  }
+
+  // The file is writable but no staged copy can be put beside it, so the write has to happen in
+  // place, as it did before this adapter.
+  tmp.test("a writable file in a directory that cannot be written is still formatted") { dir =>
+    val locked = dir / "locked"
+    val file   = locked / "a.conf"
+    val run    = for {
+      _       <- Files[IO].createDirectory(locked)
+      _       <- write(locked, "a.conf", "a=1".getBytes(UTF_8))
+      _       <- TestPosix.chmod(locked, 0x16d) // 0555
+      outcome <- formatter.format(file)
+      bytes   <- read(file)
+    } yield {
+      assertEquals(outcome, FormatOutcome.Formatted)
+      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+    }
+    run.guarantee(TestPosix.chmod(locked, 0x1ed).attempt.void) // 0755, so the fixture can delete it
+  }
+
+  // A read-only file is not replaced either, the way an in-place write refuses it. Root writes
+  // any file, so there the replacement is allowed.
+  tmp.test("a read-only file is left unchanged") { dir =>
+    for {
+      file     <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      _        <- TestPosix.chmod(file, 0x124) // 0444
+      writable <- Files[IO].isWritable(file)
+      result   <- formatter.format(file).attempt
+      bytes    <- read(file)
+    } yield {
+      if writable then assertEquals(result, Right(FormatOutcome.Formatted))
+      else {
+        assert(result.isLeft)
+        assertEquals(bytes, "a=1".getBytes(UTF_8).toList)
+      }
+    }
+  }
 }
