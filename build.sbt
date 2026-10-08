@@ -17,6 +17,33 @@ val munitScalaCheck = "1.2.0"
 ThisBuild / scalaVersion := scala3
 ThisBuild / version      := "0.1.0-SNAPSHOT"
 
+// The compiler enforces what review would otherwise have to catch: a match that misses a case (a
+// new Refusal reaching code that does not handle it), a value computed and dropped, == between
+// types that can never be equal, a null from a Java API used as a value, an object read before it
+// is initialised. Every warning fails the build. The sbt plugin is Scala 2.12 and sets its own.
+ThisBuild / scalacOptions ++= {
+  if (scalaBinaryVersion.value == "3")
+    Seq(
+      "-deprecation",
+      "-feature",
+      "-unchecked",
+      "-Werror",
+      "-Wunused:all",
+      "-Wvalue-discard",
+      "-Wnonunit-statement",
+      "-Wsafe-init",
+      "-Wimplausible-patterns",
+      "-Wshadow:all",
+      "-Winfer-union",
+      "-Wrecurse-with-default",
+      "-Wenum-comment-discard",
+      "-Wwrong-arrow",
+      "-language:strictEquality",
+      "-Yexplicit-nulls"
+    )
+  else Nil
+}
+
 // Coordinates and the metadata Sonatype requires before anything can reach Maven Central,
 // which is what `cs` and therefore the pre-commit coursier hook resolve from.
 ThisBuild / organization     := "eu.ww86"
@@ -357,6 +384,16 @@ lazy val sbtPlugin = project
   .settings(
     name         := "sbt-hocon-fmt",
     scalaVersion := "2.12.21",
+    // ThisBuild's options are Scala 3's; the same checks, as far as 2.12 has them.
+    scalacOptions := Seq(
+      "-deprecation",
+      "-feature",
+      "-unchecked",
+      "-Xfatal-warnings",
+      "-Xlint",
+      "-Ywarn-unused",
+      "-Ywarn-value-discard"
+    ),
     // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
     buildInfoPackage := "ww86.hocon_fmt.sbt",
     buildInfoObject  := "FormatterArtifact",

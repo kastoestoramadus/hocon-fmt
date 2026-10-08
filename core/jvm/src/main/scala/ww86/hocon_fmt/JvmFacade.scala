@@ -11,6 +11,7 @@ object JvmFacade {
 
   /** The text the file should contain, or empty when it already does. */
   @throws[FormatRefusedException]("when the file must be left alone; the message says why")
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   def reformat(content: Array[Byte]): Optional[String] =
     Verdict.of(content) match {
       case Verdict.AlreadyFormatted           => Optional.empty

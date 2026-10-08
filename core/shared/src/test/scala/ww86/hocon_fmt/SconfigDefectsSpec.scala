@@ -94,7 +94,7 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
   // nowhere to go and is dropped. Comments carry no meaning, so the target is only that the text
   // survives.
 
-  val commentsWithNoFieldAfter = Map(
+  def commentsWithNoFieldAfter = Map(
     "after the last field" -> ("a : 1\n# trailing", "trailing"),
     "last in an object"    -> ("o {\n  a : 1\n  # last in the object\n}", "last in the object")
   )
@@ -105,8 +105,9 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
   // blank line it holds " head". A blank line inside a comment block does the same to the part
   // above it. This is what nearly every real file trips over, since most start with a licence
   // header or a banner followed by a blank line: of 23 reference.conf files from Akka, Pekko,
-  // Play, Kamon, Gatling and ssl-config, 20 hold such a comment and are refused.
-  val commentAboveABlankLine = Map(
+  // Play, Kamon, Gatling and ssl-config, 20 hold such a comment and are refused. Of 1,650 real files
+  // from GitHub, 818 (49.6%) are refused for this or for a comment with no field after it.
+  def commentAboveABlankLine = Map(
     "above a blank line at the top of the file" -> ("# Copyright 2025\n\na : 1", "Copyright 2025"),
     "above a blank line inside an object"       ->
       ("o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}", "one")
@@ -132,7 +133,7 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
   // Found by FormatterPropertiesSpec. Inside an array, a one-field object that cannot be rendered on
   // one line loses its braces: `a : [ { b : ${?X} } ]` becomes `a: [ b: ${?X} ]`. Two fields, or a
   // field that fits on one line (`{ # x\n b : 1 }` does), keep them.
-  val oneFieldObjectsInAnArray = Map(
+  def oneFieldObjectsInAnArray = Map(
     "holding a substitution"                   -> "a : [ { b : ${?X} } ]",
     "whose field is an object, with a comment" -> "a : [ { # x\n b.c : 1 } ]"
   )
@@ -144,10 +145,27 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The env-override idiom: a default, then `${?ENV}` for the same key. It stays an unresolved merge,
+  // which sconfig renders as a banner of comments; at the root the text does not parse, inside an
+  // object every pass adds another banner. No plain equivalent exists, since the variable is the
+  // point. Of 1,650 real files from GitHub, 357 (21.6%) are refused for it.
+  def envOverrides = Map(
+    "at the root"      -> "port = 8080\nport = ${?PORT}",
+    "inside an object" -> "http {\n  host = localhost\n  host = ${?HOST}\n  port = 80\n}"
+  )
+
+  envOverrides.foreach { case (name, raw) =>
+    test(s"library: an env override $name should render as text that renders the same again") {
+      val rendered = raw.renderedByLibrary
+      assert(rendered.parses.isSuccess, s"OPEN sconfig BUG: rendered text does not parse: [$rendered]")
+      assertEquals(rendered.renderedByLibrary, rendered, "OPEN sconfig BUG: a second render changes the text")
+    }
+  }
+
   // --- Should accept what the specification allows -----------------------------------------------
   // These fail at parse time, so there is no rendering to compare: the target is that they parse.
 
-  val rejectedOnInput = Map(
+  def rejectedOnInput = Map(
     "an array at the file root"         -> """[ "a", "b" ]""",
     "the `[]` env-variable list suffix" -> "my-list = ${MY_LIST[]}"
   )

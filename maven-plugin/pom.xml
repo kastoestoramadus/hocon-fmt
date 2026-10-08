@@ -87,6 +87,15 @@
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.16.0</version>
+          <!-- As in the Scala build, every warning fails it. `processing` is left out: javac on JDK 17
+               reports that no processor claimed @Mojo and @Parameter, which maven-plugin-plugin reads. -->
+          <configuration>
+            <showWarnings>true</showWarnings>
+            <compilerArgs>
+              <arg>-Xlint:all,-processing</arg>
+              <arg>-Werror</arg>
+            </compilerArgs>
+          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>

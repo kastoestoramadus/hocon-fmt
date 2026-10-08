@@ -34,8 +34,10 @@ object Bench {
   }
 
   /** Warms up, then samples until the time budget is spent, keeping every result reachable so no
-    * optimiser can drop the work.
+    * optimiser can drop the work. Loops and a mutable sink, so the harness adds as
+    * little as possible to what it times.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While", "org.wartremover.warts.Null"))
   def measure(phase: Phase, budgetNanos: Long): Stats = {
     var sink: Any = null
     val warmupEnd = System.nanoTime + budgetNanos / 3
@@ -50,7 +52,7 @@ object Bench {
       samples += System.nanoTime - start
       count += 1
     }
-    if (sink == null) sys.error("unreachable: keeps the result alive")
+    if (Option(sink).isEmpty) sys.error("unreachable: keeps the result alive")
     Stats.of(samples.result())
   }
 

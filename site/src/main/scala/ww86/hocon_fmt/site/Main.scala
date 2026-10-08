@@ -1,11 +1,12 @@
 package ww86.hocon_fmt.site
 
-import com.raquo.laminar.api.L.{*, given}
+import com.raquo.laminar.api.L.*
 import org.scalajs.dom
 
 /** Mounts the page into #root of index.html; see docs/site.md. */
 @main def main(): Unit =
-  documentEvents(_.onDomContentLoaded).foreach { _ =>
+  // The page lives as long as the tab, so the subscription is never cancelled.
+  val _ = documentEvents(_.onDomContentLoaded).foreach { _ =>
     Option(dom.document.getElementById("root")).foreach { container =>
       container.innerHTML = ""
       render(container, Page())

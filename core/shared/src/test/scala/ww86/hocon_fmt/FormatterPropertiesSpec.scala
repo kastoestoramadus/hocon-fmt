@@ -1,6 +1,6 @@
 package ww86.hocon_fmt
 
-import org.ekrich.config.{ConfigList, ConfigObject, ConfigValue}
+import org.ekrich.config.{ConfigList, ConfigObject}
 import org.scalacheck.Prop.forAll
 import scala.jdk.CollectionConverters.*
 
@@ -14,6 +14,9 @@ import ww86.hocon_fmt.HoconGen.*
   * may always refuse; what it must never do is hand back text that lost something.
   */
 class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSupport {
+
+  val PlaceholderKey = "__INCLUDE_(\\d+)".r
+  val GuardKey       = "__INCLUDE_GUARD_\\d+".r
 
   // The rarest defects found so far took thousands of documents to turn up; a deeper search is
   // `sbt -Dhocon.properties=20000 "coreJVM/testOnly ww86.hocon_fmt.FormatterPropertiesSpec"`.
@@ -90,17 +93,14 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }.toMap
   }
 
-  val PlaceholderKey = "__INCLUDE_(\\d+)".r
-  val GuardKey       = "__INCLUDE_GUARD_\\d+".r
-
   def leavesOf(obj: ConfigObject, at: List[String]): List[Leaf] =
     obj.entrySet.asScala.toList.flatMap { entry =>
       val path = at :+ entry.getKey
       (entry.getKey, entry.getValue) match {
-        case (_, inner: ConfigObject)                                          => leavesOf(inner, path)
-        case (GuardKey(), _)                                                   => Nil
-        case (PlaceholderKey(index), value) if value.unwrapped == entry.getKey =>
-          List(Leaf(path, value.origin.lineNumber, Some(index.toInt)))
+        case (_, inner: ConfigObject)                                                         => leavesOf(inner, path)
+        case (GuardKey(), _)                                                                  => Nil
+        case (PlaceholderKey(index), value) if Option(value.unwrapped).contains(entry.getKey) =>
+          List(Leaf(path, value.origin.lineNumber, Option(index).flatMap(_.toIntOption)))
         case (_, list: ConfigList) => Leaf(path, list.origin.lineNumber, None) :: leavesInItems(list, path)
         case (_, value)            => List(Leaf(path, value.origin.lineNumber, None))
       }

@@ -1,7 +1,7 @@
 package ww86.hocon_fmt
 
 /** Why the formatter left a text alone. Every case means the file must not be written. */
-enum Refusal {
+enum Refusal derives CanEqual {
 
   /** Decoding the bytes leniently would replace the invalid ones, and writing that back would
     * destroy them.

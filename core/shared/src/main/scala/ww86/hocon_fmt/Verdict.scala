@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets.UTF_8
   * Every integration acts on this, so the CLI and the build-tool plugins cannot disagree about a
   * file: they differ only in how they find files and report.
   */
-enum Verdict {
+enum Verdict derives CanEqual {
   case AlreadyFormatted
   case NeedsFormatting(formatted: String)
   case Refused(refusal: Refusal)

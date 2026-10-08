@@ -1,0 +1,44 @@
+# Improvement log
+
+Changes made under standing approval, newest first. Before a release we go through this list:
+what to keep, simplify, optimise or remove. Each entry names the PR and what to look at again.
+
+| Date | PR | Change | Revisit before release |
+|---|---|---|---|
+| 2026-10-08 | #39 | CI also runs `scalafmtSbtCheck`; `build.sbt` and `project/ExampleGenerator.scala` reformatted. | — |
+| 2026-10-08 | #38 | Every Scala 3 warning fails the build (`-Werror`, `-Wunused:all`, `-Wsafe-init`, `strictEquality`, explicit nulls, …); WartRemover on main code; `-Xlint:all -Werror` for the Gradle and Maven plugins; 2.12 equivalents for the sbt plugin. | The four `@SuppressWarnings` (IncludeMasking, Bench, JvmFacade, LivePr readers): could IncludeMasking drop `var`/`while` without a bench regression? `-Wtostring-interpolated` was left off (15 hits, all test messages). `-Yexplicit-nulls` is experimental in 3.8. |
+| 2026-10-08 | #38 | `SconfigDefectsSpec` records the env-override defect (`x = 1` then `x = ${?X}`); 357 of 1,650 real files are refused for it, fixed by ekrich/sconfig#600. | Drop the refusal tests that turn green once a sconfig with #600 is released. |
+| 2026-10-08 | #37 | Shared examples recognise moved includes and test that refusal kinds match the generator’s catalogue. | `ExamplesSpec` still lists one sample per `Refusal` case by hand; keep it in sync when adding cases. |
+| 2026-10-08 | #34 | Formatting refuses includes that would cross fields and change which values win, including inside arrays. | `IncludeOrder` adds source/output parses; benchmark the cost and revisit when sconfig preserves parse order; overridden definitions still escape detection. |
+| 2026-10-08 | #36 | The playground and cross-platform tests use the same examples from `examples/`, with exact output and a now/pending/target roadmap. | Review whether the `project/ExampleGenerator.scala` schema and pending/target metadata justify their maintenance cost. |
+| 2026-10-08 | #35 | Tests and limitations document why licence headers and comments above blank lines cause files to be left unchanged. | Drop the blank-line `LostComment` refusal expectations when sconfig preserves those comments. |
+| 2026-10-07 | #32 | A browser page formats pasted HOCON locally and explains refusals alongside the author’s upstream contributions. | Review `Browser`/`GitHubApi` live fetch, deadline and localStorage cache versus a shipped snapshot; release-state dates in `Contributions.scala` need manual updates. |
+| 2026-10-07 | #30 | The ideas list records a scheduled refresh of the page’s contribution snapshot as a deferred option. | Decide whether a scheduled Pages rebuild is needed before adding another refresh path (`docs/ideas.md`). |
+| 2026-10-07 | #31 | Tagged releases upload signed sbt, Maven and Mill artifacts to Central for manual publication, after checking version agreement. | Exercise `.github/workflows/release.yml` with real secrets; the Central job is unverified and Mill has no signing-only dry run. |
+| 2026-10-07 | #29 | The Maven plugin gains a release profile producing sources, javadocs and signatures for a manually published Central deployment. | Verify signing and `deploy` in `maven-plugin/pom.xml` with real credentials before release. |
+| 2026-10-07 | #28 | Core, CLI and sbt-plugin JVM artifacts can be signed and staged together in the Central Portal through `publishRelease`. | Verify `publishSigned` and `sonaUpload`; decide whether the JVM-only artifact set in `build.sbt` is sufficient. |
+| 2026-10-07 | #27 | Library coordinates and the Gradle plugin id move to the verified `eu.ww86` namespace. | Verify that the Gradle Plugin Portal accepts `eu.ww86.hocon-fmt` before publishing. |
+| 2026-10-07 | #26 | Commands, packages, hooks, plugin artifacts and documentation consistently use the project name `hocon-fmt`. | — |
+| 2026-10-02 | #25 | Named Scala acceptance tests check the CLI’s bytes, diagnostics and exit codes as real JVM, Node and Native processes. | `CliAcceptanceSuite` does not cover Windows or terminal stdin; decide the supported platform contract before release. |
+| 2026-10-02 | #24 | Stdin formatting preserves UTF-8 under non-UTF-8 JVM locales and works with redirected regular files on Native. | Revisit blocking `System.in`/`System.out` in `StdStreams` if fs2 supports Native regular files; JVM file-mode summaries still use locale-dependent `IO.print`. |
+| 2026-10-02 | #23 | Editors can format UTF-8 buffers through `--stdin`, name them in diagnostics and query `--version`; users get bug and wishlist links. | — |
+| 2026-09-26 | #18 | Maintainers get a registry-by-registry release runbook and a concrete list of possible future features. | Recheck `docs/releasing.md` against the first real release; CLI missing-file checks still exit successfully, as recorded in `docs/ideas.md`. |
+| 2026-09-26 | #17 | Users can try every channel from a checkout, with JVM CLI paths resolved from the build root and wheel output directories created automatically. | — |
+| 2026-09-26 | #16 | Other web pages can load a standalone script and format HOCON through the `HoconFormatter.format` global. | The site now calls `coreJS` directly; decide whether the separate `web` API and release bundle still have users. |
+| 2026-09-26 | #15 | Mill builds can format and check resource files directly through `HoconFormatterModule`. | The mixin must also be added to test modules; consider whether an external module would be simpler (`docs/ideas.md`). |
+| 2026-09-26 | #14 | Users get channel-specific usage, architecture, testing and limitation docs, with contributor rules separated into `AGENTS.md`. | — |
+| 2026-09-26 | #21 | Main receives the already reviewed formatter, CLI, plugin and safety improvements from the stacked PRs #2–#13. | — |
+| 2026-09-26 | #13 | Formatting preserves quoted-comment includes, refuses lost comments or includes and avoids concurrent rewrites of duplicate CLI paths. | Retire sconfig-specific refusal expectations as upstream fixes ship; `HoconText` and `IncludeMasking` remain machinery an eventual syntax-tree parser would replace. |
+| 2026-09-26 | #12 | Per-phase benchmarks track every runtime and remove a redundant output parse, making formatting faster. | `scripts/bench.py` stores history in Git notes and CI only reports regressions; review the maintenance cost and noisy-runner thresholds. |
+| 2026-09-26 | #11 | Pre-commit can format or check through native wheels or Node, and tagged releases build binaries, wheels and npm archives. | Exercise the release matrix and registry installs; `.github/workflows/release.yml` does not yet publish to PyPI or npm, and Windows relies on Node hooks. |
+| 2026-09-26 | #10 | Maven projects can format files or fail `verify` on unformatted files, with configurable includes, excludes and skip. | — |
+| 2026-09-26 | #9 | Gradle projects get format/check tasks with configuration-cache support and an isolated formatter runtime. | Functional tests cover the build’s Gradle version only; decide the minimum supported version and test it (`docs/ideas.md`). |
+| 2026-09-26 | #8 | sbt projects can format or check resource files across aggregated projects without loading Scala 3 into sbt’s Scala 2.12 classpath. | — |
+| 2026-09-26 | #7 | The same CLI formats or checks files on JVM, Node and Native, with usage errors distinguished by exit code 2. | — |
+| 2026-09-26 | #6 | All callers receive typed refusals and file verdicts, and non-UTF-8 files remain byte-for-byte untouched. | — |
+| 2026-09-26 | #5 | The formatter core runs on Scala Native and no longer mistakes marker-like user fields for include placeholders. | — |
+| 2026-09-25 | #4 | The core runs on JVM and Scala.js, preserves includes through a separate masking pipeline and refuses broken or unstable renderings. | Ordered runtime tests in `build.sbt` stop on the first failure; review that trade-off against seeing all platform failures in one run. |
+| 2026-09-05 | #2 | Golden files and focused invariant, include and specification suites pin rendering and expose valid HOCON that sconfig corrupts. | Remove obsolete defect expectations as sconfig fixes land; preserve the intentional normalisations documented in `docs/limitations.md`. |
+| 2026-09-05 | #1 | GitHub CI runs tests and enforces Scala formatting on pushes and pull requests. | `.scalafmt.conf` uses `align.preset = most`, which realigns whole blocks; consider `some` if review diffs become noisy. |
+| 2026-03-09 | — | `81ef554` introduces command-line formatting and checking through sconfig, include masking and example tests. | Assess whether sconfig’s fixed parse/render normalisations meet users’ expectations (`docs/limitations.md`); a style-preserving parser would replace this foundation. |
+| 2026-03-09 | — | `9540cb1` establishes the project repository and GPL-3.0 licence for distribution. | — |

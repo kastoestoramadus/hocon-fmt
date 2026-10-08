@@ -10,6 +10,6 @@ object Stats {
   def of(nanos: Seq[Long]): Stats = {
     val sorted        = nanos.sorted.toVector
     def at(q: Double) = sorted(math.min(sorted.size - 1, (q * sorted.size).toInt)) / 1000.0
-    Stats(sorted.size, sorted.head / 1000.0, at(0.5), at(0.9))
+    Stats(sorted.size, at(0), at(0.5), at(0.9))
   }
 }

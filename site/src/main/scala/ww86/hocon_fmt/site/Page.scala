@@ -1,6 +1,6 @@
 package ww86.hocon_fmt.site
 
-import com.raquo.laminar.api.L.{*, given}
+import com.raquo.laminar.api.L.*
 
 /** The whole page: the formatter presented, the playground, the upstream work, the footer. */
 object Page:

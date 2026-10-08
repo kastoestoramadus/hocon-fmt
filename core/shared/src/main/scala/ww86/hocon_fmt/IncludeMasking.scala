@@ -13,7 +13,11 @@ import scala.annotation.tailrec
   * Swapping the whole statement, rather than the keyword alone, is what lets an include share a
   * line with other content. The scheme this replaced commented out the rest of the line, which
   * swallowed closing braces and any entries following the include.
+  *
+  * A character scanner on the hot path of every format, written with indices and loops; the
+  * suppression is for this object only, not a precedent.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While", "org.wartremover.warts.Return"))
 private[hocon_fmt] object IncludeMasking {
 
   /** Masked text, plus the statements it replaced keyed by their placeholder index. */
@@ -137,7 +141,7 @@ private[hocon_fmt] object IncludeMasking {
     while (matcher.find(from))
       replacement(matcher) match {
         case Some(next) =>
-          out.append(text.substring(copiedUpTo, matcher.start)).append(next)
+          val _ = out.append(text.substring(copiedUpTo, matcher.start)).append(next)
           copiedUpTo = matcher.end
           from = matcher.end
         case None => from = matcher.start + 1

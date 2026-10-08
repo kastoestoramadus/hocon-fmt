@@ -4,6 +4,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.util.Try
+import scala.util.control.NonFatal
 
 /** The one kind of network call the page makes: the read-only search for the author's pull
   * requests, with a small cache so reloading does not burn the unauthenticated rate limit of ten
@@ -41,10 +42,10 @@ object GitHubApi:
     Try(js.JSON.parse(body)).toEither.left
       .map(t => GitHubError.Malformed(Option(t.getMessage).getOrElse("unreadable response")))
       .flatMap { json =>
-        val items = json.selectDynamic("items")
-        if js.isUndefined(items) || (items: Any) == null || !js.Array.isArray(items)
-        then Left(GitHubError.Malformed("no items array"))
-        else Right(items.asInstanceOf[js.Array[js.Dynamic]].flatMap(LivePr.read).toList)
+        LivePr
+          .asArray(json.selectDynamic("items"))
+          .map(_.flatMap(LivePr.read).toList)
+          .toRight(GitHubError.Malformed("no items array"))
       }
 
   // --- the cache -------------------------------------------------------------------------------
@@ -62,15 +63,11 @@ object GitHubApi:
   /** `None` when the entry is stale, malformed, or not JSON at all. */
   def decode(cached: String, nowMs: Double): Option[List[LivePr]] =
     Try(js.JSON.parse(cached)).toOption.flatMap { json =>
-      val fetchedAt = json.selectDynamic("fetchedAt")
-      if js.typeOf(fetchedAt) != "number" then None
-      else if fetchedAt.asInstanceOf[Double] + cacheTtlMs <= nowMs then None
-      else
-        val items = json.selectDynamic("items")
-        if js.isUndefined(items) || (items: Any) == null || !js.Array.isArray(items) then None
-        else
-          val read = items.asInstanceOf[js.Array[js.Dynamic]].flatMap(readCachedItem).toList
-          Some(read)
+      for
+        fetchedAt <- LivePr.asDouble(json.selectDynamic("fetchedAt"))
+        if fetchedAt + cacheTtlMs > nowMs
+        items <- LivePr.asArray(json.selectDynamic("items"))
+      yield items.flatMap(readCachedItem).toList
     }
 
   /** The cache stores the same fields the live answer carries, state spelled out. A malformed
@@ -103,8 +100,8 @@ object GitHubApi:
 
   def readCache(storage: Storage, key: String, nowMs: Double): Option[List[LivePr]] =
     try storage.get(key).flatMap(decode(_, nowMs))
-    catch case _: Throwable => None
+    catch case NonFatal(_) => None
 
   def writeCache(storage: Storage, key: String, nowMs: Double, items: List[LivePr]): Unit =
     try storage.set(key, encode(items, nowMs))
-    catch case _: Throwable => ()
+    catch case NonFatal(_) => ()

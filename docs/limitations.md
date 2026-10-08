@@ -9,7 +9,7 @@ Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought
 expected text is not guessed: each case is paired with a plainly written config that means the same
 thing and renders correctly, and the test first asserts both `resolve()` to the same value. A
 failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 17 failures on the JVM and Native, 18 on Scala.js.
+`sbt libraryDefects`, on all three platforms: 19 failures on the JVM and Native, 20 on Scala.js.
 When a sconfig release fixes one, its test turns green: that is the signal to drop the refusal and
 the entry below. sconfig 2.0.0 was tried on 2026-09-25: the regular suites pass on it, and the
 defects then known remain.
@@ -84,6 +84,10 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
 - **Substitution cycle**: `a : ${b}` with `b : ${a}` renders as an unresolved-merge banner that
   parses but changes again on the next pass. A syntax check alone misses this.
+- **Env override**: `host = localhost` then `host = ${?HOST}` stays an unresolved merge, rendered as
+  a banner that grows by one on every pass; at the file root the banner does not even parse
+  (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
+  files from GitHub are refused for it. Fixed by ekrich/sconfig#600, not yet released.
 
 Rejected at parse time although the specification allows them (`Refusal.NotHocon`):
 

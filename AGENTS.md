@@ -10,7 +10,7 @@ sconfig, cross-built for the JVM, Scala.js and Scala Native. GPL-3.0.
 sbt test                  # core + cli on JVM, Scala.js, Scala Native, web, and site (needs Node and clang)
 sbt crossCompile          # compile every platform's tests; needs neither Node nor clang
 sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
-sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 17 (JVM, Native), 18 (JS)
+sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 19 (JVM, Native), 20 (JS)
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt coreJVM/publishM2     # needed before the Gradle and Maven builds
 sbt coreJVM/publishLocal  # needed before the Mill build
@@ -72,8 +72,26 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
 - A change to a hot path gets a `scripts/bench.py run` before and after.
 - New Scala code is functional Scala 3: ADTs and `Either` rather than exceptions, no `var`, effects
   at the edges. Braces, not significant indentation (`.scalafmt.conf`). The sbt plugin is Scala 2.12.
+- The compiler enforces what review would otherwise catch (`scalacOptions` in `build.sbt`, every
+  warning an error). Adapt the code; never relax a flag or add `@nowarn` to get a build through.
+  The usual fixes:
+  - `strictEquality`: a type compared with `==` gets `derives CanEqual`, and so does an enum
+    matched on a case without parameters, since that match is an `==`.
+  - Explicit nulls: a value from a Java API is `T | Null`; wrap it in `Option(...)` or match
+    `case s: String`, at the boundary. `.nn` only with a comment saying why it cannot be null. A
+    Scala.js facade is trusted as typed, so a JS value that can be null or undefined is read as
+    `js.Dynamic` and checked (`js.typeOf`, `js.isUndefined`, `Option(...)`) before use.
+  - A value dropped on purpose is `val _ = ...`; anything else dropped is a bug, an `IO` above all.
+  - Safe init: a test suite registers its tests while the class is constructed, so data the tests
+    read is declared above them or is a `def`; extractors (`Regex`) stay `val`s at the top.
+- WartRemover (`project/Warts.scala`) fails the main code on what the compiler has no flag for:
+  `.head`, `.get` on `Option` or `Try`, `null`, `throw`, `return`, `var`, `while`, casts. A place
+  that needs one takes a `@SuppressWarnings` on the narrowest definition, with a comment saying
+  why. Catch with `NonFatal`, never `Throwable`.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
+- Every merged improvement gets a line in [docs/improvement-log.md](docs/improvement-log.md), with
+  what to look at again before a release.
 
 Where to add a test: [docs/testing.md](docs/testing.md). What is not done yet, and why it might be
 worth doing: [docs/ideas.md](docs/ideas.md).
