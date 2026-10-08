@@ -34,7 +34,8 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 ## The pipeline
 
 1. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
-2. sconfig parses and renders the masked text with the `FormatOptions` asked for: the default
+2. The source and parsed tree are checked for placeholder collisions (see [include masking](#include-masking)).
+   sconfig renders the masked tree with the `FormatOptions` asked for: the default
    style (`=`), or what the caller — the CLI's flags over a `.hocon-fmt.conf` — requested.
 3. `IncludeMasking.unmask` puts the original statements back.
 4. The result is refused if an include statement did not come back (`Refusal.LostInclude`) or a
@@ -75,16 +76,24 @@ Each **whole statement** is swapped for a placeholder field before parsing and s
    a quoted target, or `required(...)` / `file(...)` / `url(...)` / `classpath(...)` with balanced
    parentheses. Anything else (`include_path`, the word in prose) is left alone. The statement
    becomes `__INCLUDE_<n>` plus a guard field; the original is kept in a side table.
-2. `unmask` restores the statements and drops the guards. A placeholder counts only when its key
+2. The reserved name is checked, not trusted. With includes, the source check refuses extra
+   literal `__INCLUDE_` occurrences and any case-insensitive `\u005f` underscore escape outside
+   the masked include targets, including in comments and triple-quoted strings.
+3. After parsing, keys at every object level, strings and array elements are checked for the
+   reserved prefix. Only exact generated key/value pairs for issued indices are allowed;
+   unresolved values are checked through their rendering, including substitution paths.
+   Since a concatenated user key can replace even an identical generated pair during parsing,
+   a second parse uses generated names absent from the first rendering and source. That tree
+   permits no reserved user names or values. This extra parse is needed only for files with includes.
+4. Before restoration, each generated index must appear exactly once as a complete placeholder
+   field and once as a guard, with no other reserved text in the rendering. Missing placeholders
+   remain `Refusal.LostInclude`; collisions are `Refusal.ReservedName`.
+   Indices too long for an `Int` are the user's, never an exception.
+5. `unmask` restores the statements and drops the guards. A placeholder counts only when its key
    and value carry the same index, compared exactly, so `__INCLUDE_0 : "__INCLUDE_01"` stays the
    user's own field. Own-line guards are removed before inline ones: the inline pattern does not
    consume the preceding newline, so the other order leaves blank lines behind. sconfig may render
    a guard on the very first line, so a newline is lent for that pass.
-
-3. The reserved name is checked, not trusted: if the masked text, or sconfig's rendering of it, has
-   `__INCLUDE_` anywhere but in the three places each placeholder writes it (or an escape could
-   spell it), the file is refused with `Refusal.ReservedName` instead of restored on a guess.
-   Indices too long for an `Int` are the user's, never an exception.
 
 **Why a guard field:** `setSimplifyNestedObjects` collapses a single-field object into a dotted
 path, so `o { __INCLUDE_0: v }` would become `o.__INCLUDE_0: v`, moving the placeholder out of its
