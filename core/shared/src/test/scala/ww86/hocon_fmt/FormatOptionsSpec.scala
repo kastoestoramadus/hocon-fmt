@@ -55,6 +55,13 @@ class FormatOptionsSpec extends munit.FunSuite {
     assertEquals(FormatOptions.parse("# only a comment\n", "team.conf"), Right(FormatOptions.default))
   }
 
+  test("an explicit null is an error naming the file and the key, not an absent option") {
+    List("separator", "double-indent", "simplify-nested-objects").foreach { key =>
+      val result = FormatOptions.parse(s"$key = null", "team.conf")
+      assert(result.left.exists(m => m.startsWith("team.conf: ") && m.contains(key)), s"$key = null gave $result")
+    }
+  }
+
   test("an unknown key is an error naming the file and the key, never silently ignored") {
     assertEquals(
       FormatOptions.parse("separators = \":\"", ".hocon-fmt.conf"),

@@ -87,6 +87,42 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // User text that looks like what IncludeMasking writes, next to a real include: the formatter may
+  // refuse the file, but a file it formats keeps that text.
+  property("never alters text that looks like a placeholder, in any option combination") {
+    import org.scalacheck.Gen
+    val digits    = Gen.oneOf("0", "1", "01", "7", "99999999999", "999999999999999999999")
+    val sep       = Gen.oneOf(" = ", " : ", "=", ":")
+    val lookalike = for {
+      n  <- digits
+      s1 <- sep
+      s2 <- sep
+      t  <- Gen.oneOf(
+             s"__INCLUDE_$n",
+             s"__INCLUDE_GUARD_$n${s1}g",
+             s"__INCLUDE_$n${s1}__INCLUDE_$n",
+             s"x __INCLUDE_GUARD_$n${s2}g y"
+           )
+    } yield t
+    def bareKey(text: String): String =
+      "__INCLUDE_" + text.dropWhile(_ != '_').drop(10).takeWhile(c => c.isLetterOrDigit || c == '_')
+    val place = Gen.oneOf("value", "quotedKey", "bareKey", "nested")
+    forAll(lookalike, place) { (text, where) =>
+      val source = where match {
+        case "value"     => s"include \"f.conf\"\na = \"$text\""
+        case "quotedKey" => s"include \"f.conf\"\n\"$text\" = 42"
+        case "bareKey"   => s"include \"f.conf\"\n${bareKey(text)} = 5"
+        case _           => s"o { include \"f.conf\"\n  a = \"$text\" }"
+      }
+      val kept = if (where == "bareKey") bareKey(text) else text
+      allOptions.foreach { options =>
+        HoconFormatter.format(source, options).foreach { out =>
+          assert(out.contains(kept), s"[$kept] changed in:\n$out")
+        }
+      }
+    }
+  }
+
   // Without this the properties above would pass vacuously on a formatter that refused everything.
   property("formats every document it has no reason to refuse, in any option combination") {
     val documentsWithoutReason = documents(includes = true, distinctKeys = true)
