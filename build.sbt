@@ -520,8 +520,9 @@ lazy val javaApi = project
     autoScalaLibrary := false,
     crossPaths       := false,
     // Scala 3.8 needs Java 17, so a lower target would only move the failure to the first format.
-    // The Gradle build pins the same flags, so both compilers hold the sources to one standard.
-    Compile / javacOptions ++= Seq("--release", "17", "-Xlint:all", "-Werror"),
+    // The Gradle build compiles the same sources with the same flags; -g is Gradle's debug
+    // default, and without it sbt's jar would drop the LocalVariableTable Gradle's classes keep.
+    Compile / javacOptions ++= Seq("-g", "--release", "17", "-Xlint:all", "-Werror"),
     // The doc task inherits the compile options through scope delegation, where -Xlint:all is a
     // javac-only flag; javadoc's own doclint stays on at its default and the sources must pass it.
     Compile / doc / javacOptions := Seq("--release", "17"),
