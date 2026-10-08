@@ -73,8 +73,10 @@ class IsolatedLoaderContractTest {
             fail("no hocon-fmt-java-api version — run the suite through the Gradle build, which "
                     + "passes it, and run `sbt javaApi/publishM2` to publish the API first");
         }
-        Path jar = Path.of(System.getProperty("user.home"), ".m2", "repository", "eu", "ww86",
-                "hocon-fmt-java-api", version, "hocon-fmt-java-api-" + version + ".jar");
+        Path repository = Path.of(System.getProperty("maven.repo.local",
+                Path.of(System.getProperty("user.home"), ".m2", "repository").toString()));
+        Path jar = repository.resolve(Path.of("eu", "ww86",
+                "hocon-fmt-java-api", version, "hocon-fmt-java-api-" + version + ".jar"));
         if (!Files.isRegularFile(jar)) {
             fail("no " + jar + " — run `sbt javaApi/publishM2` to publish the API first");
         }
