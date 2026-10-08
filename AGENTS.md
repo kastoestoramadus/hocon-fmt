@@ -88,6 +88,8 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   why. Catch with `NonFatal`, never `Throwable`.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
+- Every merged improvement gets a line in [docs/improvement-log.md](docs/improvement-log.md), with
+  what to look at again before a release.
 
 Where to add a test: [docs/testing.md](docs/testing.md). What is not done yet, and why it might be
 worth doing: [docs/ideas.md](docs/ideas.md).
