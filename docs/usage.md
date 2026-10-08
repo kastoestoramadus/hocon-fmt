@@ -83,6 +83,40 @@ file but loses the crash-atomicity of the rename. Symlinks are followed. A repla
 file, so other hard links keep the old content; an in-place write keeps them too. Calls on the same
 file must be serialised; `distinctPaths` canonicalises and deduplicates a list before parallel work.
 
+## Try and Future
+
+The core needs neither cats-effect nor fs2: `Verdict.of(bytes)` is a pure decision —
+`NeedsFormatting(text)`, `AlreadyFormatted` or `Refused(refusal)` — and only `hocon-fmt-core` has
+to be on the classpath. A caller whose channel carries values, not effects, lifts a refusal into
+the one `FormatRefusedException`, which carries the typed `Refusal` in `.refusal`:
+
+```scala
+import scala.util.{Failure, Success, Try}
+import ww86.hocon_fmt.{FormatRefusedException, Verdict}
+
+val bytes: Array[Byte] = ??? // the file's content
+val formatted: Try[String] = Try(Verdict.of(bytes)).flatMap {
+  case Verdict.NeedsFormatting(text) => Success(text)
+  case Verdict.AlreadyFormatted      => Success(String(bytes, UTF_8))
+  case Verdict.Refused(refusal)      => Failure(FormatRefusedException(refusal))
+}
+```
+
+```scala
+import scala.concurrent.Future
+import ww86.hocon_fmt.{FormatRefusedException, Verdict}
+
+val formatted: Future[String] = Future(Verdict.of(bytes)).flatMap {
+  case Verdict.NeedsFormatting(text) => Future.successful(text)
+  case Verdict.AlreadyFormatted      => Future.successful(String(bytes, UTF_8))
+  case Verdict.Refused(refusal)      => Future.failed(FormatRefusedException(refusal))
+}
+```
+
+Both recipes are compiled in `TryAndFutureSpec`. Nothing refuses on its own: `Verdict` is a value,
+and `FormatRefusedException` exists only where a caller or an adapter raises it — the same type the
+build-tool facade and the cats adapter raise.
+
 ## pre-commit
 
 ```yaml

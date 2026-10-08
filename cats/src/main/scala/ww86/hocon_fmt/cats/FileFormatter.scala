@@ -4,7 +4,7 @@ import _root_.cats.effect.Async
 import _root_.cats.syntax.all.*
 import fs2.{Pipe, Stream}
 import fs2.io.file.{Files, Path}
-import ww86.hocon_fmt.{Refusal, Verdict}
+import ww86.hocon_fmt.{FormatRefusedException, Refusal, Verdict}
 
 /** Result of formatting a file in place. IO failures remain in the effect's error channel. */
 enum FormatOutcome derives CanEqual {
@@ -12,9 +12,6 @@ enum FormatOutcome derives CanEqual {
   case AlreadyFormatted
   case Refused(refusal: Refusal)
 }
-
-/** Opt-in error-channel representation of a safe-formatting refusal. */
-final class FormatRefusedException(val refusal: Refusal) extends Exception(refusal.reason)
 
 /** File operations for JVM, Node and Native callers. Supply Files explicitly to choose a filesystem.
   * Calls on the same file must be serialised by the caller.
