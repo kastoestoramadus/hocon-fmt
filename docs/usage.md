@@ -48,6 +48,75 @@ Three builds of the same program:
 
 \* `--check` on one small file, averaged over 10 runs on one Linux machine.
 
+## cats-effect library
+
+`hocon-fmt-cats` supplies file operations on the JVM, Scala.js under Node and Scala Native.
+Use `"eu.ww86" %% "hocon-fmt-cats" % "0.1.0"` on the JVM, or `%%%` in a cross-project.
+Node applications also supply one `java.time` implementation, for example
+`"org.ekrich" %%% "sjavatime" % "1.5.0"`; cats-effect already supplies one on Native.
+
+```scala
+import cats.effect.IO
+import fs2.Stream
+import fs2.io.file.Path
+import ww86.hocon_fmt.interop.cats.FileFormatter
+
+val formatter = FileFormatter[IO]
+val file = Path("application.conf")
+val verdict = formatter.verdict(file)          // IO[Verdict], strictly decoded from bytes
+val outcome = formatter.format(file)          // IO[FormatOutcome]
+val checked = Stream.emits(List(file)).covary[IO].through(formatter.check)
+val required = formatter.formatOrRaise(file)   // refusal raised as FormatRefusedException
+```
+
+The API works with any `F[_]: Async` and `Files[F]`. `format` returns `Formatted`,
+`AlreadyFormatted` or `Refused(refusal)`. Checks emit `(Path, Verdict)` pairs without writing.
+IO errors use the effect's error channel; refusals stay values unless `formatOrRaise` is used,
+whose exception carries the original `Refusal` in `.refusal`.
+
+Formatting stages the complete output in a managed temporary directory beside the original,
+then atomically replaces the original; a failed or cancelled staged write leaves the original
+intact and cleans up staging. The staged file is only renamed over the original when it can be
+given the original's owner, group and every mode bit, setgid included, and when both the file and
+its directory can be written; otherwise the formatted text is written in place, which keeps the
+file but loses the crash-atomicity of the rename. Symlinks are followed. A replacement is a new
+file, so other hard links keep the old content; an in-place write keeps them too. Calls on the same
+file must be serialised; `distinctPaths` canonicalises and deduplicates a list before parallel work.
+
+## Try and Future
+
+The core needs neither cats-effect nor fs2: `Verdict.of(bytes)` is a pure decision —
+`NeedsFormatting(text)`, `AlreadyFormatted` or `Refused(refusal)` — and only `hocon-fmt-core` has
+to be on the classpath. A caller whose channel carries values, not effects, lifts a refusal into
+the one `FormatRefusedException`, which carries the typed `Refusal` in `.refusal`:
+
+```scala
+import scala.util.{Failure, Success, Try}
+import ww86.hocon_fmt.{FormatRefusedException, Verdict}
+
+val bytes: Array[Byte] = ??? // the file's content
+val formatted: Try[String] = Try(Verdict.of(bytes)).flatMap {
+  case Verdict.NeedsFormatting(text) => Success(text)
+  case Verdict.AlreadyFormatted      => Success(String(bytes, UTF_8))
+  case Verdict.Refused(refusal)      => Failure(FormatRefusedException(refusal))
+}
+```
+
+```scala
+import scala.concurrent.Future
+import ww86.hocon_fmt.{FormatRefusedException, Verdict}
+
+val formatted: Future[String] = Future(Verdict.of(bytes)).flatMap {
+  case Verdict.NeedsFormatting(text) => Future.successful(text)
+  case Verdict.AlreadyFormatted      => Future.successful(String(bytes, UTF_8))
+  case Verdict.Refused(refusal)      => Future.failed(FormatRefusedException(refusal))
+}
+```
+
+Both recipes are compiled in `TryAndFutureSpec`. Nothing refuses on its own: `Verdict` is a value,
+and `FormatRefusedException` exists only where a caller or an adapter raises it — the same type the
+build-tool facade and the cats adapter raise.
+
 ## pre-commit
 
 ```yaml
