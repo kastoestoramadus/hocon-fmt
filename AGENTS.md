@@ -72,6 +72,20 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
 - A change to a hot path gets a `scripts/bench.py run` before and after.
 - New Scala code is functional Scala 3: ADTs and `Either` rather than exceptions, no `var`, effects
   at the edges. Braces, not significant indentation (`.scalafmt.conf`). The sbt plugin is Scala 2.12.
+- The compiler enforces what review would otherwise catch (`scalacOptions` in `build.sbt`, every
+  warning an error). Adapt the code; never relax a flag or add `@nowarn` to get a build through.
+  The usual fixes:
+  - `strictEquality`: a type compared with `==` gets `derives CanEqual`, and so does an enum
+    matched on a case without parameters, since that match is an `==`.
+  - Explicit nulls: a value from a Java or JS API is `T | Null`; wrap it in `Option(...)` or match
+    `case s: String`, at the boundary. `.nn` only with a comment saying why it cannot be null.
+  - A value dropped on purpose is `val _ = ...`; anything else dropped is a bug, an `IO` above all.
+  - Safe init: a test suite registers its tests while the class is constructed, so data the tests
+    read is declared above them or is a `def`; extractors (`Regex`) stay `val`s at the top.
+- WartRemover (`project/Warts.scala`) fails the main code on what the compiler has no flag for:
+  `.head`, `.get` on `Option` or `Try`, `null`, `throw`, `return`, `var`, `while`, casts. A place
+  that needs one takes a `@SuppressWarnings` on the narrowest definition, with a comment saying
+  why. Catch with `NonFatal`, never `Throwable`.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
 
