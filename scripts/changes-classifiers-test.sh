@@ -96,6 +96,18 @@ check "a docs file renamed into code (ci.yml)" true \
 # An empty diff (BASE == HEAD) has no paths: docs-only, nothing to run for.
 check "no change at all (ci.yml)" false \
   "$(classify .github/workflows/ci.yml "$repo" HEAD code)"
+check "no change at all (pages.yml)" false \
+  "$(classify .github/workflows/pages.yml "$repo" HEAD site)"
+
+# A diff that cannot run is not evidence of a docs-only change: delete the base commit's
+# root tree object, so `git cat-file -e` still passes but `git diff` fails, and the
+# classifier must answer true (run everything) rather than a silent false.
+tree=$(git -C "$repo" rev-parse "$base^{tree}")
+rm "$repo/.git/objects/${tree:0:2}/${tree:2}"
+check "an unreadable diff (ci.yml)" true \
+  "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
+check "an unreadable diff (pages.yml)" true \
+  "$(classify .github/workflows/pages.yml "$repo" "$base" site)"
 
 if [ "$failures" -eq 0 ]; then
   echo "all classifier cases pass"

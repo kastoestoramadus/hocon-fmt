@@ -37,19 +37,29 @@ jobs:
           # empty on workflow_dispatch, which always deploys.
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
+          set -euo pipefail
           site=false
           # An unresolvable base (a new branch, a rewritten history) deploys rather than
           # leaving the page stale.
           if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            # --no-renames lists a pure rename as both of its paths: plain --name-only shows
-            # only the destination, so a core file renamed into docs/ would read as
-            # docs-only and leave the page stale.
-            while IFS= read -r file; do
-              case "$file" in
-                site/*|core/*|examples/*|build.sbt|project/*|scripts/fetch-sconfig-fork.sh|.github/workflows/pages.yml)
-                  site=true; break ;;
-              esac
-            done < <(git diff --name-only --no-renames "$BASE" HEAD)
+            # The diff is captured before the loop reads it: piped straight in, a failed
+            # `git diff` would feed the loop nothing and read as a docs-only change, so it
+            # answers site=true instead — the same fail-open as an unresolvable base, and
+            # any other error fails the step loudly. `--no-renames` lists a pure rename as
+            # both of its paths: plain --name-only shows only the destination, so a core
+            # file renamed into docs/ would read as docs-only and leave the page stale.
+            if files=$(git diff --name-only --no-renames "$BASE" HEAD); then
+              if [ -n "$files" ]; then
+                while IFS= read -r file; do
+                  case "$file" in
+                    site/*|core/*|examples/*|build.sbt|project/*|scripts/fetch-sconfig-fork.sh|.github/workflows/pages.yml)
+                      site=true; break ;;
+                  esac
+                done <<< "$files"
+              fi
+            else
+              site=true
+            fi
           else
             site=true
           fi
