@@ -8,6 +8,7 @@ table the old single-file log kept, with the same columns. A file that does not 
 title line, a Change paragraph or a Look-at-again paragraph missing — is an error, so adding
 an entry can be checked with a run. Python 3 standard library only."""
 
+import re
 import sys
 from pathlib import Path
 
@@ -56,8 +57,9 @@ def entries():
 
 
 def pr_key(pr):
-    """Sort key for the PR cell: `#62` by number; `—` (no pull request) last."""
-    return int(pr.lstrip("#")) if pr.startswith("#") else -1
+    """Sort key for the PR cell: `#62`, bare or as a `[#62](…)` link, by number; `—` last."""
+    match = re.search(r"#(\d+)", pr)
+    return int(match.group(1)) if match else -1
 
 
 def main():

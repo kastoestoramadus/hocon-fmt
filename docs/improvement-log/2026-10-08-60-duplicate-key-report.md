@@ -1,4 +1,4 @@
-# 2026-10-08 — #60 — The CLI reports the keys a later definition replaces
+# 2026-10-08 — [#60](https://github.com/kastoestoramadus/hocon-fmt/pull/60) — The CLI reports the keys a later definition replaces
 
 **Change:** The CLI reports the keys a later definition replaces (`DuplicateReport` in core, from
 the syntax-preserving document parse of the text): a warning per finding,

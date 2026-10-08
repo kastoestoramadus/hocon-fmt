@@ -19,8 +19,10 @@ title line and two paragraphs, both required:
 **Look at again before a release:** the reason to revisit, or `—` when there is none.
 ```
 
-`<PR>` is `#<number>` or `—`; `<title>` is a few words for the file list and the table's benefit,
-since the paragraphs stay verbatim.
+`<PR>` is `#<number>` or `—`, optionally with the number linked —
+`[#60](https://github.com/kastoestoramadus/hocon-fmt/pull/60)` — a form the table keeps;
+`<title>` is a few words for the file list and the table's benefit, since the paragraphs stay
+verbatim.
 
 ## Adding an entry
 
