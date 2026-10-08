@@ -1,6 +1,6 @@
 package ww86.hocon_fmt
 
-import org.ekrich.config.ConfigObject
+import org.ekrich.config.{ConfigList, ConfigObject, ConfigValue}
 import org.scalacheck.Prop.forAll
 import scala.jdk.CollectionConverters.*
 
@@ -101,8 +101,17 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
         case (GuardKey(), _)                                                   => Nil
         case (PlaceholderKey(index), value) if value.unwrapped == entry.getKey =>
           List(Leaf(path, value.origin.lineNumber, Some(index.toInt)))
-        case (_, value) => List(Leaf(path, value.origin.lineNumber, None))
+        case (_, list: ConfigList) => Leaf(path, list.origin.lineNumber, None) :: leavesInItems(list, path)
+        case (_, value)            => List(Leaf(path, value.origin.lineNumber, None))
       }
+    }
+
+  // The objects in an array are reached by their position; the other items are no leaves of their own.
+  def leavesInItems(list: ConfigList, at: List[String]): List[Leaf] =
+    list.asScala.toList.zipWithIndex.flatMap {
+      case (item: ConfigObject, i) => leavesOf(item, at :+ i.toString)
+      case (item: ConfigList, i)   => leavesInItems(item, at :+ i.toString)
+      case _                       => Nil
     }
 }
 

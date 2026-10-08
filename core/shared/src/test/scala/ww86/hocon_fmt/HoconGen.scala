@@ -88,16 +88,27 @@ object HoconGen {
 
   def includeKey(statement: String): List[String] = List(s"include $statement")
 
+  def includesIn(value: Value, at: List[String]): Map[String, Set[List[String]]] = value match {
+    case Value.Object(inner) => keysBeforeIncludes(inner, at)
+    case Value.Array(items)  => items.zipWithIndex.flatMap { case (item, i) => includesIn(item, at :+ i.toString) }.toMap
+    case Value.Scalar(_)     => Map.empty
+  }
+
   def keysBeforeIncludes(nodes: List[Node], at: List[String]): Map[String, Set[List[String]]] = {
+    // An array is a value of its own, and the objects in it are reached by their position.
     def leaves(path: List[String], value: Value): Set[List[String]] = value match {
       case Value.Object(inner) =>
         inner.flatMap { case Node.Field(key, _, v, _) => leaves(path ++ segments(key), v); case _ => Nil }.toSet
+      case Value.Array(items) =>
+        Set(path) ++ items.zipWithIndex.flatMap { case (item, i) =>
+          leaves(path :+ i.toString, item) - (path :+ i.toString)
+        }
       case _ => Set(path)
     }
     val (_, found) = nodes.foldLeft((Set.empty[List[String]], Map.empty[String, Set[List[String]]])) {
       case ((before, acc), Node.Field(key, _, value, _)) =>
         val path   = at ++ segments(key)
-        val nested = value match { case Value.Object(inner) => keysBeforeIncludes(inner, path); case _ => Map.empty }
+        val nested = includesIn(value, path)
         (before ++ leaves(path, value), acc ++ nested)
       case ((before, acc), Node.Include(statement, _)) =>
         (before + includeKey(statement), acc + (statement -> before))

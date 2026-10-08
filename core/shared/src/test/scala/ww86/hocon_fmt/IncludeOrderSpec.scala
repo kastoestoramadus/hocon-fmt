@@ -32,6 +32,14 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
       """include "a.conf", include "b.conf"""",
       """include "a.conf""""
     ),
+    "a field after the include, in an object in an array" -> (
+      """arr = [ { include "f.conf", a = 2 } ]""",
+      """include "f.conf""""
+    ),
+    "a key defined again after the include, in an object in an array" -> (
+      "arr = [\n{\n o.a = 1\n include \"g.conf\"\n o.c = 2\n}\n]\n",
+      """include "g.conf""""
+    ),
     "a key defined again after the include" -> (
       "a.b = 1\ninclude \"defaults.conf\"\na.c = 2",
       """include "defaults.conf""""
