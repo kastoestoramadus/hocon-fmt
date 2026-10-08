@@ -42,7 +42,7 @@ jobs:
       # Runs even when the tests fail, so one run reports both signals.
       - name: Check formatting
         if: ${{ !cancelled() }}
-        run: sbt scalafmtCheckAll
+        run: sbt scalafmtCheckAll scalafmtSbtCheck
 
   sbt-plugin:
     runs-on: ubuntu-latest
