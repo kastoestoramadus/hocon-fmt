@@ -2,7 +2,6 @@ package ww86.hocon_fmt.maven;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,6 +11,8 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.codehaus.plexus.util.DirectoryScanner;
+import ww86.hocon_fmt.java.HoconFmt;
+import ww86.hocon_fmt.java.Verdict;
 
 /** What both goals share: which files to look at, and what the formatter makes of each. */
 abstract class HoconFormatterMojo extends AbstractMojo {
@@ -43,7 +44,7 @@ abstract class HoconFormatterMojo extends AbstractMojo {
     var examined = new ArrayList<Examined>();
     for (String relativePath : matchingFiles()) {
       Path file = baseDirectory.toPath().resolve(relativePath);
-      Outcome outcome = Outcome.of(read(file, relativePath), relativePath);
+      Outcome outcome = examine(file, relativePath);
       if (outcome instanceof Outcome.Refused refused) {
         getLog().warn("Leaving " + relativePath + " unchanged: " + refused.reason());
       }
@@ -79,11 +80,15 @@ abstract class HoconFormatterMojo extends AbstractMojo {
     return Arrays.stream(scanner.getIncludedFiles()).sorted().toList();
   }
 
-  private static byte[] read(Path file, String relativePath) throws MojoExecutionException {
+  Verdict verdictFor(Path file) throws IOException {
+    return HoconFmt.checkFile(file);
+  }
+
+  private Outcome examine(Path file, String relativePath) throws MojoExecutionException {
     try {
-      return Files.readAllBytes(file);
+      return Outcome.of(verdictFor(file));
     } catch (IOException e) {
-      throw new MojoExecutionException("Cannot read " + relativePath, e);
+      throw new MojoExecutionException("Cannot process " + relativePath, e);
     }
   }
 }
