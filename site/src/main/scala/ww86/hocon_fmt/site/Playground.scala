@@ -10,14 +10,9 @@ import ww86.hocon_fmt.{ExampleData, Verdict}
 object Playground:
 
   def apply(): HtmlElement =
-    val first = ExampleData.showcase.headOption.fold("")(_.input)
-    val input = Var(first)
-    // Formatting as you type, with a pause: a verdict per settled input, not per keystroke.
-    val verdict =
-      input.signal.changes
-        .debounce(150)
-        .startWith(first)
-        .map(text => text -> Verdict.of(text))
+    val first   = ExampleData.showcase.headOption.fold("")(_.input)
+    val input   = Var(first)
+    val verdict = verdicts(input.signal, first)
 
     div(
       sectionTag(
@@ -123,6 +118,15 @@ object Playground:
         p(cls := "status", aria.live := "polite", child <-- verdict.map(statusLine))
       )
     )
+
+  /** One verdict per settled input; kept separate from the DOM for reactive tests. */
+  private[site] def verdicts(input: Signal[String], first: String, debounceMs: Int = 150): Signal[(String, Verdict)] = {
+    input.distinct.changes
+      .debounce(debounceMs)
+      .startWith(first)
+      .distinct
+      .map(text => text -> Verdict.of(text))
+  }
 
   /** The output pane shows the formatting; a refused or settled text stays exactly as typed. */
   private def out(entry: (String, Verdict)): String = entry match {
