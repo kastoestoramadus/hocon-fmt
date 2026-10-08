@@ -8,6 +8,7 @@ the `Release` workflow has never run.
 |---|---|---|---|
 | `hocon-fmt-core_3`, `hocon-fmt-core_sjs1_3`, `hocon-fmt-core_native0.5_3` | sbt | Maven Central | the pure formatter on every platform |
 | `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | sbt | Maven Central | cats-effect file operations on every platform |
+| `hocon-fmt-zio_3`, `hocon-fmt-zio_sjs1_3`, `hocon-fmt-zio_native0.5_3` | sbt | Maven Central | the ZIO library adapter |
 | `hocon-fmt-cli_3` | sbt | Maven Central | the JVM command line |
 | `sbt-hocon-fmt` | sbt | Maven Central | `addSbtPlugin` |
 | `hocon-fmt-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
@@ -115,8 +116,8 @@ workflow" for workflows on the default branch.
 4. Publish, in dependency order:
    - Maven Central, first: the Gradle, Maven and Mill plugins and the sbt plugin all resolve the
      core from there. The tag leaves three deployments in the portal (sbt, Maven, Mill). Look each
-     over in Publish → Deployments, then publish the sbt one, which carries core and cats on all
-     three platforms, first. A release cannot be undone.
+     over in Publish → Deployments, then publish the sbt one, which carries core, cats and zio on all
+     three platforms (zio is text only on Scala.js), first. A release cannot be undone.
    - The Gradle Plugin Portal.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).
@@ -159,6 +160,10 @@ pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --re
 pipx run hocon-fmt --check application.conf          # the wheel, native
 npx hocon-fmt@<version> --check application.conf     # the npm package
 ```
+
+Try the ZIO usage example from [usage](usage.md) on the JVM and Native, and the text API on
+Scala.js, with the released adapter version and no local repository configured. Check a refused
+file stays untouched and a streamed check still reports a later readable file.
 
 Then the plugins as [usage](usage.md) shows them, with the released version, in a project that
 has no local repositories configured: `mavenLocal()`, `~/.m2` and `~/.ivy2/local` would hide a

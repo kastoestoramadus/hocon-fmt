@@ -9,6 +9,10 @@ Every channel runs the same formatter and follows the same rules:
   untouched. A refusal never fails the run: a `.conf` file that is not HOCON at all, such as an
   nginx config, is common enough that failing on it would make the tool unusable.
 
+Library adapters expose refusals to the caller: the ZIO adapter uses a typed error for a
+single operation and a per-file outcome for a streamed check, so the application controls its
+run policy.
+
 All JVM channels need Java 17 or newer, as Scala 3.8 does.
 
 ## Command line
@@ -219,3 +223,48 @@ override def hoconFormatSources = Task.Sources("conf")
 | `includes` | `src/**/*.conf`, `src/**/*.hocon` |
 | `excludes` | none |
 | `skip` (`-Dhocon-fmt.skip`) | `false` |
+
+## ZIO library
+
+Add `"eu.ww86" %% "hocon-fmt-zio" % "0.1.0"` on the JVM, or use `%%%` in a
+Scala.js / Scala Native build. From a checkout, run
+`sbt coreJVM/publishLocal zioJVM/publishLocal` and use `0.1.0-SNAPSHOT`, adding the
+`coreJS`/`zioJS` or `coreNative`/`zioNative` pair for those platforms: the adapter
+depends on `hocon-fmt-core`, so publishing it alone resolves nothing.
+The adapter uses ZIO 2.1.26 and has no cats or cats-effect dependency.
+
+```scala
+import java.nio.file.Paths
+import zio.{IO, UIO}
+import ww86.hocon_fmt.{Refusal, Verdict}
+import ww86.hocon_fmt.interop.zio.{FileError, ZioFiles, ZioFormatter}
+
+val formatted: IO[Refusal, String] = ZioFormatter.format("app.port=8080")
+val decision: UIO[Verdict] = ZioFormatter.verdict("app.port=8080")
+val path = Paths.get("application.conf")
+val rewrite: IO[FileError, Verdict] = ZioFiles.format(path)
+val report = ZioFiles.check(List(path, Paths.get("local.conf"))).runCollect
+```
+
+`ZioFiles.verdict(path)` checks without writing. It and `format(path)` put content
+refusals in `FileError.Refused(reason)` and filesystem errors in `FileError.Io(cause)`,
+wrapping a JDK call that fails unchecked (a path on a closed ZIP filesystem, say) in an
+`IOException` that keeps the original as its cause. `format` returns the original decision:
+`NeedsFormatting` means the write completed; `AlreadyFormatted` leaves the file untouched.
+`check` is a lazy `ZStream` of `FileOutcome(path, Either[FileError, Verdict])`: it retains
+failures as per-file outcomes and continues to the next path. The application decides how
+to report them.
+
+Files are read strictly as UTF-8 through blocking `java.nio` operations. Only a
+`NeedsFormatting` verdict writes: the adapter stages complete output beside the original, then
+atomically replaces the original only when the staged copy can be given the original's owner,
+group and every mode bit, setgid included, and when both the file and its directory can be
+written; otherwise the formatted text is written in place, which keeps the file but loses the
+crash-atomicity of the rename. A failed or cancelled staged write leaves the original intact
+and removes the temporary file; filesystems without atomic replacement produce an I/O error.
+Symbolic links are followed and retained. A replacement is a new file, so other hard links keep
+the old content; an in-place write keeps them too. Avoid concurrent edits to the same file
+while formatting.
+
+JVM and Scala Native provide both APIs. Scala.js provides `ZioFormatter` for text only;
+`java.nio` file operations belong to the JVM and Native builds.
