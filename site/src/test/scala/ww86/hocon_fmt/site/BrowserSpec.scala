@@ -10,14 +10,15 @@ import Browser.given
   * rather than as a property of a `js.Dynamic`.
   */
 @js.native
-trait FetchGlobal extends js.Object:
+trait FetchGlobal extends js.Object {
   def fetch(url: String): js.Promise[js.Any] = js.native
+}
 
 /** The browser the page really runs in, faked: `dom.window` is one global lookup, so a test can
   * hand the `Browser` givens a `fetch` and a localStorage without jsdom. This is the part no unit
   * test covered when the page shipped, and the part that was broken — see the last test.
   */
-class BrowserSpec extends munit.FunSuite:
+class BrowserSpec extends munit.FunSuite {
 
   /** What api.github.com answers with: one pull request the snapshot knows (#600, open there) and
     * one it does not (#999).
@@ -28,10 +29,11 @@ class BrowserSpec extends munit.FunSuite:
       |{"number":999,"title":"brand new","state":"open","pull_request":{"merged_at":null}}
       |]}""".stripMargin
 
-  override def afterEach(context: AfterEach): Unit =
+  override def afterEach(context: AfterEach): Unit = {
     // Node has no window of its own; a fake left behind would be a trap for the next suite.
     install(js.Dynamic.literal())
     super.afterEach(context)
+  }
 
   test("the browser's own fetch answers the author's pull requests") {
     val browser = FakeBrowser()
@@ -107,18 +109,19 @@ class BrowserSpec extends munit.FunSuite:
     assert(js.typeOf(window.asInstanceOf[FetchGlobal].fetch) != "function")
   }
 
-  def assertSnapshotStands(board: ContributionsView.Board): Unit =
+  def assertSnapshotStands(board: ContributionsView.Board): Unit = {
     assertEquals(board.failedLibraries, Library.values.toList)
     assertEquals(board.liveLibraries, Nil)
     assertEquals(board.entries, Contributions.all)
     assertEquals(board.asOf, Contributions.readOn)
     assert(!board.checking, "an answer that is a failure must still settle the state line")
+  }
 
   def install(window: js.Any): Unit =
     js.Dynamic.global.globalThis.updateDynamic("window")(window)
 
   /** A window Node does not have: a recording `fetch` and a localStorage in memory. */
-  final class FakeBrowser:
+  final class FakeBrowser {
     val searched: scala.collection.mutable.ListBuffer[String] = scala.collection.mutable.ListBuffer.empty
     val store                                                 = scala.collection.mutable.Map.empty[String, String]
 
@@ -150,7 +153,7 @@ class BrowserSpec extends munit.FunSuite:
       })
     }
 
-    def window(fetch: Option[js.Any]): js.Any =
+    def window(fetch: Option[js.Any]): js.Any = {
       val storage = js.Dynamic.literal(
         getItem = js.Any.fromFunction1[String, String | Null](key => store.getOrElse[String | Null](key, null)),
         setItem = js.Any.fromFunction2 { (key: String, value: String) =>
@@ -158,6 +161,10 @@ class BrowserSpec extends munit.FunSuite:
           ()
         }
       )
-      fetch match
+      fetch match {
         case Some(f) => js.Dynamic.literal(fetch = f, localStorage = storage)
         case None    => js.Dynamic.literal(localStorage = storage)
+      }
+    }
+  }
+}

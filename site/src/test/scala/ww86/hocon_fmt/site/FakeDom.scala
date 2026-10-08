@@ -17,7 +17,7 @@ import scala.scalajs.js
   * models the way browsers report it, so a test asserting on the mounted tree reads like the
   * page itself.
   */
-object FakeDom:
+object FakeDom {
 
   val source =
     """(function () {
@@ -194,3 +194,4 @@ object FakeDom:
 
   /** A fresh document, with the DOM classes installed as globals. */
   def document(): js.Dynamic = js.eval(source).asInstanceOf[js.Dynamic]
+}

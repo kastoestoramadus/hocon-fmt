@@ -3,7 +3,7 @@ package ww86.hocon_fmt.site
 import com.raquo.laminar.api.L.*
 
 /** The whole page: the formatter presented, the playground, the upstream work, the footer. */
-object Page:
+object Page {
 
   def apply(): HtmlElement =
     div(
@@ -20,7 +20,7 @@ object Page:
       pageFooter()
     )
 
-  private def pageFooter(): HtmlElement =
+  private def pageFooter(): HtmlElement = {
     val version = BuildInfo.version
     val source  = if version.endsWith("-SNAPSHOT") then Repo.url else Repo.tree(s"v$version")
     footerTag(
@@ -32,3 +32,5 @@ object Page:
       " · ",
       a(href := "https://ww86.eu", "ww86.eu")
     )
+  }
+}
