@@ -123,6 +123,33 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  property("refuses concatenated reserved spellings, in any option combination") {
+    import org.scalacheck.Gen
+    val collision = for {
+      index      <- Gen.oneOf("0", "1", "01", "99999999999")
+      guard      <- Gen.oneOf(false, true)
+      split      <- Gen.choose(1, 9)
+      quotedTail <- Gen.oneOf(false, true)
+      place      <- Gen.oneOf("key", "value", "array", "nested")
+    } yield {
+      val text  = s"__INCLUDE_${if (guard) "GUARD_" else ""}$index"
+      val tail  = text.drop(split)
+      val token = s"\"${text.take(split)}\"" + (if (quotedTail) s"\"$tail\"" else tail)
+      val field = place match {
+        case "key"    => s"$token = ${if (guard) "g" else token}"
+        case "array"  => s"a = [$token]"
+        case "nested" => s"o { $token = g }"
+        case _        => s"a = $token"
+      }
+      s"include \"f.conf\"\ninclude \"second.conf\"\n$field\n"
+    }
+    forAll(collision) { source =>
+      allOptions.foreach { options =>
+        assertEquals(HoconFormatter.format(source, options), Left(Refusal.ReservedName))
+      }
+    }
+  }
+
   // Without this the properties above would pass vacuously on a formatter that refused everything.
   property("formats every document it has no reason to refuse, in any option combination") {
     val documentsWithoutReason = documents(includes = true, distinctKeys = true)
