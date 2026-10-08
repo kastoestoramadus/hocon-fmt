@@ -88,6 +88,7 @@ final case class Example(
 )
 """ + "\nobject ExampleData {\n" +
       entries.mkString("  val all: List[Example] = List(\n    ", ",\n    ", "\n  )\n") +
+      "  val kinds: Set[String] = Set(" + kinds.toSeq.sorted.map(quoted).mkString(", ") + ")\n" +
       "  val showcase: List[Example] = all.filter(_.id.startsWith(\"showcase/\"))\n}\n"
     if (!output.exists || IO.read(output) != text) IO.write(output, text)
     Seq(output)
