@@ -39,8 +39,14 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   def arguments(config: Option[Path] = None, style: StyleOverrides = StyleOverrides.none): Arguments =
     Arguments(files = Nil, checkOnly = false, config = config, style = style)
 
+  def checkWith(style: StyleOverrides, files: Path*): IO[CmdApi.Run] =
+    CmdApi
+      .examineAll(Arguments(files.toList, checkOnly = true, config = None, style = style))
+      .map(_.fold(e => fail(e), identity))
+
   val unformatted = "a   :    1"
   val formatted   = "a = 1\n"
+  val duplicated  = "x = 1\nx = 2\n"
 
   tmp.test("--check reports exit code 1 for an unformatted file") { dir =>
     write(dir, "a.conf", unformatted).flatMap(check(_)).map(run => assertEquals(run.exitCode, ExitCode(1)))
@@ -275,6 +281,36 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     )
   }
 
+  test("arguments: --fail-on-duplicates comes in a --no- pair") {
+    assertEquals(
+      CmdApi.command.parse(List("--fail-on-duplicates", "a.conf")),
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = false,
+            config = None,
+            style = StyleOverrides(failOnDuplicates = Some(true))
+          )
+        )
+      )
+    )
+    assertEquals(
+      CmdApi.command.parse(List("--no-fail-on-duplicates", "a.conf")),
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = false,
+            config = None,
+            style = StyleOverrides(failOnDuplicates = Some(false))
+          )
+        )
+      )
+    )
+    assert(CmdApi.command.parse(List("--fail-on-duplicates", "--no-fail-on-duplicates", "a.conf")).isLeft)
+  }
+
   test("arguments: a separator or flag pair nothing can honour is a usage error") {
     List(
       List("--separator", "equals", "a.conf"),
@@ -288,9 +324,15 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     val Left(help) = CmdApi.command.parse(List("--help")): @unchecked
     assert(help.errors.isEmpty, help.errors.toString)
     val text = help.toString
-    List("--separator", "--config", "--double-indent", "--no-double-indent", "--simplify-nested-objects").foreach {
-      flag =>
-        assert(text.contains(flag), text)
+    List(
+      "--separator",
+      "--config",
+      "--double-indent",
+      "--no-double-indent",
+      "--simplify-nested-objects",
+      "--fail-on-duplicates"
+    ).foreach { flag =>
+      assert(text.contains(flag), text)
     }
   }
 
@@ -411,6 +453,93 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       file <- write(dir, "a.conf", "a = 1\n")
       run  <- check(file)
     } yield assertEquals(run.exitCode, ExitCode(1))
+  }
+
+  // --- the duplicate report --------------------------------------------------------------------
+
+  test("a duplicate report that cannot run warns on stdin") {
+    val result = CmdApi.formatStdin("a : ${".getBytes(UTF_8), "broken.conf", StyleOverrides.none)
+    assert(result.stderr.contains("WARNING: duplicate report could not run for broken.conf"), result.stderr)
+  }
+
+  tmp.test("a duplicate report that cannot run warns for the file and preserves it") { dir =>
+    for {
+      file <- write(dir, "broken.conf", "a : ${")
+      run  <- rewrite(file)
+      text <- textOf(file)
+    } yield {
+      assert(run.rendered.contains(s"WARNING: duplicate report could not run for $file"), run.rendered)
+      assertEquals(text, "a : ${")
+      assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
+  test("write mode warns about the dead definition, and the warning changes no exit code by default") {
+    // A file with a dead duplicate is not formatted, so a run that rewrites it would exit 0 even
+    // without the report; what the report adds is the line saying why.
+    val result = CmdApi.formatStdin(duplicated.getBytes(UTF_8), "editor.conf", StyleOverrides.none)
+    assertEquals(result.stdout, "x = 2\n")
+    assertEquals(result.exitCode, ExitCode.Success)
+    assertEquals(
+      result.stderr,
+      "editor.conf:1: x defined again at line 2; the earlier value never takes effect\n"
+    )
+  }
+
+  test("--fail-on-duplicates makes a finding fail the run, and writes what it would have written") {
+    val result =
+      CmdApi.formatStdin(duplicated.getBytes(UTF_8), "editor.conf", StyleOverrides(failOnDuplicates = Some(true)))
+    assertEquals(result.exitCode, ExitCode(1))
+    assertEquals(result.stdout, "x = 2\n")
+  }
+
+  tmp.test("the warning names the file, the earlier line and the line that replaces it") { dir =>
+    for {
+      file <- write(dir, "a.conf", duplicated)
+      run  <- rewrite(file)
+      text <- textOf(file)
+    } yield {
+      assertEquals(text, "x = 2\n")
+      assert(
+        run.rendered.contains(s"$file:1: x defined again at line 2; the earlier value never takes effect"),
+        run.rendered
+      )
+      assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
+  // A refusal never fails a run, so a refused file with a dead duplicate is where the default and
+  // the flag part ways: the warning is the only thing the report says about the file.
+  tmp.test("a refused file is still reported on, and --fail-on-duplicates fails it") { dir =>
+    val refused = "x = 1\nx = 2\n# nothing follows\n"
+    for {
+      file   <- write(dir, "a.conf", refused)
+      plain  <- check(file)
+      strict <- checkWith(StyleOverrides(failOnDuplicates = Some(true)), file)
+      text   <- textOf(file)
+    } yield {
+      assertEquals(text, refused)
+      assertEquals(plain.exitCode, ExitCode.Success)
+      assert(plain.rendered.contains("cannot format, leaving unchanged"), plain.rendered)
+      assert(plain.rendered.contains("x defined again at line 2"), plain.rendered)
+      assertEquals(strict.exitCode, ExitCode(1))
+      assertEquals(strict.rendered, plain.rendered)
+    }
+  }
+
+  tmp.test("fail-on-duplicates in the repository's .hocon-fmt.conf sets it, and a flag overrides it") { dir =>
+    val refused = "x = 1\nx = 2\n# nothing follows\n"
+    for {
+      _      <- write(dir, ".hocon-fmt.conf", "fail-on-duplicates = true\n")
+      file   <- write(dir, "a.conf", refused)
+      styled <- styleFor()(file)
+      run    <- check(file)
+      off    <- checkWith(StyleOverrides(failOnDuplicates = Some(false)), file)
+    } yield {
+      assertEquals(styled, Right(List(file -> FormatOptions(failOnDuplicates = true))))
+      assertEquals(run.exitCode, ExitCode(1))
+      assertEquals(off.exitCode, ExitCode.Success)
+    }
   }
 
   test("stdin applies the style flags; no config file is looked up, the stdin name is not read") {

@@ -11,6 +11,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeDetectionSpec` | `core/shared` | which occurrences of `include` are a directive; the contract of the detection regex |
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
+| `DuplicateReportSpec` | `core/shared` | the duplicate report: replaced definitions and ancestor barriers, independent array scopes, and resolution showing which values survive |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
 | `OptionsSpec` | `core/shared` | the parse and render options the formatter pins explicitly: the final newline, empty text, and how env-variable values render |
@@ -115,7 +116,8 @@ case cannot drift. When `now != target`, `reason-if-different` is
 required. `ExamplesSpec` asserts `now` and output and prints gaps as
 `now / pending / target`; absent pending is shown as “—”. Optional `pending` records
 a verdict from a local sconfig build with the author’s open PRs merged; this build
-does not compute it and the suite does not assert it. Optional `findings: [...]`
+does not compute it and the suite does not assert it. `findings: [...]` carries the report's kinds for
+the example's `input.conf`, which `ExamplesSpec` asserts — an example that declares none has none.
 reserves identifiers for a later duplicate report.
 
 `source` records `kind: synthetic | distilled | verbatim` and `pattern`; verbatim

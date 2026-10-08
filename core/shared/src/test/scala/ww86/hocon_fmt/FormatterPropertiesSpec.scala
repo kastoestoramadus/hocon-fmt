@@ -69,6 +69,17 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // What the report says about a document whose keys never repeat: nothing. The report does not
+  // depend on the options, so one combination is enough.
+  property("reports nothing on a document whose paths never repeat") {
+    forAll(documentsWithConcatenations) { doc =>
+      DuplicateReport.findings(doc.text) match {
+        case Right(found)  => assertEquals(found, Nil, s"reported on:\n${doc.text}")
+        case Left(refusal) => fail(s"the report refused a generated document: ${refusal.reason}\n${doc.text}")
+      }
+    }
+  }
+
   property("never leaks a placeholder, in any option combination") {
     forAll(documents(includes = true)) { doc =>
       allOptions.foreach { options =>

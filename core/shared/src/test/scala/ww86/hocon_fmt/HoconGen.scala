@@ -298,6 +298,18 @@ object HoconGen {
       Document(if (distinctKeys) withDistinctKeys(nodes) else nodes)
     }
 
+  /** Independent array pieces may reuse element field names; neither replaces the other. */
+  val documentsWithConcatenations: Gen[Document] = for {
+    doc           <- documents(includes = true, distinctKeys = true)
+    key           <- word.map(_ + "_concat")
+    values        <- Gen.listOfN(2, Gen.choose(-1000, 1000))
+    selfReference <- Gen.oneOf(true, false)
+  } yield {
+    val arrays = values.map(n => s"[{b=$n}]")
+    val value  = if (selfReference) arrays.mkString(s"\n$key = $${$key} ") else arrays.mkString(" ")
+    Document(doc.nodes :+ Node.Field(key, " = ", Value.Scalar(value)))
+  }
+
   /** Renames fields so no two at one level share the first segment of their path. */
   def withDistinctKeys(nodes: List[Node]): List[Node] =
     nodes.zipWithIndex.map {

@@ -65,6 +65,47 @@ in how they find files and report — and in the name they pass (`Verdict.of(byt
 rules out a file named `.json` or `.properties`. Formatting those writes HOCON where the name
 promises another format, so nothing here touches them (`Refusal.OtherFormat`).
 
+## The duplicate report
+
+HOCON merges a key defined more than once, and the parse a format makes keeps only the winner:
+`ConfigFactory.parseString("x = 1\nx = 2")` renders `x = 2` alone, the earlier definition gone
+with its line. A report of definitions a later one replaces therefore cannot read that parse —
+the merge is where the evidence is lost. `DuplicateReport` reads the syntax-preserving document
+parse of the same text (`ConfigDocumentFactory.parseString`), whose tree keeps every field, and
+counts lines by the renders of the nodes it passes in source order. That is one more parse of
+the text, and the price of seeing what the merge discards; `format` and `Verdict` are untouched,
+and the report never reads what an `include` names — the include is a node of the document tree,
+so no masking is involved and the lines are the text's own.
+
+Getting to the tree takes one implementation detail: sconfig publishes no traversal API
+([lightbend/config#300](https://github.com/lightbend/config/issues/300)), so the document is
+matched against `SimpleConfigDocument` and its `configNodeTree` read. The rest of what the report
+touches — `ConfigNodeField.path` and `.value`, `ConfigNodeComplexValue.children`, the `Tokens`
+helpers — is public but in packages sconfig documents as internal, so an sconfig upgrade is worth
+a look at `DuplicateReport` even when it compiles.
+
+A later definition replaces everything before it, except where it cannot: an object — written as a
+block or as a dotted path — merges with an earlier object, and with an earlier substitution, whose
+resolved object merges into it. Two fields of one object are two definitions of one path, so
+`a { b = 1 }` and `a.b = 2` are the leaf reported; a dotted path also defines the objects on the
+way to its leaf, which is how `logger = ERROR` then `logger.play = INFO` is reported. A later
+definition holding a substitution replaces nothing: the merge stays unresolved, and the earlier
+value is what the substitution falls back to when it is optional and unset. `+=` counts as one —
+it is `${?key} [ ... ]` in another spelling.
+
+Every array value has its own element scope, including pieces of a concatenation and arrays in
+later definitions. Their index-zero objects cannot replace each other's fields. A replacement
+of an ancestor ends its descendants' lifetime before a later object introduces fresh fields;
+when an ancestor warning covers the same source and replacement lines, it covers those leaves
+too. Leaves on separate lines retain their own warning.
+
+The CLI prints a finding as a warning beside the file it examined, and only `--fail-on-duplicates`
+(or its key in `.hocon-fmt.conf`) makes one fail a run; `cats`' `FileFormatter.inspect` hands the
+verdict, findings and any report failure of one read to the CLI, and its `write` replaces the file
+as `format` does. A failed document parse or an unsupported document tree produces a warning that the
+duplicate report could not run, rather than an empty successful report. The plugins do not report
+yet: they call the core through `JvmFacade`, which has no report.
+
 ## Include masking
 
 Read this before touching `IncludeMasking`: it is the core algorithm, not incidental cruft. The

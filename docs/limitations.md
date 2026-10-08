@@ -91,7 +91,8 @@ Moved across a field (`Refusal.MovedInclude`):
 
   **Not detected:** sconfig drops a definition that a later one of the same key overrides, and
   after an include that definition may have been what overrode the included file. Neither the parse
-  of the source nor that of the output shows it, so the comparison above cannot:
+  of the source nor that of the output shows it, so the comparison above cannot — the duplicate
+  report can, since it reads a parse that keeps every definition:
   `include "f.conf"` then `o = 3` then `o.c = 7` renders without `o = 3`, and `x.a = 5`, the
   include, `x {}` renders without `x {}`. In both the included file's values for `o` and `x` now
   survive. Such a file is formatted today.
@@ -135,6 +136,34 @@ Scala.js only:
 
 - **Parsing text containing an `include`** throws `NotImplementedError`. See
   [architecture](architecture.md#platforms) for why the formatter is unaffected.
+
+## What the duplicate report does not claim
+
+The report says a key's earlier definition takes no effect; it says nothing where the earlier
+value can still matter, and it reads one text at a time.
+
+- **An include is not read.** `include "defaults.conf"` then `x = 2` may well make the included
+  file's `x` dead, and `x = 1` before the include may be dead as well; the report opens no file,
+  so both are silent. Only definitions written in the text itself are compared.
+- **A later definition holding a substitution is not reported.** `x = 1` then `x = ${y}`, with `y`
+  defined elsewhere, resolves to `y` and leaves the `1` dead — but `${?y}` is the same shape with
+  `y` unset, where the `1` is exactly what the result is. The report does not resolve, so it
+  reports neither. `+=` counts as a substitution: it is `${?key} [ ... ]` in another spelling. The
+  guard has a blind spot worth knowing: an optional override only works as the *last* definition
+  of its key, so `x = 1`, `x = ${?ENV}`, `x = 2` does resolve to `2`, and both earlier definitions
+  are reported.
+- **An object defined twice is not itself a finding**, since the two merge; a leaf inside it that
+  the later definition replaces is one, however deeply it is written (`a { b = 1 }` then
+  `a.b = 2`). A dotted path defines the objects on the way to its leaf: `logger = ERROR` then
+  `logger.play = INFO` replaces the scalar and is reported.
+- **An object written over a substitution is not a finding** either, though it takes the shape of
+  one: `a = ${b}` then `a.c = 2` resolves to `b`'s fields with `c` beside them.
+- **Array elements belong to their own array value.** Concatenating `[{b=1}] [{b=2}]`, or
+  appending the second array through `${a}`, preserves both objects. Their fields are never
+  paired across array values; repeated fields within an element are still reported.
+- **The finding's lines are the text's.** The first is the line the earlier field starts on — a
+  value spanning lines counts from its key — and the second is the line of the definition that
+  first replaces it, not of the last one.
 
 ## Intentional normalisations
 

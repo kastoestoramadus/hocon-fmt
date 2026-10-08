@@ -55,8 +55,22 @@ class FormatOptionsSpec extends munit.FunSuite {
     assertEquals(FormatOptions.parse("# only a comment\n", "team.conf"), Right(FormatOptions.default))
   }
 
+  // The one option that does not reach the renderer: it says what the command line does with the
+  // duplicate report, and the config file names it like the rest.
+  test("fail-on-duplicates parses, defaults to false, and refuses anything else") {
+    assertEquals(FormatOptions.default.failOnDuplicates, false)
+    assertEquals(
+      FormatOptions.parse("fail-on-duplicates = true", "team.conf"),
+      Right(FormatOptions(failOnDuplicates = true))
+    )
+    assertEquals(
+      FormatOptions.parse("fail-on-duplicates = maybe", "team.conf"),
+      Left("team.conf: fail-on-duplicates: expected true or false")
+    )
+  }
+
   test("an explicit null is an error naming the file and the key, not an absent option") {
-    List("separator", "double-indent", "simplify-nested-objects").foreach { key =>
+    List("separator", "double-indent", "simplify-nested-objects", "fail-on-duplicates").foreach { key =>
       val result = FormatOptions.parse(s"$key = null", "team.conf")
       assert(result.left.exists(m => m.startsWith("team.conf: ") && m.contains(key)), s"$key = null gave $result")
     }
