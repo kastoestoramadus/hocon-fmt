@@ -1,7 +1,5 @@
 package ww86.hocon_fmt.java;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * What formatting makes of one input, as a Java caller sees it. The core decides this as a Scala 3
  * enum; this mirror carries the same three outcomes in types the JVM understands natively.
@@ -12,7 +10,6 @@ import org.jspecify.annotations.NullMarked;
  * one on Java 21 — can check a {@code switch} over it for exhaustiveness. Sealed plus records
  * restores exactly that, on Java 21; on Java 17 callers read the outcome with {@code instanceof}.
  */
-@NullMarked
 public sealed interface Verdict
         permits Verdict.AlreadyFormatted, Verdict.NeedsFormatting, Verdict.Refused {
 

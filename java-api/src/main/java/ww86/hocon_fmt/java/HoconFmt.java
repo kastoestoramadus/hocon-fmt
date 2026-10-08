@@ -3,7 +3,6 @@ package ww86.hocon_fmt.java;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.jspecify.annotations.NullMarked;
 import ww86.hocon_fmt.FormatRefusedException;
 
 /**
@@ -11,7 +10,6 @@ import ww86.hocon_fmt.FormatRefusedException;
  * including the refusals, which are values here rather than exceptions — and never accepts or
  * returns null.
  */
-@NullMarked
 public final class HoconFmt {
 
     private HoconFmt() {}

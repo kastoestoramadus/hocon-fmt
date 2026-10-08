@@ -1,13 +1,10 @@
 package ww86.hocon_fmt.java;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Why the formatter refused an input: one constant per case of the core's {@code Refusal} enum, in
  * the same order. The test suite reflects over the core's companion and fails when it grows a
  * case, so a new refusal cannot slip through this mirror unnamed.
  */
-@NullMarked
 public enum RefusalKind {
     /** Decoding the bytes leniently would have replaced the invalid ones. */
     NotUtf8,
