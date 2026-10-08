@@ -81,4 +81,31 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   tmp.test("unreadable files stay in the IO error channel") { dir =>
     formatter.verdict(dir / "missing.conf").attempt.map(result => assert(result.isLeft))
   }
+  tmp.test("canonical paths deduplicate aliases and retain missing files for reporting") { dir =>
+    for {
+      file <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      canonical <- Files[IO].realPath(file)
+      paths <- formatter.distinctPaths(List(file, dir / "." / "a.conf", dir / "missing.conf"))
+    } yield assertEquals(paths, List(canonical, (dir / "missing.conf").absolute))
+  }
+
+  tmp.test("format follows symlinks and preserves permissions") { dir =>
+    for {
+      file <- write(dir, "target.conf", "a=1".getBytes(UTF_8))
+      canonical <- Files[IO].realPath(file)
+      permissions <- Files[IO].getPosixPermissions(file)
+      link = dir / "link.conf"
+      _ <- Files[IO].createSymbolicLink(link, canonical)
+      outcome <- formatter.format(link)
+      isLink <- Files[IO].isSymbolicLink(link)
+      after <- Files[IO].getPosixPermissions(file)
+      bytes <- read(file)
+    } yield {
+      assertEquals(outcome, FormatOutcome.Formatted)
+      assert(isLink)
+      assertEquals(after, permissions)
+      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+    }
+  }
+
 }
