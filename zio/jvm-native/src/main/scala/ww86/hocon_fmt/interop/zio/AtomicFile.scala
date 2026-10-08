@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.zio
+package ww86.hocon_fmt.interop.zio
 
 import java.io.IOException
 import java.nio.charset.StandardCharsets.UTF_8

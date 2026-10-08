@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.zio
+package ww86.hocon_fmt.interop.zio
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import _root_.zio.{Runtime, Unsafe}

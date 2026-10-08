@@ -166,7 +166,7 @@ The adapter uses ZIO 2.1.26 and has no cats or cats-effect dependency.
 import java.nio.file.Paths
 import zio.{IO, UIO}
 import ww86.hocon_fmt.{Refusal, Verdict}
-import ww86.hocon_fmt.zio.{FileError, ZioFiles, ZioFormatter}
+import ww86.hocon_fmt.interop.zio.{FileError, ZioFiles, ZioFormatter}
 
 val formatted: IO[Refusal, String] = ZioFormatter.format("app.port=8080")
 val decision: UIO[Verdict] = ZioFormatter.verdict("app.port=8080")

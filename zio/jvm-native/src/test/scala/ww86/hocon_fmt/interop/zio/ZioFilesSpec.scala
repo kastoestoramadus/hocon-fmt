@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.zio
+package ww86.hocon_fmt.interop.zio
 
 import java.nio.file.{Files, Path}
 import scala.jdk.CollectionConverters.*

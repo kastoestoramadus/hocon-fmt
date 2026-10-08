@@ -1,4 +1,4 @@
-package ww86.hocon_fmt.zio
+package ww86.hocon_fmt.interop.zio
 
 import _root_.zio.{IO, UIO, ZIO}
 import ww86.hocon_fmt.{HoconFormatter, Refusal, Verdict}
