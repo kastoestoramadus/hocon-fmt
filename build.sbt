@@ -87,6 +87,9 @@ lazy val root = project
     coreJVM,
     coreJS,
     coreNative,
+    catsJVM,
+    catsJS,
+    catsNative,
     cliJVM,
     cliJS,
     cliNative,
@@ -108,12 +111,15 @@ lazy val root = project
     Test / test             := Def
       .sequential(
         coreJVM / Test / test,
+        catsJVM / Test / test,
         cliJVM / Test / test,
         coreJS / Test / test,
+        catsJS / Test / test,
         cliJS / Test / test,
         web / Test / test,
         site / Test / test,
         coreNative / Test / test,
+        catsNative / Test / test,
         cliNative / Test / test
       )
       .value
@@ -157,6 +163,33 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
 lazy val coreJVM    = core.jvm
 lazy val coreJS     = core.js
 lazy val coreNative = core.native
+
+/** Effectful file operations shared by applications and the CLI. */
+lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+  .crossType(CrossType.Pure)
+  .in(file("cats"))
+  .dependsOn(core)
+  .settings(
+    name := "hocon-fmt-cats",
+    libraryDependencies ++= Seq(
+      "org.typelevel" %%% "cats-effect"       % catsEffect,
+      "co.fs2"        %%% "fs2-io"            % fs2,
+      "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % Test
+    )
+  )
+  .jvmSettings(announceRuntime("cats on the JVM"))
+  .jsSettings(
+    announceRuntime("cats on Scala.js"),
+    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule))
+  )
+  .nativeSettings(
+    announceRuntime("cats on Scala Native"),
+    Test / nativeConfig ~= { _.withMode(Mode.debug).withLTO(LTO.none) }
+  )
+
+lazy val catsJVM    = cats.jvm
+lazy val catsJS     = cats.js
+lazy val catsNative = cats.native
 
 /** The command line tool, on every platform: the native binary, the Node bundle behind the
   * pre-commit hook, and the JVM. Effects live here, in cats-effect, so `core` stays pure.
@@ -335,7 +368,7 @@ lazy val site = project
 
 addCommandAlias(
   "crossCompile",
-  Seq(coreJVM, coreJS, coreNative, cliJVM, cliJS, cliNative, web, site)
+  Seq(coreJVM, coreJS, coreNative, catsJVM, catsJS, catsNative, cliJVM, cliJS, cliNative, web, site)
     .map(p => s"${p.id}/Test/compile")
     .mkString("; ")
 )
