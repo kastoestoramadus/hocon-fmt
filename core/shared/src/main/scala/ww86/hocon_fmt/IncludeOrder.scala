@@ -45,6 +45,12 @@ private[hocon_fmt] object IncludeOrder {
 
   private val PlaceholderKey = (IncludeMasking.PlaceholderPrefix + """(\d+)""").r
   private val GuardKey       = (IncludeMasking.GuardPrefix + """(\d+)""").r
+  // PROBE: comment and blank placeholders exist only in the masked text, never in the source this
+  // file is compared against, so they are filtered like the guards.
+  private val CommentKey = (ProbeMasking.CommentPrefix + """(\d+)""").r
+  private val BlankKey   = (ProbeMasking.BlankPrefix + """(\d+)""").r
+  private val CommentGuardKey = (ProbeMasking.CommentPrefix + """GUARD_(\d+)""").r
+  private val BlankGuardKey   = (ProbeMasking.BlankPrefix + """GUARD_(\d+)""").r
 
   // A regex group is `String | Null` to the compiler; `(\d+)` always takes part in a match.
   private object Index {
@@ -93,6 +99,8 @@ private[hocon_fmt] object IncludeOrder {
     val line = value.origin.lineNumber
     key match {
       case GuardKey(Index(index)) if ours(index) && Try(value.unwrapped).toOption.contains(IncludeMasking.GuardValue) =>
+        None
+      case CommentKey(_) | BlankKey(_) | CommentGuardKey(_) | BlankGuardKey(_) =>
         None
       case PlaceholderKey(Index(index)) if ours(index) && Try(value.unwrapped).toOption.contains(key) =>
         Some(Leaf(path, line, Some(index)))

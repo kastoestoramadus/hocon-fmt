@@ -67,10 +67,15 @@ object HoconFormatter {
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
+    val probe  = ProbeMasking.mask(masked.text)
     for {
-      rendered <- attempt(render(masked.text, options))(unreadable)
+      rendered <- attempt(render(probe.text, options))(unreadable)
       _        <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
-    } yield Pass(IncludeMasking.unmask(rendered, masked.originals), rendered, masked.originals)
+    } yield Pass(
+      IncludeMasking.unmask(ProbeMasking.unmask(rendered, probe.originals), masked.originals),
+      rendered,
+      masked.originals
+    )
   }
 
   private def render(masked: String, options: ConfigParseOptions): String = {
