@@ -11,8 +11,6 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -64,32 +62,23 @@ class IsolatedLoaderContractTest {
         return url;
     }
 
-    /** The newest {@code hocon-fmt-java-api} jar in Maven Local, not its sources or javadoc. */
-    private static URL publishedJar() throws Exception {
-        Path group = Path.of(System.getProperty("user.home"), ".m2", "repository", "eu", "ww86",
-                "hocon-fmt-java-api");
-        if (!Files.isDirectory(group)) {
-            fail("no " + group + " — run `sbt javaApi/publishM2` to publish the API first");
+    /**
+     * This build's {@code hocon-fmt-java-api} jar in Maven Local, not its sources or javadoc. The
+     * Gradle build passes the project version, and exactly that jar is required: a newer or older
+     * one left in the repository must not stand in for the packaging under test.
+     */
+    private static URL publishedJar() {
+        String version = System.getProperty("hocon-fmt-java-api.version");
+        if (version == null || version.isBlank()) {
+            fail("no hocon-fmt-java-api version — run the suite through the Gradle build, which "
+                    + "passes it, and run `sbt javaApi/publishM2` to publish the API first");
         }
-        try (Stream<Path> versions = Files.list(group)) {
-            return versions
-                    .filter(Files::isDirectory)
-                    .sorted(Comparator.reverseOrder())
-                    .flatMap(dir -> {
-                        try {
-                            return Files.list(dir);
-                        } catch (Exception e) {
-                            throw new IllegalStateException(e);
-                        }
-                    })
-                    .filter(jar -> jar.getFileName().toString().matches("hocon-fmt-java-api-.+\\.jar"))
-                    .filter(jar -> !jar.getFileName().toString().contains("-sources")
-                            && !jar.getFileName().toString().contains("-javadoc"))
-                    .findFirst()
-                    .map(IsolatedLoaderContractTest::toUrl)
-                    .orElseThrow(() -> new AssertionError(
-                            "no hocon-fmt-java-api jar under " + group + " — run `sbt javaApi/publishM2`"));
+        Path jar = Path.of(System.getProperty("user.home"), ".m2", "repository", "eu", "ww86",
+                "hocon-fmt-java-api", version, "hocon-fmt-java-api-" + version + ".jar");
+        if (!Files.isRegularFile(jar)) {
+            fail("no " + jar + " — run `sbt javaApi/publishM2` to publish the API first");
         }
+        return toUrl(jar);
     }
 
     private static URL toUrl(Path jar) {
