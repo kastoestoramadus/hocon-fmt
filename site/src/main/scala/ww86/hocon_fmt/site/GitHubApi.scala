@@ -74,16 +74,18 @@ object GitHubApi:
     * entry invalidates only itself.
     */
   private def readCachedItem(item: js.Dynamic): Option[LivePr] =
-    for
-      number <- LivePr.asInt(item.number)
-      title  <- LivePr.asString(item.title)
-      state  <- LivePr.asString(item.state).flatMap {
-                 case "open"   => Some(LiveState.Open)
-                 case "merged" => Some(LiveState.Merged)
-                 case "closed" => Some(LiveState.ClosedUnmerged)
-                 case _        => None
-               }
-    yield LivePr(number, title, state)
+    if js.isUndefined(item) || Option(item).isEmpty then None
+    else
+      for
+        number <- LivePr.asInt(item.number)
+        title  <- LivePr.asString(item.title)
+        state  <- LivePr.asString(item.state).flatMap {
+                   case "open"   => Some(LiveState.Open)
+                   case "merged" => Some(LiveState.Merged)
+                   case "closed" => Some(LiveState.ClosedUnmerged)
+                   case _        => None
+                 }
+      yield LivePr(number, title, state)
 
   private def stateName(state: LiveState): String = state match {
     case LiveState.Open           => "open"

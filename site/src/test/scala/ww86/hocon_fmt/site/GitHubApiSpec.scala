@@ -55,6 +55,18 @@ class GitHubApiSpec extends munit.FunSuite:
     }
   }
 
+  test("null search items are dropped while valid pull requests survive") {
+    assertEquals(GitHubApi.parse("""{"items":[null]}"""), Right(Nil))
+    assertEquals(GitHubApi.parse(body.replace("[", "[null,")), GitHubApi.parse(body))
+  }
+
+  test("null cache items are dropped while valid pull requests survive") {
+    assertEquals(GitHubApi.decode("""{"fetchedAt":1000,"items":[null]}""", nowMs = 1000), Some(Nil))
+    val items  = List(LivePr(598, "renderer", LiveState.Merged))
+    val stored = GitHubApi.encode(items, fetchedAtMs = 1000)
+    assertEquals(GitHubApi.decode(stored.replace("[", "[null,"), nowMs = 1000), Some(items))
+  }
+
   test("the cache round-trips and expires") {
     val items  = List(LivePr(598, "renderer", LiveState.Merged))
     val stored = GitHubApi.encode(items, fetchedAtMs = 1000)
@@ -85,4 +97,4 @@ class GitHubApiSpec extends munit.FunSuite:
     assertEquals(GitHubApi.readCache(storage, "sconfig", nowMs = 1000 + GitHubApi.cacheTtlMs), None)
   }
 
-  private def ok(text: String, status: Int = 200): Http = _ => Future.successful(Response(status, text))
+  def ok(text: String, status: Int = 200): Http = _ => Future.successful(Response(status, text))
