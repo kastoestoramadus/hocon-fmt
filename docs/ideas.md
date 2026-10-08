@@ -249,7 +249,9 @@ here; the normalisation entry goes away with the fix.
 
 The `cats` and `zio` adapters mirror about a hundred lines of file-identity code — stage a copy
 beside the original, give it the original's owner, group and every mode bit, prove it by reading
-them back, rename over the original, and write in place when any step fails — including the Scala
+them back, rename over the original, and write in place only when the identity is unavailable, the
+file or its directory unwritable, or the identity cannot be kept; a staging, writing or renaming
+I/O error instead propagates and leaves the original intact — including the Scala
 Native C `stat`/`chown`/`chmod` interop both carry (`FileIdentity` and the per-platform attribute
 sources exist twice, `AtomicFiles` against `AtomicFile`/`PosixIdentity`). Calling one adapter from
 the other is no fix: it would put fs2 and cats-effect on the ZIO classpath, or ZIO on the cats
