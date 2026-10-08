@@ -36,6 +36,17 @@ class ExamplesSpec extends munit.FunSuite {
     assertEquals(cases.map(kindOf).toSet, ExampleData.kinds)
   }
 
+  /** The `findings` list an example carries is the report's own, pinned where the site can read
+    * it: the catalogue's dead duplicate is reported, and a fixture that declares none has none —
+    * the env-override and append fixtures are among those.
+    */
+  test("every example declares the findings the report makes of its input") {
+    ExampleData.all.foreach { example =>
+      val kinds = DuplicateReport.findings(example.input).fold(_ => Nil, _.map(_.kind).distinct.sorted)
+      assertEquals(kinds, example.findings.distinct.sorted, s"${example.id}")
+    }
+  }
+
   test("examples have an explicit reason for every roadmap gap") {
     ExampleData.all.foreach { example =>
       assert(
