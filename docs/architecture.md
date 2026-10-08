@@ -37,6 +37,13 @@ their hosts. Effects live in `cli`, on cats-effect.
    reproduces it: output that will not parse
    again is `Refusal.BrokenOutput`, output that changes again is `Refusal.UnstableOutput`. Input
    sconfig cannot read is `Refusal.NotHocon`.
+5. Last, `IncludeOrder` refuses output in which an include has changed places with a field
+   (`Refusal.MovedInclude`). The placeholder is a field to sconfig, which orders fields by the line
+   they start on and fields sharing a line arbitrarily, so the include can end up on the other side
+   of a field that a later definition would override. For each include it compares the full paths
+   of the keys defined before it in its object, in the masked rendering and in the source; the source
+   is read with `mask(_, onOwnLines = true)`, which puts each placeholder on a line of its own, since
+   its real line does not say where it stood.
 
 `HoconText` finds the strings and comments of a text in one pass. Masking asks it whether an
 `include` is code, and the comment check asks it for each comment's text.

@@ -40,6 +40,24 @@ Dropped with its object (`Refusal.LostInclude`):
   then `o : 5`. sconfig merges repeated keys, so the include no longer mattered, but its text would
   vanish.
 
+Moved across a field (`Refusal.MovedInclude`):
+
+- **An include that shares a line with a field**: `include "defaults.conf", zone = "us"`.
+  `keepOriginOrder` sorts by the line a field starts on, an origin has no column, and fields on
+  one line come out in no defined order (`z = 1, y = 2, x = 3` renders `x`, `y`, `z`). The include
+  is masked as a field, so it moves like one; here it lands after `zone`, and since a later
+  definition wins, `zone` then resolves to the included file's value instead of `us`. No open
+  sconfig pull request orders same-line fields: the origin-line ones cannot, with no column to
+  go by, so the fix would be to order by parse sequence.
+- **A key defined again after the include**: `a.b = 1`, the include, `a.c = 2`. Repeated keys are
+  rendered once, where the first appeared, so `a.c` would move before the include.
+
+  `format` compares, for every include, the full paths of the keys defined before it in its
+  object, before and after. Includes on their own lines, in any order, are unaffected, and so is
+  an include after the fields on its line. Fields moving among themselves matter only against an
+  include: a key defined twice is merged when parsing. For the same reason sorting fields would
+  move includes across them, and is never offered.
+
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
 - **Substitution cycle**: `a : ${b}` with `b : ${a}` renders as an unresolved-merge banner that

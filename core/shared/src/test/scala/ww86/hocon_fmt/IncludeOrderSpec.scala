@@ -12,17 +12,35 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
 
   // `defaults.conf` holds `zone = "eu"`: written first, the include is overridden by `zone`.
   val moved = Map(
-    "a field after the include on its line"           -> """include "defaults.conf", zone = "us"""",
-    "a field after the include in an object"          -> """app { include "defaults.conf", zone = "us" }""",
-    "fields on both sides of the include on its line" -> """a = 1, include "defaults.conf", b = 2""",
-    "a function-form include followed by a field"     -> """include required(file("defaults.conf")), zone = "us"""",
-    "two includes on one line"                        -> """include "a.conf", include "b.conf"""",
-    "a key defined again after the include"           -> "a.b = 1\ninclude \"defaults.conf\"\na.c = 2"
+    "a field after the include on its line" -> (
+      """include "defaults.conf", zone = "us"""",
+      """include "defaults.conf""""
+    ),
+    "a field after the include in an object" -> (
+      """app { include "defaults.conf", zone = "us" }""",
+      """include "defaults.conf""""
+    ),
+    "fields on both sides of the include on its line" -> (
+      """a = 1, include "defaults.conf", b = 2""",
+      """include "defaults.conf""""
+    ),
+    "a function-form include followed by a field" -> (
+      """include required(file("defaults.conf")), zone = "us"""",
+      """include required(file("defaults.conf"))"""
+    ),
+    "two includes on one line" -> (
+      """include "a.conf", include "b.conf"""",
+      """include "a.conf""""
+    ),
+    "a key defined again after the include" -> (
+      "a.b = 1\ninclude \"defaults.conf\"\na.c = 2",
+      """include "defaults.conf""""
+    )
   )
 
-  moved.foreach { case (name, raw) =>
+  moved.foreach { case (name, (raw, statement)) =>
     test(s"refuses $name") {
-      assert(format(raw).isLeft, s"formatted, with the include moved: ${format(raw)}")
+      assertEquals(refusalOf(raw), Refusal.MovedInclude(statement))
     }
   }
 
