@@ -167,6 +167,16 @@ object Contributions {
     ),
     Contribution(
       Sconfig,
+      647,
+      "Keep detached comments on request",
+      Theme.Comments,
+      PrState.Open,
+      "A comment a blank line separates from the next field is dropped on parse (issue #646); " +
+        "`setKeepDetachedComments` attaches it to that field instead, off by default, and the " +
+        "playground above already runs on a build that carries it."
+    ),
+    Contribution(
+      Sconfig,
       472,
       "[BUGFIX] surplus spaces in array comments",
       Theme.Comments,

@@ -45,7 +45,6 @@ private[hocon_fmt] object IncludeOrder {
 
   private val PlaceholderKey = (IncludeMasking.PlaceholderPrefix + """(\d+)""").r
   private val GuardKey       = (IncludeMasking.GuardPrefix + """(\d+)""").r
-
   // A regex group is `String | Null` to the compiler; `(\d+)` always takes part in a match.
   private object Index {
     def unapply(digits: String | Null): Option[Int] = Option(digits).flatMap(_.toIntOption)

@@ -18,7 +18,8 @@ around it in `HoconFormatter`.
 | `cli` | `CmdApi`, an `IOApp`: arguments, the `.hocon-fmt.conf` lookup, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `java-api` | `HoconFmt` and the mirrored `Verdict` records and `RefusalKind` for Java and Kotlin callers; published as `eu.ww86:hocon-fmt-java-api` from sbt, tested by the standalone Gradle build in `java-api/` | JVM, Java 17 | core, jspecify |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
-| `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |
+| `coreSite` | the core's sources against a sconfig fork that keeps detached comments, with the real `CommentCarrier`; not published | Scala.js | the fork |
+| `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling `coreSite` directly; see [site](site.md) | Scala.js | coreSite |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | core, at run time |
 | `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | java-api, at run time |
 | `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | java-api |
@@ -34,7 +35,8 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 ## The pipeline
 
 1. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
-2. The source and parsed tree are checked for placeholder collisions (see [include masking](#include-masking)).
+2. The source and parsed tree are checked for placeholder collisions (see
+   [include masking](#include-masking) and [comment carrier](#comment-carrier)).
    sconfig renders the masked tree with the `FormatOptions` asked for: the default
    style (`=`), or what the caller — the CLI's flags over a `.hocon-fmt.conf` — requested.
 3. `IncludeMasking.unmask` puts the original statements back.
@@ -101,6 +103,41 @@ object. A second field keeps the object from collapsing.
 
 **Why the whole statement:** the previous scheme replaced only the keyword and commented out the
 rest of the line, which swallowed closing braces and entries following the include.
+
+## Comment carrier
+
+<!-- UPSTREAM-SCONFIG: delete this section with the seam once the option is released. -->
+
+sconfig attaches a comment to the field below it and drops one that attaches to nothing. The
+fork the project page runs on has `setKeepDetachedComments` (ekrich/sconfig#646, draft #647), which
+attaches a block a blank line detaches. A block that no field follows is still dropped: the last
+lines of an object, the end of the file, a file of comments only.
+
+`HoconFormatter` reaches this through `CommentCarrier` (`parseOptions`, and `mask` returning a
+`Carried` with its `restore` and its tree judgement). Two sources exist and a project compiles
+exactly one:
+
+- `core/default-shared`, in `coreJVM`, `coreJS` and `coreNative`: does nothing, so the published
+  core is unchanged and still depends on sconfig alone. There is no run-time switch.
+- `core/site-shared`, in `coreSite` only: sets the option and masks those blocks like
+  [includes](#include-masking), a placeholder field plus a guard, restored after the render. It
+  runs after include masking. A block inside an array or parentheses is left alone, because no
+  field can stand there, and the file is refused as a lost comment.
+
+The placeholder prefix is chosen to occur nowhere the parse could put it: not in the masked text,
+and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where `"__COMM""ENT_0"`
+spells `__COMMENT_0`. So the prefix steps aside for user text that could be rendered into it, and
+the restore matches only what this pass generated. That reading is a source-level
+over-approximation; the tree the parse made is judged as well, the way [include
+masking](#include-masking) judges its own (`PlaceholderTree`), so a spelling the reading missed is
+refused (`Refusal.ReservedName`) rather than restored. Both `:` and `=` are matched, the renderer
+writing the asked-for separator. A rendering whose prefix occurrences are not exactly the three
+each placeholder writes is left unrestored: the block is then a lost comment and the file is
+refused, never altered. `IncludeOrder` gets the text with the comments already restored, so it
+never sees a placeholder. The regex rules of include masking apply.
+
+This is temporary: [site](site.md#returning-to-upstream-sconfig) lists what goes when sconfig
+releases the option.
 
 ## Platforms
 

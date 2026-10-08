@@ -54,6 +54,12 @@ object DefectTable {
       DefectRow.noFixYet
     ),
     DefectRow(
+      "a comment, a blank line, then the next field",
+      RefusalKind.LostComment,
+      List(PrLink(Sconfig, 647)),
+      DefectRow.noFixYet
+    ),
+    DefectRow(
       "a comment with no field after it",
       RefusalKind.LostComment,
       Nil,
