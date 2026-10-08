@@ -183,6 +183,22 @@ class HoconFormatterPluginFunctionalTest {
         assertEquals(FORMATTED, read(file));
     }
 
+    // The worker calls the Java API; the core and the Scala library come with it, transitively.
+    @Test
+    void theWorkerClasspathResolvesTheJavaApiAndItsCore() throws IOException {
+        writeBuild(
+                "",
+                "tasks.register(\"showWorkerClasspath\") {\n"
+                        + "    val files = configurations.named(\"hoconFormatterClasspath\")\n"
+                        + "    doLast { files.get().files.forEach { println(\"worker: \" + it.name) } }\n"
+                        + "}\n");
+
+        String output = build("showWorkerClasspath").getOutput();
+
+        assertTrue(output.contains("worker: hocon-fmt-java-api-"), output);
+        assertTrue(output.contains("worker: hocon-fmt-core_3-"), output);
+    }
+
     void writeBuild(String extraPlugins, String configuration) throws IOException {
         write(
                 "build.gradle.kts",

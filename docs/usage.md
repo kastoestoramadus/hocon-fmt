@@ -225,7 +225,8 @@ hoconFormatter {
 `hoconFormat` rewrites; `hoconFormatCheck` fails on an unformatted file and runs as part of
 `check`. Both are configuration-cache compatible, and the check is up to date while neither the
 files nor the formatter change. To pin another formatter version:
-`dependencies { hoconFormatter("eu.ww86:hocon-fmt-core_3:<version>") }`.
+`dependencies { hoconFormatter("eu.ww86:hocon-fmt-java-api:<version>") }`; the plugin calls the Java
+API, and the core comes with it, so naming the core alone would leave the worker without its entry point.
 
 ## Mill
 

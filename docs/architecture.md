@@ -112,13 +112,15 @@ A formatter written in Scala 3 has to reach hosts that are not:
   the build's resolvers but not its Scala version, which would otherwise pin a 2.12 scala-library
   onto a formatter that needs Scala 3's. Only `FormatRefusedException` counts as a refusal; any
   other exception fails the task.
-- **Gradle** compiles against the core but does not ship it: the core is resolved through a
-  `hoconFormatter` configuration in the consumer's build and runs in a Worker API class loader, so
-  a Scala 3 library never lands on a buildscript classpath shared with other plugins.
+- **Gradle** compiles against the Java API but does not ship it: `eu.ww86:hocon-fmt-java-api` (the
+  core comes transitively) is resolved through a `hoconFormatter` configuration in the consumer's
+  build and runs in a Worker API class loader, so a Scala 3 library never lands on a buildscript
+  classpath shared with other plugins. The worker reads the API's sealed `Verdict`
+  records; it no longer calls `JvmFacade`.
 - **Maven** gives every plugin its own class loader, so the plugin depends on the core directly.
 
 `JvmFacade.reformat(byte[]): Optional<String>`, throwing a checked `FormatRefusedException` whose
-message is the reason, is the JDK-typed boundary all three share. `java-api` publishes that
+message is the reason, is the JDK-typed boundary the sbt and Maven plugins still call. `java-api` publishes that
 boundary as the artifact `eu.ww86:hocon-fmt-java-api`: Java-only, so no `_3` suffix and no Scala
 library inside, with the verdicts as records and a `RefusalKind` per refusal case — the mirror
 exists because Scala 3 writes sealed-ness to TASTy, not the class file, so no Java compiler can
