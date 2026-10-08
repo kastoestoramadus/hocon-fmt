@@ -105,20 +105,34 @@ private[hocon_fmt] object IncludeMasking {
 
   private def reservedIn(value: ConfigValue, allowed: Map[String, String]): Boolean = value match {
     case obj: ConfigObject =>
-      obj.entrySet.asScala.exists { entry =>
-        val key       = entry.getKey
-        val child     = entry.getValue
-        val generated = allowed.get(key).exists(expected => Try(child.unwrapped).toOption.contains(expected))
-        !generated && (key.contains(PlaceholderPrefix) || reservedIn(child, allowed))
+      // An object merge waiting on a substitution cannot list its keys: `entrySet` throws
+      // NotResolved. Judging it through its rendering instead keeps the throw out of `format`,
+      // which would take the library's limitation for the input's fault.
+      Try(obj.entrySet.asScala.toList).toOption match {
+        case None          => renderedReserved(obj)
+        case Some(entries) =>
+          entries.exists { entry =>
+            val key       = entry.getKey
+            val child     = entry.getValue
+            val generated = allowed.get(key).exists(expected => Try(child.unwrapped).toOption.contains(expected))
+            !generated && (key.contains(PlaceholderPrefix) || reservedIn(child, allowed))
+          }
       }
     case list: ConfigList => list.asScala.exists(reservedIn(_, allowed))
     case other            =>
       Try(other.unwrapped).toOption match {
         case Some(text: String) => text.contains(PlaceholderPrefix)
         case Some(_)            => false
-        case None               => other.render(HoconFormatter.renderOptions).contains(PlaceholderPrefix)
+        case None               => renderedReserved(other)
       }
   }
+
+  /** An unresolved value cannot be unwrapped; its rendering exposes substitution paths and the
+    * pieces of unresolved concatenations and merges, so that is what the check reads. A rendering
+    * that itself fails hides nothing: rendering the tree is refused before any output exists.
+    */
+  private def renderedReserved(value: ConfigValue): Boolean =
+    Try(value.render(HoconFormatter.renderOptions)).toOption.exists(_.contains(PlaceholderPrefix))
 
   /** An identical user field can overwrite a generated field before we see the tree. Parse again
     * with generated names absent from the first rendering: user reserved names then remain visible,
