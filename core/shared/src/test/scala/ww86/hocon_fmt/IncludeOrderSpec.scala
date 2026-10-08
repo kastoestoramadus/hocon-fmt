@@ -1,7 +1,5 @@
 package ww86.hocon_fmt
 
-import ww86.hocon_fmt.HoconFormatter.format
-
 /** An include is a field like any other: a later definition wins, so what comes before it decides
   * which value a key resolves to. sconfig orders fields by the line they start on and leaves
   * fields sharing a line in no defined order (`SconfigDefectsSpec`), and a key defined twice is
@@ -52,7 +50,7 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
-  val kept = Map(
+  def kept = Map(
     "the include on its own line, first" -> (
       "include \"defaults.conf\"\nzone = \"us\"",
       "include \"defaults.conf\"\nzone: us\n"

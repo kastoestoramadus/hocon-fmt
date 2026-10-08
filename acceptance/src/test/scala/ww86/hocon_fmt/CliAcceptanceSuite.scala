@@ -6,7 +6,10 @@ import java.nio.charset.StandardCharsets.UTF_8
 class CliAcceptanceSuite extends munit.FunSuite {
 
   private def property(name: String): String =
-    sys.props.getOrElse(name, sys.error(s"$name is not set; run this suite through sbt acceptance/test"))
+    sys.props
+      .get(name)
+      .collect { case value: String => value }
+      .getOrElse(sys.error(s"$name is not set; run this suite through sbt acceptance/test"))
 
   private val runtimes: List[(String, Seq[String])] = List(
     "jvm"    -> Seq(s"${sys.props("java.home")}/bin/java", "-cp", property("cli.jvm.classpath"), "ww86.hocon_fmt.CmdApi"),

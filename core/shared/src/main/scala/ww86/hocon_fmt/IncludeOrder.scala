@@ -46,11 +46,16 @@ private[hocon_fmt] object IncludeOrder {
   private val PlaceholderKey = (IncludeMasking.PlaceholderPrefix + """(\d+)""").r
   private val GuardKey       = (IncludeMasking.GuardPrefix + """(\d+)""").r
 
+  // A regex group is `String | Null` to the compiler; `(\d+)` always takes part in a match.
+  private object Index {
+    def unapply(digits: String | Null): Option[Int] = Option(digits).flatMap(_.toIntOption)
+  }
+
   private def keysBefore(masked: String, ours: Set[Int]): Try[Map[Int, Position]] =
     Try(ConfigFactory.parseString(masked, HoconFormatter.parseOptions).root).map { root =>
       val leaves = leavesOf(root, Nil, ours)
       leaves.collect { case Leaf(path, line, Some(index)) =>
-        val inItsObject = leaves.filter(other => other.path.startsWith(path.init) && other.path != path)
+        val inItsObject = leaves.filter(other => other.path.startsWith(path.dropRight(1)) && other.path != path)
         val before      = inItsObject.filter(_.line < line).map(_.path).toSet
         index -> Position(before, tied = inItsObject.exists(_.line == line))
       }.toMap
@@ -87,10 +92,10 @@ private[hocon_fmt] object IncludeOrder {
   private def leafOf(key: String, path: List[String], value: ConfigValue, ours: Set[Int]): Option[Leaf] = {
     val line = value.origin.lineNumber
     key match {
-      case GuardKey(index) if ours(index.toInt) && Try(value.unwrapped).toOption.contains(IncludeMasking.GuardValue) =>
+      case GuardKey(Index(index)) if ours(index) && Try(value.unwrapped).toOption.contains(IncludeMasking.GuardValue) =>
         None
-      case PlaceholderKey(index) if ours(index.toInt) && Try(value.unwrapped).toOption.contains(key) =>
-        Some(Leaf(path, line, Some(index.toInt)))
+      case PlaceholderKey(Index(index)) if ours(index) && Try(value.unwrapped).toOption.contains(key) =>
+        Some(Leaf(path, line, Some(index)))
       case _ => Some(Leaf(path, line, None))
     }
   }

@@ -17,7 +17,7 @@ object CmdApi extends IOApp {
 
   final case class Arguments(files: List[Path], checkOnly: Boolean)
 
-  enum Invocation {
+  enum Invocation derives CanEqual {
     case FileMode(arguments: Arguments)
     case Stdin(filename: String)
     case Version
@@ -29,7 +29,7 @@ object CmdApi extends IOApp {
       header = "Formats HOCON files in place. Files it cannot format safely are left alone."
     ) {
       (
-        Opts.arguments[String]("file").orEmpty.map(_.toList.map(Path(_))),
+        Opts.arguments[String]("file").orEmpty.map(_.map(Path(_))),
         Opts
           .flag(
             "check",

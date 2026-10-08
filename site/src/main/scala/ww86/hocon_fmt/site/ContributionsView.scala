@@ -1,7 +1,6 @@
 package ww86.hocon_fmt.site
 
-import com.raquo.laminar.api.L.{*, given}
-import org.scalajs.dom
+import com.raquo.laminar.api.L.*
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

@@ -6,7 +6,7 @@ import scala.scalajs.js
 final case class LivePr(number: Int, title: String, state: LiveState)
 
 /** The search API tells a merge from a rejection only through `pull_request.merged_at`. */
-enum LiveState:
+enum LiveState derives CanEqual:
   case Open
   case Merged
   case ClosedUnmerged
@@ -26,25 +26,32 @@ object LivePr:
 
   private def readState(item: js.Dynamic): Option[LiveState] =
     val pr = item.pull_request
-    if js.isUndefined(pr) || (pr: Any) == null then None
+    if js.isUndefined(pr) || Option(pr).isEmpty then None
     else
       asString(item.state).flatMap {
         case "open"   => Some(LiveState.Open)
         case "closed" =>
           val mergedAt = pr.merged_at
-          if js.isUndefined(mergedAt) || (mergedAt: Any) == null then Some(LiveState.ClosedUnmerged)
+          if js.isUndefined(mergedAt) || Option(mergedAt).isEmpty then Some(LiveState.ClosedUnmerged)
           else Some(LiveState.Merged)
         case _ => None
       }
 
   private[site] def asInt(v: js.Dynamic): Option[Int] =
-    if js.typeOf(v) != "number" then None
-    else
-      val d = v.asInstanceOf[Double]
-      if d.isValidInt then Some(d.toInt) else None
+    asDouble(v).filter(_.isValidInt).map(_.toInt)
 
+  // The only casts on the page: each follows the check that makes it safe.
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private[site] def asDouble(v: js.Dynamic): Option[Double] =
+    if js.typeOf(v) == "number" then Some(v.asInstanceOf[Double]) else None
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[site] def asString(v: js.Dynamic): Option[String] =
     if js.typeOf(v) == "string" then Some(v.asInstanceOf[String]) else None
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private[site] def asArray(v: js.Dynamic): Option[js.Array[js.Dynamic]] =
+    if js.Array.isArray(v) then Some(v.asInstanceOf[js.Array[js.Dynamic]]) else None
 
 /** The snapshot updated with what the live search says. Pure, so the page shows the same thing
   * offline as online and the rules have tests.

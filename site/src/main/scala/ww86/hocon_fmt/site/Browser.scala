@@ -4,6 +4,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.util.Try
+import scala.util.control.NonFatal
 
 import org.scalajs.dom
 
@@ -29,13 +30,13 @@ object Browser:
     try
       val controller = new dom.AbortController()
       val deadline   = js.timers.setTimeout(deadlineMs)(controller.abort())
-      val request    = js.Dynamic.literal(signal = controller.signal).asInstanceOf[dom.RequestInit]
+      val request    = new dom.RequestInit { signal = controller.signal }
       dom.window
         .fetch(url, request)
         .toFuture
         .flatMap(response => response.text().toFuture.map(body => GitHubApi.Response(response.status, body)))
         .andThen { case _ => js.timers.clearTimeout(deadline) }
-    catch case e: Throwable => Future.failed(e)
+    catch case NonFatal(e) => Future.failed(e)
 
   // Storage is an optional browser facility: a page opened where it is denied works without it.
   given GitHubApi.Storage = new GitHubApi.Storage:

@@ -44,7 +44,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
 
   // Taken verbatim from the HOCON specification. The cycle renders as an unresolved-merge
   // banner: it parses, so the output check passes, but a second pass changes it again.
-  val specSelfReference = Map(
+  def specSelfReference = Map(
     "substitution cycle (Examples of Self-Referential Substitutions)" ->
       "a : 1\nb : 2\na : ${b}\nb : ${a}"
   )
@@ -61,7 +61,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
   // notice one going missing. sconfig drops a comment that no field follows (see
   // SconfigDefectsSpec), so these must either keep every comment or be refused.
 
-  val commentsOnly = Map(
+  def commentsOnly = Map(
     "after the last field"             -> ("a : 1\n# trailing", List("trailing")),
     "last in an object"                -> ("o {\n  a : 1\n  # last in the object\n}", List("last in the object")),
     "a file of nothing but comments"   -> ("# one\n// two\n", List("one", "two")),
@@ -83,7 +83,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
   // sconfig drops the comment outright (see SconfigDefectsSpec), so the only safe answer is to
   // refuse; 20 of 23 reference.conf files in the Akka, Pekko, Play, Kamon, Gatling and ssl-config
   // corpus hold such a comment.
-  val commentAboveBlankLine = Map(
+  def commentAboveBlankLine = Map(
     "a header followed by a blank line"     -> "# Copyright 2025\n\na : 1",
     "a comment block split by a blank line" ->
       "o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"
@@ -101,7 +101,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
 
   // --- Normalised on purpose: meaning kept, original spelling not ------------------------------
 
-  val normalised = List(
+  def normalised = List(
     ("// comments become #", "// c\na : 1", "# c"),
     ("= separator becomes :", "a = 1", "a: 1"),
     ("nested objects are flattened to paths", "a { b { c : 1 } }", "a.b.c: 1"),
@@ -120,7 +120,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
 
   // --- Supported, guarded against regression ---------------------------------------------------
 
-  val supported = Map(
+  def supported = Map(
     "substitution"           -> "b : 1\na : ${b}",
     "optional substitution"  -> "a : ${?MISSING}\nb : 2",
     "array concatenation"    -> "a : [1] [2]",

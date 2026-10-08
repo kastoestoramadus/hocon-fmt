@@ -79,7 +79,7 @@ class BrowserSpec extends munit.FunSuite:
 
   test("a search that fails leaves the snapshot standing") {
     val browser = FakeBrowser()
-    install(browser.window(Some(js.Any.fromFunction1((url: String) => js.Promise.reject(new js.Error("network"))))))
+    install(browser.window(Some(js.Any.fromFunction1((_: String) => js.Promise.reject(new js.Error("network"))))))
     ContributionsView.refreshBoard.map(assertSnapshotStands)
   }
 
@@ -126,7 +126,7 @@ class BrowserSpec extends munit.FunSuite:
     /** What a connection that has gone nowhere looks like: the promise settles only when the
       * page's own deadline aborts the request.
       */
-    def neverAnswers: js.Any = js.Any.fromFunction2 { (url: String, request: js.Dynamic) =>
+    def neverAnswers: js.Any = js.Any.fromFunction2 { (_: String, request: js.Dynamic) =>
       new js.Promise[js.Any]((_, reject) => {
         request.signal.addEventListener("abort", js.Any.fromFunction0(() => reject(new js.Error("aborted"))))
       })
@@ -134,7 +134,7 @@ class BrowserSpec extends munit.FunSuite:
 
     def window(fetch: Option[js.Any]): js.Any =
       val storage = js.Dynamic.literal(
-        getItem = js.Any.fromFunction1((key: String) => store.getOrElse(key, null)),
+        getItem = js.Any.fromFunction1[String, String | Null](key => store.getOrElse[String | Null](key, null)),
         setItem = js.Any.fromFunction2 { (key: String, value: String) =>
           store.update(key, value)
           ()

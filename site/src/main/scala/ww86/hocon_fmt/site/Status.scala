@@ -5,7 +5,7 @@ import ww86.hocon_fmt.{Refusal, Verdict}
 /** Why the formatter left a text alone, named for the page. A browser string cannot fail UTF-8
   * decoding, so `NotUtf8` exists here only to make the mapping total.
   */
-enum RefusalKind:
+enum RefusalKind derives CanEqual:
 
   case NotHocon, BrokenOutput, LostComment, LostInclude, MovedInclude, UnstableOutput, NotUtf8
 
@@ -34,7 +34,7 @@ object RefusalKind:
   }
 
 /** The one status line the playground shows under the output pane. */
-enum Status:
+enum Status derives CanEqual:
   case Formatted(changedLines: Int)
   case AlreadyFormatted
   case LeftUnchanged(

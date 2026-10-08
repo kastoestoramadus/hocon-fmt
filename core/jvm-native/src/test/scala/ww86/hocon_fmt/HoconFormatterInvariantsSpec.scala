@@ -37,7 +37,7 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
 
   // Include-free configs can be parsed directly, so meaning can be compared before
   // and after formatting without going through the formatter's own preprocessing.
-  val semanticCases = Map(
+  def semanticCases = Map(
     "nested objects"   -> """a { b { c : 1 }, d : "x" }""",
     "list and numbers" -> """xs : [1, 2, 3]
                             |pi : 3.14
@@ -58,7 +58,7 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
 
   // Adversarial: the masking injects `__INCLUDE_<n>` and `__INCLUDE_GUARD_<n>` fields into the
   // source. Content that already looks like one must not be mistaken for the real thing.
-  val markerCases = Map(
+  def markerCases = Map(
     "placeholder as a value"      -> """key : "__INCLUDE_0"""",
     "placeholder as a key"        -> """"__INCLUDE_0" : 1""",
     "full placeholder field"      -> """__INCLUDE_0 : "__INCLUDE_0"""",

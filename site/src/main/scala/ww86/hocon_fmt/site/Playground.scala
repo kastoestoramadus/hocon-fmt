@@ -1,6 +1,6 @@
 package ww86.hocon_fmt.site
 
-import com.raquo.laminar.api.L.{*, given}
+import com.raquo.laminar.api.L.*
 
 import ww86.hocon_fmt.{ExampleData, Verdict}
 
@@ -10,12 +10,13 @@ import ww86.hocon_fmt.{ExampleData, Verdict}
 object Playground:
 
   def apply(): HtmlElement =
-    val input = Var(ExampleData.showcase.head.input)
+    val first = ExampleData.showcase.headOption.fold("")(_.input)
+    val input = Var(first)
     // Formatting as you type, with a pause: a verdict per settled input, not per keystroke.
     val verdict =
       input.signal.changes
         .debounce(150)
-        .startWith(ExampleData.showcase.head.input)
+        .startWith(first)
         .map(text => text -> Verdict.of(text))
 
     div(
@@ -125,8 +126,8 @@ object Playground:
 
   /** The output pane shows the formatting; a refused or settled text stays exactly as typed. */
   private def out(entry: (String, Verdict)): String = entry match {
-    case (text, Verdict.NeedsFormatting(formatted)) => formatted
-    case (text, _)                                  => text
+    case (_, Verdict.NeedsFormatting(formatted)) => formatted
+    case (text, _)                               => text
   }
 
   private def statusLine(entry: (String, Verdict)): HtmlElement =

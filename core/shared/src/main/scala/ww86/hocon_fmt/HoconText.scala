@@ -10,7 +10,7 @@ import scala.annotation.tailrec
   */
 private[hocon_fmt] object HoconText {
 
-  enum Kind { case Quoted, Comment }
+  enum Kind derives CanEqual { case Quoted, Comment }
 
   /** `text.substring(start, end)`; code is whatever no span covers. */
   final case class Span(kind: Kind, start: Int, end: Int)
