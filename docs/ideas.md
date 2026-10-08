@@ -61,6 +61,26 @@ Standard input to standard output and `--version` are implemented; see [usage](u
 ruff and prettier do; today the caller expands globs. Maybe
 `--strict`, turning a refusal into a failure, for teams that want every `.conf` to be HOCON.
 
+### Report dead duplicate keys (M)
+
+Sconfig merges repeated keys: a later plain value silently overrides an earlier one, a
+"dead duplicate" that is often a mistake. A CLI report could point at both definitions,
+without refusing formatting; this is analysis rather than formatting, so it may belong behind a
+separate flag. Exclude the common, deliberate `x = default` then `x = ${?ENV}` idiom and
+object merges (`a { x = 1 }` then `a { y = 2 }`), which kill nothing. The real-file sweep
+(`~/hocon-corpus/REPORT.md` §7.4) found the idiom in 626 of 1,650 GitHub files and dead
+duplicates in 138; for HMRC's 1,168 files, 990 and 70 respectively. These are heuristic counts.
+[Sunbird's `route.domain`](https://github.com/Sunbird-Knowlg/knowledge-platform/blob/abda3e345c2a18c139f2469653a3ef6120eb4a23/content-api/content-service/conf/application.conf#L456)
+changes from `localhost:8182` to `localhost:9042`; other examples are
+[DataDog's `ssl-config.logger`](https://github.com/DataDog/system-tests/blob/beaae93100abf7e55d884019369f7c6f597ac79d/utils/build/docker/java/akka-http/src/main/resources/reference.conf#L646)
+and [Macrometa's `akka.logging-filter`](https://github.com/Macrometacorp/macrometa-connector-databricks/blob/d5354e2d02a8a8573faec150efa2fb47233b13fe/app/src/main/resources/application.conf#L5).
+
+**Code:** the merged `Config` loses overridden values' origins, so inspect the pre-merge
+`ConfigDocument` tree or use a parse-time hook. In sconfig 1.12.4, `ConfigDocument` preserves
+syntax but exposes only editing, path checks and rendering; `ConfigNode` has no public accessor,
+and `ConfigParseOptions` offers no field hook. Neither route is available through the public API:
+an upstream tree-traversal API or hook is needed; its implementation cost is unknown.
+
 ## Distribution
 
 ### Homebrew tap (S)

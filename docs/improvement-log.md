@@ -5,6 +5,7 @@ what to keep, simplify, optimise or remove. Each entry names the PR and what to 
 
 | Date | PR | Change | Revisit before release |
 |---|---|---|---|
+| 2026-10-08 | [PR](https://github.com/kastoestoramadus/hocon-fmt/compare/main...docs/idea-dead-duplicates) | Record a separate report of dead duplicate keys, corpus evidence and sconfig API constraints in the ideas list. | Exclude optional env overrides and object merges; recheck public tree traversal or parse-time hooks before implementation. |
 | 2026-10-08 | #40 | Drop null or undefined pull request items in live responses and cached answers; require the browser deadline test to observe an abort. | Keep the bounded fake-fetch fallback when changing deadline handling; it catches requests that never abort. |
 | 2026-10-08 | #39 | CI also runs `scalafmtSbtCheck`; `build.sbt` and `project/ExampleGenerator.scala` reformatted. | — |
 | 2026-10-08 | #38 | Every Scala 3 warning fails the build (`-Werror`, `-Wunused:all`, `-Wsafe-init`, `strictEquality`, explicit nulls, …); WartRemover on main code; `-Xlint:all -Werror` for the Gradle and Maven plugins; 2.12 equivalents for the sbt plugin. | The four `@SuppressWarnings` (IncludeMasking, Bench, JvmFacade, LivePr readers): could IncludeMasking drop `var`/`while` without a bench regression? `-Wtostring-interpolated` was left off (15 hits, all test messages). `-Yexplicit-nulls` is experimental in 3.8. |
