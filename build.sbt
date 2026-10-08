@@ -130,6 +130,7 @@ lazy val root = project
     coreJVM,
     coreJS,
     coreNative,
+    coreSite,
     catsJVM,
     catsJS,
     catsNative,
@@ -161,6 +162,7 @@ lazy val root = project
         zioJS / Test / test,
         zioNative / Test / test,
         coreJS / Test / test,
+        coreSite / Test / test,
         catsJS / Test / test,
         cliJS / Test / test,
         web / Test / test,
@@ -181,6 +183,10 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("core"))
   .settings(
     name := "hocon-fmt-core",
+    // UPSTREAM-SCONFIG: the no-op comment seam; `coreSite` swaps it for the real one. Delete both
+    // with the seam once ekrich/sconfig releases the option (#646/#647).
+    Compile / unmanagedSourceDirectories +=
+      (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / "main" / "scala",
     Test / sourceGenerators += Def.task {
       ExampleGenerator.generate(
         (ThisBuild / baseDirectory).value / "examples",
@@ -210,6 +216,46 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
 lazy val coreJVM    = guardPublish(core.jvm)
 lazy val coreJS     = guardPublish(core.js)
 lazy val coreNative = guardPublish(core.native)
+
+/** UPSTREAM-SCONFIG: the core as the project page runs it, against the sconfig fork that keeps
+  * detached comments (ekrich/sconfig#646, draft #647). The same sources as `coreJS`, the real
+  * `CommentCarrier` from `core/site-shared` in place of the no-op one, and core's shared suite
+  * with an explicit ledger of what differs. Not published. When the option is released, delete
+  * this project, `sconfigFork`, `checkSconfigFork` and `scripts/fetch-sconfig-fork.sh`; the list
+  * of places is "Returning to upstream sconfig" in docs/site.md.
+  */
+lazy val coreSite = project
+  .in(file("core/site"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name           := "hocon-fmt-core-site",
+    publish / skip := true,
+    announceRuntime("core for the page on Scala.js"),
+    Compile / unmanagedSourceDirectories := Seq(
+      (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "main" / "scala",
+      (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / "main" / "scala"
+    ),
+    Test / unmanagedSourceDirectories := Seq(
+      (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "test" / "scala",
+      (ThisBuild / baseDirectory).value / "core" / "site-shared" / "src" / "test" / "scala"
+    ),
+    Test / sourceGenerators += Def.task {
+      ExampleGenerator.generate(
+        (ThisBuild / baseDirectory).value / "examples",
+        (Test / sourceManaged).value
+      )
+    }.taskValue,
+    // Resolving the fork without it published would end in a bare "not found"; this names the fix.
+    update := update.dependsOn(ThisBuild / checkSconfigFork).value,
+    libraryDependencies ++= Seq(
+      "org.ekrich"    %%% "sconfig"          % sconfigFork,
+      "org.ekrich"    %%% "sjavatime"        % sjavatime       % Provided,
+      "org.scalameta" %%% "munit"            % munit           % Test,
+      "org.scalameta" %%% "munit-scalacheck" % munitScalaCheck % Test
+    ),
+    // The upstream defect suite describes released sconfig, which core's own suites run.
+    Test / test / testOptions += Tests.Exclude(Seq("ww86.hocon_fmt.SconfigDefectsSpec"))
+  )
 
 /** Effectful file operations shared by applications and the CLI. */
 lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
@@ -453,6 +499,7 @@ addCommandAlias(
     coreJVM,
     coreJS,
     coreNative,
+    coreSite,
     catsJVM,
     catsJS,
     catsNative,

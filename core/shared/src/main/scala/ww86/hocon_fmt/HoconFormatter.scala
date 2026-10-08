@@ -14,7 +14,7 @@ object HoconFormatter {
 
   // Visible to the tests: a copy over there would drift, and a library test rendering with
   // options other than these would prove nothing about this formatter.
-  private[hocon_fmt] val parseOptions = ConfigParseOptions.defaults.setAllowMissing(true)
+  private[hocon_fmt] val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
 
   private val formattingOptions = ConfigFormatOptions.defaults
     .setKeepOriginOrder(true)
@@ -67,15 +67,15 @@ object HoconFormatter {
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
-    val probe  = ProbeMasking.mask(masked.text)
+    val carried = CommentCarrier.mask(masked.text)
     for {
-      rendered <- attempt(render(probe.text, options))(unreadable)
+      rendered <- attempt(render(carried.text, options))(unreadable)
       _        <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
-    } yield Pass(
-      IncludeMasking.unmask(ProbeMasking.unmask(rendered, probe.originals), masked.originals),
-      rendered,
-      masked.originals
-    )
+    } yield {
+      // The masked text with its carried parts back, so nothing downstream sees our placeholders.
+      val restored = carried.restore(rendered)
+      Pass(IncludeMasking.unmask(restored, masked.originals), restored, masked.originals)
+    }
   }
 
   private def render(masked: String, options: ConfigParseOptions): String = {
