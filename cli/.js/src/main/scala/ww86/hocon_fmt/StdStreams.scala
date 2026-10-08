@@ -1,6 +1,6 @@
 package ww86.hocon_fmt
 
-import cats.effect.IO
+import _root_.cats.effect.IO
 
 /** Node reads stdin as a stream, and writes UTF-8 whatever the locale. */
 private[hocon_fmt] object StdStreams {
