@@ -2,6 +2,7 @@ package ww86.hocon_fmt.site
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.scalajs.js
+import scala.util.{Failure, Success}
 
 import Browser.given
 
@@ -21,7 +22,7 @@ class BrowserSpec extends munit.FunSuite:
   /** What api.github.com answers with: one pull request the snapshot knows (#600, open there) and
     * one it does not (#999).
     */
-  private val searchBody =
+  val searchBody =
     """{"total_count":2,"items":[
       |{"number":600,"title":"merge entries","state":"closed","pull_request":{"merged_at":"2026-10-01T00:00:00Z"}},
       |{"number":999,"title":"brand new","state":"open","pull_request":{"merged_at":null}}
@@ -88,8 +89,13 @@ class BrowserSpec extends munit.FunSuite:
     install(browser.window(Some(browser.neverAnswers)))
     Browser
       .withDeadline(50)("https://api.github.com/search/issues")
-      .map(response => fail(s"expected the deadline to fail the request, got $response"))
-      .recover { case _ => () }
+      .transform {
+        case Failure(error) =>
+          assert(error.getMessage.contains("deadline test: aborted"), s"unexpected fetch failure: $error")
+          Success(())
+        case Success(response) =>
+          fail(s"expected the deadline to abort the request, got $response")
+      }
   }
 
   test("a native member read as a value is never a function, which is why the probe is gone") {
@@ -101,20 +107,20 @@ class BrowserSpec extends munit.FunSuite:
     assert(js.typeOf(window.asInstanceOf[FetchGlobal].fetch) != "function")
   }
 
-  private def assertSnapshotStands(board: ContributionsView.Board): Unit =
+  def assertSnapshotStands(board: ContributionsView.Board): Unit =
     assertEquals(board.failedLibraries, Library.values.toList)
     assertEquals(board.liveLibraries, Nil)
     assertEquals(board.entries, Contributions.all)
     assertEquals(board.asOf, Contributions.readOn)
     assert(!board.checking, "an answer that is a failure must still settle the state line")
 
-  private def install(window: js.Any): Unit =
+  def install(window: js.Any): Unit =
     js.Dynamic.global.globalThis.updateDynamic("window")(window)
 
   /** A window Node does not have: a recording `fetch` and a localStorage in memory. */
-  final private class FakeBrowser:
+  final class FakeBrowser:
     val searched: scala.collection.mutable.ListBuffer[String] = scala.collection.mutable.ListBuffer.empty
-    private val store                                         = scala.collection.mutable.Map.empty[String, String]
+    val store                                                 = scala.collection.mutable.Map.empty[String, String]
 
     def answering(body: String, status: Int = 200): js.Any = js.Any.fromFunction1 { (url: String) =>
       searched += url
@@ -127,8 +133,20 @@ class BrowserSpec extends munit.FunSuite:
       * page's own deadline aborts the request.
       */
     def neverAnswers: js.Any = js.Any.fromFunction2 { (_: String, request: js.Dynamic) =>
-      new js.Promise[js.Any]((_, reject) => {
-        request.signal.addEventListener("abort", js.Any.fromFunction0(() => reject(new js.Error("aborted"))))
+      new js.Promise[js.Any]((resolve, reject) => {
+        val signal = request.selectDynamic("signal")
+        assert(!js.isUndefined(signal), "fetch request must carry an abort signal")
+        // Settle even if abort regresses, so the success branch fails promptly.
+        val fallback = js.timers.setTimeout(500) {
+          val _ = resolve(js.Dynamic.literal(status = 200, text = js.Any.fromFunction0(() => js.Promise.resolve(""))))
+        }
+        signal.addEventListener(
+          "abort",
+          js.Any.fromFunction0(() => {
+            js.timers.clearTimeout(fallback)
+            reject(new js.Error("deadline test: aborted"))
+          })
+        )
       })
     }
 
