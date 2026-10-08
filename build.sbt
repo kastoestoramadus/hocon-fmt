@@ -437,6 +437,28 @@ addCommandAlias(
   Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec").mkString("; ")
 )
 
+// Statement and branch coverage for the JVM modules, aggregate last. Dotty's coverage runtime
+// needs java.util.UUID over java.security.SecureRandom, which neither the Scala.js nor the Scala
+// Native javalib carries, so instrumenting those platforms stops at link time; the Gradle and
+// Maven plugins are Java builds without unit tests, so JaCoCo there has nothing to measure.
+// Reports land under */target/scala-*/scoverage-report.
+addCommandAlias(
+  "coverageJvm",
+  Seq(
+    "clean",
+    "coverage",
+    "coreJVM/test",
+    "cliJVM/test",
+    "catsJVM/test",
+    "zioJVM/test",
+    "coreJVM/coverageReport",
+    "cliJVM/coverageReport",
+    "catsJVM/coverageReport",
+    "zioJVM/coverageReport",
+    "coverageAggregate"
+  ).mkString("; ")
+)
+
 /** Timings of each formatter phase on each platform; see `scripts/bench.py`. Not published. The
   * mutable loop in `Bench.measure` is deliberate: an allocation-free timing loop is the one place
   * where the functional style would distort what it measures.
