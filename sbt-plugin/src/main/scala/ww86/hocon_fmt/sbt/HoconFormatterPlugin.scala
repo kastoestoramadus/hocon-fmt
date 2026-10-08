@@ -86,7 +86,8 @@ object HoconFormatterPlugin extends AutoPlugin {
     val files = hoconFormatSources.all(ScopeFilter(inAggregates(ThisProject))).value.flatten
     IsolatedFormatter.using(hoconFormatterClasspath.value) { formatter =>
       files.map(_.getCanonicalFile).distinct.sorted.map { file =>
-        Examined(file, IO.relativize(root, file).getOrElse(file.getPath), formatter.verdictFor(IO.readBytes(file)))
+        val path = IO.relativize(root, file).getOrElse(file.getPath)
+        Examined(file, path, formatter.verdictFor(IO.readBytes(file), path))
       }
     }
   }

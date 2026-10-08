@@ -7,13 +7,14 @@ import ww86.hocon_fmt.{Refusal, Verdict}
   */
 enum RefusalKind derives CanEqual:
 
-  case NotHocon, BrokenOutput, LostComment, LostInclude, MovedInclude, UnstableOutput, NotUtf8
+  case NotHocon, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, UnstableOutput, NotUtf8
 
   /** The name the `web` script publishes in its JavaScript API, which `HoconFormatterJsSpec`
     * pins there; the defect table lists refusals by it, and `ContributionsSpec` pins the set.
     */
   def name: String = this match {
     case NotHocon       => "notHocon"
+    case OtherFormat    => "otherFormat"
     case BrokenOutput   => "brokenOutput"
     case LostComment    => "lostComment"
     case LostInclude    => "lostInclude"
@@ -26,6 +27,7 @@ object RefusalKind:
   def of(refusal: Refusal): RefusalKind = refusal match {
     case Refusal.NotUtf8         => RefusalKind.NotUtf8
     case Refusal.NotHocon(_)     => RefusalKind.NotHocon
+    case Refusal.OtherFormat(_)  => RefusalKind.OtherFormat
     case Refusal.BrokenOutput(_) => RefusalKind.BrokenOutput
     case Refusal.LostComment(_)  => RefusalKind.LostComment
     case Refusal.LostInclude(_)  => RefusalKind.LostInclude
@@ -68,7 +70,9 @@ object Status:
       .count(i => beforeLines.lift(i) != afterLines.lift(i))
 
   private def explanation(kind: RefusalKind): String = kind match {
-    case RefusalKind.NotHocon     => "sconfig cannot read this text as HOCON, so there is nothing to format."
+    case RefusalKind.NotHocon    => "sconfig cannot read this text as HOCON, so there is nothing to format."
+    case RefusalKind.OtherFormat =>
+      "the file is named as a format of its own, which the loader reads too, and this formatter writes HOCON only, so it leaves the file alone."
     case RefusalKind.BrokenOutput =>
       "the configuration library renders this as text it cannot read back, so the formatter leaves it alone rather than hand it on."
     case RefusalKind.LostComment =>
@@ -82,8 +86,8 @@ object Status:
   }
 
   private def learnMore(kind: RefusalKind): Option[String] = kind match {
-    case RefusalKind.NotUtf8  => None
-    case RefusalKind.NotHocon => Some(limitationsPage)
+    case RefusalKind.NotUtf8                            => None
+    case RefusalKind.NotHocon | RefusalKind.OtherFormat => Some(limitationsPage)
     case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude | RefusalKind.MovedInclude |
         RefusalKind.UnstableOutput =>
       Some(defectsSection)

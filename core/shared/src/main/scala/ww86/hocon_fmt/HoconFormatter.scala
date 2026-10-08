@@ -21,20 +21,35 @@ object HoconFormatter {
     .setDoubleIndent(false)
     .setColonAssign(true)
     .setSimplifyNestedObjects(true)
+    // The final newline is an upstream default today; set here so a default moving under us
+    // cannot change the output — sconfig#566 once removed FormattingOptions from under its users.
+    .setNewLineAtEnd(true)
 
   private[hocon_fmt] val renderOptions = ConfigRenderOptions.defaults
     .setJson(false)
     .setOriginComments(false)
     .setComments(true)
     .setFormatted(true)
+    // Upstream's default too, and invisible while origin comments are off; set for the same
+    // reason as the newline.
+    .setShowEnvVariableValues(true)
     .setConfigFormatOptions(formattingOptions)
 
   /** Formatted text, or why the input was left alone. */
   def format(source: String): Either[Refusal, String] =
+    formatWith(source, parseOptions)
+
+  /** As [[format(String)]], with `origin` naming where the text came from, so a refusal reports
+    * `conf/application.conf: 8: ...` rather than `String: 8: ...`.
+    */
+  def format(source: String, origin: String): Either[Refusal, String] =
+    formatWith(source, parseOptions.setOriginDescription(origin))
+
+  private def formatWith(source: String, options: ConfigParseOptions): Either[Refusal, String] =
     for {
-      pass <- formatOnce(source)(Refusal.NotHocon(_))
+      pass <- formatOnce(source, options)(Refusal.NotHocon(_))
       _    <- commentsKept(source, pass.text)
-      _    <- secondPassAgrees(pass.text)
+      _    <- secondPassAgrees(pass.text, options)
       _    <- includesKeptInPlace(source, pass)
     } yield pass.text
 
@@ -48,16 +63,18 @@ object HoconFormatter {
     * names the refusal for text sconfig cannot parse: the input's fault on the first pass, the
     * formatter's on the second.
     */
-  private def formatOnce(source: String)(unreadable: String => Refusal): Either[Refusal, Pass] = {
+  private def formatOnce(source: String, options: ConfigParseOptions)(
+      unreadable: String => Refusal
+  ): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
     for {
-      rendered <- attempt(render(masked.text))(unreadable)
+      rendered <- attempt(render(masked.text, options))(unreadable)
       _        <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
     } yield Pass(IncludeMasking.unmask(rendered, masked.originals), rendered, masked.originals)
   }
 
-  private def render(masked: String): String = {
-    val parsed = ConfigFactory.parseString(masked, parseOptions)
+  private def render(masked: String, options: ConfigParseOptions): String = {
+    val parsed = ConfigFactory.parseString(masked, options)
     if (parsed.isEmpty) "" // rendering an empty root would produce "{}"
     else parsed.root.render(renderOptions)
   }
@@ -71,8 +88,8 @@ object HoconFormatter {
     * back verbatim, and resolving them would reach for the filesystem, which says nothing about
     * whether the text is well formed and which sconfig cannot do at all on Scala.js.
     */
-  private def secondPassAgrees(formatted: String): Either[Refusal, Unit] =
-    formatOnce(formatted)(Refusal.BrokenOutput(_))
+  private def secondPassAgrees(formatted: String, options: ConfigParseOptions): Either[Refusal, Unit] =
+    formatOnce(formatted, options)(Refusal.BrokenOutput(_))
       .filterOrElse(_.text == formatted, Refusal.UnstableOutput)
       .map(_ => ())
 

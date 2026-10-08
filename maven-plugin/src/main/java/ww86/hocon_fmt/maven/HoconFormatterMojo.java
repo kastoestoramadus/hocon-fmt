@@ -43,7 +43,7 @@ abstract class HoconFormatterMojo extends AbstractMojo {
     var examined = new ArrayList<Examined>();
     for (String relativePath : matchingFiles()) {
       Path file = baseDirectory.toPath().resolve(relativePath);
-      Outcome outcome = Outcome.of(read(file, relativePath));
+      Outcome outcome = Outcome.of(read(file, relativePath), relativePath);
       if (outcome instanceof Outcome.Refused refused) {
         getLog().warn("Leaving " + relativePath + " unchanged: " + refused.reason());
       }

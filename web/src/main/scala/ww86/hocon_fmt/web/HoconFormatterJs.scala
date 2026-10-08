@@ -19,8 +19,11 @@ trait FormatResult extends js.Object {
 @JSExportTopLevel("HoconFormatter")
 object HoconFormatterJs {
 
+  /** Text a page hands over has no file name behind it, so a refusal names the playground as the
+    * place the parse tripped rather than saying "String".
+    */
   @JSExport
-  def format(source: String): FormatResult = Verdict.of(source) match {
+  def format(source: String): FormatResult = Verdict.of(source, "playground") match {
     case Verdict.AlreadyFormatted =>
       new FormatResult {
         val verdict            = "alreadyFormatted"
@@ -46,6 +49,7 @@ object HoconFormatterJs {
   def nameOf(refusal: Refusal): String = refusal match {
     case Refusal.NotUtf8         => "notUtf8"
     case Refusal.NotHocon(_)     => "notHocon"
+    case Refusal.OtherFormat(_)  => "otherFormat"
     case Refusal.BrokenOutput(_) => "brokenOutput"
     case Refusal.LostComment(_)  => "lostComment"
     case Refusal.LostInclude(_)  => "lostInclude"

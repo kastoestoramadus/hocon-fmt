@@ -93,7 +93,7 @@ object CmdApi extends IOApp {
   final case class StdinResult(stdout: String, stderr: String, exitCode: ExitCode)
 
   def formatStdin(content: Array[Byte], filename: String): StdinResult =
-    Verdict.of(content) match {
+    Verdict.of(content, filename) match {
       case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, "", ExitCode.Success)
       case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), "", ExitCode.Success)
       case Verdict.Refused(refusal)           =>

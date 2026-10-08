@@ -119,13 +119,15 @@ object Playground:
       )
     )
 
-  /** One verdict per settled input; kept separate from the DOM for reactive tests. */
+  /** One verdict per settled input; kept separate from the DOM for reactive tests. Typed text has
+    * no file name behind it, so a refusal names the playground as the place a parse tripped.
+    */
   private[site] def verdicts(input: Signal[String], first: String, debounceMs: Int = 150): Signal[(String, Verdict)] = {
     input.distinct.changes
       .debounce(debounceMs)
       .startWith(first)
       .distinct
-      .map(text => text -> Verdict.of(text))
+      .map(text => text -> Verdict.of(text, "playground"))
   }
 
   /** The output pane shows the formatting; a refused or settled text stays exactly as typed. */
