@@ -100,5 +100,7 @@ does not compute it and the suite does not assert it. Optional `findings: [...]`
 reserves identifiers for a later duplicate report.
 
 `source` records `kind: synthetic | distilled | verbatim` and `pattern`; verbatim
-examples also require `url` and `licence`. Add fixtures only after reviewing their
+examples also require `url` and `licence`. A distilled entry may carry
+`source.seen-in`, the number of corpus files containing the pattern; the generator
+ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.

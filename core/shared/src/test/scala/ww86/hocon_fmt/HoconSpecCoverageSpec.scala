@@ -106,6 +106,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     ("= separator becomes :", "a = 1", "a: 1"),
     ("nested objects are flattened to paths", "a { b { c : 1 } }", "a.b.c: 1"),
     ("triple-quoted strings become escaped", "a : \"\"\"x\ny\"\"\"", "a: \"x\\ny\""),
+    ("+= appends become the expanded substitution", "a += 2", "a: ${?a}["),
     ("number literals are canonicalised", "a : 1.5e3", "a: 1500"),
     ("unicode escapes are resolved", "a : \"\\u0041\"", "a: A")
   )
