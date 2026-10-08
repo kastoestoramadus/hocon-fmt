@@ -48,7 +48,7 @@ class ExamplesSpec extends munit.FunSuite {
     }
   }
 
-  ExampleData.all.foreach { example =>
+  ExampleData.all.filterNot(e => Variant.differs(e.id)).foreach { example =>
     example.options.foreach { option =>
       test(s"${example.id} ($option): ${example.now}") {
         val verdict = Verdict.of(example.input)

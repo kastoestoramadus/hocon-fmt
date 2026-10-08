@@ -1,13 +1,13 @@
 import scala.scalanative.build.{LTO, Mode}
 
-val scala3    = "3.8.2"
-val sconfig   = "1.12.4"
-val munit     = "1.2.4"
+val scala3  = "3.8.2"
+val sconfig = "1.12.4"
+val munit   = "1.2.4"
 // UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
 // Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
 val sconfigFork = "2.0.0-hocon-fmt-efb66e0131"
-val osLib     = "0.11.8"
-val sjavatime = "1.5.0"
+val osLib       = "0.11.8"
+val sjavatime   = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
 val laminar = "17.2.1"
 
@@ -108,7 +108,8 @@ def guardPublish(p: Project): Project =
 
 // UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
 // releases the option (#646/#647); see "Returning to upstream sconfig" in docs/site.md.
-val checkSconfigFork = taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
+val checkSconfigFork =
+  taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
 
 ThisBuild / checkSconfigFork := {
   val ivyHome  = ivyPaths.value.ivyHome.getOrElse(Path.userHome / ".ivy2")
@@ -185,8 +186,10 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     name := "hocon-fmt-core",
     // UPSTREAM-SCONFIG: the no-op comment seam; `coreSite` swaps it for the real one. Delete both
     // with the seam once ekrich/sconfig releases the option (#646/#647).
-    Compile / unmanagedSourceDirectories +=
-      (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / "main" / "scala",
+    Seq(Compile -> "main", Test -> "test").map { case (configuration, dir) =>
+      configuration / unmanagedSourceDirectories +=
+        (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / dir / "scala"
+    },
     Test / sourceGenerators += Def.task {
       ExampleGenerator.generate(
         (ThisBuild / baseDirectory).value / "examples",

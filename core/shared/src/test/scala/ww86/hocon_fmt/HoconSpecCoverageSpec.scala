@@ -32,7 +32,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "array self-concatenation" -> "a : [ 1, 2 ]\na : ${a} [ 3, 4 ]"
   )
 
-  mustRefuse.foreach { case (name, raw) =>
+  mustRefuse.filterNot((name, _) => Variant.differs(s"mustRefuse: $name")).foreach { case (name, raw) =>
     test(s"formatter: refuses rather than corrupts: $name") {
       assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
       refusalOf(raw) match {
@@ -49,7 +49,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
       "a : 1\nb : 2\na : ${b}\nb : ${a}"
   )
 
-  specSelfReference.foreach { case (name, raw) =>
+  specSelfReference.filterNot((name, _) => Variant.differs(s"specSelfReference: $name")).foreach { case (name, raw) =>
     test(s"formatter: refuses output that is not a fixed point: $name") {
       assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
       assertEquals(refusalOf(raw), Refusal.UnstableOutput, s"$name: refused for the wrong reason")
@@ -89,14 +89,15 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
       "o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"
   )
 
-  commentAboveBlankLine.foreach { case (name, raw) =>
-    test(s"formatter: never loses a comment: $name") {
-      assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
-      refusalOf(raw) match {
-        case Refusal.LostComment(_) => ()
-        case other                  => fail(s"$name: refused for the wrong reason: ${other.reason}")
+  commentAboveBlankLine.filterNot((name, _) => Variant.differs(s"commentAboveBlankLine: $name")).foreach {
+    case (name, raw) =>
+      test(s"formatter: never loses a comment: $name") {
+        assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
+        refusalOf(raw) match {
+          case Refusal.LostComment(_) => ()
+          case other                  => fail(s"$name: refused for the wrong reason: ${other.reason}")
+        }
       }
-    }
   }
 
   // --- Normalised on purpose: meaning kept, original spelling not ------------------------------

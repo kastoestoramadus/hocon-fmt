@@ -66,7 +66,7 @@ object HoconFormatter {
   private def formatOnce(source: String, options: ConfigParseOptions)(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
-    val masked = IncludeMasking.mask(source)
+    val masked  = IncludeMasking.mask(source)
     val carried = CommentCarrier.mask(masked.text)
     for {
       rendered <- attempt(render(carried.text, options))(unreadable)
