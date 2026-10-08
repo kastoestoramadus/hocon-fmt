@@ -35,8 +35,8 @@ class FormatOptionsSpec extends munit.FunSuite {
   }
 
   test("a verdict follows the options it was given") {
-    assertEquals(Verdict.of("a = 1"), Verdict.AlreadyFormatted)
-    assertEquals(Verdict.of("a = 1", colon), Verdict.NeedsFormatting("a: 1\n"))
+    assertEquals(Verdict.of("a = 1\n"), Verdict.AlreadyFormatted)
+    assertEquals(Verdict.of("a = 1\n", colon), Verdict.NeedsFormatting("a: 1\n"))
     assertEquals(Verdict.of("a : 1", "app.conf", colon), Verdict.NeedsFormatting("a: 1\n"))
   }
 

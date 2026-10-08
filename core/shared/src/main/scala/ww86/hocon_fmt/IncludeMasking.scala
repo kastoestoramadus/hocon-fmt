@@ -111,17 +111,19 @@ private[hocon_fmt] object IncludeMasking {
 
   /** Built from the same constants the placeholders are written with, so the two cannot drift.
     *
-    * The value's index is captured rather than backreferenced to the key's, because Scala Native's
+    * The separator matches `:` and `=` because the renderer writes the token the asked-for
+    * [[FormatOptions.separator]] names, and both spellings are our own placeholders. The value's
+    * index is captured rather than backreferenced to the key's, because Scala Native's
     * `java.util.regex` is RE2-based and has no backreferences; `unmask` compares the two.
     */
   private val PlaceholderField = Pattern.compile(
-    s"""$OptionalQuote$PlaceholderPrefix(\\d+)$OptionalQuote\\s*:""" +
+    s"""$OptionalQuote$PlaceholderPrefix(\\d+)$OptionalQuote\\s*[:=]""" +
       s"""\\s*$OptionalQuote$PlaceholderPrefix(\\d+)$OptionalQuote"""
   )
 
   // The renderer may or may not quote the guard value, so both spellings have to match.
   private val guardField =
-    s"""$OptionalQuote$GuardPrefix(\\d+)$OptionalQuote[ \\t]*:[ \\t]*$OptionalQuote$GuardValue$OptionalQuote"""
+    s"""$OptionalQuote$GuardPrefix(\\d+)$OptionalQuote[ \\t]*[:=][ \\t]*$OptionalQuote$GuardValue$OptionalQuote"""
   private val GuardOnItsOwnLine = Pattern.compile(s"""\\n[ \\t]*$guardField""")
   private val GuardInline       = Pattern.compile(s""",?[ \\t]*$guardField""")
 
