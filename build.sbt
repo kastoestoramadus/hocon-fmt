@@ -236,7 +236,7 @@ lazy val coreSite = project
     announceRuntime("core for the page on Scala.js"),
     Compile / unmanagedSourceDirectories := Seq(
       (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "main" / "scala",
-      (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / "main" / "scala"
+      (ThisBuild / baseDirectory).value / "core" / "site-shared" / "src" / "main" / "scala"
     ),
     Test / unmanagedSourceDirectories := Seq(
       (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "test" / "scala",

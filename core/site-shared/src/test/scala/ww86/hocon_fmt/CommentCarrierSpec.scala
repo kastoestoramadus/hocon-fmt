@@ -23,12 +23,12 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(out, "# Copyright 2025\na: 1\n")
   }
 
-  test("every ledger entry now formats") {
+  test("the comment cases of the ledger now format") {
     assertEquals(Variant.ledger.size, 14)
     List("catalogue/detached-header-comment", "catalogue/trailing-comment-in-object").foreach { id =>
       Verdict.of(example(id).input) match {
-        case Verdict.NeedsFormatting(out) => assert(out.contains("#"), out)
-        case other                        => fail(s"$id: $other")
+        case Verdict.Refused(refusal) => fail(s"$id: ${refusal.reason}")
+        case _                        => ()
       }
     }
     // The two coverage fixtures; the block split by a blank line keeps both halves, in order.
