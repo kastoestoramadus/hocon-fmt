@@ -18,11 +18,13 @@ object LivePr:
     * guessed.
     */
   def read(item: js.Dynamic): Option[LivePr] =
-    for
-      number <- asInt(item.number)
-      title  <- asString(item.title)
-      state  <- readState(item)
-    yield LivePr(number, title, state)
+    if js.isUndefined(item) || Option(item).isEmpty then None
+    else
+      for
+        number <- asInt(item.number)
+        title  <- asString(item.title)
+        state  <- readState(item)
+      yield LivePr(number, title, state)
 
   private def readState(item: js.Dynamic): Option[LiveState] =
     val pr = item.pull_request
