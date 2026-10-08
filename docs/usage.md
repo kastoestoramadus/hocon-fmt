@@ -202,8 +202,10 @@ enum Kotlin is worse than unchecked — a `when` missing a branch compiles and t
 `NoWhenBranchMatchedException` at run time — which is the trap the mirror removes. On Java 17
 every outcome is an `instanceof` away.
 
-The module builds in `java-api/` like the Gradle plugin does, resolving the core from Maven Local
-until it reaches Maven Central; a consumer declares
+sbt builds and publishes the artifact (`eu.ww86:hocon-fmt-java-api`, no `_3` suffix — it is plain
+Java) over the same sources the standalone Gradle build in `java-api/` tests: `sbt javaApi/publishM2`
+puts it in Maven Local for development, and releases carry it to Maven Central with a POM that
+pulls in the core and jspecify. A consumer declares only
 `implementation("eu.ww86:hocon-fmt-java-api:0.1.0")`.
 
 ## pre-commit
