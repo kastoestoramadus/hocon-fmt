@@ -372,7 +372,7 @@ lazy val site = project
 
 addCommandAlias(
   "crossCompile",
-  Seq(coreJVM, coreJS, coreNative, cliJVM, cliJS, cliNative, web, site)
+  Seq(coreJVM, coreJS, coreNative, cliJVM, cliJS, cliNative, zioJVM, zioJS, zioNative, web, site)
     .map(p => s"${p.id}/Test/compile")
     .mkString("; ")
 )
@@ -454,5 +454,7 @@ addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
 addCommandAlias(
   "publishRelease",
   // `sbtPlugin` is also an sbt key, so the plugin's project is named by its id.
-  Seq(coreJVM.id, cliJVM.id, "sbtPlugin").map(id => s"$id/publishSigned").mkString("; ") + "; sonaUpload"
+  Seq(coreJVM.id, coreJS.id, coreNative.id, cliJVM.id, zioJVM.id, zioJS.id, zioNative.id, "sbtPlugin")
+    .map(id => s"$id/publishSigned")
+    .mkString("; ") + "; sonaUpload"
 )

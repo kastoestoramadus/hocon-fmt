@@ -13,6 +13,7 @@ around it in `HoconFormatter`.
 | module | what it is | platforms | depends on |
 |---|---|---|---|
 | `core` | `HoconFormatter.format: String => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
+| `zio` | `ZioFormatter`, blocking `ZioFiles`, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
 | `cli` | `CmdApi`, an `IOApp`: arguments, file IO, parallelism, report | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io, decline |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |
@@ -25,7 +26,7 @@ around it in `HoconFormatter`.
 | `bench` | times each formatter phase; see [testing](testing.md#benchmarks) | JVM, Scala.js, Scala Native | core |
 
 `core` stays pure and depends on nothing but sconfig because the build-tool plugins load it into
-their hosts. Effects live in `cli`, on cats-effect.
+their hosts. Effects live in `cli`, on cats-effect, and in the independent `zio` library adapter.
 
 ## The pipeline
 
