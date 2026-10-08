@@ -44,9 +44,11 @@ hs_err_pid*
 # scala-cli
 .scala-build/
 
-# Gradle (gradle-plugin/)
+# Gradle (gradle-plugin/, java-api/)
 /gradle-plugin/.gradle/
 /gradle-plugin/build/
+/java-api/.gradle/
+/java-api/build/
 
 # Python (pre-commit hook packaging)
 __pycache__/

@@ -19,6 +19,7 @@ expect() { # file, pattern, minimum matches
 
 expect build.sbt                      "^ThisBuild / version +:= \"$re\"$" 1
 expect gradle-plugin/build.gradle.kts "^version = \"$re\"$"               1
+expect java-api/build.gradle.kts      "^version = \"$re\"$"               1
 expect mill-plugin/build.mill         "formatterVersion = \"$re\"$"       1
 expect maven-plugin/pom.xml           "<version>$re</version>"            2
 expect .pre-commit-hooks.yaml         "hocon-fmt(==|@)$re\""              4
