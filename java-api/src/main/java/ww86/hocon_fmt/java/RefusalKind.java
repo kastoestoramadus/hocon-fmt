@@ -25,11 +25,14 @@ public enum RefusalKind {
 
     /**
      * The kind of a refusal raised by the core, for callers holding a {@code Refusal} from a
-     * {@link FormatRefusedException}. The dispatch is on the case's own name because the core's
-     * parameterless cases have no JVM type to test against, and their singletons sit behind a
-     * {@code MODULE$} expression that {@code -Xlint:static} forbids; the names are pinned by the
-     * parity test, and a case the mirror does not know fails loudly instead of masquerading as
-     * one of these constants.
+     * {@link ww86.hocon_fmt.FormatRefusedException}. The dispatch is on the case's own name
+     * because the core's parameterless cases have no JVM type to test against, and their
+     * singletons sit behind a {@code MODULE$} expression that {@code -Xlint:static} forbids; the
+     * names are pinned by the parity test, and a case the mirror does not know fails loudly
+     * instead of masquerading as one of these constants.
+     *
+     * @param refusal the refusal the core raised
+     * @return the constant standing for the refusal's case
      */
     public static RefusalKind of(ww86.hocon_fmt.Refusal refusal) {
         return switch (refusal.productPrefix()) {

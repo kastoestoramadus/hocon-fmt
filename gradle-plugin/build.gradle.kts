@@ -9,7 +9,7 @@ group = "eu.ww86"
 version = "0.1.0-SNAPSHOT"
 
 repositories {
-    // Until the core reaches Maven Central, `sbt coreJVM/publishM2` is what puts it here.
+    // Until the core reaches Maven Central, `sbt coreJVM/publishM2 javaApi/publishM2` puts it here.
     mavenLocal()
     mavenCentral()
 }
@@ -37,7 +37,7 @@ val functionalTestSourceSet = sourceSets.create("functionalTest")
 dependencies {
     // Compile only: at run time the formatter is resolved in the consumer's build and loaded in an
     // isolated worker class loader, so its Scala library never lands on the buildscript classpath.
-    compileOnly("eu.ww86:hocon-fmt-core_3:$version")
+    compileOnly("eu.ww86:hocon-fmt-java-api:$version")
     "functionalTestImplementation"(platform("org.junit:junit-bom:6.0.1"))
     "functionalTestImplementation"("org.junit.jupiter:junit-jupiter")
     "functionalTestRuntimeOnly"("org.junit.platform:junit-platform-launcher")
@@ -61,9 +61,9 @@ tasks.check {
     dependsOn(functionalTest)
 }
 
-// The plugin asks for the core by these coordinates, so the two are released in lockstep.
+// The plugin asks for the Java API (the core comes with it) by these coordinates, so the two are released in lockstep.
 tasks.processResources {
-    val coordinates = "${project.group}:hocon-fmt-core_3:${project.version}"
+    val coordinates = "${project.group}:hocon-fmt-java-api:${project.version}"
     inputs.property("coordinates", coordinates)
     filesMatching("**/formatter.properties") {
         expand("coordinates" to coordinates)

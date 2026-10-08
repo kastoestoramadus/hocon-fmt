@@ -10,6 +10,7 @@ the `Release` workflow has never run.
 | `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | sbt | Maven Central | cats-effect file operations on every platform |
 | `hocon-fmt-zio_3`, `hocon-fmt-zio_sjs1_3`, `hocon-fmt-zio_native0.5_3` | sbt | Maven Central | the ZIO library adapter |
 | `hocon-fmt-cli_3` | sbt | Maven Central | the JVM command line |
+| `hocon-fmt-java-api` | sbt | Maven Central | a library dependency for Java and Kotlin callers |
 | `sbt-hocon-fmt` | sbt | Maven Central | `addSbtPlugin` |
 | `hocon-fmt-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
 | `mill-hocon-fmt_mill1_3` | `mill-plugin/` | Maven Central | `//| mvnDeps` |
@@ -102,9 +103,9 @@ workflow" for workflows on the default branch.
    `gradle-plugin/build.gradle.kts` (`version`), `java-api/build.gradle.kts` (`version`),
    `maven-plugin/pom.xml` (the plugin's own version and the `hocon-fmt-core_3` dependency),
    `mill-plugin/build.mill` (`formatterVersion`), and the `additional_dependencies` of all four
-   hooks in `.pre-commit-hooks.yaml`. The npm and wheel versions follow `build.sbt`. All core and
-   cats platform artifacts also inherit that version; `signRelease` and `publishRelease` include
-   all six library artifacts.
+   hooks in `.pre-commit-hooks.yaml`. The npm and wheel versions follow `build.sbt`. All core, cats
+   and zio platform artifacts and the Java API also inherit that version; `signRelease` and
+   `publishRelease` include every sbt artifact the table above lists as built by sbt.
 2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
    artifact without releasing anything, which is how to find out the matrix works. Its `central`
    job also signs with the real key and passphrase, uploading nothing: the passphrase is checked
@@ -117,15 +118,18 @@ workflow" for workflows on the default branch.
 4. Publish, in dependency order:
    - Maven Central, first: the Gradle, Maven and Mill plugins and the sbt plugin all resolve the
      core from there. The tag leaves three deployments in the portal (sbt, Maven, Mill). Look each
-     over in Publish → Deployments, then publish the sbt one, which carries core, cats and zio on all
-     three platforms (zio is text only on Scala.js), first. A release cannot be undone.
+     over in Publish → Deployments, then publish the sbt one, which carries core, cats and zio on
+     all three platforms (zio is text only on Scala.js) and the Java API, first. A release cannot
+     be undone.
    - The Gradle Plugin Portal.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).
 
-Until the core is on Maven Central, the Gradle and Maven builds resolve it from Maven Local and
-the Mill build from the local Ivy repository: run `sbt coreJVM/publishM2` or
-`sbt coreJVM/publishLocal` before building them.
+Until the artifacts are on Maven Central, the Gradle and Maven builds resolve them from Maven
+Local: run `sbt coreJVM/publishM2 javaApi/publishM2` before the Gradle build, or
+`sbt coreJVM/publishM2` before the Maven build. The Mill build resolves the core from the local
+Ivy repository: run `sbt coreJVM/publishLocal` before building it. The java-api tests load the jar sbt publishes,
+so `sbt javaApi/publishM2` joins `sbt coreJVM/publishM2` before `./gradlew check` in `java-api/`.
 
 ## pre-commit
 

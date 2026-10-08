@@ -28,7 +28,7 @@ public final class HoconFormatterPlugin implements Plugin<Project> {
 
         NamedDomainObjectProvider<DependencyScopeConfiguration> formatter = project.getConfigurations()
                 .dependencyScope("hoconFormatter", configuration -> configuration.defaultDependencies(
-                        dependencies -> dependencies.add(project.getDependencies().create(coreCoordinates()))));
+                        dependencies -> dependencies.add(project.getDependencies().create(formatterCoordinates()))));
         NamedDomainObjectProvider<ResolvableConfiguration> formatterClasspath = project.getConfigurations()
                 .resolvable("hoconFormatterClasspath", configuration -> configuration.extendsFrom(formatter.get()));
 
@@ -52,8 +52,8 @@ public final class HoconFormatterPlugin implements Plugin<Project> {
                 .configure(task -> task.dependsOn(check)));
     }
 
-    /** The core released together with this plugin; a build can override it in {@code hoconFormatter}. */
-    static String coreCoordinates() {
+    /** The Java API released together with this plugin; a build can override it in {@code hoconFormatter}. */
+    static String formatterCoordinates() {
         try (InputStream in = HoconFormatterPlugin.class.getResourceAsStream("formatter.properties")) {
             Properties properties = new Properties();
             properties.load(in);

@@ -18,27 +18,55 @@ public final class HoconFmt {
 
     private HoconFmt() {}
 
-    /** What the formatter makes of HOCON text. */
+    /**
+     * What the formatter makes of HOCON text.
+     *
+     * @param text the HOCON to judge
+     * @return the verdict: already formatted, needs formatting, or refused
+     */
     public static Verdict check(String text) {
         return mirror(ww86.hocon_fmt.Verdict.of(text));
     }
 
-    /** What the formatter makes of HOCON text the caller knows a name for. */
+    /**
+     * What the formatter makes of HOCON text the caller knows a name for.
+     *
+     * @param text the HOCON to judge
+     * @param name the name the caller knows the text by
+     * @return the verdict: already formatted, needs formatting, or refused
+     */
     public static Verdict check(String text, String name) {
         return mirror(ww86.hocon_fmt.Verdict.of(text, name));
     }
 
-    /** What the formatter makes of UTF-8 bytes; bytes that are not valid UTF-8 are refused. */
+    /**
+     * What the formatter makes of UTF-8 bytes; bytes that are not valid UTF-8 are refused.
+     *
+     * @param content the UTF-8 bytes of the HOCON to judge
+     * @return the verdict: already formatted, needs formatting, or refused
+     */
     public static Verdict check(byte[] content) {
         return mirror(ww86.hocon_fmt.Verdict.of(content));
     }
 
-    /** What the formatter makes of UTF-8 bytes the caller knows a name for. */
+    /**
+     * What the formatter makes of UTF-8 bytes the caller knows a name for.
+     *
+     * @param content the UTF-8 bytes of the HOCON to judge
+     * @param name the name the caller knows the bytes by
+     * @return the verdict: already formatted, needs formatting, or refused
+     */
     public static Verdict check(byte[] content, String name) {
         return mirror(ww86.hocon_fmt.Verdict.of(content, name));
     }
 
-    /** Reads the file as UTF-8 bytes and judges its content, without touching it. */
+    /**
+     * Reads the file as UTF-8 bytes and judges its content, without touching it.
+     *
+     * @param file the file to read
+     * @return the verdict: already formatted, needs formatting, or refused
+     * @throws IOException when the file cannot be read
+     */
     public static Verdict checkFile(Path file) throws IOException {
         return check(Files.readAllBytes(file), file.toString());
     }
@@ -48,7 +76,9 @@ public final class HoconFmt {
      * already formatted or refused. The write itself is the one the Gradle and Maven plugins make:
      * {@link Files#writeString} over the whole file.
      *
+     * @param file the file to read, and to rewrite when formatting changes it
      * @return the verdict, so a caller can tell a write from a pass without rereading
+     * @throws IOException when the file cannot be read or written
      */
     public static Verdict formatFile(Path file) throws IOException {
         Verdict verdict = check(Files.readAllBytes(file), file.toString());
@@ -61,12 +91,23 @@ public final class HoconFmt {
     /**
      * The formatted text, or the exception the JVM integrations raise. Already formatted text
      * comes back as it is.
+     *
+     * @param text the HOCON to format
+     * @return the text the input should become; the input itself when already formatted
+     * @throws FormatRefusedException when the input must be left alone; the message says why
      */
     public static String formatOrThrow(String text) throws FormatRefusedException {
         return textOf(ww86.hocon_fmt.Verdict.of(text), text);
     }
 
-    /** As {@link #formatOrThrow(String)}, with the name the caller knows the text by. */
+    /**
+     * As {@link #formatOrThrow(String)}, with the name the caller knows the text by.
+     *
+     * @param text the HOCON to format
+     * @param name the name the caller knows the text by
+     * @return the text the input should become; the input itself when already formatted
+     * @throws FormatRefusedException when the input must be left alone; the message says why
+     */
     public static String formatOrThrow(String text, String name) throws FormatRefusedException {
         return textOf(ww86.hocon_fmt.Verdict.of(text, name), text);
     }

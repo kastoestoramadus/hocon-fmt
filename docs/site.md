@@ -2,8 +2,8 @@
 
 The project page: the formatter presented, a playground, and the author's contributions to the
 libraries it depends on. Meant to be served as `https://hocon-fmt.ww86.eu` from this repository's
-GitHub Pages; until Pages is enabled, `sbt site/build` writes everything to `site/target/site`,
-and the page works from `file://` as every ww86.eu page does.
+GitHub Pages. `sbt site/build` writes everything to `site/target/site`, and the page also works
+from `file://` as every ww86.eu page does.
 
 ## The module
 
@@ -127,6 +127,12 @@ Locations below are in `site/src/main/scala/ww86/hocon_fmt/site/` at the reviewe
 
 ## Publishing
 
-Not done yet, deliberately: DNS and Pages are the user's to switch on. When it happens, serve
-`site/target/site` from the `gh-pages` branch (or a Pages workflow), keep the `CNAME`, and the
-relative links do the rest. The hub, ww86.eu, needs only a card linking here.
+Deployment is handled by [the Pages workflow](../.github/workflows/pages.yml) on every push to
+`main`, or manually through `workflow_dispatch`: it runs `sbt site/build`, uploads
+`site/target/site`, and deploys it to the `github-pages` environment. Deployments are serialized
+without cancelling an in-flight run. The output includes `CNAME` for `hocon-fmt.ww86.eu` and
+`.nojekyll`; relative links also keep local previews working.
+
+Repository Pages must use the **GitHub Actions** source and the custom domain
+`hocon-fmt.ww86.eu`, with a DNS CNAME pointing to `kastoestoramadus.github.io`.
+Not done yet: the hub, ww86.eu, needs a card linking here.

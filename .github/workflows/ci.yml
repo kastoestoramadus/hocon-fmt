@@ -68,9 +68,10 @@ jobs:
           cache: sbt
       - uses: sbt/setup-sbt@v1
       - uses: gradle/actions/setup-gradle@v4
-      # The plugin resolves the core from Maven Local until it is on Maven Central.
-      - name: Publish the core locally
-        run: sbt coreJVM/publishM2
+      # The plugin resolves the Java API, and the core through it, from Maven Local until they are
+      # on Maven Central.
+      - name: Publish the core and the Java API locally
+        run: sbt coreJVM/publishM2 javaApi/publishM2
       - name: Functional tests
         working-directory: gradle-plugin
         run: ./gradlew check
@@ -86,9 +87,12 @@ jobs:
           cache: sbt
       - uses: sbt/setup-sbt@v1
       - uses: gradle/actions/setup-gradle@v4
-      # The library resolves the core from Maven Local until it is on Maven Central.
-      - name: Publish the core locally
-        run: sbt coreJVM/publishM2
+      # One sbt run publishes the core and the API: the library resolves the core from Maven Local
+      # until it is on Maven Central, and sbt builds and publishes the artifact itself; the run
+      # also compiles the javadoc jar, and the contract suite in the Gradle build loads exactly
+      # this published jar.
+      - name: Publish the core and the Java API locally
+        run: sbt coreJVM/publishM2 javaApi/publishM2
       - name: Java and Kotlin tests
         working-directory: java-api
         run: ./gradlew check
