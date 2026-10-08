@@ -24,6 +24,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
 | invoker | `maven-plugin/src/it` | the Maven plugin in real Maven builds |
 | unit, integration | `mill-plugin/test`, `mill-plugin/integration` | the Mill plugin in process through `UnitTester`, and in a real Mill: 1.1.4, the oldest supported, and 1.1.10 |
+| `HoconFmtTest`, `KotlinInteropTest` | `java-api/src/test` | the Java API for Java and Kotlin callers: the mirrored verdicts and refusal kinds and the parity tests that pin the mirror to the core, file checks and the write only on `NeedsFormatting`, `formatOrThrow`, and what Kotlin sees — a value-used `when` with no `else` and JSpecify's non-null returns |
 | e2e | `scripts/pre-commit-e2e.sh` | both families of pre-commit hooks, native and Node, installed from this repository as a user would |
 | `CliAcceptanceSuite` | `acceptance` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, redirected files and pipes, input beyond one read, refusals, `--version`, argument errors; `sbt acceptance/test` |
 

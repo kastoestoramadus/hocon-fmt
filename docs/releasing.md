@@ -97,12 +97,13 @@ workflow" for workflows on the default branch.
 
 ## Each release
 
-1. Set the version in the five places that carry it: `build.sbt` (`ThisBuild / version`),
-   `gradle-plugin/build.gradle.kts` (`version`), `maven-plugin/pom.xml` (the plugin's own version
-   and the `hocon-fmt-core_3` dependency), `mill-plugin/build.mill` (`formatterVersion`),
-   and the `additional_dependencies` of all four hooks in `.pre-commit-hooks.yaml`. The npm and
-   wheel versions follow `build.sbt`. All core and cats platform artifacts also inherit that
-   version; `signRelease` and `publishRelease` include all six library artifacts.
+1. Set the version in the six places that carry it: `build.sbt` (`ThisBuild / version`),
+   `gradle-plugin/build.gradle.kts` (`version`), `java-api/build.gradle.kts` (`version`),
+   `maven-plugin/pom.xml` (the plugin's own version and the `hocon-fmt-core_3` dependency),
+   `mill-plugin/build.mill` (`formatterVersion`), and the `additional_dependencies` of all four
+   hooks in `.pre-commit-hooks.yaml`. The npm and wheel versions follow `build.sbt`. All core and
+   cats platform artifacts also inherit that version; `signRelease` and `publishRelease` include
+   all six library artifacts.
 2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
    artifact without releasing anything, which is how to find out the matrix works. Its `central`
    job also signs with the real key and passphrase, uploading nothing: the passphrase is checked

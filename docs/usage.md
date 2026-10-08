@@ -142,19 +142,24 @@ if (verdict instanceof Verdict.NeedsFormatting needed) {
 ```
 
 ```kotlin
-when (val verdict = HoconFmt.checkFile(path)) {
-    is Verdict.AlreadyFormatted -> println("$path is formatted")
-    is Verdict.NeedsFormatting -> println("would become: ${verdict.formatted()}")
-    is Verdict.Refused -> println("leaving alone: ${verdict.reason()}")
+val verdict = HoconFmt.checkFile(path)
+val shape = when (verdict) {
+    is Verdict.AlreadyFormatted -> "$path is formatted"
+    is Verdict.NeedsFormatting -> "would become: ${verdict.formatted()}"
+    is Verdict.Refused -> "leaving alone: ${verdict.reason()}"
 }
+println(shape)
 ```
 
 `check` judges text or bytes, `checkFile` a path, `formatFile` rewrites a file only when the
 formatted text differs — the same whole-file `Files.writeString` the Gradle and Maven plugins
 make, so a refused file is never touched — and `formatOrThrow` raises the core's
-`FormatRefusedException` for callers that prefer an exception. Kotlin's `when` needs no `else`
-branch as a statement (Kotlin does not check exhaustiveness over Java hierarchies), and on Java 21
-the sealed mirror switches without a `default`. On Java 17 every outcome is an `instanceof` away.
+`FormatRefusedException` for callers that prefer an exception. Both compilers hold the caller to
+the full set: the Kotlin `when` above is value-used with no `else`, and a Java 21 `switch` needs
+no `default`; a missing branch is a compile error, not a run-time surprise. Over the core's own
+enum Kotlin is worse than unchecked — a `when` missing a branch compiles and then throws
+`NoWhenBranchMatchedException` at run time — which is the trap the mirror removes. On Java 17
+every outcome is an `instanceof` away.
 
 The module builds in `java-api/` like the Gradle plugin does, resolving the core from Maven Local
 until it reaches Maven Central; a consumer declares
