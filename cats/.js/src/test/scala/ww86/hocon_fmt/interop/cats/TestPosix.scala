@@ -16,6 +16,7 @@ object TestPosix {
     def statSync(path: String): js.Dynamic                = js.native
     def chmodSync(path: String, mode: Int): Unit          = js.native
     def chownSync(path: String, uid: Int, gid: Int): Unit = js.native
+    def linkSync(existing: String, link: String): Unit    = js.native
   }
 
   def stat(path: Path): IO[Stat] = IO {
@@ -27,6 +28,16 @@ object TestPosix {
 
   def chgrp(path: Path, group: Int): IO[Unit] =
     stat(path).flatMap(current => IO(NodeFs.chownSync(path.toString, current.owner, group)))
+
+  /** The file's inode, which a rename changes and a write in place does not. */
+  def ino(path: Path): IO[Long] = IO(longNumber(NodeFs.statSync(path.toString), "ino"))
+
+  /** How many directory entries point at the file's inode. */
+  def nlink(path: Path): IO[Long] = IO(longNumber(NodeFs.statSync(path.toString), "nlink"))
+
+  /** A second directory entry for the same inode. */
+  def link(link: Path, existing: Path): IO[Unit] =
+    IO(NodeFs.linkSync(existing.toString, link.toString))
 
   /** A group this process may give a file other than the one `path` is in, where it has one. */
   def otherGroup(path: Path): IO[Option[Int]] =
@@ -45,6 +56,12 @@ object TestPosix {
   def number(attributes: js.Dynamic, name: String): Int = {
     val value = attributes.selectDynamic(name)
     if js.typeOf(value) == "number" then value.asInstanceOf[Double].toInt
+    else throw new IllegalStateException(s"no $name in the node stat result")
+  }
+
+  def longNumber(attributes: js.Dynamic, name: String): Long = {
+    val value = attributes.selectDynamic(name)
+    if js.typeOf(value) == "number" then value.asInstanceOf[Double].toLong
     else throw new IllegalStateException(s"no $name in the node stat result")
   }
 }

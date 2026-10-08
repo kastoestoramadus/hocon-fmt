@@ -14,7 +14,7 @@ around it in `HoconFormatter`.
 |---|---|---|---|
 | `core` | `HoconFormatter.format: String => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
 | `cats` | `FileFormatter[F]`: file verdicts, identity-preserving formatting, streaming checks, opt-in refusal errors | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io |
-| `zio` | `ZioFormatter`, blocking `ZioFiles`, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
+| `zio` | `ZioFormatter`, blocking `ZioFiles`, identity-preserving formatting, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
 | `cli` | `CmdApi`, an `IOApp`: arguments, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |

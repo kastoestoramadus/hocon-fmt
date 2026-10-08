@@ -235,7 +235,8 @@ at [ekrich/sconfig](https://github.com/ekrich/sconfig) helps everyone on sconfig
 ### Render `+=` back as `+=` upstream (S)
 
 Formatting expands the append shorthand to the specification's form, `a += 2` becoming
-`a: ${?a}[2]`, recorded as an intentional normalisation in [limitations](limitations.md). The value
+`a: ${?a}[` with the `2` and the closing bracket on their own lines below, recorded as an
+intentional normalisation in [limitations](limitations.md). The value
 is the same, but the spelling the author wrote is not kept, and sconfig is why: its parse tree
 desugars `+=` at parse time, so the renderer cannot tell the shorthand from the expansion written
 out. A render option that keeps the shorthand needs the parser to mark what it built.
@@ -243,6 +244,24 @@ out. A render option that keeps the shorthand needs the parser to mark what it b
 here; the normalisation entry goes away with the fix.
 
 ## The project
+
+### A dependency-free shared file-identity module (M)
+
+The `cats` and `zio` adapters mirror about a hundred lines of file-identity code — stage a copy
+beside the original, give it the original's owner, group and every mode bit, prove it by reading
+them back, rename over the original, and write in place only when the identity is unavailable, the
+file or its directory unwritable, or the identity cannot be kept; a staging, writing or renaming
+I/O error instead propagates and leaves the original intact — including the Scala
+Native C `stat`/`chown`/`chmod` interop both carry (`FileIdentity` and the per-platform attribute
+sources exist twice, `AtomicFiles` against `AtomicFile`/`PosixIdentity`). Calling one adapter from
+the other is no fix: it would put fs2 and cats-effect on the ZIO classpath, or ZIO on the cats
+one, against [architecture](architecture.md). A `file-identity` artifact depending on nothing but
+the standard library would delete the mirror and stop the two adapters drifting; the cost is a
+sixth published artifact — coordinates, release config, signing, a runbook line — for code with
+two consumers. **Your part:** deciding the artifact earns its publication. **Code:** move the
+identity record and the per-platform attribute sources, parameterise the write over the effect
+type, point both adapters at it; the rename and hard-link tests each adapter carries today move
+with it unchanged.
 
 ### Java style in the Gradle and Maven plugins (S)
 

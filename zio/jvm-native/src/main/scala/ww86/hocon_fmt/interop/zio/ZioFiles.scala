@@ -31,7 +31,9 @@ object ZioFiles {
       }
     }
 
-  /** Returns the original decision; NeedsFormatting means the replacement completed. */
+  /** Returns the original decision; NeedsFormatting means the formatted text was written, by a
+    * staged replacement or in place.
+    */
   def format(path: Path): IO[FileError, Verdict] =
     BlockingIo(path.toRealPath()).mapError(FileError.Io(_)).flatMap { target =>
       verdict(target).flatMap {
