@@ -117,6 +117,49 @@ Both recipes are compiled in `TryAndFutureSpec`. Nothing refuses on its own: `Ve
 and `FormatRefusedException` exists only where a caller or an adapter raises it — the same type the
 build-tool facade and the cats adapter raise.
 
+## Java and Kotlin
+
+`eu.ww86:hocon-fmt-java-api` puts the same core behind types the JVM speaks natively: static
+methods on `ww86.hocon_fmt.java.HoconFmt` return a `Verdict` that is a sealed interface of records —
+`AlreadyFormatted`, `NeedsFormatting(formatted)` and `Refused(kind, reason)` — with a `RefusalKind`
+constant per core `Refusal` case. The mirror exists because Scala 3 writes sealed-ness to TASTy and
+not to the class file, so no Java compiler can switch over the core's enum exhaustively; the mirror
+can, on Java 21. Nothing accepts or returns null: the package is JSpecify `@NullMarked`, which
+Kotlin enforces as compile errors.
+
+```java
+import ww86.hocon_fmt.java.HoconFmt;
+import ww86.hocon_fmt.java.RefusalKind;
+import ww86.hocon_fmt.java.Verdict;
+
+Verdict verdict = HoconFmt.checkFile(path);
+if (verdict instanceof Verdict.NeedsFormatting needed) {
+    System.out.println("Run me to rewrite " + path);
+} else if (verdict instanceof Verdict.Refused refused
+        && refused.kind() == RefusalKind.NotHocon) {
+    logger.warn("Leaving {} alone: {}", path, refused.reason());
+}
+```
+
+```kotlin
+when (val verdict = HoconFmt.checkFile(path)) {
+    is Verdict.AlreadyFormatted -> println("$path is formatted")
+    is Verdict.NeedsFormatting -> println("would become: ${verdict.formatted()}")
+    is Verdict.Refused -> println("leaving alone: ${verdict.reason()}")
+}
+```
+
+`check` judges text or bytes, `checkFile` a path, `formatFile` rewrites a file only when the
+formatted text differs — the same whole-file `Files.writeString` the Gradle and Maven plugins
+make, so a refused file is never touched — and `formatOrThrow` raises the core's
+`FormatRefusedException` for callers that prefer an exception. Kotlin's `when` needs no `else`
+branch as a statement (Kotlin does not check exhaustiveness over Java hierarchies), and on Java 21
+the sealed mirror switches without a `default`. On Java 17 every outcome is an `instanceof` away.
+
+The module builds in `java-api/` like the Gradle plugin does, resolving the core from Maven Local
+until it reaches Maven Central; a consumer declares
+`implementation("eu.ww86:hocon-fmt-java-api:0.1.0")`.
+
 ## pre-commit
 
 ```yaml
