@@ -27,8 +27,10 @@ import scala.collection.mutable
   * object only.
   *
   * UPSTREAM-SCONFIG: delete this file with the seam once ekrich/sconfig releases the option
-  * (#646/#647). The test that signals it is `SconfigDefectsSpec` "library: keeps a comment a
-  * blank line detaches from the field below"; docs/site.md, "Returning to upstream sconfig".
+  * (#646/#647). The test that signals it is `KeepDetachedCommentsGuardSpec`, "library: sconfig
+  * keeps a comment a blank line detaches from the field below", which turns green on a sconfig
+  * with the option; then follow docs/site.md, "Returning to upstream sconfig", and delete this
+  * file, the call sites and `coreSite`.
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
 private[hocon_fmt] object CommentCarrier {
