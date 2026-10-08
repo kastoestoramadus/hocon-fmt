@@ -185,7 +185,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
       bytes  <- read(file)
     } yield {
       assertNotEquals(after, before, "inode unchanged: the file was written in place")
-      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
     }
   }
 
@@ -205,7 +205,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
       assertEquals(before, 2L)
       assertEquals(after, 1L, "the file still shares its inode: it was written in place")
       assertEquals(linked, "a=1".getBytes(UTF_8).toList)
-      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
     }
   }
 

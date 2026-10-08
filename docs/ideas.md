@@ -246,7 +246,7 @@ at [ekrich/sconfig](https://github.com/ekrich/sconfig) helps everyone on sconfig
 ### Render `+=` back as `+=` upstream (S)
 
 Formatting expands the append shorthand to the specification's form, `a += 2` becoming
-`a: ${?a}[` with the `2` and the closing bracket on their own lines below, recorded as an
+`a = ${?a}[` with the `2` and the closing bracket on their own lines below, recorded as an
 intentional normalisation in [limitations](limitations.md). The value
 is the same, but the spelling the author wrote is not kept, and sconfig is why: its parse tree
 desugars `+=` at parse time, so the renderer cannot tell the shorthand from the expansion written

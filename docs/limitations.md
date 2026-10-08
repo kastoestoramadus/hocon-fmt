@@ -113,8 +113,8 @@ not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpe
 - nested objects are flattened to path keys (`setSimplifyNestedObjects`)
 - triple-quoted strings become escaped single-line strings
 - `+=` appends become the specification's expansion, the same value (`a += 2` renders as
-  `a: ${?a}[`, with the `2` indented on the next line and the `]` on its own — what
-  `examples/catalogue/plus-append-alone/expected/default.conf` pins, not `a: ${?a}[2]` on one
+  `a = ${?a}[`, with the `2` indented on the next line and the `]` on its own — what
+  `examples/catalogue/plus-append-alone/expected/default.conf` pins, not `a = ${?a}[2]` on one
   line): sconfig renders the expanded form, keeping no trace of the shorthand (an append after an
   earlier definition of the key is instead the `+=` field-separator defect above, and is refused)
 - number literals are canonicalised (`1.5e3` becomes `1500`)
