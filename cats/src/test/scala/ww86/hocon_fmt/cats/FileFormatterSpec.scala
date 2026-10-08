@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import cats.effect.IO
 import cats.syntax.all.*
 import fs2.{Chunk, Stream}
-import fs2.io.file.{Files, Path}
+import fs2.io.file.{Files, Path, PosixPermission}
 import ww86.hocon_fmt.{Refusal, Verdict}
 
 class FileFormatterSpec extends munit.CatsEffectSuite {
@@ -83,23 +83,25 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   }
   tmp.test("canonical paths deduplicate aliases and retain missing files for reporting") { dir =>
     for {
-      file <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      file      <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
       canonical <- Files[IO].realPath(file)
-      paths <- formatter.distinctPaths(List(file, dir / "." / "a.conf", dir / "missing.conf"))
+      paths     <- formatter.distinctPaths(List(file, dir / "." / "a.conf", dir / "missing.conf"))
     } yield assertEquals(paths, List(canonical, (dir / "missing.conf").absolute))
   }
 
   tmp.test("format follows symlinks and preserves permissions") { dir =>
     for {
-      file <- write(dir, "target.conf", "a=1".getBytes(UTF_8))
-      canonical <- Files[IO].realPath(file)
-      permissions <- Files[IO].getPosixPermissions(file)
-      link = dir / "link.conf"
-      _ <- Files[IO].createSymbolicLink(link, canonical)
-      outcome <- formatter.format(link)
-      isLink <- Files[IO].isSymbolicLink(link)
-      after <- Files[IO].getPosixPermissions(file)
-      bytes <- read(file)
+      file                <- write(dir, "target.conf", "a=1".getBytes(UTF_8))
+      canonical           <- Files[IO].realPath(file)
+      originalPermissions <- Files[IO].getPosixPermissions(file)
+      permissions          = originalPermissions.add(PosixPermission.OwnerExecute)
+      _                   <- Files[IO].setPosixPermissions(file, permissions)
+      link                 = dir / "link.conf"
+      _                   <- Files[IO].createSymbolicLink(link, canonical)
+      outcome             <- formatter.format(link)
+      isLink              <- Files[IO].isSymbolicLink(link)
+      after               <- Files[IO].getPosixPermissions(file)
+      bytes               <- read(file)
     } yield {
       assertEquals(outcome, FormatOutcome.Formatted)
       assert(isLink)
