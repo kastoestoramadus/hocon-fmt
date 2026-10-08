@@ -6,16 +6,21 @@ import org.junit.jupiter.api.Test
 class KotlinInteropTest {
 
     @Test
-    fun `when over the verdict needs no else`() {
+    fun `when over the mirror is checked for exhaustiveness`() {
         val verdict: Verdict = HoconFmt.check("a = 1\n")
 
-        var shaped = ""
-        when (verdict) {
-            is Verdict.AlreadyFormatted -> shaped = "already"
-            is Verdict.NeedsFormatting -> shaped = "needs: ${verdict.formatted().trim()}"
-            is Verdict.Refused -> shaped = "refused: ${verdict.reason()}"
+        // A value-used when with no else: the Kotlin compiler accepts it only because the mirror
+        // is sealed. Delete the `is Verdict.Refused` branch below and, from java-api/, run
+        // `./gradlew compileTestKotlin`: it fails with "'when' expression must be exhaustive.
+        // Add the 'is Refused' branch or an 'else' branch." (Kotlin 2.4.21, exit 1). The same
+        // two-branch when over the core's own enum compiles and then throws
+        // NoWhenBranchMatchedException at run time — the trap the mirror removes.
+        fun shape(v: Verdict): String = when (v) {
+            is Verdict.AlreadyFormatted -> "already"
+            is Verdict.NeedsFormatting -> "needs: ${v.formatted().trim()}"
+            is Verdict.Refused -> "refused: ${v.reason()}"
         }
-        assertEquals("needs: a: 1", shaped)
+        assertEquals("needs: a: 1", shape(verdict))
     }
 
     @Test

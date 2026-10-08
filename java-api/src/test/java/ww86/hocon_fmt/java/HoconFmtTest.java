@@ -20,9 +20,9 @@ import ww86.hocon_fmt.FormatRefusedException;
 
 class HoconFmtTest {
 
-    private static final String UNFORMATTED = "a = 1\n";
-    private static final String FORMATTED = "a: 1\n";
-    private static final String NOT_HOCON = "server {\n    listen 80;\n}\n";
+    static final String UNFORMATTED = "a = 1\n";
+    static final String FORMATTED = "a: 1\n";
+    static final String NOT_HOCON = "server {\n    listen 80;\n}\n";
 
     @Test
     void checkMarksUnformattedText() {
@@ -68,7 +68,7 @@ class HoconFmtTest {
         assertEquals(List.of("AlreadyFormatted", "NeedsFormatting", "Refused"), coreCases);
     }
 
-    private static List<String> caseFields(Class<?> companion) {
+    static List<String> caseFields(Class<?> companion) {
         return Stream.of(companion.getDeclaredFields())
                 .filter(field -> Modifier.isPublic(field.getModifiers())
                         && Modifier.isStatic(field.getModifiers())
