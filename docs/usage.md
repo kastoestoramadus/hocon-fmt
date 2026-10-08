@@ -193,14 +193,24 @@ println(shape)
 ```
 
 `check` judges text or bytes, `checkFile` a path, `formatFile` rewrites a file only when the
-formatted text differs — the same whole-file `Files.writeString` the Gradle and Maven plugins
-make, so a refused file is never touched — and `formatOrThrow` raises the core's
+formatted text differs — Gradle, Maven and sbt use this same file operation — and
+`formatOrThrow` raises the core's
 `FormatRefusedException` for callers that prefer an exception. Both compilers hold the caller to
 the full set: the Kotlin `when` above is value-used with no `else`, and a Java 21 `switch` needs
 no `default`; a missing branch is a compile error, not a run-time surprise. Over the core's own
 enum Kotlin is worse than unchecked — a `when` missing a branch compiles and then throws
 `NoWhenBranchMatchedException` at run time — which is the trap the mirror removes. On Java 17
 every outcome is an `instanceof` away.
+
+`formatFile` resolves symlinks first and retains the link. It stages complete UTF-8 output beside
+the target and atomically replaces it only when the file and directory are writable and the
+staged owner, group and all mode bits (setuid, setgid and sticky included) match after readback.
+When identity cannot be proved, or the directory is unwritable, it writes in place; that fallback
+retains the inode but cannot offer crash-atomicity. A staging failure leaves the original intact
+and removes the temporary file; an unsupported atomic move is an I/O error. Refused and already
+formatted files retain both their bytes and modification time. Atomic replacement leaves other
+hard links on the old content; an in-place write updates them too. Serialise calls and avoid
+concurrent edits to the same file. Mill continues to write in place through its core integration.
 
 sbt builds and publishes the artifact (`eu.ww86:hocon-fmt-java-api`, no `_3` suffix — it is plain
 Java) over the same sources the standalone Gradle build in `java-api/` tests: `sbt javaApi/publishM2`
