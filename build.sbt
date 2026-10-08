@@ -8,6 +8,7 @@ val sjavatime = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
 val laminar = "17.2.1"
 
+val zioVersion      = "2.1.26"
 val catsEffect      = "3.7.1"
 val fs2             = "3.14.0"
 val decline         = "2.6.2"
@@ -84,6 +85,9 @@ lazy val root = project
   .in(file("."))
   // Aggregation drives compile, scalafmt and the rest.
   .aggregate(
+    zioJVM,
+    zioJS,
+    zioNative,
     coreJVM,
     coreJS,
     coreNative,
@@ -109,6 +113,9 @@ lazy val root = project
       .sequential(
         coreJVM / Test / test,
         cliJVM / Test / test,
+        zioJVM / Test / test,
+        zioJS / Test / test,
+        zioNative / Test / test,
         coreJS / Test / test,
         cliJS / Test / test,
         web / Test / test,
@@ -157,6 +164,36 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
 lazy val coreJVM    = core.jvm
 lazy val coreJS     = core.js
 lazy val coreNative = core.native
+
+lazy val zio = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+  .crossType(CrossType.Full)
+  .in(file("zio"))
+  .dependsOn(core)
+  .settings(
+    name := "hocon-fmt-zio",
+    libraryDependencies ++= Seq(
+      "dev.zio"       %%% "zio"         % zioVersion,
+      "dev.zio"       %%% "zio-streams" % zioVersion,
+      "org.scalameta" %%% "munit"       % munit % Test
+    )
+  )
+  .platformsSettings(JVMPlatform, NativePlatform)(
+    libraryDependencies += "org.scalameta" %%% "munit-scalacheck" % munitScalaCheck % Test,
+    Seq(Compile, Test).map { configuration =>
+      configuration / unmanagedSourceDirectories +=
+        (ThisBuild / baseDirectory).value / "zio" / "jvm-native" / "src" / configuration.name / "scala"
+    }
+  )
+  .platformsSettings(JSPlatform, NativePlatform)(
+    libraryDependencies += "org.ekrich" %%% "sjavatime" % sjavatime
+  )
+  .jvmSettings(announceRuntime("ZIO adapter on the JVM"))
+  .jsSettings(announceRuntime("ZIO text adapter on Scala.js"))
+  .nativeSettings(announceRuntime("ZIO adapter on Scala Native"))
+
+lazy val zioJVM    = zio.jvm
+lazy val zioJS     = zio.js
+lazy val zioNative = zio.native
 
 /** The command line tool, on every platform: the native binary, the Node bundle behind the
   * pre-commit hook, and the JVM. Effects live here, in cats-effect, so `core` stays pure.
