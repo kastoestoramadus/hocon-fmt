@@ -24,6 +24,24 @@ object TestPosix {
     val _ = NioFiles.setAttribute(path, "unix:gid", Int.box(group))
   }
 
+  /** The file's inode, which a rename changes and a write in place does not. */
+  def ino(path: Path): Long = {
+    val attributes = NioFiles.readAttributes(path, "unix:ino")
+    attributes.get("ino") match {
+      case value: java.lang.Long => value.longValue
+      case other                 => throw new IllegalStateException(s"no unix attributes: $other")
+    }
+  }
+
+  /** How many directory entries point at the file's inode. */
+  def nlink(path: Path): Long = {
+    val attributes = NioFiles.readAttributes(path, "unix:nlink")
+    attributes.get("nlink") match {
+      case value: Number => value.longValue
+      case other         => throw new IllegalStateException(s"no unix attributes: $other")
+    }
+  }
+
   /** A group this process may give a file other than the one `path` is in, where it has one. */
   def otherGroup(path: Path): Option[Int] = {
     val current = stat(path)

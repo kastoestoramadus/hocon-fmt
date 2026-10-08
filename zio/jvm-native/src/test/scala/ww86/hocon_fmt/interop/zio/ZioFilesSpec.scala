@@ -142,6 +142,31 @@ class ZioFilesSpec extends munit.FunSuite {
     }
   }
 
+  // The identity tests above would also pass if the file were written in place, so only an
+  // assertion on the inode pins that the rename still happens where it can.
+  test("a writable file in a writable directory is replaced by a rename") {
+    withFile(bytes("a=1")) { path =>
+      val before = TestPosix.ino(path)
+      val _      = run(ZioFiles.format(path))
+      assertNotEquals(TestPosix.ino(path), before, "inode unchanged: the file was written in place")
+      assertEquals(Verdict.of(Files.readAllBytes(path)), Verdict.AlreadyFormatted)
+    }
+  }
+
+  // The documented consequence of the rename: the hard link keeps pointing at the old inode, so
+  // it holds the old content and the formatted file has none of its links left.
+  test("a replacement leaves a hard link holding the old content") {
+    withFile(bytes("a=1")) { path =>
+      val sibling = path.resolveSibling("hardlinked.conf").nn // resolveSibling returns a path.
+      val _       = Files.createLink(sibling, path)
+      assertEquals(TestPosix.nlink(path), 2L)
+      val _ = run(ZioFiles.format(path))
+      assertEquals(TestPosix.nlink(path), 1L, "the file still shares its inode: it was written in place")
+      assertEquals(Files.readAllBytes(sibling).toSeq, bytes("a=1").toSeq)
+      assertEquals(Verdict.of(Files.readAllBytes(path)), Verdict.AlreadyFormatted)
+    }
+  }
+
   // The file is writable but no staged copy can be put beside it, so the write has to happen in
   // place, as it did before this adapter.
   test("a writable file in a directory that cannot be written is still formatted") {
