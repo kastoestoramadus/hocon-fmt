@@ -77,8 +77,10 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   The usual fixes:
   - `strictEquality`: a type compared with `==` gets `derives CanEqual`, and so does an enum
     matched on a case without parameters, since that match is an `==`.
-  - Explicit nulls: a value from a Java or JS API is `T | Null`; wrap it in `Option(...)` or match
-    `case s: String`, at the boundary. `.nn` only with a comment saying why it cannot be null.
+  - Explicit nulls: a value from a Java API is `T | Null`; wrap it in `Option(...)` or match
+    `case s: String`, at the boundary. `.nn` only with a comment saying why it cannot be null. A
+    Scala.js facade is trusted as typed, so a JS value that can be null or undefined is read as
+    `js.Dynamic` and checked (`js.typeOf`, `js.isUndefined`, `Option(...)`) before use.
   - A value dropped on purpose is `val _ = ...`; anything else dropped is a bug, an `IO` above all.
   - Safe init: a test suite registers its tests while the class is constructed, so data the tests
     read is declared above them or is a `def`; extractors (`Regex`) stay `val`s at the top.
