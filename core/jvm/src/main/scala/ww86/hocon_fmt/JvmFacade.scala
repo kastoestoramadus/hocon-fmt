@@ -16,8 +16,6 @@ object JvmFacade {
     Verdict.of(content) match {
       case Verdict.AlreadyFormatted           => Optional.empty
       case Verdict.NeedsFormatting(formatted) => Optional.of(formatted)
-      case Verdict.Refused(refusal)           => throw FormatRefusedException(refusal.reason)
+      case Verdict.Refused(refusal)           => throw FormatRefusedException(refusal)
     }
 }
-
-final class FormatRefusedException(reason: String) extends Exception(reason)

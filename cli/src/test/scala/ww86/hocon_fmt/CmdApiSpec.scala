@@ -2,8 +2,8 @@ package ww86.hocon_fmt
 
 import java.nio.charset.StandardCharsets.{ISO_8859_1, UTF_8}
 
-import cats.effect.{ExitCode, IO}
-import cats.syntax.all.*
+import _root_.cats.effect.{ExitCode, IO}
+import _root_.cats.syntax.all.*
 import fs2.io.file.{Files, Path}
 import fs2.{Chunk, Stream}
 
