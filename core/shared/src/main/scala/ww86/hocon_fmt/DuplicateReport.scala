@@ -90,8 +90,8 @@ object DuplicateReport {
     try {
       ConfigDocumentFactory.parseString(source, options) match {
         case simple: SimpleConfigDocument => Right(simple.configNodeTree)
-        // sconfig publishes no way to obtain the tree, so the cast above is the only one there is;
-        // a document that is not the tree it always is today has nothing to report from.
+        // sconfig publishes no traversal API; callers must surface this failure if its
+        // document implementation changes rather than treating it as an empty report.
         case other => Left(Refusal.NotHocon(s"no document tree (${other.getClass.getName})"))
       }
     } catch {
@@ -102,10 +102,16 @@ object DuplicateReport {
   /** One field of the text: where it stands, the line its key starts on, whether its value is an
     * object (two objects merge, so neither replaces the other) and whether it holds a substitution.
     */
-  private case class Definition(keyPath: KeyPath, line: Int, objectValued: Boolean, holdsSubstitution: Boolean)
+  private case class Definition(
+      keyPath: KeyPath,
+      line: Int,
+      objectValued: Boolean,
+      holdsSubstitution: Boolean,
+      arrayScope: List[Int]
+  )
 
   private def defined(tree: ConfigNodeRoot): Vector[Definition] =
-    walk(tree, Nil, 1, Vector.empty)._2
+    walk(tree, Nil, 1, Vector.empty, Nil)._2
 
   /** The definitions `node` holds, and the line the text after it starts on. The line advances by
     * the newlines of every render in source order.
@@ -114,12 +120,16 @@ object DuplicateReport {
       node: ConfigNode,
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition]
+      found: Vector[Definition],
+      arrayScope: List[Int]
   ): (Int, Vector[Definition]) =
     node match {
-      case field: ConfigNodeField          => walkField(field, at, line, found)
-      case array: ConfigNodeArray          => walkItems(array.children.asScala.toList, at, line, found, 0)
-      case complex: ConfigNodeComplexValue => walkAll(complex.children.asScala.toList, at, line, found)
+      case field: ConfigNodeField => walkField(field, at, line, found, arrayScope)
+      // The definition offset identifies each array with fields uniquely; empty arrays have no
+      // descendants to compare. Nesting keeps even arrays starting at the same offset apart.
+      case array: ConfigNodeArray =>
+        walkItems(array.children.asScala.toList, at, line, found, 0, arrayScope :+ found.size)
+      case complex: ConfigNodeComplexValue => walkAll(complex.children.asScala.toList, at, line, found, arrayScope)
       case _                               => (line + newlines(node.render), found)
     }
 
@@ -127,9 +137,10 @@ object DuplicateReport {
       children: List[ConfigNode],
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition]
+      found: Vector[Definition],
+      arrayScope: List[Int]
   ): (Int, Vector[Definition]) =
-    children.foldLeft((line, found)) { case ((current, acc), child) => walk(child, at, current, acc) }
+    children.foldLeft((line, found)) { case ((current, acc), child) => walk(child, at, current, acc, arrayScope) }
 
   /** The objects in an array are reached by their position, which is part of where their fields
     * stand: the same key in two elements is not two definitions of one path.
@@ -139,13 +150,14 @@ object DuplicateReport {
       at: List[KeyPath.Segment],
       line: Int,
       found: Vector[Definition],
-      index: Int
+      index: Int,
+      arrayScope: List[Int]
   ): (Int, Vector[Definition]) =
     children
       .foldLeft((line, found, index)) { case ((current, acc, next), child) =>
         child match {
           case value: AbstractConfigNodeValue =>
-            val (after, definitions) = walk(value, at :+ KeyPath.Segment.Index(next), current, acc)
+            val (after, definitions) = walk(value, at :+ KeyPath.Segment.Index(next), current, acc, arrayScope)
             (after, definitions, next + 1)
           case other => (current + newlines(other.render), acc, next)
         }
@@ -156,19 +168,26 @@ object DuplicateReport {
       field: ConfigNodeField,
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition]
+      found: Vector[Definition],
+      arrayScope: List[Int]
   ): (Int, Vector[Definition]) = {
     val segments = pathOf(field.path)
     val path     = at ++ segments
     // `+=` is the self-referential `${?key} [ ... ]` in another spelling: it reads the earlier
     // value, which the parser only desugars in the merged tree, not in this document tree.
-    val holds    = appends(field) || holdsSubstitution(field.value)
-    val own      = Definition(KeyPath(path), line, objectValued = objectValued(field.value), holdsSubstitution = holds)
-    val fromHere = found ++ implicitObjects(at, segments, line, holds) :+ own
+    val holds = appends(field) || holdsSubstitution(field.value)
+    val own   = Definition(
+      KeyPath(path),
+      line,
+      objectValued = objectValued(field.value),
+      holdsSubstitution = holds,
+      arrayScope = arrayScope
+    )
+    val fromHere = found ++ implicitObjects(at, segments, line, holds, arrayScope) :+ own
     // The path and the separator only advance the line; the value may hold fields of its own.
     field.children.asScala.toList.foldLeft((line, fromHere)) { case ((current, acc), child) =>
       child match {
-        case value: AbstractConfigNodeValue => walk(value, path, current, acc)
+        case value: AbstractConfigNodeValue => walk(value, path, current, acc, arrayScope)
         case other                          => (current + newlines(other.render), acc)
       }
     }
@@ -181,10 +200,17 @@ object DuplicateReport {
       at: List[KeyPath.Segment],
       segments: List[KeyPath.Segment],
       line: Int,
-      holdsSubstitution: Boolean
+      holdsSubstitution: Boolean,
+      arrayScope: List[Int]
   ): Vector[Definition] =
     (1 until segments.size).toVector.map { length =>
-      Definition(KeyPath(at ++ segments.take(length)), line, objectValued = true, holdsSubstitution = holdsSubstitution)
+      Definition(
+        KeyPath(at ++ segments.take(length)),
+        line,
+        objectValued = true,
+        holdsSubstitution = holdsSubstitution,
+        arrayScope = arrayScope
+      )
     }
 
   /** Whether the later definition leaves nothing of the earlier one. A later value that holds no
@@ -195,20 +221,35 @@ object DuplicateReport {
   private def replaces(later: Definition, earlier: Definition): Boolean =
     !later.holdsSubstitution && (!later.objectValued || (!earlier.objectValued && !earlier.holdsSubstitution))
 
+  private def prefixes(path: KeyPath): Vector[KeyPath] =
+    (1 to path.segments.size).toVector.map(length => KeyPath(path.segments.take(length)))
+
   private def report(definitions: Vector[Definition]): List[Finding] = {
-    val byPath = definitions.groupBy(_.keyPath)
-    definitions
-      .map(_.keyPath)
-      .distinct
-      .flatMap { path =>
-        val ofPath = byPath.getOrElse(path, Vector.empty)
-        ofPath.zipWithIndex.flatMap { case (earlier, at) =>
-          ofPath
-            .drop(at + 1)
-            .find(later => replaces(later, earlier))
-            .map(later => Finding.KeyDefinedAgain(earlier.keyPath, earlier.line, later.line))
+    val byPath = definitions.zipWithIndex.groupBy { case (definition, _) =>
+      (definition.arrayScope, definition.keyPath)
+    }
+    val killed = definitions.zipWithIndex.flatMap { case (earlier, at) =>
+      prefixes(earlier.keyPath)
+        .flatMap(path => byPath.getOrElse((earlier.arrayScope, path), Vector.empty))
+        .filter { case (later, next) =>
+          next > at && (if (later.keyPath == earlier.keyPath) replaces(later, earlier)
+                        else !later.objectValued && !later.holdsSubstitution)
+        }
+        .minByOption(_._2)
+        .map { case (later, _) => (earlier, later) }
+    }
+    // One statement can define both an object and its leaves. When the whole statement dies at
+    // the same line, the ancestor warning covers it; leaves on their own lines still get theirs.
+    val covered = killed.map { case (earlier, later) =>
+      (earlier.arrayScope, earlier.line, later.line, earlier.keyPath)
+    }.toSet
+    killed
+      .filterNot { case (earlier, later) =>
+        prefixes(earlier.keyPath).dropRight(1).exists { path =>
+          covered.contains((earlier.arrayScope, earlier.line, later.line, path))
         }
       }
+      .map { case (earlier, later) => Finding.KeyDefinedAgain(earlier.keyPath, earlier.line, later.line) }
       .toList
   }
 

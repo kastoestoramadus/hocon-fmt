@@ -112,7 +112,13 @@ object CmdApi extends IOApp {
     * from, and whether those findings fail the run — the file's own `.hocon-fmt.conf` may ask for
     * that, so it is a per-file decision. A finding never changes what is written.
     */
-  final case class Outcome(result: Result, path: String, findings: List[Finding], failOnDuplicates: Boolean) {
+  final case class Outcome(
+      result: Result,
+      path: String,
+      findings: List[Finding],
+      failOnDuplicates: Boolean,
+      reportFailure: Option[Refusal] = None
+  ) {
 
     def fails: Boolean = result match {
       case Result.NeedsFormatting(_) => true
@@ -159,9 +165,9 @@ object CmdApi extends IOApp {
   // Stdin takes the flags but no config-file lookup: the name it is given is diagnostics only,
   // and reading a file beside it would break that promise.
   def formatStdin(content: Array[Byte], filename: String, style: StyleOverrides): StdinResult = {
-    val options                       = style.applyTo(FormatOptions.default)
-    val Inspection(verdict, findings) = Inspection.of(content, filename, options)
-    val report                        = findings.map(findingLine(filename, _)).mkString
+    val options                                      = style.applyTo(FormatOptions.default)
+    val Inspection(verdict, findings, reportFailure) = Inspection.of(content, filename, options)
+    val report                                       = findings.map(findingLine(filename, _)).mkString + reportFailureLine(filename, reportFailure)
     // Only stdout carries the formatted text; the report is diagnostics, as a refusal's reason is.
     val failed = if (options.failOnDuplicates && findings.nonEmpty) ExitCode(1) else ExitCode.Success
     verdict match {
@@ -212,7 +218,8 @@ object CmdApi extends IOApp {
     formatter
       .inspect(file, options)
       .flatMap { inspection =>
-        def outcome(result: Result) = Outcome(result, path, inspection.findings, options.failOnDuplicates)
+        def outcome(result: Result) =
+          Outcome(result, path, inspection.findings, options.failOnDuplicates, inspection.reportFailure)
         inspection.verdict match {
           case Verdict.AlreadyFormatted           => outcome(Result.AlreadyFormatted).pure[IO]
           case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal.reason.take(120))).pure[IO]
@@ -232,8 +239,14 @@ object CmdApi extends IOApp {
       case Result.AlreadyFormatted => "."
       case Result.Rewritten        => ""
     }
-    result + outcome.findings.map(findingLine(outcome.path, _)).mkString
+    result + outcome.findings.map(findingLine(outcome.path, _)).mkString + reportFailureLine(
+      outcome.path,
+      outcome.reportFailure
+    )
   }
+
+  private def reportFailureLine(path: String, failure: Option[Refusal]): String =
+    failure.fold("")(refusal => s"WARNING: duplicate report could not run for $path: ${refusal.reason.take(120)}\n")
 
   private def findingLine(path: String, finding: Finding): String = finding match {
     case Finding.KeyDefinedAgain(keyPath, earlier, later) =>

@@ -91,10 +91,18 @@ definition holding a substitution replaces nothing: the merge stays unresolved, 
 value is what the substitution falls back to when it is optional and unset. `+=` counts as one —
 it is `${?key} [ ... ]` in another spelling.
 
+Every array value has its own element scope, including pieces of a concatenation and arrays in
+later definitions. Their index-zero objects cannot replace each other's fields. A replacement
+of an ancestor ends its descendants' lifetime before a later object introduces fresh fields;
+when an ancestor warning covers the same source and replacement lines, it covers those leaves
+too. Leaves on separate lines retain their own warning.
+
 The CLI prints a finding as a warning beside the file it examined, and only `--fail-on-duplicates`
 (or its key in `.hocon-fmt.conf`) makes one fail a run; `cats`' `FileFormatter.inspect` hands the
-verdict and the findings of one read to the CLI, and its `write` replaces the file as `format`
-does. The plugins do not report yet: they call the core through `JvmFacade`, which has no report.
+verdict, findings and any report failure of one read to the CLI, and its `write` replaces the file
+as `format` does. A failed document parse or an unsupported document tree produces a warning that the
+duplicate report could not run, rather than an empty successful report. The plugins do not report
+yet: they call the core through `JvmFacade`, which has no report.
 
 ## Include masking
 

@@ -17,9 +17,11 @@ enum FormatOutcome derives CanEqual {
 
 /** What one read of a file made of it: the verdict every integration acts on, and the duplicate
   * report of the same text. The report is empty when the text is not HOCON this formatter reads,
-  * or is named as another format, so a caller can print findings without asking the report again.
+  * or is named as another format. A failed report is retained separately so callers can warn
+  * without treating failure as a successful empty report.
   */
-final case class Inspection(verdict: Verdict, findings: List[Finding]) derives CanEqual
+final case class Inspection(verdict: Verdict, findings: List[Finding], reportFailure: Option[Refusal] = None)
+    derives CanEqual
 
 object Inspection {
 
@@ -28,12 +30,15 @@ object Inspection {
     * so they have nothing to report.
     */
   def of(content: Array[Byte], name: String, options: FormatOptions): Inspection = {
-    val verdict  = Verdict.of(content, name, options)
-    val findings = verdict match {
-      case Verdict.Refused(Refusal.NotUtf8) | Verdict.Refused(Refusal.OtherFormat(_)) => Nil
-      case _                                                                          => DuplicateReport.findings(new String(content, UTF_8)).getOrElse(Nil)
+    val verdict = Verdict.of(content, name, options)
+    val report  = verdict match {
+      case Verdict.Refused(Refusal.NotUtf8) | Verdict.Refused(Refusal.OtherFormat(_)) => Right(Nil)
+      case _                                                                          => DuplicateReport.findings(new String(content, UTF_8), name)
     }
-    Inspection(verdict, findings)
+    report.fold(
+      refusal => Inspection(verdict, Nil, Some(refusal)),
+      findings => Inspection(verdict, findings)
+    )
   }
 }
 

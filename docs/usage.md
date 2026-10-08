@@ -102,6 +102,10 @@ formatting still fails `--check`. `--fail-on-duplicates` makes any finding fail 
 fail-on-duplicates = true
 ```
 
+If the document traversal cannot read the file, the CLI prints
+`WARNING: duplicate report could not run for <file>: <reason>`. This warning changes no exit
+code; the formatting verdict still decides whether the file can be written.
+
 Not every repeated path is a finding. The `x = "default"` then `x = ${?ENV}` idiom is not: the
 earlier value is what an unset variable leaves standing. Neither is an object defined twice, which
 merges, nor a later definition that holds a substitution, whose unresolved merge may still reach

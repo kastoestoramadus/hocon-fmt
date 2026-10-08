@@ -142,6 +142,9 @@ value can still matter, and it reads one text at a time.
   `logger.play = INFO` replaces the scalar and is reported.
 - **An object written over a substitution is not a finding** either, though it takes the shape of
   one: `a = ${b}` then `a.c = 2` resolves to `b`'s fields with `c` beside them.
+- **Array elements belong to their own array value.** Concatenating `[{b=1}] [{b=2}]`, or
+  appending the second array through `${a}`, preserves both objects. Their fields are never
+  paired across array values; repeated fields within an element are still reported.
 - **The finding's lines are the text's.** The first is the line the earlier field starts on — a
   value spanning lines counts from its key — and the second is the line of the definition that
   first replaces it, not of the last one.

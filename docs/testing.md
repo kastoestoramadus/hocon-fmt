@@ -11,7 +11,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeDetectionSpec` | `core/shared` | which occurrences of `include` are a directive; the contract of the detection regex |
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
-| `DuplicateReportSpec` | `core/shared` | the duplicate report: each shape of a replaced definition, and each shape the report leaves alone, with the resolution that shows which definition is dead |
+| `DuplicateReportSpec` | `core/shared` | the duplicate report: replaced definitions and ancestor barriers, independent array scopes, and resolution showing which values survive |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
 | `OptionsSpec` | `core/shared` | the parse and render options the formatter pins explicitly: the final newline, empty text, and how env-variable values render |
