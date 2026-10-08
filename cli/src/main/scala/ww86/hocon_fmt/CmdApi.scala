@@ -45,9 +45,9 @@ object CmdApi extends IOApp {
     Opts
       .option[String]("separator", "The key-value separator: = (the default) or :; overrides the config file.")
       .mapValidated {
-        case "="    => Separator.Equals.validNel
-        case ":"    => Separator.Colon.validNel
-        case other  => s"--separator expects = or :, not: $other".invalidNel
+        case "="   => Separator.Equals.validNel
+        case ":"   => Separator.Colon.validNel
+        case other => s"--separator expects = or :, not: $other".invalidNel
       }
       .orNone,
     toggle("double-indent", "Indent the contents of nested objects four spaces; overrides the config file."),
@@ -83,7 +83,9 @@ object CmdApi extends IOApp {
         configOpt,
         styleOpts
       ).tupled.mapValidated { case (files, checkOnly, stdin, filename, version, config, style) =>
-        if (version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty || config.nonEmpty || style != StyleOverrides.none))
+        if (
+          version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty || config.nonEmpty || style != StyleOverrides.none)
+        )
           Validated.invalidNel("--version cannot be combined with formatting arguments.")
         else if (version) Validated.validNel(Invocation.Version)
         else if (stdin && (files.nonEmpty || checkOnly || config.nonEmpty))
@@ -123,9 +125,9 @@ object CmdApi extends IOApp {
             // A config nobody asked for must not decide what happens to the files, so the run
             // stops before any of them is read, the way a usage error does.
             Console[IO].errorln(error).as(ExitCode(2))
-          case Right(run)  => IO.print(run.rendered).as(run.exitCode)
+          case Right(run) => IO.print(run.rendered).as(run.exitCode)
         }
-      case Right(Invocation.Version) => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
+      case Right(Invocation.Version)                => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
       case Right(Invocation.Stdin(filename, style)) =>
         StdStreams.readStdin
           .map(formatStdin(_, filename, style))
@@ -159,7 +161,8 @@ object CmdApi extends IOApp {
       case Some(explicit) =>
         ConfigFile.read[IO](explicit).map(_.map(base => paths.map(_ -> arguments.style.applyTo(base))))
       case None =>
-        paths.traverse(path => ConfigFile.optionsFor[IO](path, arguments.style))
+        paths
+          .traverse(path => ConfigFile.optionsFor[IO](path, arguments.style))
           .map(options => options.sequence.map(paths.zip(_)))
     }
 

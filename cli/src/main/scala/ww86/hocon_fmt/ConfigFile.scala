@@ -40,13 +40,13 @@ object ConfigFile {
     * must not reach in. The walk ends at the filesystem root, whose parent is none.
     */
   def discover[F[_]: Async: Files](from: Path): F[Option[Path]] = {
-    val config = FormatOptions.ConfigFileName
+    val config                           = FormatOptions.ConfigFileName
     def walk(dir: Path): F[Option[Path]] =
       Files[F].exists(dir / config).flatMap {
-        case true => (dir / config).some.pure[F]
+        case true  => (dir / config).some.pure[F]
         case false =>
           Files[F].exists(dir / ".git").flatMap {
-            case true => none[Path].pure[F]
+            case true  => none[Path].pure[F]
             case false => dir.parent.fold(none[Path].pure[F])(walk)
           }
       }

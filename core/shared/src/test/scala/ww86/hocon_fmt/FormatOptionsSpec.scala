@@ -11,7 +11,10 @@ class FormatOptionsSpec extends munit.FunSuite {
   private val colon = FormatOptions(separator = Separator.Colon)
 
   test("the default separator is =") {
-    assertEquals(FormatOptions.default, FormatOptions(Separator.Equals, doubleIndent = false, simplifyNestedObjects = true))
+    assertEquals(
+      FormatOptions.default,
+      FormatOptions(Separator.Equals, doubleIndent = false, simplifyNestedObjects = true)
+    )
     assertEquals(format("a : 1"), Right("a = 1\n"))
     assertEquals(format("a = 1"), Right("a = 1\n"))
   }

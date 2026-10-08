@@ -80,9 +80,9 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   property("keeps the meaning of every document it formats, in any option combination") {
     forAll(documents(includes = false)) { doc =>
       allOptions.foreach { options =>
-        HoconFormatter.format(doc.text, options).foreach(out =>
-          assertSameMeaning(out, doc.text, s"meaning changed, output:\n$out")
-        )
+        HoconFormatter
+          .format(doc.text, options)
+          .foreach(out => assertSameMeaning(out, doc.text, s"meaning changed, output:\n$out"))
       }
     }
   }

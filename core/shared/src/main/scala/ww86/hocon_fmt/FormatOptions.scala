@@ -37,8 +37,8 @@ object FormatOptions {
     * naming the file and the key — never silently ignored.
     */
   def parse(text: String, file: String): Either[String, FormatOptions] =
-    Try(ConfigFactory.parseString(text)).toEither
-      .left.map(e => s"$file: ${Option(e.getMessage).getOrElse(e.toString)}")
+    Try(ConfigFactory.parseString(text)).toEither.left
+      .map(e => s"$file: ${Option(e.getMessage).getOrElse(e.toString)}")
       .flatMap(fromConfig(_, file))
 
   /** Reads the options from an already parsed config, under the file's name for errors. */

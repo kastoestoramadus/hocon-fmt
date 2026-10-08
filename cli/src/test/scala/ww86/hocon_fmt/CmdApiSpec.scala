@@ -27,11 +27,13 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   def textOf(file: Path): IO[String] = bytesOf(file).map(bytes => String(bytes.toArray, UTF_8))
 
   def check(files: Path*): IO[CmdApi.Run] =
-    CmdApi.examineAll(Arguments(files.toList, checkOnly = true, config = None, style = StyleOverrides.none))
+    CmdApi
+      .examineAll(Arguments(files.toList, checkOnly = true, config = None, style = StyleOverrides.none))
       .map(_.fold(e => fail(e), identity))
 
   def rewrite(files: Path*): IO[CmdApi.Run] =
-    CmdApi.examineAll(Arguments(files.toList, checkOnly = false, config = None, style = StyleOverrides.none))
+    CmdApi
+      .examineAll(Arguments(files.toList, checkOnly = false, config = None, style = StyleOverrides.none))
       .map(_.fold(e => fail(e), identity))
 
   def arguments(config: Option[Path] = None, style: StyleOverrides = StyleOverrides.none): Arguments =
@@ -236,7 +238,12 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       CmdApi.command.parse(List("--separator", ":", "a.conf")),
       Right(
         CmdApi.Invocation.FileMode(
-          Arguments(List(Path("a.conf")), checkOnly = false, config = None, style = StyleOverrides(separator = Some(Separator.Colon)))
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = false,
+            config = None,
+            style = StyleOverrides(separator = Some(Separator.Colon))
+          )
         )
       )
     )
@@ -244,7 +251,12 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       CmdApi.command.parse(List("--config", "team.conf", "--separator", "=", "-c", "a.conf")),
       Right(
         CmdApi.Invocation.FileMode(
-          Arguments(List(Path("a.conf")), checkOnly = true, config = Some(Path("team.conf")), style = StyleOverrides(separator = Some(Separator.Equals)))
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = true,
+            config = Some(Path("team.conf")),
+            style = StyleOverrides(separator = Some(Separator.Equals))
+          )
         )
       )
     )
@@ -276,8 +288,9 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     val Left(help) = CmdApi.command.parse(List("--help")): @unchecked
     assert(help.errors.isEmpty, help.errors.toString)
     val text = help.toString
-    List("--separator", "--config", "--double-indent", "--no-double-indent", "--simplify-nested-objects").foreach { flag =>
-      assert(text.contains(flag), text)
+    List("--separator", "--config", "--double-indent", "--no-double-indent", "--simplify-nested-objects").foreach {
+      flag =>
+        assert(text.contains(flag), text)
     }
   }
 
@@ -286,7 +299,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
       file   <- write(dir, "a.conf", unformatted)
       styled <- styleFor()(file)
-    } yield assertEquals(styled, Right(List(file -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true))))
+    } yield assertEquals(
+      styled,
+      Right(List(file -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true)))
+    )
   }
 
   tmp.test("the config file is looked up above the file's directory, and the nearest one wins") { dir =>
@@ -299,7 +315,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       _      <- write(sub, ".hocon-fmt.conf", "double-indent = true\n")
       file   <- write(sub, "a.conf", unformatted)
       styled <- styleFor()(file)
-    } yield assertEquals(styled, Right(List(file -> FormatOptions(Separator.Equals, doubleIndent = true, simplifyNestedObjects = true))))
+    } yield assertEquals(
+      styled,
+      Right(List(file -> FormatOptions(Separator.Equals, doubleIndent = true, simplifyNestedObjects = true)))
+    )
   }
 
   tmp.test("the walk stops at the repository root, so a style above the checkout does not reach in") { dir =>
@@ -320,7 +339,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       fromFile <- styleFor()(file)
       byFlag   <- styleFor(style = StyleOverrides(separator = Some(Separator.Equals)))(file)
     } yield {
-      assertEquals(fromFile, Right(List(file -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true))))
+      assertEquals(
+        fromFile,
+        Right(List(file -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true)))
+      )
       assertEquals(byFlag, Right(List(file -> FormatOptions.default)))
     }
   }
@@ -338,7 +360,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       _      <- write(dir, ".hocon-fmt.conf", "double-indent = maybe\n")
       file   <- write(dir, "a.conf", unformatted)
       styled <- styleFor()(file)
-    } yield assert(styled.left.exists(message => message.contains("double-indent") && message.contains(dir.toString)), styled)
+    } yield assert(
+      styled.left.exists(message => message.contains("double-indent") && message.contains(dir.toString)),
+      styled
+    )
   }
 
   tmp.test("an explicit --config is used for every file, nearer .hocon-fmt.conf files aside") { dir =>
@@ -389,7 +414,8 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   }
 
   test("stdin applies the style flags; no config file is looked up, the stdin name is not read") {
-    val result = CmdApi.formatStdin("a = 1\n".getBytes(UTF_8), "<stdin>", StyleOverrides(separator = Some(Separator.Colon)))
+    val result =
+      CmdApi.formatStdin("a = 1\n".getBytes(UTF_8), "<stdin>", StyleOverrides(separator = Some(Separator.Colon)))
     assertEquals(result.stdout, "a: 1\n")
   }
 }
