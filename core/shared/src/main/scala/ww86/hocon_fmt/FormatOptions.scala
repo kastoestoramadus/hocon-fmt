@@ -15,12 +15,15 @@ enum Separator derives CanEqual {
   * flags and the `.hocon-fmt.conf` file.
   *
   * Anything not listed here is sconfig's renderer deciding, not an option: see the pins in
-  * `OptionsSpec`.
+  * `OptionsSpec`. `failOnDuplicates` is the one that reaches no renderer: it says whether a
+  * finding of the duplicate report fails a `--check` run, and travels in this type because the
+  * config file names it beside the style keys.
   */
 final case class FormatOptions(
     separator: Separator = Separator.Equals,
     doubleIndent: Boolean = false,
-    simplifyNestedObjects: Boolean = true
+    simplifyNestedObjects: Boolean = true,
+    failOnDuplicates: Boolean = false
 ) derives CanEqual
 
 object FormatOptions {
@@ -31,7 +34,7 @@ object FormatOptions {
   /** The file a repository keeps its style in, looked up from the formatted file upwards. */
   val ConfigFileName = ".hocon-fmt.conf"
 
-  private val KnownKeys = Set("separator", "double-indent", "simplify-nested-objects")
+  private val KnownKeys = Set("separator", "double-indent", "simplify-nested-objects", "fail-on-duplicates")
 
   /** Reads the options from a config file's text. Unknown keys and mistyped values are an error
     * naming the file and the key — never silently ignored.
@@ -51,7 +54,8 @@ object FormatOptions {
           separator             <- separatorOf(config, file)
           doubleIndent          <- booleanOf(config, file, "double-indent", default.doubleIndent)
           simplifyNestedObjects <- booleanOf(config, file, "simplify-nested-objects", default.simplifyNestedObjects)
-        } yield FormatOptions(separator, doubleIndent, simplifyNestedObjects)
+          failOnDuplicates      <- booleanOf(config, file, "fail-on-duplicates", default.failOnDuplicates)
+        } yield FormatOptions(separator, doubleIndent, simplifyNestedObjects, failOnDuplicates)
     }
   }
 

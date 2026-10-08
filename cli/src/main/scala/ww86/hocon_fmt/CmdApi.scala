@@ -8,7 +8,7 @@ import _root_.cats.effect.{ExitCode, IO, IOApp}
 import _root_.cats.syntax.all.*
 import com.monovore.decline.{Command, Help, Opts, PlatformApp}
 import fs2.io.file.{Files, Path}
-import ww86.hocon_fmt.interop.cats.{FileFormatter, FormatOutcome}
+import ww86.hocon_fmt.interop.cats.{FileFormatter, Inspection}
 
 /** Command line entry point: parses arguments, delegates file operations to [[FileFormatter]],
   * and prints the results. The same code runs as a native binary, a Node script and a JVM program.
@@ -51,7 +51,11 @@ object CmdApi extends IOApp {
       }
       .orNone,
     toggle("double-indent", "Indent the contents of nested objects four spaces; overrides the config file."),
-    toggle("simplify-nested-objects", "Flatten nested objects to path keys; overrides the config file.")
+    toggle("simplify-nested-objects", "Flatten nested objects to path keys; overrides the config file."),
+    toggle(
+      "fail-on-duplicates",
+      "Exit 1 when a key is defined again and the earlier value never takes effect; overrides the config file."
+    )
   ).mapN(StyleOverrides.apply)
 
   private val configOpt: Opts[Option[Path]] =
@@ -97,20 +101,30 @@ object CmdApi extends IOApp {
       }
     }
 
-  enum Outcome {
-    case Rewritten(path: String)
-    case AlreadyFormatted(path: String)
-    case NeedsFormatting(path: String, formatted: String)
-    case Unformattable(path: String, reason: String)
+  enum Result derives CanEqual {
+    case Rewritten
+    case AlreadyFormatted
+    case NeedsFormatting(formatted: String)
+    case Unformattable(reason: String)
+  }
+
+  /** One file's run: what was made of it, the findings the report made of the text it was read
+    * from, and whether those findings fail the run — the file's own `.hocon-fmt.conf` may ask for
+    * that, so it is a per-file decision. A finding never changes what is written.
+    */
+  final case class Outcome(result: Result, path: String, findings: List[Finding], failOnDuplicates: Boolean) {
+
+    def fails: Boolean = result match {
+      case Result.NeedsFormatting(_) => true
+      case _                         => failOnDuplicates && findings.nonEmpty
+    }
   }
 
   /** Every file's outcome, and what the process prints and exits with because of them. */
   final case class Run(outcomes: List[Outcome]) {
 
     // 1 rather than -1: an exit status is a byte, so -1 would reach the shell as 255.
-    def exitCode: ExitCode =
-      if (outcomes.exists { case _: Outcome.NeedsFormatting => true; case _ => false }) ExitCode(1)
-      else ExitCode.Success
+    def exitCode: ExitCode = if (outcomes.exists(_.fails)) ExitCode(1) else ExitCode.Success
 
     def rendered: String =
       (s"Running HOCON formatter for ${outcomes.size} files.\n" :: outcomes.map(render)).mkString
@@ -144,13 +158,19 @@ object CmdApi extends IOApp {
 
   // Stdin takes the flags but no config-file lookup: the name it is given is diagnostics only,
   // and reading a file beside it would break that promise.
-  def formatStdin(content: Array[Byte], filename: String, style: StyleOverrides): StdinResult =
-    Verdict.of(content, filename, style.applyTo(FormatOptions.default)) match {
-      case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, "", ExitCode.Success)
-      case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), "", ExitCode.Success)
+  def formatStdin(content: Array[Byte], filename: String, style: StyleOverrides): StdinResult = {
+    val options                       = style.applyTo(FormatOptions.default)
+    val Inspection(verdict, findings) = Inspection.of(content, filename, options)
+    val report                        = findings.map(findingLine(filename, _)).mkString
+    // Only stdout carries the formatted text; the report is diagnostics, as a refusal's reason is.
+    val failed = if (options.failOnDuplicates && findings.nonEmpty) ExitCode(1) else ExitCode.Success
+    verdict match {
+      case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, report, failed)
+      case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), report, failed)
       case Verdict.Refused(refusal)           =>
-        StdinResult("", s"cannot format $filename: ${refusal.reason}\n", ExitCode(1))
+        StdinResult("", report + s"cannot format $filename: ${refusal.reason}\n", ExitCode(1))
     }
+  }
 
   /** Every file's style: the `.hocon-fmt.conf` found from its directory, overridden by the flags;
     * an explicit `--config` takes the place of the lookup and holds for every file. Resolved
@@ -188,30 +208,36 @@ object CmdApi extends IOApp {
 
   private val formatter = FileFormatter[IO]
 
-  private def examine(file: Path, path: String, checkOnly: Boolean, options: FormatOptions): IO[Outcome] = {
-    val result = if (checkOnly) {
-      formatter.verdict(file, options).map {
-        case Verdict.NeedsFormatting(formatted) => Outcome.NeedsFormatting(path, formatted)
-        case Verdict.AlreadyFormatted           => Outcome.AlreadyFormatted(path)
-        case Verdict.Refused(refusal)           => Outcome.Unformattable(path, refusal.reason.take(120))
+  private def examine(file: Path, path: String, checkOnly: Boolean, options: FormatOptions): IO[Outcome] =
+    formatter
+      .inspect(file, options)
+      .flatMap { inspection =>
+        def outcome(result: Result) = Outcome(result, path, inspection.findings, options.failOnDuplicates)
+        inspection.verdict match {
+          case Verdict.AlreadyFormatted           => outcome(Result.AlreadyFormatted).pure[IO]
+          case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal.reason.take(120))).pure[IO]
+          case Verdict.NeedsFormatting(formatted) =>
+            if (checkOnly) outcome(Result.NeedsFormatting(formatted)).pure[IO]
+            else formatter.write(file, formatted).as(outcome(Result.Rewritten))
+        }
       }
-    } else {
-      formatter.format(file, options).map {
-        case FormatOutcome.Formatted        => Outcome.Rewritten(path)
-        case FormatOutcome.AlreadyFormatted => Outcome.AlreadyFormatted(path)
-        case FormatOutcome.Refused(refusal) => Outcome.Unformattable(path, refusal.reason.take(120))
-      }
+      .handleError(e => Outcome(Result.Unformattable(Option(e.getMessage).getOrElse(e.toString)), path, Nil, false))
+
+  private def render(outcome: Outcome): String = {
+    val result = outcome.result match {
+      case Result.Unformattable(reason) =>
+        s"ERROR: cannot format, leaving unchanged: ${outcome.path} ($reason)\n"
+      case Result.NeedsFormatting(formatted) =>
+        s"Found a not formatted file: ${outcome.path} .\nAfter formatting:\n$formatted\n\n"
+      case Result.AlreadyFormatted => "."
+      case Result.Rewritten        => ""
     }
-    result.handleError(e => Outcome.Unformattable(path, Option(e.getMessage).getOrElse(e.toString)))
+    result + outcome.findings.map(findingLine(outcome.path, _)).mkString
   }
 
-  private def render(outcome: Outcome): String = outcome match {
-    case Outcome.Unformattable(path, reason) =>
-      s"ERROR: cannot format, leaving unchanged: $path ($reason)\n"
-    case Outcome.NeedsFormatting(path, formatted) =>
-      s"Found a not formatted file: $path .\nAfter formatting:\n$formatted\n\n"
-    case Outcome.AlreadyFormatted(_) => "."
-    case Outcome.Rewritten(_)        => ""
+  private def findingLine(path: String, finding: Finding): String = finding match {
+    case Finding.KeyDefinedAgain(keyPath, earlier, later) =>
+      s"$path:$earlier: ${keyPath.rendered} defined again at line $later; the earlier value never takes effect\n"
   }
 
   // 2, as grep and most formatters use for a usage error, keeps 1 meaning "unformatted".
