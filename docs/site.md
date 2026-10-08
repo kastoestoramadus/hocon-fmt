@@ -31,9 +31,11 @@ One page, three parts, all rendered by Laminar into `#root`.
 2. **The playground**: input and output panes, formatting as you type with a 150 ms debounce, and
    one status line — "Formatted" with how many lines changed (input and output compared line by
    line), "Already formatted", or "Left unchanged" with the refusal, one sentence per refusal
-   kind, and a link into [limitations](limitations.md). Five example buttons, each pinned by a
-   test that runs it through the core on Scala.js (`ExamplesSpec`), so an example cannot quietly
-   stop showing what its label promises.
+   kind, and a link into [limitations](limitations.md). Example buttons come from
+   `examples/showcase/NN-slug/` in directory order, using `title` and `shows` from
+   `example.conf`. The sbt generator embeds the same data that core’s `ExamplesSpec`
+   pins on JVM, Scala.js and Native. `examples/catalogue/` is reserved for tests and
+   never appears on the page. See [shared examples](testing.md#shared-examples) for the schema.
 3. **The work upstream**: the author's pull requests on sconfig and lightbend/config, grouped by
    library and theme, each with its state, and the defect table tying every refusal of
    [limitations](limitations.md) to the pull requests that aim to fix it.
@@ -83,9 +85,8 @@ re-read the data; the script says so when it reports anything.
 
 `sbt site/test` runs the suite on Node: the status model, the changed-line count, the refusal
 sentences, the snapshot/live merge, the grouping, the fetch path against a fake `Http` and a fake
-`Storage` (success, a 403, malformed bodies, a throwing storage), and the five examples against
-the real core. `BrowserSpec` goes a step further and fakes the browser itself: `dom.window` is one
-global, so the test installs a window with its own `fetch` and localStorage and drives the real
+`Storage` (success, a 403, malformed bodies, a throwing storage). `BrowserSpec` goes a step further
+and fakes the browser itself: `dom.window` is one global, so the test installs a window with its own `fetch` and localStorage and drives the real
 `refreshBoard` — the search answering, a browser without `fetch`, a search that fails, a search
 that never answers, and the ten-minute cache. That path is where the page was broken once while
 every unit test was green. The snapshot has integrity tests: every defect row resolves to an

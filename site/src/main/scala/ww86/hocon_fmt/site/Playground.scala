@@ -2,7 +2,7 @@ package ww86.hocon_fmt.site
 
 import com.raquo.laminar.api.L.{*, given}
 
-import ww86.hocon_fmt.Verdict
+import ww86.hocon_fmt.{ExampleData, Verdict}
 
 /** The page's first two parts: what the formatter is, and the playground on the core itself.
   * The third part lives in [[ContributionsView]].
@@ -10,10 +10,13 @@ import ww86.hocon_fmt.Verdict
 object Playground:
 
   def apply(): HtmlElement =
-    val input = Var(Examples.messy.source)
+    val input = Var(ExampleData.showcase.head.input)
     // Formatting as you type, with a pause: a verdict per settled input, not per keystroke.
     val verdict =
-      input.signal.changes.debounce(150).startWith(Examples.messy.source).map(text => text -> Verdict.of(text))
+      input.signal.changes
+        .debounce(150)
+        .startWith(ExampleData.showcase.head.input)
+        .map(text => text -> Verdict.of(text))
 
     div(
       sectionTag(
@@ -83,13 +86,13 @@ object Playground:
         ),
         div(
           cls := "examples",
-          Examples.all.map { example =>
+          ExampleData.showcase.map { example =>
             button(
               cls   := "example",
               tpe   := "button",
               title := example.shows,
-              example.label,
-              onClick.mapTo(example.source) --> input
+              example.title,
+              onClick.mapTo(example.input) --> input
             )
           }
         ),
