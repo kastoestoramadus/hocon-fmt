@@ -25,6 +25,9 @@ object Variant {
     "specSelfReference: substitution cycle (Examples of Self-Referential Substitutions)" -> fork
   )
 
+  /** The fork base fixes the unresolved-object-merge rendering pinned by the shared suite. */
+  val unresolvedMergesFormat: Boolean = true
+
   def differs(id: String): Boolean = ledger.contains(id)
 
   /** The examples `ExamplesSpec` pins as refused differently depending on the style options; with
