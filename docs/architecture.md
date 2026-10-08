@@ -21,8 +21,8 @@ around it in `HoconFormatter`.
 | `coreSite` | the core's sources against a sconfig fork that keeps detached comments, with the real `CommentCarrier`; not published | Scala.js | the fork |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling `coreSite` directly; see [site](site.md) | Scala.js | coreSite |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | core, at run time |
-| `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | core, at run time |
-| `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | core |
+| `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | java-api, at run time |
+| `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | java-api |
 | `mill-plugin` | `hoconFormat`, `hoconFormatCheck` for Mill 1.1.4 and later; standalone Mill build | JVM, Scala 3 | core |
 | `npm/` | template of the npm package that wraps the Node build of the CLI | Node | cli |
 | `python/` | builds the wheel that carries the native binary, for the pre-commit hooks | | cli |
@@ -170,10 +170,12 @@ A formatter written in Scala 3 has to reach hosts that are not:
   build and runs in a Worker API class loader, so a Scala 3 library never lands on a buildscript
   classpath shared with other plugins. The worker reads the API's sealed `Verdict`
   records; it no longer calls `JvmFacade`.
-- **Maven** gives every plugin its own class loader, so the plugin depends on the core directly.
+- **Maven** gives every plugin its own class loader, so the plugin depends on the Java API directly
+  and the core comes transitively. `Outcome` reads the API's sealed `Verdict` records with an
+  `instanceof` chain, as the Gradle worker does; it no longer calls `JvmFacade`.
 
 `JvmFacade.reformat(byte[]): Optional<String>`, throwing a checked `FormatRefusedException` whose
-message is the reason, is the JDK-typed boundary the sbt and Maven plugins still call. `java-api` publishes that
+message is the reason, is the JDK-typed boundary the sbt plugin still calls. `java-api` publishes that
 boundary as the artifact `eu.ww86:hocon-fmt-java-api`: Java-only, so no `_3` suffix and no Scala
 library inside, with the verdicts as records and a `RefusalKind` per refusal case — the mirror
 exists because Scala 3 writes sealed-ness to TASTy, not the class file, so no Java compiler can
