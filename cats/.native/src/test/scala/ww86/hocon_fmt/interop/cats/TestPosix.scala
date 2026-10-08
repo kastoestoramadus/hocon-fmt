@@ -36,6 +36,32 @@ object TestPosix {
     }
   }
 
+  /** The file's inode, which a rename changes and a write in place does not. */
+  def ino(path: Path): IO[Long] = IO.blocking {
+    Zone.acquire { implicit zone =>
+      val buffer = stackalloc[sys.stat]()
+      if sys.stat(toCString(path.toString), buffer) == 0 then buffer.st_ino.toLong
+      else throw new IllegalStateException(s"cannot stat $path")
+    }
+  }
+
+  /** How many directory entries point at the file's inode. */
+  def nlink(path: Path): IO[Long] = IO.blocking {
+    Zone.acquire { implicit zone =>
+      val buffer = stackalloc[sys.stat]()
+      if sys.stat(toCString(path.toString), buffer) == 0 then buffer.st_nlink.toLong
+      else throw new IllegalStateException(s"cannot stat $path")
+    }
+  }
+
+  /** A second directory entry for the same inode. */
+  def link(link: Path, existing: Path): IO[Unit] = IO.blocking {
+    Zone.acquire { implicit zone =>
+      if unistd.link(toCString(existing.toString), toCString(link.toString)) != 0 then
+        throw new IllegalStateException(s"cannot link $existing to $link")
+    }
+  }
+
   /** A group this process may give a file other than the one `path` is in, where it has one. */
   def otherGroup(path: Path): IO[Option[Int]] =
     stat(path).map { current =>
