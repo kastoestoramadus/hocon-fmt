@@ -1,6 +1,37 @@
 package ww86.hocon_fmt
 
 class ExamplesSpec extends munit.FunSuite {
+
+  /** The kind an example's `now` and `pending` carry for each refusal. Exhaustive on purpose: the
+    * compiler warns when a `Refusal` case is missing here, so a new case cannot drift past this
+    * suite the way `MovedInclude` did.
+    */
+  def kindOf(refusal: Refusal): String = refusal match {
+    case Refusal.NotUtf8         => "not-utf8"
+    case Refusal.NotHocon(_)     => "not-hocon"
+    case Refusal.BrokenOutput(_) => "broken-output"
+    case Refusal.LostComment(_)  => "lost-comment"
+    case Refusal.LostInclude(_)  => "lost-include"
+    case Refusal.MovedInclude(_) => "moved-include"
+    case Refusal.UnstableOutput  => "unstable-output"
+  }
+
+  test("every refusal maps to a kind the generator accepts") {
+    // `Refusal.values` is not defined for enums with non-singleton cases ("a values array is not
+    // defined"), so one sample instance per case stands in; a case missing from the list still
+    // trips the exhaustive match in `kindOf` above.
+    val cases = List(
+      Refusal.NotUtf8,
+      Refusal.NotHocon("detail"),
+      Refusal.BrokenOutput("detail"),
+      Refusal.LostComment("# gone"),
+      Refusal.LostInclude("include \"x.conf\""),
+      Refusal.MovedInclude("include \"x.conf\""),
+      Refusal.UnstableOutput
+    )
+    assertEquals(cases.map(kindOf).toSet, ExampleData.kinds)
+  }
+
   test("examples have an explicit reason for every roadmap gap") {
     ExampleData.all.foreach { example =>
       assert(
@@ -22,16 +53,7 @@ class ExamplesSpec extends munit.FunSuite {
         val actual  = verdict match {
           case Verdict.NeedsFormatting(_) => "formatted"
           case Verdict.AlreadyFormatted   => "already-formatted"
-          case Verdict.Refused(refusal)   =>
-            val kind = refusal match {
-              case Refusal.NotUtf8         => "not-utf8"
-              case Refusal.NotHocon(_)     => "not-hocon"
-              case Refusal.BrokenOutput(_) => "broken-output"
-              case Refusal.LostComment(_)  => "lost-comment"
-              case Refusal.LostInclude(_)  => "lost-include"
-              case Refusal.UnstableOutput  => "unstable-output"
-            }
-            s"refused:$kind"
+          case Verdict.Refused(refusal)   => s"refused:${kindOf(refusal)}"
         }
         assertEquals(actual, example.now)
         verdict match {

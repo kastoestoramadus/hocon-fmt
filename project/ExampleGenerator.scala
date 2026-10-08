@@ -18,7 +18,7 @@ object ExampleGenerator {
       "\"" + escaped + "\""
     }
     def list(values: Seq[String]): String                       = values.map(quoted).mkString("List(", ", ", ")")
-    val kinds                                                   = Set("not-utf8", "not-hocon", "broken-output", "lost-comment", "lost-include", "unstable-output")
+    val kinds = Set("not-utf8", "not-hocon", "broken-output", "lost-comment", "lost-include", "moved-include", "unstable-output")
     def verdict(value: String, target: Boolean = false): String = {
       require(
         value == "formatted" || (!target && value == "already-formatted") ||
@@ -88,6 +88,7 @@ final case class Example(
 )
 """ + "\nobject ExampleData {\n" +
       entries.mkString("  val all: List[Example] = List(\n    ", ",\n    ", "\n  )\n") +
+      "  val kinds: Set[String] = Set(" + kinds.toSeq.sorted.map(quoted).mkString(", ") + ")\n" +
       "  val showcase: List[Example] = all.filter(_.id.startsWith(\"showcase/\"))\n}\n"
     if (!output.exists || IO.read(output) != text) IO.write(output, text)
     Seq(output)
