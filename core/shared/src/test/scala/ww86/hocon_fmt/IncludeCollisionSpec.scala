@@ -36,6 +36,32 @@ class IncludeCollisionSpec extends munit.FunSuite {
     ("an escaped underscore", include + "a = \"\\u005f_INCLUDE_GUARD_0 = g\"", "INCLUDE_GUARD_0 = g")
   )
 
+  val concatenatedCases = for {
+    index    <- List(0, 1)
+    spelling <- List(
+                  s"\"__INCL\"\"UDE_GUARD_$index\" = \"g\"",
+                  s"\"__INCL\"\"UDE_$index\" = \"__INCL\"\"UDE_$index\"",
+                  s"\"__INCL\"UDE_GUARD_$index = g"
+                )
+    nested <- List(false, true)
+  } yield {
+    val includes = include + (if (index == 1) "include \"second.conf\"\n" else "")
+    val body     = includes + spelling + "\n"
+    if (nested) s"o {\n$body}\n" else body
+  }
+
+  val concatenatedValues = for {
+    token <- List("\"__INCL\"\"UDE_0\"", "\"__INCL\"UDE_GUARD_0")
+    field <- List(s"a = $token", s"a = [$token]", s"o { a = $token }")
+  } yield include + field + "\n"
+
+  for {
+    source  <- concatenatedCases ++ concatenatedValues ++ List(include + "a = ${\"__INCL\"\"UDE_0\"}\n")
+    options <- allOptions
+  } test(s"concatenated reserved spelling: $source ($options)") {
+    assertEquals(HoconFormatter.format(source, options), Left(Refusal.ReservedName))
+  }
+
   for {
     (name, source, kept) <- cases
     options              <- allOptions

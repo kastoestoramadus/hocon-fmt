@@ -116,9 +116,12 @@ another, but nothing here promises the options agree:
   the default nesting and formats without it.
 
 `Refusal.ReservedName`: a file with an `include` is refused when the rest of its text spells
-`__INCLUDE_`, the name the include placeholders are written with (see
-[architecture](architecture.md#include-masking)). Restoring placeholders cannot tell such text
-from ours, and guessing corrupted it silently. A file without an include is not affected.
+`__INCLUDE_` literally, or parses to a key or value containing it (including adjacent quoted or
+unquoted token concatenations). This is the prefix of the include placeholders (see
+[architecture](architecture.md#include-masking)); restoring user text as a placeholder corrupted
+it silently. The source check also broadly refuses any case-insensitive `\u005f` underscore
+escape, even in a comment or triple-quoted string where it does not resolve. Include targets are
+masked before this check and remain verbatim. A file without an include is not affected.
 
 Rejected at parse time although the specification allows them (`Refusal.NotHocon`):
 

@@ -86,21 +86,27 @@ object HoconFormatter {
     // UPSTREAM-SCONFIG: the seam call; inline `restore`'s absence once the option is released.
     val carried = CommentCarrier.mask(masked.text)
     for {
-      _        <- Either.cond(!IncludeMasking.collides(masked), (), Refusal.ReservedName)
-      rendered <- attempt(render(carried.text, parse, options))(unreadable)
-      _        <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
-      _        <- Either.cond(!IncludeMasking.collides(masked, rendered), (), Refusal.ReservedName)
+      _         <- Either.cond(!IncludeMasking.collides(masked), (), Refusal.ReservedName)
+      parsed    <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
+      collision <- attempt(IncludeMasking.collides(masked, parsed.root))(unreadable)
+      _         <- Either.cond(!collision, (), Refusal.ReservedName)
+      rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
+      _         <- if (masked.originals.isEmpty) Right(())
+           else {
+             val probe = IncludeMasking.collisionProbe(source, rendered)
+             attempt(ConfigFactory.parseString(probe.text, parse))(unreadable).flatMap { checked =>
+               attempt(IncludeMasking.probeCollides(checked.root))(unreadable).flatMap { collision =>
+                 Either.cond(!collision, (), Refusal.ReservedName)
+               }
+             }
+           }
+      _ <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
+      _ <- Either.cond(!IncludeMasking.collides(masked, rendered), (), Refusal.ReservedName)
     } yield {
       // The masked text with its carried parts back, so nothing downstream sees our placeholders.
       val restored = carried.restore(rendered)
       Pass(IncludeMasking.unmask(restored, masked.originals), restored, masked.originals)
     }
-  }
-
-  private def render(masked: String, parse: ConfigParseOptions, options: FormatOptions): String = {
-    val parsed = ConfigFactory.parseString(masked, parse)
-    if (parsed.isEmpty) "" // rendering an empty root would produce "{}"
-    else parsed.root.render(renderOptions(options))
   }
 
   /** Formatting the output again is the whole check. The CLI writes on success, so output that
