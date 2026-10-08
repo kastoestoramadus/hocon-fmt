@@ -138,13 +138,32 @@ private[hocon_fmt] object IncludeMasking {
     * with generated names absent from the first rendering: user reserved names then remain visible,
     * even when spelled as concatenated tokens. No generated reserved names are allowed in this tree.
     */
-  def collisionProbe(source: String, rendered: String): Masked = {
+  def collisionProbe(source: String, rendered: String): Masked =
+    maskWithPrefix(source, onOwnLines = false, s"$ProbePrefix${firstUnusedProbeIndex(source, rendered)}_")
+
+  /** The smallest index whose prefix occurs in neither text, found by one scan per text over the
+    * whole `__HOCON_MASK_<digits>_` family. Asking `contains` per candidate index rescanned both
+    * texts once per index, so a comment listing the first thirty thousand indices made formatting
+    * quadratic in the texts' length.
+    */
+  private def firstUnusedProbeIndex(source: String, rendered: String): Int = {
+    val used = probeFamilyIndices(source) ++ probeFamilyIndices(rendered)
     @tailrec
-    def unused(index: Int): String = {
-      val prefix = s"__HOCON_MASK_${index}_"
-      if (rendered.contains(prefix) || source.contains(prefix)) unused(index + 1) else prefix
-    }
-    maskWithPrefix(source, onOwnLines = false, unused(0))
+    def firstFree(index: Int): Int = if (used(index.toString)) firstFree(index + 1) else index
+    firstFree(0)
+  }
+
+  /** Scans one text for the family, resuming one character past each match as the other scans in
+    * this object do, so a prefix starting inside another match is still found. The digit string is
+    * kept as written: `__HOCON_MASK_01_` spells index 1 but does not contain `__HOCON_MASK_1_`, and
+    * the two differ to the `contains` this replaces.
+    */
+  private def probeFamilyIndices(text: String): Set[String] = {
+    val matcher = ProbeFamily.matcher(text)
+    @tailrec
+    def collect(from: Int, found: Set[String]): Set[String] =
+      if (!matcher.find(from)) found else collect(matcher.start + 1, found + matcher.group(1))
+    collect(0, Set.empty)
   }
 
   def probeCollides(parsed: ConfigObject): Boolean = reservedIn(parsed, Map.empty)
@@ -214,6 +233,12 @@ private[hocon_fmt] object IncludeMasking {
   val PlaceholderPrefix = "__INCLUDE_"
   val GuardPrefix       = "__INCLUDE_GUARD_"
   val GuardValue        = "g"
+
+  /** The family `collisionProbe` names its generated fields with; the regex is RE2- and
+    * ES2015-safe, like every other pattern here.
+    */
+  private val ProbePrefix = "__HOCON_MASK_"
+  private val ProbeFamily = Pattern.compile(ProbePrefix + """(\d+)_""")
 
   private def placeholderFor(index: Int, prefix: String): String =
     s"""$prefix$index : "$prefix$index", """ +
