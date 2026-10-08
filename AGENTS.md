@@ -13,7 +13,7 @@ sbt crossCompile          # compile every platform's tests; needs neither Node n
 sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
 sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 19 (JVM, Native), 20 (JS)
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
-sbt coreJVM/publishM2     # needed before the Gradle and Maven builds
+sbt coreJVM/publishM2 javaApi/publishM2  # needed before the Gradle build; Maven needs core only
 sbt javaApi/publishM2     # needed before the java-api tests: the contract suite loads this jar
 sbt coreJVM/publishLocal  # needed before the Mill build
 (cd gradle-plugin && ./gradlew check)

@@ -125,9 +125,10 @@ workflow" for workflows on the default branch.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).
 
-Until the core is on Maven Central, the Gradle and Maven builds resolve it from Maven Local and
-the Mill build from the local Ivy repository: run `sbt coreJVM/publishM2` or
-`sbt coreJVM/publishLocal` before building them. The java-api tests load the jar sbt publishes,
+Until the artifacts are on Maven Central, the Gradle and Maven builds resolve them from Maven
+Local: run `sbt coreJVM/publishM2 javaApi/publishM2` before the Gradle build, or
+`sbt coreJVM/publishM2` before the Maven build. The Mill build resolves the core from the local
+Ivy repository: run `sbt coreJVM/publishLocal` before building it. The java-api tests load the jar sbt publishes,
 so `sbt javaApi/publishM2` joins `sbt coreJVM/publishM2` before `./gradlew check` in `java-api/`.
 
 ## pre-commit
