@@ -57,8 +57,8 @@ object HoconFormatterPlugin extends AutoPlugin {
         case Examined(file, path, Verdict.NeedsFormatting(formatted)) =>
           IO.write(file, formatted, UTF_8)
           log.info(s"Formatted $path")
-        case Examined(_, path, Verdict.Refused(reason)) => log.warn(refusal(path, reason))
-        case _                                          => ()
+        case Examined(_, path, Verdict.Refused(_, reason)) => log.warn(refusal(path, reason))
+        case _                                             => ()
       }
       log.info(summary(examined, needingFormatAre = "formatted"))
     },
@@ -67,7 +67,7 @@ object HoconFormatterPlugin extends AutoPlugin {
       val examined = examineAll.value
       examined.foreach {
         case Examined(_, path, Verdict.NeedsFormatting(_)) => log.warn(s"Not formatted: $path")
-        case Examined(_, path, Verdict.Refused(reason))    => log.warn(refusal(path, reason))
+        case Examined(_, path, Verdict.Refused(_, reason)) => log.warn(refusal(path, reason))
         case _                                             => ()
       }
       log.info(summary(examined, needingFormatAre = "not formatted"))

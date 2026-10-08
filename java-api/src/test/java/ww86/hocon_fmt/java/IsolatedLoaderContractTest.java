@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * apart from its consumer — a {@link URLClassLoader} over the platform loader, holding the
  * java-api jar, the core, its Scala library and sconfig, and nothing reachable by name. That is
  * the shape of {@code IsolatedFormatter.using} in the sbt plugin, and it carries the reflective
- * promise {@code JvmFacadeSpec} makes for the core facade: the entry point must answer
+ * promise the sbt plugin requires: the entry point must answer
  * reflectively, the verdict's record accessors must read across the loader, and the refusal kind
  * must come back as an enum whose {@code name()} the caller compares. The two loaders hold
  * distinct classes under equal names, so what crosses the boundary is values, never types.
@@ -144,4 +144,30 @@ class IsolatedLoaderContractTest {
             assertEquals("not valid UTF-8", read(verdict, "reason"));
         });
     }
+
+    @Test
+    void aNamedByteEntryReportsTheOrigin() throws Exception {
+        withIsolatedLoader(loader -> {
+            Method entry = hoconFmt(loader).getMethod("check", byte[].class, String.class);
+            Object verdict = entry.invoke(null, "a : ${".getBytes(StandardCharsets.UTF_8),
+                    "conf/application.conf");
+            assertEquals("Refused", verdict.getClass().getSimpleName());
+            assertEquals("NotHocon", ((Enum<?>) read(verdict, "kind")).name());
+            assertTrue(((String) read(verdict, "reason"))
+                    .startsWith("not valid HOCON: conf/application.conf:"));
+        });
+    }
+
+    @Test
+    void aNamePromisingAnotherFormatIsRefused() throws Exception {
+        withIsolatedLoader(loader -> {
+            Method entry = hoconFmt(loader).getMethod("check", byte[].class, String.class);
+            Object verdict = entry.invoke(null, "{\"a\": 1}".getBytes(StandardCharsets.UTF_8),
+                    "application.json");
+            assertEquals("Refused", verdict.getClass().getSimpleName());
+            assertEquals("OtherFormat", ((Enum<?>) read(verdict, "kind")).name());
+            assertTrue(((String) read(verdict, "reason")).startsWith("a JSON file"));
+        });
+    }
+
 }

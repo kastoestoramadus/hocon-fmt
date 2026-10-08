@@ -14,7 +14,6 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
 | `OptionsSpec` | `core/shared` | the parse and render options the formatter pins explicitly: the final newline, empty text, and how env-variable values render |
-| `JvmFacadeSpec` | `core/jvm` | the JDK-typed boundary, called from Java (`JavaCaller.java`) and reflectively |
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
@@ -23,11 +22,12 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `ZioFormatterSpec`, `ZioFilesSpec`, adapter `FormatterPropertiesSpec` | `zio/shared`, `zio/jvm-native` | typed text refusals on all runtimes; file decisions, untouched refusals, atomic replacement cleanup, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and permissions, plus 1000 arbitrary byte sequences on JVM / Native |
 | `ZioFilesJvmSpec` | `zio/jvm` | a path on a closed ZIP filesystem, whose unchecked `ClosedFileSystemException` must stay that file's outcome; Scala Native serves no jar provider, so the mechanism is JVM-only |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
-| scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |
+| scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build, including the java-api worker classpath, reflective verdict mapping and untouched byte-level refusals |
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
 | invoker | `maven-plugin/src/it` | the Maven plugin in real Maven builds |
 | unit, integration | `mill-plugin/test`, `mill-plugin/integration` | the Mill plugin in process through `UnitTester`, and in a real Mill: 1.1.4, the oldest supported, and 1.1.10 |
 | `HoconFmtTest`, `KotlinInteropTest` | `java-api/src/test` | the Java API for Java and Kotlin callers: the mirrored verdicts and refusal kinds and the parity tests that pin the mirror to the core, file checks and the write only on `NeedsFormatting`, `formatOrThrow`, and what Kotlin sees — a value-used `when` with no `else` and JSpecify's non-null returns |
+| `IsolatedLoaderContractTest` | `java-api/src/test` | the sbt-published API in an isolated loader: byte entry points, verdict record accessors, enum names, named refusals and other-format refusal |
 | e2e | `scripts/pre-commit-e2e.sh` | both families of pre-commit hooks, native and Node, installed from this repository as a user would |
 | `CliAcceptanceSuite` | `acceptance` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, redirected files and pipes, input beyond one read, refusals, `--version`, argument errors; `sbt acceptance/test` |
 | scoverage report | `coverageJvm`: core, cats, cli, zio on the JVM | which statements and branches the JVM tests reach, per module; CI's `coverage` job publishes the HTML and a per-module summary, and nothing fails on it |
