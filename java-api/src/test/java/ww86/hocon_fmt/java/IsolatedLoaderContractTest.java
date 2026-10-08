@@ -144,4 +144,30 @@ class IsolatedLoaderContractTest {
             assertEquals("not valid UTF-8", read(verdict, "reason"));
         });
     }
+
+    @Test
+    void aNamedByteEntryReportsTheOrigin() throws Exception {
+        withIsolatedLoader(loader -> {
+            Method entry = hoconFmt(loader).getMethod("check", byte[].class, String.class);
+            Object verdict = entry.invoke(null, "a : ${".getBytes(StandardCharsets.UTF_8),
+                    "conf/application.conf");
+            assertEquals("Refused", verdict.getClass().getSimpleName());
+            assertEquals("NotHocon", ((Enum<?>) read(verdict, "kind")).name());
+            assertTrue(((String) read(verdict, "reason"))
+                    .startsWith("not valid HOCON: conf/application.conf:"));
+        });
+    }
+
+    @Test
+    void aNamePromisingAnotherFormatIsRefused() throws Exception {
+        withIsolatedLoader(loader -> {
+            Method entry = hoconFmt(loader).getMethod("check", byte[].class, String.class);
+            Object verdict = entry.invoke(null, "{\"a\": 1}".getBytes(StandardCharsets.UTF_8),
+                    "application.json");
+            assertEquals("Refused", verdict.getClass().getSimpleName());
+            assertEquals("OtherFormat", ((Enum<?>) read(verdict, "kind")).name());
+            assertTrue(((String) read(verdict, "reason")).startsWith("a JSON file"));
+        });
+    }
+
 }
