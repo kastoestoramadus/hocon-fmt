@@ -39,6 +39,9 @@ jobs:
           # An unresolvable base (a new branch, a rewritten history) runs everything rather
           # than skipping.
           if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            # --no-renames lists a pure rename as both of its paths: plain --name-only shows
+            # only the destination, so a code file renamed into docs/ would read as
+            # docs-only and skip CI.
             while IFS= read -r file; do
               case "$file" in
                 docs/*) ;;        # the documentation directory
@@ -46,7 +49,7 @@ jobs:
                 *.md) ;;          # a root-level *.md (README.md, AGENTS.md, CLAUDE.md, ...)
                 *) code=true; break ;;
               esac
-            done < <(git diff --name-only "$BASE" HEAD)
+            done < <(git diff --name-only --no-renames "$BASE" HEAD)
           else
             code=true
           fi

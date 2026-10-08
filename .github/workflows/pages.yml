@@ -41,12 +41,15 @@ jobs:
           # An unresolvable base (a new branch, a rewritten history) deploys rather than
           # leaving the page stale.
           if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            # --no-renames lists a pure rename as both of its paths: plain --name-only shows
+            # only the destination, so a core file renamed into docs/ would read as
+            # docs-only and leave the page stale.
             while IFS= read -r file; do
               case "$file" in
                 site/*|core/*|examples/*|build.sbt|project/*|scripts/fetch-sconfig-fork.sh|.github/workflows/pages.yml)
                   site=true; break ;;
               esac
-            done < <(git diff --name-only "$BASE" HEAD)
+            done < <(git diff --name-only --no-renames "$BASE" HEAD)
           else
             site=true
           fi
