@@ -6,7 +6,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import fs2.{Chunk, Stream}
 import fs2.io.file.{Files, Path, PosixPermission}
-import ww86.hocon_fmt.{FormatRefusedException, Refusal, Verdict}
+import ww86.hocon_fmt.{FormatOptions, FormatRefusedException, Refusal, Separator, Verdict}
 
 class FileFormatterSpec extends munit.CatsEffectSuite {
   val tmp       = ResourceFunFixture(Files[IO].tempDirectory)
@@ -43,6 +43,20 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
       assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
       assertEquals(second, FormatOutcome.AlreadyFormatted)
       assertEquals(entries, List(file))
+    }
+  }
+
+  tmp.test("format and verdict honour the options they are given") { dir =>
+    val colon = FormatOptions(separator = Separator.Colon)
+    for {
+      file    <- write(dir, "a.conf", "a = 1\n".getBytes(UTF_8))
+      verdict <- formatter.verdict(file, colon)
+      outcome <- formatter.format(file, colon)
+      bytes   <- read(file)
+    } yield {
+      assertEquals(verdict, Verdict.NeedsFormatting("a: 1\n"))
+      assertEquals(outcome, FormatOutcome.Formatted)
+      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
     }
   }
 
