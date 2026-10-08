@@ -11,7 +11,7 @@ followed by a blank line, is never formatted.
 ## Impact
 
 On the 1,650-file GitHub corpus (2026-10-08), 818 files are refused for a lost comment, the
-largest class after none. Blank lines are a separate loss: sconfig keeps no spacing, and the
+largest refusal class. Blank lines are a separate loss: sconfig keeps no spacing, and the
 checks accept it.
 
 ## Two routes
