@@ -15,8 +15,13 @@ enum FileError derives CanEqual {
 final case class FileOutcome(path: Path, result: Either[FileError, Verdict]) derives CanEqual
 
 object ZioFiles {
+
+  /** The decision on one file's bytes. A refusal is `FileError.Refused`, never a returned value, so
+    * `Verdict.Refused` is unreachable here; `Verdict` is the shared decision type `Verdict.of`
+    * returns, and narrowing it would only move a cast into every caller.
+    */
   def verdict(path: Path): IO[FileError, Verdict] =
-    ZIO.attemptBlockingIO(Files.readAllBytes(path)).mapError(FileError.Io(_)).flatMap { bytes =>
+    BlockingIo(Files.readAllBytes(path)).mapError(FileError.Io(_)).flatMap { bytes =>
       Verdict.of(bytes) match {
         case Verdict.Refused(reason) => ZIO.fail(FileError.Refused(reason))
         case decision                => ZIO.succeed(decision)
@@ -25,7 +30,7 @@ object ZioFiles {
 
   /** Returns the original decision; NeedsFormatting means the replacement completed. */
   def format(path: Path): IO[FileError, Verdict] =
-    ZIO.attemptBlockingIO(path.toRealPath()).mapError(FileError.Io(_)).flatMap { target =>
+    BlockingIo(path.toRealPath()).mapError(FileError.Io(_)).flatMap { target =>
       verdict(target).flatMap {
         case decision @ Verdict.NeedsFormatting(text) =>
           AtomicFile.write(target, text).mapError(FileError.Io(_)).as(decision)

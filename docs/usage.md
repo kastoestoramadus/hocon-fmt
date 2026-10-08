@@ -176,11 +176,13 @@ val report = ZioFiles.check(List(path, Paths.get("local.conf"))).runCollect
 ```
 
 `ZioFiles.verdict(path)` checks without writing. It and `format(path)` put content
-refusals in `FileError.Refused(reason)` and filesystem errors in `FileError.Io(cause)`.
-`format` returns the original decision: `NeedsFormatting` means the write completed;
-`AlreadyFormatted` leaves the file untouched. `check` is a lazy `ZStream` of
-`FileOutcome(path, Either[FileError, Verdict])`: it retains failures as per-file outcomes
-and continues to the next path. The application decides how to report them.
+refusals in `FileError.Refused(reason)` and filesystem errors in `FileError.Io(cause)`,
+wrapping a JDK call that fails unchecked (a path on a closed ZIP filesystem, say) in an
+`IOException` that keeps the original as its cause. `format` returns the original decision:
+`NeedsFormatting` means the write completed; `AlreadyFormatted` leaves the file untouched.
+`check` is a lazy `ZStream` of `FileOutcome(path, Either[FileError, Verdict])`: it retains
+failures as per-file outcomes and continues to the next path. The application decides how
+to report them.
 
 Files are read strictly as UTF-8 through blocking `java.nio` operations. Only a
 `NeedsFormatting` verdict writes: the adapter stages complete output beside the original,

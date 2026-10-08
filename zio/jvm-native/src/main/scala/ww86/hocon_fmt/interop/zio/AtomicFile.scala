@@ -4,12 +4,12 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path, StandardCopyOption}
 import java.nio.file.attribute.PosixFileAttributeView
-import _root_.zio.{IO, ZIO}
+import _root_.zio.IO
 
 private[zio] object AtomicFile {
   def write(target: Path, text: String): IO[IOException, Unit] =
     // Keeping staging and cleanup in one blocking operation prevents interruption racing a writer.
-    ZIO.attemptBlockingIO {
+    BlockingIo {
       val temporary = Files.createTempFile(target.toAbsolutePath().getParent, ".hocon-fmt-", ".tmp")
       try {
         val _ = Files.write(temporary, text.getBytes(UTF_8))
