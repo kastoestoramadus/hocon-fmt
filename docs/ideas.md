@@ -67,8 +67,8 @@ Sconfig merges repeated keys: a later plain value silently overrides an earlier 
 "dead duplicate" that is often a mistake. A CLI report could point at both definitions,
 without refusing formatting; this is analysis rather than formatting, so it may belong behind a
 separate flag. Exclude the common, deliberate `x = default` then `x = ${?ENV}` idiom and
-object merges (`a { x = 1 }` then `a { y = 2 }`), which kill nothing. The real-file sweep
-(`~/hocon-corpus/REPORT.md` §7.4) found the idiom in 626 of 1,650 GitHub files and dead
+object merges (`a { x = 1 }` then `a { y = 2 }`), which kill nothing. A sweep of real files from
+GitHub (October 2026) found the idiom in 626 of 1,650 GitHub files and dead
 duplicates in 138; for HMRC's 1,168 files, 990 and 70 respectively. These are heuristic counts.
 [Sunbird's `route.domain`](https://github.com/Sunbird-Knowlg/knowledge-platform/blob/abda3e345c2a18c139f2469653a3ef6120eb4a23/content-api/content-service/conf/application.conf#L456)
 changes from `localhost:8182` to `localhost:9042`; other examples are
