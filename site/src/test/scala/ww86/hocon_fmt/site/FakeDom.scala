@@ -9,13 +9,17 @@ import scala.scalajs.js
   * skip a platform; this is a plain JS source string instead, linked with the tests themselves.
   *
   * Two things it deliberately does not model, because the components under test never reach for
-  * them: HTML parsing (elements are built through `createElement`/`appendChild`) and layout. What
-  * it does model — parents, siblings, listeners, attributes — it models the way browsers report
-  * them, so a test asserting on the mounted tree reads like the page itself.
+  * them: HTML parsing (elements are built through `createElement`/`appendChild`) and layout.
+  * Event dispatch is simplified where the components never reach either: an event runs only the
+  * listeners on its target — no bubbling or capture, and the `addEventListener` options are
+  * dropped — while a fired event carries just `type` and `target`, not `preventDefault` or
+  * `currentTarget`. The structure it does model — parents, siblings, listeners, attributes — it
+  * models the way browsers report it, so a test asserting on the mounted tree reads like the
+  * page itself.
   */
 object FakeDom:
 
-  private val source =
+  val source =
     """(function () {
       |  "use strict";
       |
