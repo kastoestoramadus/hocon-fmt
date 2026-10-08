@@ -63,7 +63,26 @@ object ExampleGenerator {
       }
     }
     val output = managed / "ww86" / "hocon_fmt" / "ExampleData.scala"
-    val text   = "package ww86.hocon_fmt\n\nobject ExampleData {\n" +
+    val text   = "package ww86.hocon_fmt\n\n" +
+      """final case class ExampleSource(kind: String, pattern: String, url: Option[String], licence: Option[String])
+
+/** Human-authored expectations, embedded at build time without runtime file access. */
+final case class Example(
+    id: String,
+    title: String,
+    story: String,
+    shows: String,
+    input: String,
+    target: String,
+    now: String,
+    pending: Option[String],
+    reasonIfDifferent: Option[String],
+    findings: List[String],
+    source: ExampleSource,
+    options: List[String],
+    expected: Map[String, String]
+)
+""" + "\nobject ExampleData {\n" +
       entries.mkString("  val all: List[Example] = List(\n    ", ",\n    ", "\n  )\n") +
       "  val showcase: List[Example] = all.filter(_.id.startsWith(\"showcase/\"))\n}\n"
     if (!output.exists || IO.read(output) != text) IO.write(output, text)

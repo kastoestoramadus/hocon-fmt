@@ -6,6 +6,7 @@
 Each directory contains `input.conf`, HOCON metadata in `example.conf`, and
 `expected/default.conf` (unchanged input for refused showcase examples).
 Refused catalogue examples use `expected/refused.txt` instead. The sbt source generator
-embeds these files for tests on all three platforms and for the site.
+embeds these files in core test sources on all three platforms and in site sources,
+keeping them out of the published core artifacts.
 
 See [the schema and testing contract](../docs/testing.md#shared-examples).

@@ -78,7 +78,7 @@ output are compared exactly, including the final newline. Only the `default` opt
 exists today.
 
 The sbt source generator reads `example.conf` with sconfig and embeds both directories
-in core Scala data; tests and the site use it without runtime file I/O. Metadata carries
+in core test and site Scala data; tests and the site use it without runtime file I/O. Metadata carries
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
 `target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
 Verdicts are `formatted`, `already-formatted` (only for now or pending), or
