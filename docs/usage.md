@@ -256,12 +256,15 @@ failures as per-file outcomes and continues to the next path. The application de
 to report them.
 
 Files are read strictly as UTF-8 through blocking `java.nio` operations. Only a
-`NeedsFormatting` verdict writes: the adapter stages complete output beside the original,
-retains POSIX permissions where supported, and atomically replaces it. Failure to replace
-leaves the original untouched and removes the temporary file; filesystems without atomic
-replacement produce an I/O error. Symbolic links are followed and retained. Replacement
-creates a new file identity; other metadata and hard links are not preserved. Avoid concurrent
-edits to the same file while formatting.
+`NeedsFormatting` verdict writes: the adapter stages complete output beside the original, then
+atomically replaces the original only when the staged copy can be given the original's owner,
+group and every mode bit, setgid included, and when both the file and its directory can be
+written; otherwise the formatted text is written in place, which keeps the file but loses the
+crash-atomicity of the rename. A failed or cancelled staged write leaves the original intact
+and removes the temporary file; filesystems without atomic replacement produce an I/O error.
+Symbolic links are followed and retained. A replacement is a new file, so other hard links keep
+the old content; an in-place write keeps them too. Avoid concurrent edits to the same file
+while formatting.
 
 JVM and Scala Native provide both APIs. Scala.js provides `ZioFormatter` for text only;
 `java.nio` file operations belong to the JVM and Native builds.
