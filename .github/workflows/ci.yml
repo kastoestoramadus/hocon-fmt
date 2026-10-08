@@ -29,6 +29,17 @@ jobs:
       - name: Set up sbt
         uses: sbt/setup-sbt@v1
 
+      # UPSTREAM-SCONFIG: the page runs on a sconfig fork until ekrich/sconfig releases the option
+      # (#646/#647); delete this step and its cache once it does (docs/site.md, "Returning to
+      # upstream sconfig"). The cache is keyed on the script, which pins the fork's sha.
+      - name: Cache the sconfig fork
+        uses: actions/cache@v4
+        with:
+          path: ~/.ivy2/local/org.ekrich
+          key: sconfig-fork-${{ hashFiles('scripts/fetch-sconfig-fork.sh') }}
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
+
       # Covers every runtime: core on the JVM, Scala.js and Scala Native, and the cli.
       # Ubuntu runners ship Node for Scala.js and clang for Scala Native.
       - name: Compile and test

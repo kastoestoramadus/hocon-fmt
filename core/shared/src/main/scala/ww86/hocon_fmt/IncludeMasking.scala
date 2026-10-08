@@ -2,11 +2,9 @@ package ww86.hocon_fmt
 
 import java.util.regex.{Matcher, Pattern}
 
-import org.ekrich.config.{ConfigList, ConfigObject, ConfigValue}
+import org.ekrich.config.ConfigObject
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters.*
-import scala.util.Try
 
 /** Carries `include` directives across a parse-render round trip.
   *
@@ -91,34 +89,17 @@ private[hocon_fmt] object IncludeMasking {
       "\\u005f"
     ))
 
-  /** Check field pairs, not independent allowed strings: a placeholder value under a user key
-    * is still the user's value. Unresolved values cannot be unwrapped, but their rendering exposes
-    * substitution paths and the pieces of unresolved concatenations and merges.
+  /** Check field pairs, not independent allowed strings: a placeholder value under a user key is
+    * still the user's value. Judged by [[PlaceholderTree]], as the site's comment placeholders are.
     */
   def collides(masked: Masked, parsed: ConfigObject): Boolean =
-    masked.originals.nonEmpty && reservedIn(
-      parsed,
-      masked.originals.keysIterator.flatMap { index =>
-        List(s"$PlaceholderPrefix$index" -> s"$PlaceholderPrefix$index", s"$GuardPrefix$index" -> GuardValue)
-      }.toMap
-    )
+    masked.originals.nonEmpty && PlaceholderTree.collides(parsed, PlaceholderPrefix, generated(masked.originals))
 
-  private def reservedIn(value: ConfigValue, allowed: Map[String, String]): Boolean = value match {
-    case obj: ConfigObject =>
-      obj.entrySet.asScala.exists { entry =>
-        val key       = entry.getKey
-        val child     = entry.getValue
-        val generated = allowed.get(key).exists(expected => Try(child.unwrapped).toOption.contains(expected))
-        !generated && (key.contains(PlaceholderPrefix) || reservedIn(child, allowed))
-      }
-    case list: ConfigList => list.asScala.exists(reservedIn(_, allowed))
-    case other            =>
-      Try(other.unwrapped).toOption match {
-        case Some(text: String) => text.contains(PlaceholderPrefix)
-        case Some(_)            => false
-        case None               => other.render(HoconFormatter.renderOptions).contains(PlaceholderPrefix)
-      }
-  }
+  /** The key/value pairs this pass wrote, the only reserved names the tree may hold. */
+  private def generated(originals: Map[Int, String]): Map[String, String] =
+    originals.keysIterator.flatMap { index =>
+      List(s"$PlaceholderPrefix$index" -> s"$PlaceholderPrefix$index", s"$GuardPrefix$index" -> GuardValue)
+    }.toMap
 
   /** An identical user field can overwrite a generated field before we see the tree. Parse again
     * with generated names absent from the first rendering: user reserved names then remain visible,
@@ -133,7 +114,7 @@ private[hocon_fmt] object IncludeMasking {
     maskWithPrefix(source, onOwnLines = false, unused(0))
   }
 
-  def probeCollides(parsed: ConfigObject): Boolean = reservedIn(parsed, Map.empty)
+  def probeCollides(parsed: ConfigObject): Boolean = PlaceholderTree.collides(parsed, PlaceholderPrefix, Map.empty)
 
   /** Each index must have exactly one complete placeholder and guard, with no other reserved text.
     * A total alone cannot detect one index replacing another.

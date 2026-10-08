@@ -50,7 +50,7 @@ class ExamplesSpec extends munit.FunSuite {
     }
   }
 
-  ExampleData.all.foreach { example =>
+  ExampleData.all.filterNot(e => Variant.differs(e.id)).foreach { example =>
     example.options.foreach { option =>
       test(s"${example.id} ($option): ${example.now}") {
         val verdict = Verdict.of(example.input)
@@ -90,23 +90,7 @@ class ExamplesSpec extends munit.FunSuite {
         example.id -> bySimplify.toList.sortBy(!_._1).map((k, v) => s"simplify=$k: ${v.toList.sorted.mkString(",")}")
       )
     }
-    assertEquals(
-      differing,
-      List(
-        "showcase/05-sconfig-defect" -> List(
-          "simplify=true: refused:broken-output",
-          "simplify=false: refused:unstable-output"
-        ),
-        "catalogue/env-override-root-not-parseable" -> List(
-          "simplify=true: refused:broken-output",
-          "simplify=false: refused:unstable-output"
-        ),
-        "catalogue/object-substitution-then-field" -> List(
-          "simplify=true: refused:broken-output",
-          "simplify=false: formatted"
-        )
-      )
-    )
+    assertEquals(differing, Variant.refusedDifferently)
   }
 
   test("showcase follows directory order and excludes catalogue") {

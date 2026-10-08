@@ -7,7 +7,8 @@ from `file://` as every ww86.eu page does.
 
 ## The module
 
-`site` is a Scala.js project that depends on `coreJS` directly: the page calls `HoconFormatter`
+`site` is a Scala.js project that depends on `coreSite` directly (`coreJS` against a sconfig fork,
+see [running ahead](#running-ahead-of-the-release)): the page calls `HoconFormatter`
 and `Verdict` itself, with no JavaScript API in between (that is what replaced the lab-directory
 plan in [playground](playground.md); the `web` module and its script are unchanged). Laminar
 17.2.1, the latest stable for `_sjs1_3`, renders it; sjavatime supplies the `java.time` sconfig
@@ -124,6 +125,58 @@ Locations below are in `site/src/main/scala/ww86/hocon_fmt/site/` at the reviewe
 | [Keyed split for dynamic lists](https://laminar.dev/documentation#performant-children-rendering--split) | `ContributionsView.scala:47,120`, `sections` | Deferred: the list is empty until the answer arrives, and each mount rebuilds it from the board — a remount replaces the whole list and keeps no DOM or focus, which nothing on the page needs today. Before adding polling/filtering, use library/theme keys and `(library, number)` PR keys, and bind item Signals so updates preserve DOM/focus. Showcase buttons and defect rows are static lists. |
 | [Components as functions](https://laminar.dev/documentation#reusing-elements) | `Page.scala:8`, `Playground.scala:12`, `ContributionsView.scala:21` | Retained: functions return fresh elements; never reuse an element across parents. Splitting the page into more components now would add structure without a reuse need. |
 | [Testing observables](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#documentation) | `Playground.verdicts`, `ContributionsView.boardUpdates`, `ComponentSpec` | Applied: Node tests exercise the actual observable graph with explicit owners, including disposal and recovery, and `ComponentSpec` mounts the real components in a fake document to pin what a helper test cannot see. Keep the pure-model and fake-browser suites and the real-browser served/offline rendering checks; no jsdom dependency added. |
+
+## Running ahead of the release
+
+<!-- UPSTREAM-SCONFIG: delete this section and the checklist below once the option is released. -->
+
+The playground runs a development build of sconfig, the fork `kastoestoramadus/sHOCON` at the
+sha pinned in `scripts/fetch-sconfig-fork.sh`. It carries `setKeepDetachedComments`
+([ekrich/sconfig#646](https://github.com/ekrich/sconfig/issues/646), draft
+[#647](https://github.com/ekrich/sconfig/pull/647)), so the page keeps a comment above a blank
+line, and the base of that branch (sconfig main) also fixes some merge renderings released
+sconfig 1.12.4 gets wrong. A muted line under the playground says so. Everything published, the
+command line and the plugins, uses released sconfig unchanged.
+
+- `scripts/fetch-sconfig-fork.sh` clones the fork at the pinned sha into
+  `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes the Scala.js artifact for Scala 3.8.2 to
+  the local Ivy repository as `2.0.0-hocon-fmt-<sha10>`. Run it once per sha, before `sbt test`;
+  CI and the Pages workflow run it first and cache `~/.ivy2/local/org.ekrich` by the script's hash.
+  An sbt source dependency is impossible (the fork builds with sbt 2), and JitPack and GitHub
+  Packages cannot serve it without auth or an sbt 2 build.
+- `checkSconfigFork` runs before `coreSite` resolves anything and fails naming the script. The
+  build never skips a platform whose input is missing, so a machine without the fork fails
+  `sbt test` rather than leaving the site untested.
+- The fork's build needs sbt-scalajs 1.22, so the whole build moved there from 1.20.1; its artifact
+  carries Scala.js IR 1.22, which 1.20 cannot link.
+
+## Returning to upstream sconfig
+
+<!-- UPSTREAM-SCONFIG: this checklist is the revert; delete it as its last step. -->
+
+Everything that exists only for the fork carries the marker `UPSTREAM-SCONFIG:`; `git grep
+UPSTREAM-SCONFIG` lists it. The signal is `KeepDetachedCommentsGuardSpec` (`sbt libraryDefects`):
+it is red until released sconfig has `setKeepDetachedComments`, and green once the dependency
+`sconfig` in `build.sbt` is a release that carries it. Then:
+
+1. Delete `scripts/fetch-sconfig-fork.sh`, the `sconfigFork` value and `checkSconfigFork` in
+   `build.sbt`, and the two script steps (with their cache) in `.github/workflows/ci.yml` and
+   `pages.yml`.
+2. Delete the `coreSite` project, point `site` back at `coreJS`, and drop it from `root`'s aggregate and `test` sequence and from `crossCompile`.
+3. In `core`, enable the option in `HoconFormatter.parseOptions` and delete the seam:
+   `CommentCarrier`, `Carried`, `core/default-shared`, `core/site-shared` (only the masking of
+   blocks no field follows may still be wanted: compare with the measured corpus), the calls in
+   `HoconFormatter`, and `Variant` in the tests with its ledger. Then the four pinned refusals
+   (`detached-header-comment`, `trailing-comment-in-object`, the two `commentAboveBlankLine`
+   cases) flip for the command line as well.
+4. Delete the muted line under the playground (`Playground.scala`), reword showcase 05, and drop the
+   fork-only text where the marker sits: the "Comment carrier" section and the `coreSite` row in
+   [architecture](architecture.md), the paragraph in [limitations](limitations.md), the `coreSite`
+   bullet in [testing](testing.md), the script line in [README](../README.md), and the rule and
+   `coreSite` mention in [AGENTS](../AGENTS.md); retitle the idea in [ideas](ideas.md) and refresh
+   the closing note of [the investigation](investigations/blank-line-comments.md). Then delete
+   `KeepDetachedCommentsGuardSpec` with its `libraryDefects` entry and `testOptions` exclusion.
+5. Keep the Scala.js 1.22 bump and the #647 entry in the snapshot, and update `Contributions.readOn`.
 
 ## Publishing
 
