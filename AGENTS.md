@@ -71,10 +71,11 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   must hold for every input also gets a property in `FormatterPropertiesSpec`.
 - A change to a hot path gets a `scripts/bench.py run` before and after.
 - New Scala code is functional Scala 3: ADTs and `Either` rather than exceptions, no `var`, effects
-  at the edges. Braces, not significant indentation (`.scalafmt.conf`). The sbt plugin is Scala 2.12.
-- The compiler enforces what review would otherwise catch (`scalacOptions` in `build.sbt`, every
-  warning an error). Adapt the code; never relax a flag or add `@nowarn` to get a build through.
-  The usual fixes:
+  at the edges. Braces, not significant indentation (`-no-indent`; `.scalafmt.conf`). The sbt plugin
+  is Scala 2.12.
+- The compiler enforces what review would otherwise catch (`scalacOptions` in `build.sbt`: every
+  warning an error, and no significant indentation — `-no-indent`, which the Mill build sets too).
+  Adapt the code; never relax a flag or add `@nowarn` to get a build through. The usual fixes:
   - `strictEquality`: a type compared with `==` gets `derives CanEqual`, and so does an enum
     matched on a case without parameters, since that match is an `==`.
   - Explicit nulls: a value from a Java API is `T | Null`; wrap it in `Option(...)` or match
