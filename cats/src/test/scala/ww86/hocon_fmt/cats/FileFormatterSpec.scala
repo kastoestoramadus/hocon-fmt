@@ -6,7 +6,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import fs2.{Chunk, Stream}
 import fs2.io.file.{Files, Path, PosixPermission}
-import ww86.hocon_fmt.{Refusal, Verdict}
+import ww86.hocon_fmt.{FormatRefusedException, Refusal, Verdict}
 
 class FileFormatterSpec extends munit.CatsEffectSuite {
   val tmp       = ResourceFunFixture(Files[IO].tempDirectory)
