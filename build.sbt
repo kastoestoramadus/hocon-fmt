@@ -6,7 +6,7 @@ val munit     = "1.2.4"
 val osLib     = "0.11.8"
 val sjavatime = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
-val laminar   = "17.2.1"
+val laminar = "17.2.1"
 
 val catsEffect      = "3.7.1"
 val fs2             = "3.14.0"
@@ -140,7 +140,7 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .enablePlugins(BuildInfoPlugin)
   .dependsOn(core)
   .settings(
-    name := "hocon-fmt-cli",
+    name             := "hocon-fmt-cli",
     buildInfoPackage := "ww86.hocon_fmt",
     buildInfoKeys    := Seq[BuildInfoKey](version),
     libraryDependencies ++= Seq(
@@ -257,7 +257,8 @@ lazy val web = project
   * repository (hocon-fmt.ww86.eu); the Laminar app calls `coreJS` itself, with no JavaScript API
   * in between. Not published; see docs/site.md.
   */
-val build = taskKey[File]("Assembles the Pages output into site/target/site: index.html, the optimised script, CNAME, .nojekyll.")
+val build =
+  taskKey[File]("Assembles the Pages output into site/target/site: index.html, the optimised script, CNAME, .nojekyll.")
 
 lazy val site = project
   .in(file("site"))
