@@ -15,7 +15,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Deploys only when something the site is built from changed: the site module and the core
+  # it runs on, the examples the page's generators read, the sbt build that assembles the
+  # page, the script that publishes the sconfig fork it builds against, and this workflow,
+  # whose own change should be exercised by the next push. Anything else — including
+  # docs-only commits — redeploys an unchanged page for nothing.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      site: ${{ steps.diff.outputs.site }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Enough history to diff against the previous main commit; the whole repository
+          # is ~1 MiB of pack.
+          fetch-depth: 0
+      - name: Did anything the site is built from change?
+        id: diff
+        env:
+          # The pull request base for a pull_request, the previous main commit for a push;
+          # empty on workflow_dispatch, which always deploys.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          site=false
+          # An unresolvable base (a new branch, a rewritten history) deploys rather than
+          # leaving the page stale.
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            while IFS= read -r file; do
+              case "$file" in
+                site/*|core/*|examples/*|build.sbt|project/*|scripts/fetch-sconfig-fork.sh|.github/workflows/pages.yml)
+                  site=true; break ;;
+              esac
+            done < <(git diff --name-only "$BASE" HEAD)
+          else
+            site=true
+          fi
+          echo "site=$site" >> "$GITHUB_OUTPUT"
+
   deploy:
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
