@@ -69,7 +69,7 @@ class IncludeDetectionSpec extends munit.FunSuite with HoconTestSupport {
   test("same line: entries before an include are formatted, not passed through") {
     val out = formatted("""o { b   :    1, include "f.conf" }""")
     assert(out.contains("""include "f.conf""""), out)
-    assert(out.contains("b: 1"), s"entry before the include was not formatted: $out")
+    assert(out.contains("b = 1"), s"entry before the include was not formatted: $out")
   }
 
   test("same line: closing brace survives so the result re-parses") {
@@ -87,7 +87,7 @@ class IncludeDetectionSpec extends munit.FunSuite with HoconTestSupport {
   test("include function forms survive sharing a line") {
     val out = formatted("""o { b : 1, include required(file("f.conf")) }""")
     assert(out.contains("required"), out)
-    assert(out.contains("b: 1"), out)
+    assert(out.contains("b = 1"), out)
   }
 
   // --- Comments are not code ----------------------------------------------------------------------
@@ -124,7 +124,7 @@ class IncludeDetectionSpec extends munit.FunSuite with HoconTestSupport {
 
   List("""include "x.conf"""", """include required("x.conf")""").foreach { directive =>
     test(s"an include on the first line gains no blank line above it: $directive") {
-      assertEquals(formatted(s"$directive\na : 1"), s"$directive\na: 1\n")
+      assertEquals(formatted(s"$directive\na : 1"), s"$directive\na = 1\n")
     }
   }
 }

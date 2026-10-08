@@ -22,10 +22,10 @@ Rendered as text that will not parse again (`Refusal.BrokenOutput`):
 - **String concatenation with a substitution**: `path : ${path}":d"`
 - **Nested self-reference**: `foo : ${foo.a}`
 - **Object concatenation with a substitution**: `e = ${g} { name = "east" }`, the ordinary
-  config-inheritance idiom, which sconfig renders as `e: ${g}name: east`. The one worth reporting
+  config-inheritance idiom, which sconfig renders as `e = ${g}name = east`. The one worth reporting
   upstream first: short, obviously wrong, and common.
 - **A one-field object inside an array that does not fit on one line** loses its braces: holding
-  a substitution, `a : [ { b : ${?X} } ]` renders as `a: [ b: ${?X} ]`; so does one whose field is
+  a substitution, `a : [ { b : ${?X} } ]` renders as `a = [ b = ${?X} ]`; so does one whose field is
   an object and that holds a comment. Two fields, or a field that fits on one line, keep them.
 
 Rendered without a comment (`Refusal.LostComment`); a comment has no meaning to compare, so only
@@ -89,6 +89,21 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
   (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
   files from GitHub are refused for it. Fixed by ekrich/sconfig#600, not yet released.
 
+Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
+tree renders differently with `simplify-nested-objects = false`. Pinned over the examples in
+`ExamplesSpec`; a file that is refused under one style is not thereby shown to format wrongly under
+another, but nothing here promises the options agree:
+
+- `showcase/05-sconfig-defect` and `catalogue/env-override-root-not-parseable` are
+  `Refusal.BrokenOutput` with the default nesting and `Refusal.UnstableOutput` without it.
+- `catalogue/object-substitution-then-field` (`x = ${t} { b = 2 }`) is `Refusal.BrokenOutput` with
+  the default nesting and formats without it.
+
+`Refusal.ReservedName`: a file with an `include` is refused when the rest of its text spells
+`__INCLUDE_`, the name the include placeholders are written with (see
+[architecture](architecture.md#include-masking)). Restoring placeholders cannot tell such text
+from ours, and guessing corrupted it silently. A file without an include is not affected.
+
 Rejected at parse time although the specification allows them (`Refusal.NotHocon`):
 
 - **An array at the file root**: `[ "a", "b" ]`
@@ -108,12 +123,13 @@ These are sconfig's renderer doing what the `ConfigFormatOptions` in `HoconForma
 not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpecCoverageSpec`:
 
 - `//` comments become `#`
-- `=` becomes `:`
+- `:` becomes `=` — the default separator, and `:` on request (`--separator :`, or a
+  [`.hocon-fmt.conf`](usage.md#style-the-separator-and-friends))
 - nested objects are flattened to path keys (`setSimplifyNestedObjects`)
 - triple-quoted strings become escaped single-line strings
 - `+=` appends become the specification's expansion, the same value (`a += 2` renders as
-  `a: ${?a}[`, with the `2` indented on the next line and the `]` on its own — what
-  `examples/catalogue/plus-append-alone/expected/default.conf` pins, not `a: ${?a}[2]` on one
+  `a = ${?a}[`, with the `2` indented on the next line and the `]` on its own — what
+  `examples/catalogue/plus-append-alone/expected/default.conf` pins, not `a = ${?a}[2]` on one
   line): sconfig renders the expanded form, keeping no trace of the shorthand (an append after an
   earlier definition of the key is instead the `+=` field-separator defect above, and is refused)
 - number literals are canonicalised (`1.5e3` becomes `1500`)

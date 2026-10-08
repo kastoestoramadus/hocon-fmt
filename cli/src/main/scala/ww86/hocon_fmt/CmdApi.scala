@@ -7,7 +7,7 @@ import _root_.cats.effect.std.Console
 import _root_.cats.effect.{ExitCode, IO, IOApp}
 import _root_.cats.syntax.all.*
 import com.monovore.decline.{Command, Help, Opts, PlatformApp}
-import fs2.io.file.Path
+import fs2.io.file.{Files, Path}
 import ww86.hocon_fmt.interop.cats.{FileFormatter, FormatOutcome}
 
 /** Command line entry point: parses arguments, delegates file operations to [[FileFormatter]],
@@ -15,13 +15,53 @@ import ww86.hocon_fmt.interop.cats.{FileFormatter, FormatOutcome}
   */
 object CmdApi extends IOApp {
 
-  final case class Arguments(files: List[Path], checkOnly: Boolean)
+  /** `config` names a `.hocon-fmt.conf` explicitly; otherwise each file's is found from its
+    * directory. `style` carries what the flags set, and wins over either.
+    */
+  final case class Arguments(
+      files: List[Path],
+      checkOnly: Boolean,
+      config: Option[Path],
+      style: StyleOverrides
+  )
 
   enum Invocation derives CanEqual {
     case FileMode(arguments: Arguments)
-    case Stdin(filename: String)
+    case Stdin(filename: String, style: StyleOverrides)
     case Version
   }
+
+  // A boolean the user can both set and clear from the command line needs the pair: absent
+  // leaves the config file in charge, and both together is a usage error.
+  private def toggle(name: String, help: String): Opts[Option[Boolean]] =
+    (Opts.flag(name, help).orFalse, Opts.flag(s"no-$name", s"The opposite of --$name.").orFalse).tupled.mapValidated {
+      case (true, false)  => Some(true).validNel
+      case (false, true)  => Some(false).validNel
+      case (true, true)   => s"--$name and --no-$name cannot be combined.".invalidNel
+      case (false, false) => none[Boolean].validNel
+    }
+
+  private val styleOpts: Opts[StyleOverrides] = (
+    Opts
+      .option[String]("separator", "The key-value separator: = (the default) or :; overrides the config file.")
+      .mapValidated {
+        case "="   => Separator.Equals.validNel
+        case ":"   => Separator.Colon.validNel
+        case other => s"--separator expects = or :, not: $other".invalidNel
+      }
+      .orNone,
+    toggle("double-indent", "Indent the contents of nested objects four spaces; overrides the config file."),
+    toggle("simplify-nested-objects", "Flatten nested objects to path keys; overrides the config file.")
+  ).mapN(StyleOverrides.apply)
+
+  private val configOpt: Opts[Option[Path]] =
+    Opts
+      .option[String](
+        "config",
+        "Use this .hocon-fmt.conf for every file instead of the one found from each file's directory."
+      )
+      .map(Path(_))
+      .orNone
 
   val command: Command[Invocation] =
     Command(
@@ -39,17 +79,21 @@ object CmdApi extends IOApp {
           .orFalse,
         Opts.flag("stdin", "Read UTF-8 from stdin and write only formatted text to stdout.").orFalse,
         Opts.option[String]("stdin-filename", "Name used in stdin diagnostics; no file is read or written.").orNone,
-        Opts.flag("version", "Print the formatter version and exit.").orFalse
-      ).tupled.mapValidated { case (files, checkOnly, stdin, filename, version) =>
-        if (version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty))
+        Opts.flag("version", "Print the formatter version and exit.").orFalse,
+        configOpt,
+        styleOpts
+      ).tupled.mapValidated { case (files, checkOnly, stdin, filename, version, config, style) =>
+        if (
+          version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty || config.nonEmpty || style != StyleOverrides.none)
+        )
           Validated.invalidNel("--version cannot be combined with formatting arguments.")
         else if (version) Validated.validNel(Invocation.Version)
-        else if (stdin && (files.nonEmpty || checkOnly))
-          Validated.invalidNel("--stdin cannot be combined with files or --check.")
-        else if (stdin) Validated.validNel(Invocation.Stdin(filename.getOrElse("<stdin>")))
+        else if (stdin && (files.nonEmpty || checkOnly || config.nonEmpty))
+          Validated.invalidNel("--stdin cannot be combined with files, --check or --config.")
+        else if (stdin) Validated.validNel(Invocation.Stdin(filename.getOrElse("<stdin>"), style))
         else if (filename.nonEmpty) Validated.invalidNel("--stdin-filename requires --stdin.")
         else if (files.isEmpty) Validated.invalidNel("At least one file or --stdin is required.")
-        else Validated.validNel(Invocation.FileMode(Arguments(files, checkOnly)))
+        else Validated.validNel(Invocation.FileMode(Arguments(files, checkOnly, config, style)))
       }
     }
 
@@ -76,11 +120,17 @@ object CmdApi extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     command.parse(PlatformApp.ambientArgs.getOrElse(args)) match {
       case Right(Invocation.FileMode(arguments)) =>
-        examineAll(arguments).flatTap(run => IO.print(run.rendered)).map(_.exitCode)
-      case Right(Invocation.Version)         => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
-      case Right(Invocation.Stdin(filename)) =>
+        examineAll(arguments).flatMap {
+          case Left(error) =>
+            // A config nobody asked for must not decide what happens to the files, so the run
+            // stops before any of them is read, the way a usage error does.
+            Console[IO].errorln(error).as(ExitCode(2))
+          case Right(run) => IO.print(run.rendered).as(run.exitCode)
+        }
+      case Right(Invocation.Version)                => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
+      case Right(Invocation.Stdin(filename, style)) =>
         StdStreams.readStdin
-          .map(formatStdin(_, filename))
+          .map(formatStdin(_, filename, style))
           .handleError { e =>
             StdinResult("", s"cannot read $filename: ${Option(e.getMessage).getOrElse(e.toString)}\n", ExitCode(2))
           }
@@ -92,38 +142,61 @@ object CmdApi extends IOApp {
 
   final case class StdinResult(stdout: String, stderr: String, exitCode: ExitCode)
 
-  def formatStdin(content: Array[Byte], filename: String): StdinResult =
-    Verdict.of(content, filename) match {
+  // Stdin takes the flags but no config-file lookup: the name it is given is diagnostics only,
+  // and reading a file beside it would break that promise.
+  def formatStdin(content: Array[Byte], filename: String, style: StyleOverrides): StdinResult =
+    Verdict.of(content, filename, style.applyTo(FormatOptions.default)) match {
       case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, "", ExitCode.Success)
       case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), "", ExitCode.Success)
       case Verdict.Refused(refusal)           =>
         StdinResult("", s"cannot format $filename: ${refusal.reason}\n", ExitCode(1))
     }
 
-  /** Examines every file, even after an unformatted one is found, and each file once.
+  /** Every file's style: the `.hocon-fmt.conf` found from its directory, overridden by the flags;
+    * an explicit `--config` takes the place of the lookup and holds for every file. Resolved
+    * before any file is examined, so a bad config file stops the run before one is touched.
+    */
+  def styleFor(paths: List[Path], arguments: Arguments): IO[Either[String, List[(Path, FormatOptions)]]] =
+    arguments.config match {
+      case Some(explicit) =>
+        ConfigFile.read[IO](explicit).map(_.map(base => paths.map(_ -> arguments.style.applyTo(base))))
+      case None =>
+        paths
+          .traverse(path => ConfigFile.optionsFor[IO](path, arguments.style))
+          .map(options => options.sequence.map(paths.zip(_)))
+    }
+
+  /** The whole file pipeline: canonical paths, each file's style resolved, every file examined.
+    * `Left` is a config-file error, decided before any file is read.
+    */
+  def examineAll(arguments: Arguments): IO[Either[String, Run]] =
+    formatter.distinctPaths(arguments.files).flatMap { paths =>
+      styleFor(paths, arguments).flatMap {
+        case Left(error)   => Left(error).pure[IO]
+        case Right(styled) => examineAll(styled, arguments.checkOnly).map(Right(_))
+      }
+    }
+
+  /** Examines every file given, even after an unformatted one is found, and each path once.
     *
     * Exiting from inside a parallel loop used to kill the JVM mid-iteration, so `--check` could
-    * miss files entirely; now nothing exits until every outcome is in. And a file named twice,
-    * however spelled, would be written by two fibers at once, so files are told apart by their
-    * canonical path.
+    * miss files entirely; now nothing exits until every outcome is in. The paths arrive from
+    * `distinctPaths`, so a file named twice, however spelled, is not written by two fibers.
     */
-  def examineAll(arguments: Arguments): IO[Run] =
-    formatter
-      .distinctPaths(arguments.files)
-      .flatMap(_.parTraverse(file => examine(file, file.toString, arguments.checkOnly)))
-      .map(Run(_))
+  def examineAll(styled: List[(Path, FormatOptions)], checkOnly: Boolean): IO[Run] =
+    styled.parTraverse { case (file, options) => examine(file, file.toString, checkOnly, options) }.map(Run(_))
 
   private val formatter = FileFormatter[IO]
 
-  private def examine(file: Path, path: String, checkOnly: Boolean): IO[Outcome] = {
+  private def examine(file: Path, path: String, checkOnly: Boolean, options: FormatOptions): IO[Outcome] = {
     val result = if (checkOnly) {
-      formatter.verdict(file).map {
+      formatter.verdict(file, options).map {
         case Verdict.NeedsFormatting(formatted) => Outcome.NeedsFormatting(path, formatted)
         case Verdict.AlreadyFormatted           => Outcome.AlreadyFormatted(path)
         case Verdict.Refused(refusal)           => Outcome.Unformattable(path, refusal.reason.take(120))
       }
     } else {
-      formatter.format(file).map {
+      formatter.format(file, options).map {
         case FormatOutcome.Formatted        => Outcome.Rewritten(path)
         case FormatOutcome.AlreadyFormatted => Outcome.AlreadyFormatted(path)
         case FormatOutcome.Refused(refusal) => Outcome.Unformattable(path, refusal.reason.take(120))

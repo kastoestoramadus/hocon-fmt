@@ -116,7 +116,7 @@ class IsolatedLoaderContractTest {
     @Test
     void alreadyFormattedCrossesAsAValuelessRecord() throws Exception {
         withIsolatedLoader(loader -> {
-            Object verdict = check(loader, "a: 1\n".getBytes(StandardCharsets.UTF_8));
+            Object verdict = check(loader, "a = 1\n".getBytes(StandardCharsets.UTF_8));
             assertEquals("AlreadyFormatted", verdict.getClass().getSimpleName());
             assertTrue(verdict.getClass().isRecord(), verdict.getClass() + " is not a record");
             assertEquals(0, verdict.getClass().getRecordComponents().length);
@@ -129,7 +129,7 @@ class IsolatedLoaderContractTest {
         withIsolatedLoader(loader -> {
             Object verdict = check(loader, "a   :   1".getBytes(StandardCharsets.UTF_8));
             assertEquals("NeedsFormatting", verdict.getClass().getSimpleName());
-            assertEquals("a: 1\n", read(verdict, "formatted"));
+            assertEquals("a = 1\n", read(verdict, "formatted"));
         });
     }
 

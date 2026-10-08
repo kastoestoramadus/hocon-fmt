@@ -34,9 +34,9 @@ object Playground {
           " comments become ",
           code("#"),
           ", ",
-          code("="),
-          " becomes ",
           code(":"),
+          " becomes ",
+          code("="),
           ", nested objects flatten to dotted paths. The meaning stays; the spelling does not."
         ),
         p("Two things it does that a plain parse-render round trip does not:"),

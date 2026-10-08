@@ -43,8 +43,8 @@ class PluginIntegrationSpec extends munit.FunSuite {
 
       val format = tester.eval("__.hoconFormat")
       assert(format.isSuccess, format.debugString)
-      assertEquals(os.read(application), "include \"local.conf\"\napp {\n  name: svc\n  port: 8080\n}\n")
-      assertEquals(os.read(testConf), "timeout: \"5s\"\n")
+      assertEquals(os.read(application), "include \"local.conf\"\napp {\n  name = svc\n  port = 8080\n}\n")
+      assertEquals(os.read(testConf), "timeout = \"5s\"\n")
       assertEquals(os.read(nginx), nginxBefore)
 
       val recheck = tester.eval("__.hoconFormatCheck")

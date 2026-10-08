@@ -4,37 +4,49 @@ import org.ekrich.config.{ConfigList, ConfigObject}
 import org.scalacheck.Prop.forAll
 import scala.jdk.CollectionConverters.*
 
-import ww86.hocon_fmt.HoconFormatter.format
 import ww86.hocon_fmt.HoconGen.*
 
 /** Properties that must hold for every document, checked on generated ones.
   *
   * The example-based suites pin the cases someone thought of; these look for the ones nobody did.
   * On a failure ScalaCheck prints the shrunk document and the seed that reproduces it. The formatter
-  * may always refuse; what it must never do is hand back text that lost something.
+  * may always refuse; what it must never do is hand back text that lost something. Every property
+  * runs for every option combination: a style the user can ask for deserves the same guarantees.
   */
 class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSupport {
 
   val PlaceholderKey = "__INCLUDE_(\\d+)".r
   val GuardKey       = "__INCLUDE_GUARD_\\d+".r
 
+  /** Every combination the options can be set to. */
+  val allOptions: List[FormatOptions] =
+    for {
+      separator             <- List(Separator.Equals, Separator.Colon)
+      doubleIndent          <- List(false, true)
+      simplifyNestedObjects <- List(true, false)
+    } yield FormatOptions(separator, doubleIndent, simplifyNestedObjects)
+
   // The rarest defects found so far took thousands of documents to turn up; a deeper search is
   // `sbt -Dhocon.properties=20000 "coreJVM/testOnly ww86.hocon_fmt.FormatterPropertiesSpec"`.
   override def scalaCheckTestParameters = super.scalaCheckTestParameters
     .withMinSuccessfulTests(sys.props.get("hocon.properties").map(_.toInt).getOrElse(1000))
 
-  property("never loses a comment") {
+  property("never loses a comment, in any option combination") {
     forAll(documents(includes = true)) { doc =>
-      format(doc.text).foreach { out =>
-        doc.comments.foreach(c => assert(out.contains(c), s"comment [$c] lost from:\n$out"))
+      allOptions.foreach { options =>
+        HoconFormatter.format(doc.text, options).foreach { out =>
+          doc.comments.foreach(c => assert(out.contains(c), s"comment [$c] lost from:\n$out"))
+        }
       }
     }
   }
 
-  property("never loses an include") {
+  property("never loses an include, in any option combination") {
     forAll(documents(includes = true)) { doc =>
-      format(doc.text).foreach { out =>
-        doc.includes.foreach(i => assert(out.contains(i), s"[$i] lost from:\n$out"))
+      allOptions.foreach { options =>
+        HoconFormatter.format(doc.text, options).foreach { out =>
+          doc.includes.foreach(i => assert(out.contains(i), s"[$i] lost from:\n$out"))
+        }
       }
     }
   }
@@ -45,36 +57,83 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // definition survives. The output is read through sconfig, with the includes masked as the
   // formatter does, so a shared misreading of its line numbers is what could hide a failure here;
   // the expectation comes from the generated tree and not from sconfig.
-  property("keeps every key defined before an include before it") {
+  property("keeps every key defined before an include before it, in any option combination") {
     val documentsWithUniqueIncludes = documents(includes = true, distinctKeys = true)
       .suchThat(doc => doc.includes.distinct == doc.includes)
     forAll(documentsWithUniqueIncludes) { doc =>
-      format(doc.text).foreach { out =>
-        assertEquals(keysBeforeIncludes(out), doc.keysBeforeIncludes, s"an include changed places in:\n$out")
+      allOptions.foreach { options =>
+        HoconFormatter.format(doc.text, options).foreach { out =>
+          assertEquals(keysBeforeIncludes(out), doc.keysBeforeIncludes, s"an include changed places in:\n$out")
+        }
       }
     }
   }
 
-  property("never leaks a placeholder") {
+  property("never leaks a placeholder, in any option combination") {
     forAll(documents(includes = true)) { doc =>
-      format(doc.text).foreach(out => assert(!out.contains("__INCLUDE"), out))
+      allOptions.foreach { options =>
+        HoconFormatter.format(doc.text, options).foreach(out => assert(!out.contains("__INCLUDE"), out))
+      }
     }
   }
 
-  property("keeps the meaning of every document it formats") {
+  property("keeps the meaning of every document it formats, in any option combination") {
     forAll(documents(includes = false)) { doc =>
-      format(doc.text).foreach(out => assertSameMeaning(out, doc.text, s"meaning changed, output:\n$out"))
+      allOptions.foreach { options =>
+        HoconFormatter
+          .format(doc.text, options)
+          .foreach(out => assertSameMeaning(out, doc.text, s"meaning changed, output:\n$out"))
+      }
+    }
+  }
+
+  // User text that looks like what IncludeMasking writes, next to a real include: the formatter may
+  // refuse the file, but a file it formats keeps that text.
+  property("never alters text that looks like a placeholder, in any option combination") {
+    import org.scalacheck.Gen
+    val digits    = Gen.oneOf("0", "1", "01", "7", "99999999999", "999999999999999999999")
+    val sep       = Gen.oneOf(" = ", " : ", "=", ":")
+    val lookalike = for {
+      n  <- digits
+      s1 <- sep
+      s2 <- sep
+      t  <- Gen.oneOf(
+             s"__INCLUDE_$n",
+             s"__INCLUDE_GUARD_$n${s1}g",
+             s"__INCLUDE_$n${s1}__INCLUDE_$n",
+             s"x __INCLUDE_GUARD_$n${s2}g y"
+           )
+    } yield t
+    def bareKey(text: String): String =
+      "__INCLUDE_" + text.dropWhile(_ != '_').drop(10).takeWhile(c => c.isLetterOrDigit || c == '_')
+    val place = Gen.oneOf("value", "quotedKey", "bareKey", "nested")
+    forAll(lookalike, place) { (text, where) =>
+      val source = where match {
+        case "value"     => s"include \"f.conf\"\na = \"$text\""
+        case "quotedKey" => s"include \"f.conf\"\n\"$text\" = 42"
+        case "bareKey"   => s"include \"f.conf\"\n${bareKey(text)} = 5"
+        case _           => s"o { include \"f.conf\"\n  a = \"$text\" }"
+      }
+      val kept = if (where == "bareKey") bareKey(text) else text
+      allOptions.foreach { options =>
+        HoconFormatter.format(source, options).foreach { out =>
+          assert(out.contains(kept), s"[$kept] changed in:\n$out")
+        }
+      }
     }
   }
 
   // Without this the properties above would pass vacuously on a formatter that refused everything.
-  property("formats every document it has no reason to refuse") {
+  property("formats every document it has no reason to refuse, in any option combination") {
     val documentsWithoutReason = documents(includes = true, distinctKeys = true)
       .suchThat(doc => doc.everyCommentPrecedesAField && !doc.hitsKnownSconfigDefect && !doc.includeSharesALine)
     forAll(documentsWithoutReason) { doc =>
-      format(doc.text) match {
-        case Right(out)    => assertEquals(format(out), Right(out), "output is not a fixed point")
-        case Left(refusal) => fail(s"refused: ${refusal.reason}")
+      allOptions.foreach { options =>
+        HoconFormatter.format(doc.text, options) match {
+          case Right(out) =>
+            assertEquals(HoconFormatter.format(out, options), Right(out), "output is not a fixed point")
+          case Left(refusal) => fail(s"refused: ${refusal.reason}")
+        }
       }
     }
   }

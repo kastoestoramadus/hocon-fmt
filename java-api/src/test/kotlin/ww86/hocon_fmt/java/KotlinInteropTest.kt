@@ -7,7 +7,7 @@ class KotlinInteropTest {
 
     @Test
     fun `when over the mirror is checked for exhaustiveness`() {
-        val verdict: Verdict = HoconFmt.check("a = 1\n")
+        val verdict: Verdict = HoconFmt.check("a   =   1\n")
 
         // A value-used when with no else: the Kotlin compiler accepts it only because the mirror
         // is sealed. Delete the `is Verdict.Refused` branch below and, from java-api/, run
@@ -20,7 +20,7 @@ class KotlinInteropTest {
             is Verdict.NeedsFormatting -> "needs: ${v.formatted().trim()}"
             is Verdict.Refused -> "refused: ${v.reason()}"
         }
-        assertEquals("needs: a: 1", shape(verdict))
+        assertEquals("needs: a = 1", shape(verdict))
     }
 
     @Test

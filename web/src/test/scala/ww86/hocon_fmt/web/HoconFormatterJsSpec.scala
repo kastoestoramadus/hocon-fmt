@@ -15,22 +15,22 @@ class HoconFormatterJsSpec extends munit.FunSuite {
   test("a text that needs formatting comes back formatted") {
     val result = format("app {\n    name  =  \"svc\"\n   port =8080\n}\n")
     assertEquals(field(result, "verdict"), Some("needsFormatting"))
-    assertEquals(field(result, "formatted"), Some("app {\n  name: svc\n  port: 8080\n}\n"))
+    assertEquals(field(result, "formatted"), Some("app {\n  name = svc\n  port = 8080\n}\n"))
     assertEquals(field(result, "refusal"), None)
     assertEquals(field(result, "reason"), None)
   }
 
   test("an already formatted text comes back as it is") {
-    val result = format("retries: 3\n")
+    val result = format("retries = 3\n")
     assertEquals(field(result, "verdict"), Some("alreadyFormatted"))
-    assertEquals(field(result, "formatted"), Some("retries: 3\n"))
+    assertEquals(field(result, "formatted"), Some("retries = 3\n"))
   }
 
   test("include statements survive, as sconfig alone on Scala.js cannot parse them") {
     val result = format("include \"local.conf\"\napp {\n  include required(\"db.conf\")\n    port = 8080\n}\n")
     assertEquals(
       field(result, "formatted"),
-      Some("include \"local.conf\"\napp {\n  include required(\"db.conf\")\n  port: 8080\n}\n")
+      Some("include \"local.conf\"\napp {\n  include required(\"db.conf\")\n  port = 8080\n}\n")
     )
   }
 
@@ -65,6 +65,7 @@ class HoconFormatterJsSpec extends munit.FunSuite {
       Refusal.LostComment("")     -> "lostComment",
       Refusal.LostInclude("")     -> "lostInclude",
       Refusal.MovedInclude("")    -> "movedInclude",
+      Refusal.ReservedName        -> "reservedName",
       Refusal.UnstableOutput      -> "unstableOutput"
     )
     names.foreach((refusal, name) => assertEquals(HoconFormatterJs.nameOf(refusal), name))

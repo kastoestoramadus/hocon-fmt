@@ -18,9 +18,9 @@ class CliAcceptanceSuite extends munit.FunSuite {
   )
 
   private val unformatted = "name   =   \"zażółć gęślą jaźń ✓\"\nb { c=1 }\n"
-  private val formatted   = "name: \"zażółć gęślą jaźń ✓\"\nb.c: 1\n"
+  private val formatted   = "name = \"zażółć gęślą jaźń ✓\"\nb.c = 1\n"
   // Multi-byte characters must survive the 4096-byte reads that stdin is consumed in.
-  private val large = (1 to 1500).map(i => s"key$i: \"zażółć gęślą ✓\"\n").mkString
+  private val large = (1 to 1500).map(i => s"key$i = \"zażółć gęślą ✓\"\n").mkString
 
   final private case class Result(exitCode: Int, stdout: Array[Byte], stderr: String) {
     def stdoutText: String = String(stdout, UTF_8)

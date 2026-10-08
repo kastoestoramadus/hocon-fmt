@@ -4,12 +4,12 @@ def written = { String path -> file(path).lastModified() != 1_000_000_000_000L }
 
 assert file('src/main/resources/application.conf').text == '''\
 server {
-  host: localhost
-  port: 8080
+  host = localhost
+  port = 8080
 }
 '''
 // Directly under src/: `**` has to match zero directories, and .hocon is included by default.
-assert file('src/top.hocon').text == 'name: top\n'
+assert file('src/top.hocon').text == 'name = top\n'
 
 // Formatted already, so rewriting it would only churn its timestamp.
 assert !written('src/main/resources/formatted.conf')

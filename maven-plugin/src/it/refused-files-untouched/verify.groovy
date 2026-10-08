@@ -12,7 +12,7 @@ assert untouched('src/main/resources/self-reference.conf', 'a : 1\na : ${a}\n'.b
 assert untouched('src/main/resources/latin1.conf', 'name = "café"\n'.getBytes('ISO-8859-1'))
 
 // The goals did run: the one file they can handle was formatted.
-assert file('src/main/resources/valid.conf').text == 'a: 1\n'
+assert file('src/main/resources/valid.conf').text == 'a = 1\n'
 
 def log = file('build.log').text
 assert log =~ /\[WARNING\] Leaving src\/main\/resources\/broken.conf unchanged: .*was not closed/

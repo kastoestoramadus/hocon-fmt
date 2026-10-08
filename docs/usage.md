@@ -18,7 +18,7 @@ All JVM channels need Java 17 or newer, as Scala 3.8 does.
 ## Command line
 
 ```
-hocon-fmt [--check] <file>...
+hocon-fmt [--check] [--separator =|:] [--config <file>] <file>...
 hocon-fmt --stdin [--stdin-filename <name>]
 hocon-fmt --version
 ```
@@ -27,7 +27,7 @@ hocon-fmt --version
 |---|---|
 | 0 | done; with `--check`, every file is formatted or refused |
 | 1 | `--check` found an unformatted file, or stdin was refused |
-| 2 | the arguments could not be parsed, or stdin could not be read |
+| 2 | the arguments could not be parsed, a config file could not be read or trusted, or stdin could not be read |
 
 `--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
 summary. Already formatted input is returned unchanged. A refusal writes nothing to stdout,
@@ -39,6 +39,43 @@ Do not combine stdin mode with file arguments or `--check`.
 hocon-fmt --stdin --stdin-filename application.conf < input.conf > output.conf
 hocon-fmt --version
 ```
+
+## Style: the separator and friends
+
+The default style writes `key = value`. Three choices are yours to make, from the command line
+or from a style file kept in the repository, so nobody has to pass flags on every run:
+
+| flag | meaning |
+|---|---|
+| `--separator =\|:` | the token between a key and its value; `=` is the default |
+| `--double-indent`, `--no-double-indent` | indent the contents of nested objects four spaces |
+| `--simplify-nested-objects`, `--no-simplify-nested-objects` | flatten nested objects to path keys (the default), or keep the braces |
+| `--config <file>` | read the style from this file instead of the one found for each file |
+
+The style file is `.hocon-fmt.conf`, written in HOCON, and looked up in the formatted file's
+directory and its parents, stopping at the first one found or at a directory containing `.git`,
+so a style from outside a checkout does not reach in. The file above pins a repository that
+wants the `:` spelling:
+
+```hocon
+# .hocon-fmt.conf
+separator = ":"
+double-indent = false
+simplify-nested-objects = true
+```
+
+Precedence is **flag > config file > default**, field by field: a flag left off leaves the file
+in charge of that one choice. An unknown key or a mistyped value is an error naming the file and
+the key, and the run stops with exit 2 before any file is touched. `--stdin` applies the flags
+but does no lookup, keeping the promise that `--stdin-filename` reads nothing.
+
+```sh
+hocon-fmt --separator : application.conf   # one file, the : spelling
+git ls-files '*.conf' | xargs hocon-fmt --check   # the repository, each file styled by its .hocon-fmt.conf
+```
+
+The build-tool plugins below format with the default style; plugin settings and config-file
+lookup there come after their migration to the java API.
 
 `--version` prints the build version shared by all CLI runtimes and needs no input.
 

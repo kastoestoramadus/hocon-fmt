@@ -26,11 +26,21 @@ class CmdApiSpec extends munit.CatsEffectSuite {
 
   def textOf(file: Path): IO[String] = bytesOf(file).map(bytes => String(bytes.toArray, UTF_8))
 
-  def check(files: Path*): IO[CmdApi.Run]   = CmdApi.examineAll(Arguments(files.toList, checkOnly = true))
-  def rewrite(files: Path*): IO[CmdApi.Run] = CmdApi.examineAll(Arguments(files.toList, checkOnly = false))
+  def check(files: Path*): IO[CmdApi.Run] =
+    CmdApi
+      .examineAll(Arguments(files.toList, checkOnly = true, config = None, style = StyleOverrides.none))
+      .map(_.fold(e => fail(e), identity))
+
+  def rewrite(files: Path*): IO[CmdApi.Run] =
+    CmdApi
+      .examineAll(Arguments(files.toList, checkOnly = false, config = None, style = StyleOverrides.none))
+      .map(_.fold(e => fail(e), identity))
+
+  def arguments(config: Option[Path] = None, style: StyleOverrides = StyleOverrides.none): Arguments =
+    Arguments(files = Nil, checkOnly = false, config = config, style = style)
 
   val unformatted = "a   :    1"
-  val formatted   = "a: 1\n"
+  val formatted   = "a = 1\n"
 
   tmp.test("--check reports exit code 1 for an unformatted file") { dir =>
     write(dir, "a.conf", unformatted).flatMap(check(_)).map(run => assertEquals(run.exitCode, ExitCode(1)))
@@ -141,15 +151,27 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   test("arguments: files, with --check or -c") {
     assertEquals(
       CmdApi.command.parse(List("--check", "a.conf", "b.conf")),
-      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf"), Path("b.conf")), checkOnly = true)))
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(List(Path("a.conf"), Path("b.conf")), checkOnly = true, config = None, style = StyleOverrides.none)
+        )
+      )
     )
     assertEquals(
       CmdApi.command.parse(List("-c", "a.conf")),
-      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf")), checkOnly = true)))
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(List(Path("a.conf")), checkOnly = true, config = None, style = StyleOverrides.none)
+        )
+      )
     )
     assertEquals(
       CmdApi.command.parse(List("a.conf")),
-      Right(CmdApi.Invocation.FileMode(Arguments(List(Path("a.conf")), checkOnly = false)))
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(List(Path("a.conf")), checkOnly = false, config = None, style = StyleOverrides.none)
+        )
+      )
     )
   }
 
@@ -158,10 +180,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   }
 
   test("arguments: stdin and version need no files") {
-    assertEquals(CmdApi.command.parse(List("--stdin")), Right(CmdApi.Invocation.Stdin("<stdin>")))
+    assertEquals(CmdApi.command.parse(List("--stdin")), Right(CmdApi.Invocation.Stdin("<stdin>", StyleOverrides.none)))
     assertEquals(
       CmdApi.command.parse(List("--stdin", "--stdin-filename", "editor.conf")),
-      Right(CmdApi.Invocation.Stdin("editor.conf"))
+      Right(CmdApi.Invocation.Stdin("editor.conf", StyleOverrides.none))
     )
     assertEquals(CmdApi.command.parse(List("--version")), Right(CmdApi.Invocation.Version))
   }
@@ -177,19 +199,19 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   }
 
   test("stdin formats without mixing reports into stdout") {
-    val result = CmdApi.formatStdin(unformatted.getBytes(UTF_8), "editor.conf")
+    val result = CmdApi.formatStdin(unformatted.getBytes(UTF_8), "editor.conf", StyleOverrides.none)
     assertEquals(result.stdout, formatted)
     assertEquals(result.stderr, "")
     assertEquals(result.exitCode, ExitCode.Success)
   }
 
   test("stdin preserves already formatted input") {
-    assertEquals(CmdApi.formatStdin(formatted.getBytes(UTF_8), "<stdin>").stdout, formatted)
+    assertEquals(CmdApi.formatStdin(formatted.getBytes(UTF_8), "<stdin>", StyleOverrides.none).stdout, formatted)
   }
 
   test("stdin refusal emits no output and fails, naming the input on stderr") {
     List("a: ${".getBytes(UTF_8), Array(0xff.toByte)).foreach { bytes =>
-      val result = CmdApi.formatStdin(bytes, "editor.conf")
+      val result = CmdApi.formatStdin(bytes, "editor.conf", StyleOverrides.none)
       assertEquals(result.stdout, "")
       assertEquals(result.exitCode, ExitCode(1))
       assert(result.stderr.contains("editor.conf"), result.stderr)
@@ -199,10 +221,201 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
   // file its name promises, so the name alone decides.
   test("stdin under a name that promises another format is refused, naming what it is") {
-    val result = CmdApi.formatStdin("""{"a": 1}""".getBytes(UTF_8), "application.json")
+    val result = CmdApi.formatStdin("""{"a": 1}""".getBytes(UTF_8), "application.json", StyleOverrides.none)
     assertEquals(result.stdout, "")
     assertEquals(result.exitCode, ExitCode(1))
     assert(result.stderr.contains("application.json"), result.stderr)
     assert(result.stderr.contains("JSON"), result.stderr)
+  }
+
+  // --- the style flags and the repository's .hocon-fmt.conf ------------------------------------
+
+  def styleFor(config: Option[Path] = None, style: StyleOverrides = StyleOverrides.none)(files: Path*) =
+    CmdApi.styleFor(files.toList, arguments(config, style).copy(files = files.toList))
+
+  test("arguments: --separator and --config parse, and the booleans come in --no- pairs") {
+    assertEquals(
+      CmdApi.command.parse(List("--separator", ":", "a.conf")),
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = false,
+            config = None,
+            style = StyleOverrides(separator = Some(Separator.Colon))
+          )
+        )
+      )
+    )
+    assertEquals(
+      CmdApi.command.parse(List("--config", "team.conf", "--separator", "=", "-c", "a.conf")),
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = true,
+            config = Some(Path("team.conf")),
+            style = StyleOverrides(separator = Some(Separator.Equals))
+          )
+        )
+      )
+    )
+    assertEquals(
+      CmdApi.command.parse(List("--double-indent", "--no-simplify-nested-objects", "a.conf")),
+      Right(
+        CmdApi.Invocation.FileMode(
+          Arguments(
+            List(Path("a.conf")),
+            checkOnly = false,
+            config = None,
+            style = StyleOverrides(doubleIndent = Some(true), simplifyNestedObjects = Some(false))
+          )
+        )
+      )
+    )
+  }
+
+  test("arguments: a separator or flag pair nothing can honour is a usage error") {
+    List(
+      List("--separator", "equals", "a.conf"),
+      List("--double-indent", "--no-double-indent", "a.conf"),
+      List("--stdin", "--config", "team.conf"),
+      List("--version", "--separator", ":")
+    ).foreach(args => assert(CmdApi.command.parse(args).isLeft, args.toString))
+  }
+
+  test("--help lists the style flags and the config file") {
+    val Left(help) = CmdApi.command.parse(List("--help")): @unchecked
+    assert(help.errors.isEmpty, help.errors.toString)
+    val text = help.toString
+    List("--separator", "--config", "--double-indent", "--no-double-indent", "--simplify-nested-objects").foreach {
+      flag =>
+        assert(text.contains(flag), text)
+    }
+  }
+
+  tmp.test("a .hocon-fmt.conf beside the file sets the style") { dir =>
+    for {
+      _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file   <- write(dir, "a.conf", unformatted)
+      styled <- styleFor()(file)
+    } yield assertEquals(
+      styled,
+      Right(List(file -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true)))
+    )
+  }
+
+  tmp.test("the config file is looked up above the file's directory, and the nearest one wins") { dir =>
+    val home = dir / "repo"
+    for {
+      _      <- Files[IO].createDirectory(home)
+      _      <- write(home, ".hocon-fmt.conf", "separator = \":\"\n")
+      sub     = home / "sub"
+      _      <- Files[IO].createDirectory(sub)
+      _      <- write(sub, ".hocon-fmt.conf", "double-indent = true\n")
+      file   <- write(sub, "a.conf", unformatted)
+      styled <- styleFor()(file)
+    } yield assertEquals(
+      styled,
+      Right(List(file -> FormatOptions(Separator.Equals, doubleIndent = true, simplifyNestedObjects = true)))
+    )
+  }
+
+  tmp.test("the walk stops at the repository root, so a style above the checkout does not reach in") { dir =>
+    val repo = dir / "repo"
+    for {
+      _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      _      <- Files[IO].createDirectory(repo)
+      _      <- Files[IO].createDirectory(repo / ".git")
+      file   <- write(repo, "a.conf", unformatted)
+      styled <- styleFor()(file)
+    } yield assertEquals(styled, Right(List(file -> FormatOptions.default)))
+  }
+
+  tmp.test("a flag overrides the config file, the config file the default") { dir =>
+    for {
+      _        <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file     <- write(dir, "a.conf", unformatted)
+      fromFile <- styleFor()(file)
+      byFlag   <- styleFor(style = StyleOverrides(separator = Some(Separator.Equals)))(file)
+    } yield {
+      assertEquals(
+        fromFile,
+        Right(List(file -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true)))
+      )
+      assertEquals(byFlag, Right(List(file -> FormatOptions.default)))
+    }
+  }
+
+  tmp.test("an unknown key is an error naming the config file and the key") { dir =>
+    for {
+      _      <- write(dir, ".hocon-fmt.conf", "separators = \":\"\n")
+      file   <- write(dir, "a.conf", unformatted)
+      styled <- styleFor()(file)
+    } yield assert(styled.left.exists(_.startsWith(dir.toString)), styled)
+  }
+
+  tmp.test("a bad value is an error naming the config file and the key") { dir =>
+    for {
+      _      <- write(dir, ".hocon-fmt.conf", "double-indent = maybe\n")
+      file   <- write(dir, "a.conf", unformatted)
+      styled <- styleFor()(file)
+    } yield assert(
+      styled.left.exists(message => message.contains("double-indent") && message.contains(dir.toString)),
+      styled
+    )
+  }
+
+  tmp.test("an explicit --config is used for every file, nearer .hocon-fmt.conf files aside") { dir =>
+    val sub = dir / "sub"
+    for {
+      _      <- write(dir, "team.conf", "separator = \":\"\n")
+      _      <- write(dir, ".hocon-fmt.conf", "double-indent = true\n")
+      _      <- Files[IO].createDirectory(sub)
+      a      <- write(dir, "a.conf", unformatted)
+      b      <- write(sub, "b.conf", unformatted)
+      styled <- styleFor(config = Some(dir / "team.conf"))(a, b)
+    } yield assertEquals(
+      styled,
+      Right(
+        List(
+          a -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true),
+          b -> FormatOptions(Separator.Colon, doubleIndent = false, simplifyNestedObjects = true)
+        )
+      )
+    )
+  }
+
+  tmp.test("a missing explicit config file is an error naming it") { dir =>
+    for {
+      file   <- write(dir, "a.conf", unformatted)
+      styled <- styleFor(config = Some(dir / "nope.conf"))(file)
+    } yield assert(styled.left.exists(_.contains("nope.conf")), styled)
+  }
+
+  tmp.test("write mode formats in the style the config file asks for") { dir =>
+    for {
+      _    <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file <- write(dir, "a.conf", "a = 1\n")
+      run  <- rewrite(file)
+      text <- textOf(file)
+    } yield {
+      assertEquals(run.exitCode, ExitCode.Success)
+      assertEquals(text, "a: 1\n")
+    }
+  }
+
+  tmp.test("--check counts a default-formatted file as unformatted when the style asks for :") { dir =>
+    for {
+      _    <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file <- write(dir, "a.conf", "a = 1\n")
+      run  <- check(file)
+    } yield assertEquals(run.exitCode, ExitCode(1))
+  }
+
+  test("stdin applies the style flags; no config file is looked up, the stdin name is not read") {
+    val result =
+      CmdApi.formatStdin("a = 1\n".getBytes(UTF_8), "<stdin>", StyleOverrides(separator = Some(Separator.Colon)))
+    assertEquals(result.stdout, "a: 1\n")
   }
 }

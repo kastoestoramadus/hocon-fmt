@@ -23,7 +23,7 @@ class ZioFormatterSpec extends munit.FunSuite {
 
   test("verdict preserves all core decisions") {
     Unsafe.unsafe { implicit unsafe =>
-      val sources = List("a=1", "a: 1\n", "a={")
+      val sources = List("a : 1", "a = 1\n", "a={")
       Runtime.default.unsafe.runToFuture(_root_.zio.ZIO.foreach(sources)(ZioFormatter.verdict)).map { results =>
         assertEquals(results, sources.map(Verdict.of))
       }

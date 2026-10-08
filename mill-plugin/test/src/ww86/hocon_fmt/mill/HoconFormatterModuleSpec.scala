@@ -52,11 +52,11 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     withFiles(
       project,
       "resources/application.conf" -> text("app {\n    name  =  \"svc\"\n   port =8080\n}\n"),
-      "resources/formatted.conf"   -> text("retries: 3\n")
+      "resources/formatted.conf"   -> text("retries = 3\n")
     ) { run =>
       val formattedBefore = os.mtime(project.moduleDir / "resources" / "formatted.conf")
       assert(run.eval(project.hoconFormat()).isRight)
-      assertEquals(read(project, "resources/application.conf"), "app {\n  name: svc\n  port: 8080\n}\n")
+      assertEquals(read(project, "resources/application.conf"), "app {\n  name = svc\n  port = 8080\n}\n")
       assertEquals(os.mtime(project.moduleDir / "resources" / "formatted.conf"), formattedBefore)
       assert(run.log.contains("Formatted resources/application.conf"), run.log)
       assert(!run.log.contains("Formatted resources/formatted.conf"), run.log)
@@ -73,7 +73,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       assert(run.eval(project.hoconFormat()).isRight)
       assertEquals(
         read(project, "resources/application.conf"),
-        "include \"other.conf\"\napp {\n  name: demo\n  include required(\"nested.conf\")\n  port: 8080\n}\n"
+        "include \"other.conf\"\napp {\n  name = demo\n  include required(\"nested.conf\")\n  port = 8080\n}\n"
       )
     }
   }
@@ -90,7 +90,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
         assertEquals(readBytes(project, path).toSeq, content.toSeq, path)
         assertEquals(s"Leaving $path unchanged".r.findAllMatchIn(run.log).size, 1, run.log)
       }
-      assertEquals(read(project, "resources/acceptable.conf"), "retries: 3\n")
+      assertEquals(read(project, "resources/acceptable.conf"), "retries = 3\n")
     }
   }
 
@@ -99,7 +99,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       project,
       "resources/a.conf" -> text("a   =   1\n"),
       "resources/b.conf" -> text("b   =   2\n"),
-      "resources/c.conf" -> text("c: 3\n")
+      "resources/c.conf" -> text("c = 3\n")
     ) { run =>
       val message = failure(run.eval(project.hoconFormatCheck()))
       assert(message.contains("2 HOCON files are not formatted"), message)
@@ -114,7 +114,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
   test("hoconFormatCheck passes when every file is formatted or refused") {
     withFiles(
       project,
-      "resources/formatted.conf" -> text("retries: 3\n"),
+      "resources/formatted.conf" -> text("retries = 3\n"),
       "resources/broken.conf"    -> text("a : ${\n")
     ) { run =>
       assert(run.eval(project.hoconFormatCheck()).isRight)
@@ -130,7 +130,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       "resources/app.properties" -> text("a   =   1\n")
     ) { run =>
       assert(run.eval(project.hoconFormat()).isRight)
-      assertEquals(read(project, "resources/service.hocon"), "a: 1\n")
+      assertEquals(read(project, "resources/service.hocon"), "a = 1\n")
       assertEquals(read(project, "resources/data.json"), "{ \"a\" :   1 }\n")
       assertEquals(read(project, "resources/app.properties"), "a   =   1\n")
     }
@@ -155,7 +155,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       "resources/other.conf"     -> text("b   =   2\n")
     ) { run =>
       assert(run.eval(customSources.hoconFormat()).isRight)
-      assertEquals(read(customSources, "conf/nested/service.conf"), "a: 1\n")
+      assertEquals(read(customSources, "conf/nested/service.conf"), "a = 1\n")
       assertEquals(read(customSources, "resources/other.conf"), "b   =   2\n")
     }
   }
