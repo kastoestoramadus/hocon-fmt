@@ -13,8 +13,10 @@ sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
 sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 19 (JVM, Native), 20 (JS)
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt coreJVM/publishM2     # needed before the Gradle and Maven builds
+sbt javaApi/publishM2     # needed before the java-api tests: the contract suite loads this jar
 sbt coreJVM/publishLocal  # needed before the Mill build
 (cd gradle-plugin && ./gradlew check)
+(cd java-api && ./gradlew check)
 (cd maven-plugin && ./mvnw verify)
 (cd mill-plugin && ./mill __.testForked)
 scripts/pre-commit-e2e.sh # pre-commit hooks as installed from HEAD; needs pre-commit and python3
