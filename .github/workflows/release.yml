@@ -129,7 +129,7 @@ jobs:
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
         run: |
-          sbt coreJVM/publishM2
+          sbt coreJVM/publishM2 javaApi/publishM2
           (cd maven-plugin && ./mvnw -B -Prelease -DskipTests -Dinvoker.skip verify && ls target/*.asc)
       - name: Upload, sbt
         if: startsWith(github.ref, 'refs/tags/v')
