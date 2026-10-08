@@ -13,9 +13,19 @@ class OptionsSpec extends munit.FunSuite {
     assertEquals(HoconFormatter.renderOptions.getConfigFormatOptions.getNewLineAtEnd, true)
   }
 
+  // The default separator is `=`, so the renderer is asked for it by not setting colonAssign;
+  // a `:`-formatted file is requested with FormatOptions(separator = Separator.Colon).
+  test("the separator is decided here, not by an upstream default") {
+    assertEquals(HoconFormatter.renderOptions.getConfigFormatOptions.getColonAssign, false)
+    assertEquals(
+      HoconFormatter.renderOptions(FormatOptions(separator = Separator.Colon)).getConfigFormatOptions.getColonAssign,
+      true
+    )
+  }
+
   test("a rendered document ends with a newline, however the input ended") {
-    assertEquals(HoconFormatter.format("a: 1"), Right("a: 1\n"))
-    assertEquals(HoconFormatter.format("a: 1\n"), Right("a: 1\n"))
+    assertEquals(HoconFormatter.format("a: 1"), Right("a = 1\n"))
+    assertEquals(HoconFormatter.format("a: 1\n"), Right("a = 1\n"))
   }
 
   // An empty root would render as "{}"; an empty file stays empty.

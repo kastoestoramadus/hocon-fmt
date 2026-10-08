@@ -8,11 +8,13 @@ import java.nio.charset.StandardCharsets.{ISO_8859_1, UTF_8}
 class VerdictSpec extends munit.FunSuite with HoconTestSupport {
 
   test("formatted content needs nothing") {
-    assertEquals(Verdict.of("a: 1\n"), Verdict.AlreadyFormatted)
+    assertEquals(Verdict.of("a = 1\n"), Verdict.AlreadyFormatted)
   }
 
   test("unformatted content comes with the text it should have") {
-    assertEquals(Verdict.of("a   :    1"), Verdict.NeedsFormatting("a: 1\n"))
+    assertEquals(Verdict.of("a   :    1"), Verdict.NeedsFormatting("a = 1\n"))
+    // The separator is an option: a `:`-written file is formatted only when it is asked for.
+    assertEquals(Verdict.of("a: 1\n", FormatOptions(separator = Separator.Colon)), Verdict.AlreadyFormatted)
   }
 
   test("content the formatter refuses carries the reason") {
@@ -31,7 +33,7 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("an origin that parses comes back formatted") {
-    assertEquals(HoconFormatter.format("a   :   1", "conf/application.conf"), Right("a: 1\n"))
+    assertEquals(HoconFormatter.format("a   :   1", "conf/application.conf"), Right("a = 1\n"))
   }
 
   // Pinning the no-origin signature: parseString has always reported itself as "String".
@@ -78,9 +80,9 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("a name that promises HOCON is no refusal, whatever the text turns out to be") {
-    assertEquals(Verdict.of("a   :   1".getBytes(UTF_8), "app.conf"), Verdict.NeedsFormatting("a: 1\n"))
-    assertEquals(Verdict.of("a: 1\n".getBytes(UTF_8), "<stdin>"), Verdict.AlreadyFormatted)
-    assertEquals(Verdict.of("a   :   1", "app.conf"), Verdict.NeedsFormatting("a: 1\n"))
+    assertEquals(Verdict.of("a   :   1".getBytes(UTF_8), "app.conf"), Verdict.NeedsFormatting("a = 1\n"))
+    assertEquals(Verdict.of("a = 1\n".getBytes(UTF_8), "<stdin>"), Verdict.AlreadyFormatted)
+    assertEquals(Verdict.of("a   :   1", "app.conf"), Verdict.NeedsFormatting("a = 1\n"))
   }
 
   test("bytes are decoded as UTF-8, so non-ASCII text survives") {

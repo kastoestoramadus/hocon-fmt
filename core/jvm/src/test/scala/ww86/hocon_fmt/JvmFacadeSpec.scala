@@ -6,11 +6,11 @@ import java.nio.charset.StandardCharsets.UTF_8
 class JvmFacadeSpec extends munit.FunSuite {
 
   test("formatted content maps to empty") {
-    assertEquals(JavaCaller.describe("a: 1\n".getBytes(UTF_8)), "already formatted")
+    assertEquals(JavaCaller.describe("a = 1\n".getBytes(UTF_8)), "already formatted")
   }
 
   test("unformatted content maps to the text it should have") {
-    assertEquals(JavaCaller.describe("a   :   1".getBytes(UTF_8)), "reformat to: a: 1\n")
+    assertEquals(JavaCaller.describe("a   :   1".getBytes(UTF_8)), "reformat to: a = 1\n")
   }
 
   test("a refusal is a checked exception whose message is the reason") {
@@ -37,8 +37,8 @@ class JvmFacadeSpec extends munit.FunSuite {
     val facade   = Class.forName("ww86.hocon_fmt.JvmFacade")
     val reformat = facade.getMethod("reformat", classOf[Array[Byte]])
     val result   = reformat.invoke(null, "a   :   1".getBytes(UTF_8))
-    assertEquals(result, java.util.Optional.of("a: 1\n"))
+    assertEquals(result, java.util.Optional.of("a = 1\n"))
     val named = facade.getMethod("reformat", classOf[Array[Byte]], classOf[String])
-    assertEquals(named.invoke(null, "a   :   1".getBytes(UTF_8), "app.conf"), java.util.Optional.of("a: 1\n"))
+    assertEquals(named.invoke(null, "a   :   1".getBytes(UTF_8), "app.conf"), java.util.Optional.of("a = 1\n"))
   }
 }
