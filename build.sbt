@@ -584,7 +584,7 @@ lazy val benchJS     = bench.js
 lazy val benchNative = bench.native
 
 /** The sbt 1.x plugin. sbt loads plugins with Scala 2.12, which cannot link against this Scala 3
-  * build, so the plugin resolves the core at run time and calls it through `JvmFacade` in an
+  * build, so the plugin resolves the Java API at run time and calls its byte entry point in an
   * isolated class loader, the way sbt-scalafmt runs scalafmt. Its behaviour is covered by the
   * scripted tests in `sbt-plugin/src/sbt-test`, run with `sbtPluginTest`: each starts a fresh
   * sbt, which is too slow for the `test` sequence.
@@ -610,16 +610,16 @@ lazy val sbtPlugin = guardPublish(
       buildInfoPackage := "ww86.hocon_fmt.sbt",
       buildInfoObject  := "FormatterArtifact",
       buildInfoKeys    := Seq[BuildInfoKey](
-        "organization" -> (coreJVM / organization).value,
-        "name"         -> s"${(coreJVM / moduleName).value}_${(coreJVM / scalaBinaryVersion).value}",
-        "version"      -> (coreJVM / version).value,
+        "organization" -> (javaApi / organization).value,
+        "name"         -> (javaApi / moduleName).value,
+        "version"      -> (javaApi / version).value,
         "scalaVersion" -> (coreJVM / scalaVersion).value
       ),
       scriptedLaunchOpts += s"-Dplugin.version=${version.value}",
       // The tests read sbt's logs; on CI, sbt colours them, and the escape codes hide `[warn]`.
       scriptedLaunchOpts += "-Dsbt.log.noformat=true",
-      // The plugin fetches the core by its coordinates, so scripted needs it published first.
-      scriptedDependencies := scriptedDependencies.dependsOn(coreJVM / publishLocal).value
+      // The Java API and its transitive core must be available to the isolated worker.
+      scriptedDependencies := scriptedDependencies.dependsOn(coreJVM / publishLocal, javaApi / publishLocal).value
     )
 )
 

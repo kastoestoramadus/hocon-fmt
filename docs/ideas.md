@@ -144,7 +144,7 @@ Action to the GitHub Marketplace" on the release. **Code:** `action.yml` and a s
 
 Teams on Spotless add a step rather than a plugin. With `--stdin`, Spotless's `nativeCmd` step
 runs the binary on each file; a snippet in [usage](usage.md) is the whole integration. An
-in-process step through `JvmFacade` would avoid the binary but ties the step to Spotless's
+in-process step through the Java API would avoid the binary but ties the step to Spotless's
 internals and its configuration-cache rules.
 
 ### Dependency updates (S)

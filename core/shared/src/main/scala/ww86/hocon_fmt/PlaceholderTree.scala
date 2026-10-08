@@ -18,18 +18,27 @@ private[hocon_fmt] object PlaceholderTree {
     */
   def collides(value: ConfigValue, prefix: String, generated: Map[String, String]): Boolean = value match {
     case obj: ConfigObject =>
-      obj.entrySet.asScala.exists { entry =>
-        val key   = entry.getKey
-        val child = entry.getValue
-        val ours  = generated.get(key).exists(expected => Try(child.unwrapped).toOption.contains(expected))
-        !ours && (key.contains(prefix) || collides(child, prefix, generated))
+      // An unresolved object merge cannot enumerate its keys, but rendering exposes its pieces.
+      Try(obj.entrySet.asScala.toList).toOption match {
+        case None          => renderedReserved(obj, prefix)
+        case Some(entries) =>
+          entries.exists { entry =>
+            val key   = entry.getKey
+            val child = entry.getValue
+            val ours  = generated.get(key).exists(expected => Try(child.unwrapped).toOption.contains(expected))
+            !ours && (key.contains(prefix) || collides(child, prefix, generated))
+          }
       }
     case list: ConfigList => list.asScala.exists(collides(_, prefix, generated))
     case other            =>
       Try(other.unwrapped).toOption match {
         case Some(text: String) => text.contains(prefix)
         case Some(_)            => false
-        case None               => other.render(HoconFormatter.renderOptions).contains(prefix)
+        case None               => renderedReserved(other, prefix)
       }
   }
+
+  /** A failed rendering hides nothing: the pipeline refuses it before producing output. */
+  private def renderedReserved(value: ConfigValue, prefix: String): Boolean =
+    Try(value.render(HoconFormatter.renderOptions)).toOption.exists(_.contains(prefix))
 }

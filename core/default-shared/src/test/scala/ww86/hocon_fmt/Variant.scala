@@ -8,6 +8,9 @@ package ww86.hocon_fmt
 object Variant {
   val ledger: Map[String, String] = Map.empty
 
+  /** The fork base fixes the unresolved-object-merge rendering pinned by the shared suite. */
+  val unresolvedMergesFormat: Boolean = false
+
   def differs(id: String): Boolean = ledger.contains(id)
 
   /** The examples `ExamplesSpec` pins as refused differently depending on the style options; the

@@ -62,7 +62,7 @@ object HoconFormatter {
   private def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     for {
-      pass <- formatOnce(source, parse, options)(Refusal.NotHocon(_))
+      pass <- formatOnce(source, parse, options, probe = true)(Refusal.NotHocon(_))
       _    <- commentsKept(source, pass.text)
       _    <- secondPassAgrees(pass.text, parse, options)
       _    <- includesKeptInPlace(source, pass)
@@ -77,9 +77,11 @@ object HoconFormatter {
   /** One parse-render round trip with the includes carried across, kept separate from [[format]]
     * so the check there can run another pass without recursing back through it. `unreadable`
     * names the refusal for text sconfig cannot parse: the input's fault on the first pass, the
-    * formatter's on the second.
+    * formatter's on the second. `probe` asks for the collision probe, which only the first pass
+    * needs: its input is the user's text, where a mimic of a placeholder can hide behind an
+    * identical generated field.
     */
-  private def formatOnce(source: String, parse: ConfigParseOptions, options: FormatOptions)(
+  private def formatOnce(source: String, parse: ConfigParseOptions, options: FormatOptions, probe: Boolean)(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
@@ -93,10 +95,10 @@ object HoconFormatter {
       reserved  <- attempt(carried.collides(parsed.root))(unreadable)
       _         <- Either.cond(!reserved, (), Refusal.ReservedName)
       rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
-      _         <- if (masked.originals.isEmpty) Right(())
+      _         <- if (!probe || masked.originals.isEmpty) Right(())
            else {
-             val probe = IncludeMasking.collisionProbe(source, rendered)
-             attempt(ConfigFactory.parseString(probe.text, parse))(unreadable).flatMap { checked =>
+             val probeText = IncludeMasking.collisionProbe(source, rendered)
+             attempt(ConfigFactory.parseString(probeText.text, parse))(unreadable).flatMap { checked =>
                attempt(IncludeMasking.probeCollides(checked.root))(unreadable).flatMap { collision =>
                  Either.cond(!collision, (), Refusal.ReservedName)
                }
@@ -119,13 +121,18 @@ object HoconFormatter {
     * The pass parses the masked form. The include statements in the output are the ones just put
     * back verbatim, and resolving them would reach for the filesystem, which says nothing about
     * whether the text is well formed and which sconfig cannot do at all on Scala.js.
+    *
+    * No collision probe here: the probe hunts user text mimicking a placeholder, and this pass's
+    * input is our own output, whose `__INCLUDE_` sits only inside the restored include statements,
+    * which masking removes. A mimic the first pass could not see is the one its probe already
+    * refused, and the probe would cost this pass a fourth parse of every include-bearing file.
     */
   private def secondPassAgrees(
       formatted: String,
       parse: ConfigParseOptions,
       options: FormatOptions
   ): Either[Refusal, Unit] =
-    formatOnce(formatted, parse, options)(Refusal.BrokenOutput(_))
+    formatOnce(formatted, parse, options, probe = false)(Refusal.BrokenOutput(_))
       .filterOrElse(_.text == formatted, Refusal.UnstableOutput)
       .map(_ => ())
 
