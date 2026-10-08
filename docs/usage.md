@@ -156,7 +156,7 @@ val formatted: Future[String] = Future(Verdict.of(bytes)).flatMap {
 
 Both recipes are compiled in `TryAndFutureSpec`. Nothing refuses on its own: `Verdict` is a value,
 and `FormatRefusedException` exists only where a caller or an adapter raises it — the same type the
-build-tool facade and the cats adapter raise.
+Java API's `formatOrThrow` and the cats adapter raise.
 
 ## Java and Kotlin
 
@@ -245,6 +245,10 @@ is wired into `test` or `compile`, as with sbt-scalafmt; add `hoconFormatCheck` 
 ```scala
 hoconFormatSources := (baseDirectory.value / "conf" ** "*.conf").get
 ```
+
+The plugin resolves `eu.ww86:hocon-fmt-java-api` and its transitive core in an isolated
+class loader, apart from sbt's Scala 2.12 runtime. It sends the original bytes to the API;
+invalid UTF-8 and other refused files are reported and left untouched.
 
 ## Gradle
 
