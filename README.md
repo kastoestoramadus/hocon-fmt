@@ -162,6 +162,7 @@ node -e "require('vm').runInThisContext(require('fs').readFileSync('web/target/b
 ## Build from source
 
 ```bash
+scripts/fetch-sconfig-fork.sh  # once: the sconfig fork the site module runs on
 sbt test                    # core, cats and CLI on JVM, Scala.js and Native, plus web and site
 ```
 

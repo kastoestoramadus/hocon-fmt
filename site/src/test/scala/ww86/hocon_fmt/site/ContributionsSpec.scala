@@ -6,8 +6,8 @@ package ww86.hocon_fmt.site
 class ContributionsSpec extends munit.FunSuite {
 
   test("the snapshot carries every entry read from GitHub on the date it names") {
-    assertEquals(Contributions.all.size, 58)
-    assertEquals(Contributions.all.count(_.library == Library.Sconfig), 41)
+    assertEquals(Contributions.all.size, 59)
+    assertEquals(Contributions.all.count(_.library == Library.Sconfig), 42)
     assertEquals(Contributions.all.count(_.library == Library.LightbendConfig), 17)
   }
 

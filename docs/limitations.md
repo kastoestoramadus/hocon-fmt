@@ -43,8 +43,19 @@ to no field is dropped:
   and a blank line — strip those comment blocks and 261 of the 265 format. Nothing on sconfig
   main, among its open pull requests, or on the sHOCON `bugs-comments` branch fixes it (checked
   2026-10-08), and the gap is the same on sconfig 2.0.0.
-  The investigation, with a probe that masks these comments, is in
+  The command line and the plugins still refuse these. The project page's playground runs on a
+  sconfig fork that keeps them and masks the rest, see below; the investigation is in
   [investigations/blank-line-comments.md](investigations/blank-line-comments.md).
+
+<!-- UPSTREAM-SCONFIG: delete this paragraph once the option is released. -->
+**What the playground keeps that the command line refuses** (`coreSite`, on the sconfig fork of
+[site](site.md#running-ahead-of-the-release)): a comment above a blank line, and a block of comments
+before a closing brace or the end of the file, including a file of comments only. Blank lines
+themselves are still not kept. **What stays refused there too:** a block of comments before the
+closing `]` or `)` of an array, since no field can stand in it (about 30 corpus files), a braced
+root's header comment, and the files whose merges sconfig renders unstably. The fork's base also
+renders some merges and `+=` appends that released sconfig breaks, so the page formats a few inputs
+the command line refuses for those reasons.
 
 Blank lines meet the same blind spot: the parse tree holds values and their comments and nothing
 else, so blank lines are not kept at all — formatting the reference.conf corpus turns 1713 of its

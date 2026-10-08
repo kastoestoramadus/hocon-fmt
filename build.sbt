@@ -453,7 +453,7 @@ val build =
 lazy val site = project
   .in(file("site"))
   .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
-  .dependsOn(coreJS)
+  .dependsOn(coreSite)
   .settings(
     name := "hocon-fmt-site",
     Compile / sourceGenerators += Def.task {

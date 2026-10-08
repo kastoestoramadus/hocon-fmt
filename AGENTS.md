@@ -7,11 +7,13 @@ sconfig, cross-built for the JVM, Scala.js and Scala Native. GPL-3.0.
 ## Commands
 
 ```bash
+scripts/fetch-sconfig-fork.sh  # once per pinned sha, before sbt test: publishes the sconfig fork the page runs on
 sbt test                  # core + cli on JVM, Scala.js, Scala Native, web, and site (needs Node and clang)
 sbt coverageJvm           # statement and branch coverage on the JVM (reports under */target/scala-*/scoverage-report; not a gate)
 sbt crossCompile          # compile every platform's tests; needs neither Node nor clang
 sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
-sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 19 (JVM, Native), 20 (JS)
+sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 19 (JVM, Native), 20 (JS);
+                          # then KeepDetachedCommentsGuardSpec (JVM): red until released sconfig has the option
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt coreJVM/publishM2 javaApi/publishM2  # needed before the Gradle build; Maven needs core only
 sbt javaApi/publishM2     # needed before the java-api tests: the contract suite loads this jar
@@ -40,8 +42,8 @@ platform is how a port rots.
 ## Layout
 
 `core` (pure formatting, sconfig only) · `cats` (effectful file adapter) · `cli` (cats-effect `IOApp`) ·
-`web` (script for web pages) · `site` (the project page on Scala.js/Laminar, on the core directly —
-[docs/site.md](docs/site.md)) · `sbt-plugin` (Scala 2.12) · `gradle-plugin`,
+`web` (script for web pages) · `site` (the project page on Scala.js/Laminar, on `coreSite`: the core against a sconfig
+fork that keeps more comments — [docs/site.md](docs/site.md)) · `sbt-plugin` (Scala 2.12) · `gradle-plugin`,
 `maven-plugin` (standalone Java builds) · `mill-plugin` (standalone Mill build) · `npm/` (package
 template) · `python/` (wheel carrying the native binary) · `bench` · `.pre-commit-hooks.yaml`.
 Details and the reasons behind them: [docs/architecture.md](docs/architecture.md).
@@ -65,6 +67,11 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   Maven plugins share; Mill runs Scala 3, and its plugin matches on `Verdict`.
 - **Do not "fix" the intentional normalisations** (`//` to `#`, `=` to `:`, flattened paths, …)
   listed in [docs/limitations.md](docs/limitations.md).
+- **The page runs on a sconfig fork, temporarily.** `coreSite` is the core's sources against
+  `scripts/fetch-sconfig-fork.sh`'s artifact, with the real `CommentCarrier` from
+  `core/site-shared`; everything published uses released sconfig and the no-op carrier. Code that
+  exists only for the fork carries `UPSTREAM-SCONFIG:` (`git grep` lists the revert); the steps are
+  in [docs/site.md](docs/site.md#returning-to-upstream-sconfig).
 - **One version everywhere**: see [docs/releasing.md](docs/releasing.md) for the five places.
 
 ## Conventions

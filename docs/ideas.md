@@ -232,12 +232,13 @@ A `.hocon-fmt.conf` choosing `:` or `=`, indentation, and whether to flatten sin
 objects. Every channel would read it from the project root. Pointless while sconfig decides the
 output.
 
-### Keep comments above a blank line (M)
+### Keep comments above a blank line in the command line too (M)
 
-Licence headers and banners are the commonest refusal in real files. A probe masks them like
-includes and recovers 137 of 1,650 corpus files; sconfig's opt-in option would cover most of
-it. **Code:** the playground variant on the sconfig fork; see
-[the investigation](investigations/blank-line-comments.md).
+Licence headers and banners are the commonest refusal in real files. The project page already
+keeps them on the sconfig fork; the command line and the plugins wait for sconfig to release the
+option (ekrich/sconfig#646/#647) and then flip. **Code:** see
+[the investigation](investigations/blank-line-comments.md) and `docs/site.md`, "Returning to
+upstream sconfig".
 
 ### Skip unchanged files (S)
 

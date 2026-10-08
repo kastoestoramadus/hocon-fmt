@@ -71,6 +71,11 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
   to ignore it. `sbt libraryDefects` runs it on all three platforms, since sconfig's Scala.js and
   Native builds have defects of their own.
+- **`coreSite` runs core's shared suite** with `Variant.ledger`: the tests that pin a refusal the
+  fork does not produce (comments it keeps, merges its base renders) are listed in
+  `core/site-shared/src/test` with a reason each, and `CommentCarrierSpec` pins the outcome there
+  instead. `KeepDetachedCommentsGuardSpec` (JVM, `sbt libraryDefects`) is red until released
+  sconfig has the option: the signal to return to upstream.
 - **Order.** `sbt test` runs core, cats, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
