@@ -2,16 +2,16 @@ package ww86.hocon_fmt
 
 import java.nio.charset.StandardCharsets.UTF_8
 
-import cats.data.Validated
-import cats.effect.std.Console
-import cats.effect.{ExitCode, IO, IOApp}
-import cats.syntax.all.*
+import _root_.cats.data.Validated
+import _root_.cats.effect.std.Console
+import _root_.cats.effect.{ExitCode, IO, IOApp}
+import _root_.cats.syntax.all.*
 import com.monovore.decline.{Command, Help, Opts, PlatformApp}
-import fs2.Stream
-import fs2.io.file.{Files, Path}
+import fs2.io.file.Path
+import ww86.hocon_fmt.cats.{FileFormatter, FormatOutcome}
 
-/** Command line entry point: reads files, asks [[Verdict]] what each should become, and either
-  * reports or rewrites. The same code runs as a native binary, a Node script and a JVM program.
+/** Command line entry point: parses arguments, delegates file operations to [[FileFormatter]],
+  * and prints the results. The same code runs as a native binary, a Node script and a JVM program.
   */
 object CmdApi extends IOApp {
 
@@ -108,35 +108,29 @@ object CmdApi extends IOApp {
     * canonical path.
     */
   def examineAll(arguments: Arguments): IO[Run] =
-    arguments.files
-      .traverse(file => displayed(file).tupleRight(file))
-      .map(_.distinctBy { case (path, _) => path })
-      .flatMap(_.parTraverse { case (path, file) => examine(file, path, arguments.checkOnly) })
+    formatter
+      .distinctPaths(arguments.files)
+      .flatMap(_.parTraverse(file => examine(file, file.toString, arguments.checkOnly)))
       .map(Run(_))
 
-  private def examine(file: Path, path: String, checkOnly: Boolean): IO[Outcome] =
-    Files[IO]
-      .readAll(file)
-      .compile
-      .to(Array)
-      .map(Verdict.of)
-      .flatMap(act(file, path, checkOnly))
-      .handleError(e => Outcome.Unformattable(path, Option(e.getMessage).getOrElse(e.toString)))
+  private val formatter = FileFormatter[IO]
 
-  private def act(file: Path, path: String, checkOnly: Boolean)(verdict: Verdict): IO[Outcome] =
-    verdict match {
-      case Verdict.NeedsFormatting(formatted) if checkOnly => IO.pure(Outcome.NeedsFormatting(path, formatted))
-      case Verdict.NeedsFormatting(formatted)              => overwrite(file, formatted).as(Outcome.Rewritten(path))
-      case Verdict.AlreadyFormatted                        => IO.pure(Outcome.AlreadyFormatted(path))
-      case Verdict.Refused(refusal)                        => IO.pure(Outcome.Unformattable(path, refusal.reason.take(120)))
+  private def examine(file: Path, path: String, checkOnly: Boolean): IO[Outcome] = {
+    val result = if (checkOnly) {
+      formatter.verdict(file).map {
+        case Verdict.NeedsFormatting(formatted) => Outcome.NeedsFormatting(path, formatted)
+        case Verdict.AlreadyFormatted           => Outcome.AlreadyFormatted(path)
+        case Verdict.Refused(refusal)           => Outcome.Unformattable(path, refusal.reason.take(120))
+      }
+    } else {
+      formatter.format(file).map {
+        case FormatOutcome.Formatted        => Outcome.Rewritten(path)
+        case FormatOutcome.AlreadyFormatted => Outcome.AlreadyFormatted(path)
+        case FormatOutcome.Refused(refusal) => Outcome.Unformattable(path, refusal.reason.take(120))
+      }
     }
-
-  private def overwrite(file: Path, content: String): IO[Unit] =
-    Stream.emit(content).through(Files[IO].writeUtf8(file)).compile.drain
-
-  // The canonical path, so a report names one file one way; a missing file has none.
-  private def displayed(file: Path): IO[String] =
-    Files[IO].realPath(file).handleError(_ => file.absolute).map(_.toString)
+    result.handleError(e => Outcome.Unformattable(path, Option(e.getMessage).getOrElse(e.toString)))
+  }
 
   private def render(outcome: Outcome): String = outcome match {
     case Outcome.Unformattable(path, reason) =>

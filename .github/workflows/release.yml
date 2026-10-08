@@ -124,7 +124,7 @@ jobs:
       - name: Signing check, sbt
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: sbt coreJVM/publishSigned && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
+        run: sbt signRelease && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
       - name: Signing check, Maven
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}

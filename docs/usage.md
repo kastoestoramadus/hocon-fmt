@@ -48,6 +48,39 @@ Three builds of the same program:
 
 \* `--check` on one small file, averaged over 10 runs on one Linux machine.
 
+## cats-effect library
+
+`hocon-fmt-cats` supplies file operations on the JVM, Scala.js under Node and Scala Native.
+Use `"eu.ww86" %% "hocon-fmt-cats" % "0.1.0"` on the JVM, or `%%%` in a cross-project.
+Node applications also supply one `java.time` implementation, for example
+`"org.ekrich" %%% "sjavatime" % "1.5.0"`; cats-effect already supplies one on Native.
+
+```scala
+import cats.effect.IO
+import fs2.Stream
+import fs2.io.file.Path
+import ww86.hocon_fmt.cats.FileFormatter
+
+val formatter = FileFormatter[IO]
+val file = Path("application.conf")
+val verdict = formatter.verdict(file)          // IO[Verdict], strictly decoded from bytes
+val outcome = formatter.format(file)          // IO[FormatOutcome]
+val checked = Stream.emits(List(file)).covary[IO].through(formatter.check)
+val required = formatter.formatOrRaise(file)   // refusal raised as FormatRefusedException
+```
+
+The API works with any `F[_]: Async` and `Files[F]`. `format` returns `Formatted`,
+`AlreadyFormatted` or `Refused(refusal)`. Checks emit `(Path, Verdict)` pairs without writing.
+IO errors use the effect's error channel; refusals stay values unless `formatOrRaise` is used,
+whose exception carries the original `Refusal` in `.refusal`.
+
+Formatting stages the complete output in a managed temporary directory beside the original,
+then atomically replaces the original; a failed or cancelled staged write leaves the original
+intact and cleans up staging. If atomic replacement is unsupported, the operation fails without a
+non-atomic fallback. Symlinks are followed and file permissions preserved. Replacement changes
+file identity, so other hard links retain the old content. Calls on the same file must be
+serialised; `distinctPaths` canonicalises and deduplicates a list before parallel work.
+
 ## pre-commit
 
 ```yaml

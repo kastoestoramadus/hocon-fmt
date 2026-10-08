@@ -177,9 +177,17 @@ lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
       "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % Test
     )
   )
+  .platformsSettings(JVMPlatform, NativePlatform)(
+    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cats" / "jvm-native" / "src" / "main" / "scala"
+  )
+  .platformsSettings(JSPlatform)(
+    // Node applications supply java.time, as for core; standalone tests need it too.
+    libraryDependencies += "org.ekrich" %%% "sjavatime" % sjavatime % Test
+  )
   .jvmSettings(announceRuntime("cats on the JVM"))
   .jsSettings(
     announceRuntime("cats on Scala.js"),
+    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cats" / "js" / "src" / "main" / "scala",
     scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule))
   )
   .nativeSettings(
@@ -192,13 +200,13 @@ lazy val catsJS     = cats.js
 lazy val catsNative = cats.native
 
 /** The command line tool, on every platform: the native binary, the Node bundle behind the
-  * pre-commit hook, and the JVM. Effects live here, in cats-effect, so `core` stays pure.
+  * pre-commit hook, and the JVM. File effects live in the cats adapter, so `core` stays pure.
   */
 lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .crossType(CrossType.Pure)
   .in(file("cli"))
   .enablePlugins(BuildInfoPlugin)
-  .dependsOn(core)
+  .dependsOn(cats)
   .settings(
     name             := "hocon-fmt-cli",
     buildInfoPackage := "ww86.hocon_fmt",
@@ -447,8 +455,10 @@ addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
 
 // What a release uploads: the libraries and the sbt plugin, signed. Stops at the upload, so the
 // deployment waits in the portal until someone clicks Publish.
-addCommandAlias(
-  "publishRelease",
-  // `sbtPlugin` is also an sbt key, so the plugin's project is named by its id.
-  Seq(coreJVM.id, cliJVM.id, "sbtPlugin").map(id => s"$id/publishSigned").mkString("; ") + "; sonaUpload"
-)
+val signedReleaseTasks =
+  Seq(coreJVM.id, coreJS.id, coreNative.id, catsJVM.id, catsJS.id, catsNative.id, cliJVM.id, "sbtPlugin")
+    .map(id => s"$id/publishSigned")
+    .mkString("; ")
+
+addCommandAlias("signRelease", signedReleaseTasks)
+addCommandAlias("publishRelease", signedReleaseTasks + "; sonaUpload")
