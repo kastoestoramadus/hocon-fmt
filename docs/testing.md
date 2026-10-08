@@ -84,7 +84,10 @@ in core test and site Scala data; tests and the site use it without runtime file
 `target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
 Verdicts are `formatted`, `already-formatted` (only for now or pending), or
 `refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `broken-output`, `lost-comment`,
-`lost-include`, and `unstable-output`. When `now != target`, `reason-if-different` is
+`lost-include`, `moved-include`, and `unstable-output`. The generator embeds the kinds it
+accepts as `ExampleData.kinds`, and `ExamplesSpec` maps every `Refusal` case through an
+exhaustive `kindOf` and requires the result to be exactly that set, so the next `Refusal`
+case cannot drift. When `now != target`, `reason-if-different` is
 required. `ExamplesSpec` asserts `now` and output and prints gaps as
 `now / pending / target`; absent pending is shown as “—”. Optional `pending` records
 a verdict from a local sconfig build with the author’s open PRs merged; this build

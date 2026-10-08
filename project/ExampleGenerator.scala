@@ -18,7 +18,7 @@ object ExampleGenerator {
       "\"" + escaped + "\""
     }
     def list(values: Seq[String]): String                       = values.map(quoted).mkString("List(", ", ", ")")
-    val kinds                                                   = Set("not-utf8", "not-hocon", "broken-output", "lost-comment", "lost-include", "unstable-output")
+    val kinds = Set("not-utf8", "not-hocon", "broken-output", "lost-comment", "lost-include", "moved-include", "unstable-output")
     def verdict(value: String, target: Boolean = false): String = {
       require(
         value == "formatted" || (!target && value == "already-formatted") ||
