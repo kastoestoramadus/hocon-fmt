@@ -1,6 +1,6 @@
 package ww86.hocon_fmt
 
-import org.ekrich.config.{ConfigFactory, ConfigObject, ConfigValue}
+import org.ekrich.config.{ConfigFactory, ConfigList, ConfigObject, ConfigValue}
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
@@ -58,7 +58,8 @@ private[hocon_fmt] object IncludeOrder {
 
   /** The values that are not objects, with the line each starts on. Our placeholders are told
     * apart the way `unmask` tells them: the key and the value carry the same index. Guards are
-    * left out, since they are ours and moving them changes nothing.
+    * left out, since they are ours and moving them changes nothing. An array is a value of its own,
+    * and the objects in it, reached by their position, hold fields and includes like any other.
     */
   private def leavesOf(obj: ConfigObject, at: List[String], ours: Set[Int]): List[Leaf] =
     // An object sconfig has not resolved (a merge with a substitution) cannot list its keys.
@@ -70,9 +71,17 @@ private[hocon_fmt] object IncludeOrder {
           val path = at :+ key
           entry.getValue match {
             case inner: ConfigObject => leavesOf(inner, path, ours)
+            case list: ConfigList    => Leaf(path, list.origin.lineNumber, None) :: leavesInItems(list, path, ours)
             case value               => leafOf(key, path, value, ours).toList
           }
         }
+    }
+
+  private def leavesInItems(list: ConfigList, at: List[String], ours: Set[Int]): List[Leaf] =
+    list.asScala.toList.zipWithIndex.flatMap {
+      case (item: ConfigObject, i) => leavesOf(item, at :+ i.toString, ours)
+      case (item: ConfigList, i)   => leavesInItems(item, at :+ i.toString, ours)
+      case _                       => Nil
     }
 
   private def leafOf(key: String, path: List[String], value: ConfigValue, ours: Set[Int]): Option[Leaf] = {

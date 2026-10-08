@@ -58,6 +58,13 @@ Moved across a field (`Refusal.MovedInclude`):
   include: a key defined twice is merged when parsing. For the same reason sorting fields would
   move includes across them, and is never offered.
 
+  **Not detected:** sconfig drops a definition that a later one of the same key overrides, and
+  after an include that definition may have been what overrode the included file. Neither the parse
+  of the source nor that of the output shows it, so the comparison above cannot:
+  `include "f.conf"` then `o = 3` then `o.c = 7` renders without `o = 3`, and `x.a = 5`, the
+  include, `x {}` renders without `x {}`. In both the included file's values for `o` and `x` now
+  survive. Such a file is formatted today.
+
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
 - **Substitution cycle**: `a : ${b}` with `b : ${a}` renders as an unresolved-merge banner that
