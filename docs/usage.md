@@ -312,6 +312,9 @@ override def hoconFormatSources = Task.Sources("conf")
 | `excludes` | none |
 | `skip` (`-Dhocon-fmt.skip`) | `false` |
 
+The plugin depends on `eu.ww86:hocon-fmt-java-api`, and the core comes with it; the two are
+released in lockstep with the plugin, so a build has nothing else to declare.
+
 ## ZIO library
 
 Add `"eu.ww86" %% "hocon-fmt-zio" % "0.1.0"` on the JVM, or use `%%%` in a

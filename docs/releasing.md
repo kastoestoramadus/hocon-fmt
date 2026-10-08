@@ -101,7 +101,7 @@ workflow" for workflows on the default branch.
 
 1. Set the version in the six places that carry it: `build.sbt` (`ThisBuild / version`),
    `gradle-plugin/build.gradle.kts` (`version`), `java-api/build.gradle.kts` (`version`),
-   `maven-plugin/pom.xml` (the plugin's own version and the `hocon-fmt-core_3` dependency),
+   `maven-plugin/pom.xml` (the plugin's own version and the `hocon-fmt-java-api` dependency),
    `mill-plugin/build.mill` (`formatterVersion`), and the `additional_dependencies` of all four
    hooks in `.pre-commit-hooks.yaml`. The npm and wheel versions follow `build.sbt`. All core, cats
    and zio platform artifacts and the Java API also inherit that version; `signRelease` and
@@ -116,8 +116,9 @@ workflow" for workflows on the default branch.
    macOS (aarch64), smoke-tests them, wraps each in a wheel, packs the npm package, builds the web
    script, and attaches all of it to a GitHub release.
 4. Publish, in dependency order:
-   - Maven Central, first: the Gradle, Maven and Mill plugins and the sbt plugin all resolve the
-     core from there. The tag leaves three deployments in the portal (sbt, Maven, Mill). Look each
+   - Maven Central, first: the Gradle and Maven plugins resolve the Java API, and the core through
+     it, from there, while the Mill and sbt plugins resolve the core. The tag leaves three
+     deployments in the portal (sbt, Maven, Mill). Look each
      over in Publish → Deployments, then publish the sbt one, which carries core, cats and zio on
      all three platforms (zio is text only on Scala.js) and the Java API, first. A release cannot
      be undone.
@@ -125,9 +126,9 @@ workflow" for workflows on the default branch.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).
 
-Until the artifacts are on Maven Central, the Gradle and Maven builds resolve them from Maven
-Local: run `sbt coreJVM/publishM2 javaApi/publishM2` before the Gradle build, or
-`sbt coreJVM/publishM2` before the Maven build. The Mill build resolves the core from the local
+Until the artifacts are on Maven Central, the Gradle and Maven builds resolve the Java API, and the
+core through it, from Maven Local: run `sbt coreJVM/publishM2 javaApi/publishM2` before either
+build. The Mill build resolves the core from the local
 Ivy repository: run `sbt coreJVM/publishLocal` before building it. The java-api tests load the jar sbt publishes,
 so `sbt javaApi/publishM2` joins `sbt coreJVM/publishM2` before `./gradlew check` in `java-api/`.
 
