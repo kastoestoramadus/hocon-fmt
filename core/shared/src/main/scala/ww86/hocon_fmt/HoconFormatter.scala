@@ -32,22 +32,28 @@ object HoconFormatter {
   /** Formatted text, or why the input was left alone. */
   def format(source: String): Either[Refusal, String] =
     for {
-      formatted <- formatOnce(source)(Refusal.NotHocon(_))
-      _         <- commentsKept(source, formatted)
-      _         <- secondPassAgrees(formatted)
-    } yield formatted
+      pass <- formatOnce(source)(Refusal.NotHocon(_))
+      _    <- commentsKept(source, pass.text)
+      _    <- secondPassAgrees(pass.text)
+      _    <- includesKeptInPlace(source, pass)
+    } yield pass.text
+
+  /** What one round trip produced: the text with the includes put back, and the masked text it
+    * came from, which names the includes by the index the source gave them.
+    */
+  private case class Pass(text: String, masked: String, originals: Map[Int, String])
 
   /** One parse-render round trip with the includes carried across, kept separate from [[format]]
     * so the check there can run another pass without recursing back through it. `unreadable`
     * names the refusal for text sconfig cannot parse: the input's fault on the first pass, the
     * formatter's on the second.
     */
-  private def formatOnce(source: String)(unreadable: String => Refusal): Either[Refusal, String] = {
+  private def formatOnce(source: String)(unreadable: String => Refusal): Either[Refusal, Pass] = {
     val masked = IncludeMasking.mask(source)
     for {
       rendered <- attempt(render(masked.text))(unreadable)
       _        <- IncludeMasking.lost(rendered, masked.originals).headOption.map(Refusal.LostInclude(_)).toLeft(())
-    } yield IncludeMasking.unmask(rendered, masked.originals)
+    } yield Pass(IncludeMasking.unmask(rendered, masked.originals), rendered, masked.originals)
   }
 
   private def render(masked: String): String = {
@@ -67,8 +73,15 @@ object HoconFormatter {
     */
   private def secondPassAgrees(formatted: String): Either[Refusal, Unit] =
     formatOnce(formatted)(Refusal.BrokenOutput(_))
-      .filterOrElse(_ == formatted, Refusal.UnstableOutput)
+      .filterOrElse(_.text == formatted, Refusal.UnstableOutput)
       .map(_ => ())
+
+  /** Judged last, so a file sconfig mis-renders is refused for that and not for where the includes
+    * ended up in text nobody will read. Only the first pass is compared with the source: the second
+    * is the output itself, and agreeing with it was just checked.
+    */
+  private def includesKeptInPlace(source: String, pass: Pass): Either[Refusal, Unit] =
+    IncludeOrder.moved(source, pass.masked, pass.originals).map(Refusal.MovedInclude(_)).toLeft(())
 
   /** Every comment of the source, as many times as it occurs; the multiset difference names the
     * first one missing.

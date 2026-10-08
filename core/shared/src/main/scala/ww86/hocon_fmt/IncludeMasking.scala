@@ -19,7 +19,12 @@ private[hocon_fmt] object IncludeMasking {
   /** Masked text, plus the statements it replaced keyed by their placeholder index. */
   case class Masked(text: String, originals: Map[Int, String])
 
-  def mask(source: String): Masked = {
+  /** With `onOwnLines`, each placeholder is also put on a line of its own, so that sconfig's
+    * origin lines tell where it stood among the fields around it: [[IncludeOrder]] reads the
+    * source that way. The text is for reading only, never rendered; a comma after the statement
+    * stays on the placeholder's line, since a line may not begin with one.
+    */
+  def mask(source: String, onOwnLines: Boolean = false): Masked = {
     val masked       = new StringBuilder
     val originals    = Map.newBuilder[Int, String]
     val keywords     = IncludeKeyword.matcher(source)
@@ -31,10 +36,19 @@ private[hocon_fmt] object IncludeMasking {
       if (keywords.start >= copiedUpTo && HoconText.isCode(nonCode, keywords.start))
         targetAfterKeyword(source, keywords.end).foreach { target =>
           masked.append(source.substring(copiedUpTo, keywords.start))
+          if (onOwnLines) masked.append('\n')
           masked.append(placeholderFor(nextIndex))
           originals += nextIndex -> s"include ${target.text}"
           nextIndex += 1
           copiedUpTo = target.endIndex
+          if (onOwnLines) {
+            val comma = skipBlanks(source, copiedUpTo)
+            if (comma < source.length && source.charAt(comma) == ',') {
+              masked.append(source.substring(copiedUpTo, comma + 1))
+              copiedUpTo = comma + 1
+            }
+            masked.append('\n')
+          }
         }
 
     masked.append(source.substring(copiedUpTo))
@@ -81,9 +95,9 @@ private[hocon_fmt] object IncludeMasking {
   // a dotted path: `o { X: v }` becomes `o.X: v`, which would move the placeholder out of its
   // object and leave nothing to restore. A second field keeps the object from collapsing.
 
-  private val PlaceholderPrefix = "__INCLUDE_"
-  private val GuardPrefix       = "__INCLUDE_GUARD_"
-  private val GuardValue        = "g"
+  val PlaceholderPrefix = "__INCLUDE_"
+  val GuardPrefix       = "__INCLUDE_GUARD_"
+  val GuardValue        = "g"
 
   private def placeholderFor(index: Int): String =
     s"""$PlaceholderPrefix$index : "$PlaceholderPrefix$index", """ +
@@ -154,6 +168,12 @@ private[hocon_fmt] object IncludeMasking {
         if openParen < source.length && source.charAt(openParen) == '('
         end <- endOfParenGroup(source, openParen)
       } yield Target(function + source.substring(openParen, end), end)
+  }
+
+  private def skipBlanks(source: String, from: Int): Int = {
+    var i = from
+    while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
+    i
   }
 
   private def skipWhitespace(source: String, from: Int): Int = {

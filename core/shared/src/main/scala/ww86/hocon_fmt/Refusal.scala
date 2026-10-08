@@ -24,6 +24,12 @@ enum Refusal {
     */
   case LostInclude(statement: String)
 
+  /** Formatting would carry a field across an include. A later definition wins, so the file would
+    * resolve to other values. sconfig leaves fields sharing a line in no defined order, and
+    * renders a key defined twice where it first appeared.
+    */
+  case MovedInclude(statement: String)
+
   /** Formatting the output again would change it, so the file would never settle. sconfig renders
     * an unresolved merge as a comment banner that parses but grows on every pass.
     */
@@ -35,6 +41,7 @@ enum Refusal {
     case BrokenOutput(detail) => s"the output would not parse again: $detail"
     case LostComment(text)    => s"a comment would be lost: $text"
     case LostInclude(text)    => s"an include would be lost: $text"
+    case MovedInclude(text)   => s"an include would change places with a field: $text"
     case UnstableOutput       => "a second formatting pass would change the output again"
   }
 }

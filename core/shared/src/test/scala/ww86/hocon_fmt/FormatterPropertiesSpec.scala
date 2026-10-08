@@ -1,6 +1,8 @@
 package ww86.hocon_fmt
 
+import org.ekrich.config.{ConfigList, ConfigObject, ConfigValue}
 import org.scalacheck.Prop.forAll
+import scala.jdk.CollectionConverters.*
 
 import ww86.hocon_fmt.HoconFormatter.format
 import ww86.hocon_fmt.HoconGen.*
@@ -34,6 +36,22 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // A later definition wins, so an include sits where the fields before it say it does. Keys are
+  // compared as full paths: formatting turns a nested key into a dotted one. Keys that merge or
+  // replace each other are left out, since what counts as "before" is then a question of which
+  // definition survives. The output is read through sconfig, with the includes masked as the
+  // formatter does, so a shared misreading of its line numbers is what could hide a failure here;
+  // the expectation comes from the generated tree and not from sconfig.
+  property("keeps every key defined before an include before it") {
+    val documentsWithUniqueIncludes = documents(includes = true, distinctKeys = true)
+      .suchThat(doc => doc.includes.distinct == doc.includes)
+    forAll(documentsWithUniqueIncludes) { doc =>
+      format(doc.text).foreach { out =>
+        assertEquals(keysBeforeIncludes(out), doc.keysBeforeIncludes, s"an include changed places in:\n$out")
+      }
+    }
+  }
+
   property("never leaks a placeholder") {
     forAll(documents(includes = true)) { doc =>
       format(doc.text).foreach(out => assert(!out.contains("__INCLUDE"), out))
@@ -49,7 +67,7 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // Without this the properties above would pass vacuously on a formatter that refused everything.
   property("formats every document it has no reason to refuse") {
     val documentsWithoutReason = documents(includes = true, distinctKeys = true)
-      .suchThat(doc => doc.everyCommentPrecedesAField && !doc.hitsKnownSconfigDefect)
+      .suchThat(doc => doc.everyCommentPrecedesAField && !doc.hitsKnownSconfigDefect && !doc.includeSharesALine)
     forAll(documentsWithoutReason) { doc =>
       format(doc.text) match {
         case Right(out)    => assertEquals(format(out), Right(out), "output is not a fixed point")
@@ -57,4 +75,45 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
       }
     }
   }
+
+  /** The same reading of formatted text as `Document.keysBeforeIncludes` makes of the tree. */
+  def keysBeforeIncludes(formatted: String): Map[String, Set[List[String]]] = {
+    val masked = IncludeMasking.mask(formatted)
+    val leaves = leavesOf(masked.text.parsedConfig.root, Nil)
+    leaves.collect { case Leaf(path, line, Some(index)) =>
+      val parent = path.init
+      val before = leaves.collect {
+        case Leaf(other, l, None) if l < line && other.startsWith(parent) => other
+        case Leaf(other, l, Some(i)) if l < line && other.init == parent  => HoconGen.includeKey(masked.originals(i))
+      }
+      masked.originals(index) -> before.toSet
+    }.toMap
+  }
+
+  val PlaceholderKey = "__INCLUDE_(\\d+)".r
+  val GuardKey       = "__INCLUDE_GUARD_\\d+".r
+
+  def leavesOf(obj: ConfigObject, at: List[String]): List[Leaf] =
+    obj.entrySet.asScala.toList.flatMap { entry =>
+      val path = at :+ entry.getKey
+      (entry.getKey, entry.getValue) match {
+        case (_, inner: ConfigObject)                                          => leavesOf(inner, path)
+        case (GuardKey(), _)                                                   => Nil
+        case (PlaceholderKey(index), value) if value.unwrapped == entry.getKey =>
+          List(Leaf(path, value.origin.lineNumber, Some(index.toInt)))
+        case (_, list: ConfigList) => Leaf(path, list.origin.lineNumber, None) :: leavesInItems(list, path)
+        case (_, value)            => List(Leaf(path, value.origin.lineNumber, None))
+      }
+    }
+
+  // The objects in an array are reached by their position; the other items are no leaves of their own.
+  def leavesInItems(list: ConfigList, at: List[String]): List[Leaf] =
+    list.asScala.toList.zipWithIndex.flatMap {
+      case (item: ConfigObject, i) => leavesOf(item, at :+ i.toString)
+      case (item: ConfigList, i)   => leavesInItems(item, at :+ i.toString)
+      case _                       => Nil
+    }
 }
+
+/** A value of parsed text: where it is, the line it starts on, and the include it stands for. */
+final case class Leaf(path: List[String], line: Int, include: Option[Int])

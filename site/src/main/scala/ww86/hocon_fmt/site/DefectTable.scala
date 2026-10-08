@@ -66,6 +66,12 @@ object DefectTable:
       "no pull request: merging repeated keys is by design, and carrying includes across is the formatter's own job"
     ),
     DefectRow(
+      "an include on a line shared with a field: `include \"x.conf\", zone = \"us\"`",
+      RefusalKind.MovedInclude,
+      Nil,
+      "no pull request: fields on one line share a line number and an origin has no column, so the order would have to come from the parse sequence"
+    ),
+    DefectRow(
       "`a : ${b}` with `b : ${a}`",
       RefusalKind.UnstableOutput,
       List(PrLink(Sconfig, 598), PrLink(LightbendConfig, 868)),

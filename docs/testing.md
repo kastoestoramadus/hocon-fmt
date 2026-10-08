@@ -9,6 +9,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `HoconFormatterInvariantsSpec` | `core/jvm-native` | idempotence, output re-parses, meaning preserved, inputs shaped like the internal placeholders |
 | `FormatterPropertiesSpec` | `core/shared` | the same guarantees on generated documents: no comment, include or meaning lost, no placeholder leaked, nothing refused without reason |
 | `IncludeDetectionSpec` | `core/shared` | which occurrences of `include` are a directive; the contract of the detection regex |
+| `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8 |
