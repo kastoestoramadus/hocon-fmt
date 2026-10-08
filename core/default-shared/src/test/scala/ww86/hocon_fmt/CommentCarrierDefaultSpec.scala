@@ -1,5 +1,7 @@
 package ww86.hocon_fmt
 
+import org.ekrich.config.ConfigFactory
+
 class CommentCarrierDefaultSpec extends munit.FunSuite {
 
   test("the published core carries nothing: text and options pass through") {
@@ -7,6 +9,7 @@ class CommentCarrierDefaultSpec extends munit.FunSuite {
     val carried = CommentCarrier.mask(source)
     assertEquals(carried.text, source)
     assertEquals(carried.restore("rendered"), "rendered")
+    assert(!carried.collides(ConfigFactory.parseString("a = \"__COMMENT_0\"").root), "the no-op judges nothing")
     val options = HoconFormatter.parseOptions
     assert(CommentCarrier.parseOptions(options) eq options)
   }

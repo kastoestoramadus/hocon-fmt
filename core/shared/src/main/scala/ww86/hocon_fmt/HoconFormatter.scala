@@ -90,6 +90,8 @@ object HoconFormatter {
       parsed    <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
       collision <- attempt(IncludeMasking.collides(masked, parsed.root))(unreadable)
       _         <- Either.cond(!collision, (), Refusal.ReservedName)
+      reserved  <- attempt(carried.collides(parsed.root))(unreadable)
+      _         <- Either.cond(!reserved, (), Refusal.ReservedName)
       rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
       _         <- if (masked.originals.isEmpty) Right(())
            else {

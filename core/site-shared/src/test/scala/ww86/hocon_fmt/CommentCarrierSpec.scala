@@ -1,5 +1,7 @@
 package ww86.hocon_fmt
 
+import org.ekrich.config.{ConfigFactory, ConfigObject}
+
 class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
 
   private def example(id: String): Example =
@@ -101,6 +103,28 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
   test("the prefix steps over a spelling the text could be rendered from") {
     val masked = CommentCarrier.mask("a : \"__COMM\"\"ENT_0\"\nb : 1\n# end\n").text
     assert(masked.contains("__COMMENTX_0"), masked)
+  }
+
+  // #58's parsed-tree judgement, applied to the comment placeholders: the tree the parse made is
+  // judged the way an include mask's is, so a spelling the source reading could not see refuses
+  // rather than restores. The pass's own placeholder pairs are the one thing the tree may hold,
+  // and a prefix stepped aside keeps a user's lookalike out of the judgement entirely.
+  test("the parsed tree is judged like an include mask's") {
+    def tree(text: String): ConfigObject = ConfigFactory.parseString(text, HoconFormatter.parseOptions).root
+    val carried                          = CommentCarrier.mask("a : 1\n# end\n")
+    assert(!carried.collides(tree(carried.text)), s"its own placeholder pairs collide:\n${carried.text}")
+    val steppedAside = CommentCarrier.mask("a : \"__COM\"\"MENT_0\"\nb : 1\n# end\n")
+    assert(!steppedAside.collides(tree(steppedAside.text)), steppedAside.text)
+    val collisions = List(
+      ("a value", "a = \"__COMMENT_0\"\n"),
+      ("a key", "__COMMENT_0 = 5\n"),
+      ("a guard under another value", "__COMMENT_GUARD_0 = \"x\"\n"),
+      ("an unissued index", "a = [\"__COMMENT_7\"]\n"),
+      ("a substitution path", "a = ${__COMMENT_0}\n")
+    )
+    collisions.foreach { case (name, source) =>
+      assert(carried.collides(tree(source)), s"$name: the reserved name was not seen")
+    }
   }
 
   test("a comment that quotes a placeholder is kept") {

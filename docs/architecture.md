@@ -35,7 +35,8 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 ## The pipeline
 
 1. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
-2. The source and parsed tree are checked for placeholder collisions (see [include masking](#include-masking)).
+2. The source and parsed tree are checked for placeholder collisions (see
+   [include masking](#include-masking) and [comment carrier](#comment-carrier)).
    sconfig renders the masked tree with the `FormatOptions` asked for: the default
    style (`=`), or what the caller — the CLI's flags over a `.hocon-fmt.conf` — requested.
 3. `IncludeMasking.unmask` puts the original statements back.
@@ -113,7 +114,8 @@ attaches a block a blank line detaches. A block that no field follows is still d
 lines of an object, the end of the file, a file of comments only.
 
 `HoconFormatter` reaches this through `CommentCarrier` (`parseOptions`, and `mask` returning a
-`Carried` with its `restore`). Two sources exist and a project compiles exactly one:
+`Carried` with its `restore` and its tree judgement). Two sources exist and a project compiles
+exactly one:
 
 - `core/default-shared`, in `coreJVM`, `coreJS` and `coreNative`: does nothing, so the published
   core is unchanged and still depends on sconfig alone. There is no run-time switch.
@@ -125,7 +127,10 @@ lines of an object, the end of the file, a file of comments only.
 The placeholder prefix is chosen to occur nowhere the parse could put it: not in the masked text,
 and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where `"__COMM""ENT_0"`
 spells `__COMMENT_0`. So the prefix steps aside for user text that could be rendered into it, and
-the restore matches only what this pass generated. Both `:` and `=` are matched, the renderer
+the restore matches only what this pass generated. That reading is a source-level
+over-approximation; the tree the parse made is judged as well, the way [include
+masking](#include-masking) judges its own (`PlaceholderTree`), so a spelling the reading missed is
+refused (`Refusal.ReservedName`) rather than restored. Both `:` and `=` are matched, the renderer
 writing the asked-for separator. A rendering whose prefix occurrences are not exactly the three
 each placeholder writes is left unrestored: the block is then a lost comment and the file is
 refused, never altered. `IncludeOrder` gets the text with the comments already restored, so it

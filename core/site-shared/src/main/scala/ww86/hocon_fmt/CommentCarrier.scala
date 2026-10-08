@@ -2,7 +2,7 @@ package ww86.hocon_fmt
 
 import java.util.regex.{Matcher, Pattern}
 
-import org.ekrich.config.ConfigParseOptions
+import org.ekrich.config.{ConfigObject, ConfigParseOptions}
 import scala.annotation.tailrec
 import scala.collection.mutable
 
@@ -20,10 +20,12 @@ import scala.collection.mutable
   *
   * User text is never altered. The prefix is chosen to occur nowhere the parse could put it: not
   * in the text, and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where
-  * `"__COMM""ENT_0"` and `"\u005f..."` spell a name this pass would otherwise write. And a
-  * rendered text whose prefix occurrences are not exactly the ones the placeholders wrote is left
-  * alone: the block is then missing from the output, and the formatter's lost-comment check
-  * refuses the file rather than restore on a guess.
+  * `"__COMM""ENT_0"` and `"\u005f..."` spell a name this pass would otherwise write. The tree the
+  * parse actually made is judged too, the way [[IncludeMasking]] judges its own
+  * ([[PlaceholderTree]]), so a spelling the source reading missed refuses the file. And a rendered
+  * text whose prefix occurrences are not exactly the ones the placeholders wrote is left alone:
+  * the block is then missing from the output, and the formatter's lost-comment check refuses the
+  * file rather than restore on a guess.
   *
   * The regexes must hold on RE2 and ES2015: no lookaround, no backreferences, no multiline `^`.
   * A character scanner like [[IncludeMasking]], written with loops; the suppression is for this
@@ -48,7 +50,7 @@ private[hocon_fmt] object CommentCarrier {
   def mask(source: String): Carried = {
     val prefix = prefixFor(source)
     val blocks = blocksOf(source)
-    if (blocks.isEmpty) Carried(source, identity)
+    if (blocks.isEmpty) Carried(source, identity, _ => false)
     else {
       val masked = new StringBuilder
       var copied = 0
@@ -58,9 +60,23 @@ private[hocon_fmt] object CommentCarrier {
       }
       val _         = masked.append(source.substring(copied))
       val originals = blocks.zipWithIndex.map { case ((_, _, block), index) => index -> block }.toMap
-      Carried(masked.result(), restore(_, prefix, originals))
+      Carried(masked.result(), restore(_, prefix, originals), collides(_, prefix, originals.keySet))
     }
   }
+
+  /** The same judgement [[IncludeMasking]] makes of its tree: a reserved name is the user's unless
+    * it is exactly a key/value pair this pass wrote. `prefixFor` keeps the prefix out of every
+    * spelling of the source, so a hit here is a spelling that reading could not see, and refusing
+    * is the only safe answer.
+    */
+  private def collides(parsed: ConfigObject, prefix: String, indices: Set[Int]): Boolean =
+    PlaceholderTree.collides(
+      parsed,
+      prefix,
+      indices.iterator.flatMap { index =>
+        List(s"$prefix$index" -> s"$prefix$index", s"${prefix}GUARD_$index" -> GuardValue)
+      }.toMap
+    )
 
   /** The first prefix the parse cannot spell from the text: `__COMMENT_` when the text does not
     * mention it, `__COMMENTX_` and so on otherwise. Each step appends an `X`, so a finite text

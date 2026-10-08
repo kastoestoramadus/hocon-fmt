@@ -13,5 +13,5 @@ import org.ekrich.config.ConfigParseOptions
 private[hocon_fmt] object CommentCarrier {
   def parseOptions(base: ConfigParseOptions): ConfigParseOptions = base
 
-  def mask(source: String): Carried = Carried(source, identity)
+  def mask(source: String): Carried = Carried(source, identity, _ => false)
 }
