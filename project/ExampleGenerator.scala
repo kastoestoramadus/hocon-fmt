@@ -49,9 +49,13 @@ object ExampleGenerator {
         if (sourceKind == "verbatim") { str("source.url"); str("source.licence") }
         val options = config.getStringList("options").asScala.toList
         require(options == List("default"), s"$id: only options: [default] is supported")
-        val expectedFile = dir / "expected" / (if (section == "catalogue" && now.startsWith("refused:")) "refused.txt"
-                                               else "default.conf")
-        require(expectedFile.isFile, s"$id: missing $expectedFile")
+        val expected =
+          if (section == "showcase" && now.startsWith("refused:")) "Map.empty[String, String]"
+          else {
+            val expectedFile = dir / "expected" / (if (now.startsWith("refused:")) "refused.txt" else "default.conf")
+            require(expectedFile.isFile, s"$id: missing $expectedFile")
+            s"""Map("default" -> ${quoted(IO.read(expectedFile))})"""
+          }
         val input = dir / "input.conf"
         require(input.isFile, s"$id: missing input.conf")
         val findings = if (config.hasPath("findings")) config.getStringList("findings").asScala.toList else Nil
@@ -59,7 +63,7 @@ object ExampleGenerator {
           s"${quoted(IO.read(input))}, ${quoted(target)}, ${quoted(now)}, ${optional("pending")}, " +
           s"${optional("reason-if-different")}, ${list(findings)}, " +
           s"ExampleSource(${quoted(sourceKind)}, ${quoted(pattern)}, ${optional("source.url")}, ${optional("source.licence")}), " +
-          s"""${list(options)}, Map("default" -> ${quoted(IO.read(expectedFile))}))"""
+          s"${list(options)}, $expected)"
       }
     }
     val output = managed / "ww86" / "hocon_fmt" / "ExampleData.scala"

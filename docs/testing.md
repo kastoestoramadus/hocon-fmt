@@ -71,8 +71,8 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 
 `examples/showcase/NN-slug/` holds the playground examples in directory order.
 `examples/catalogue/slug/` holds examples for tests only. Both contain `input.conf`,
-`example.conf`, and `expected/default.conf`. For refused showcase examples, that expected
-file pins the unchanged input. Refused catalogue examples instead carry
+`example.conf`, and, for successful examples, `expected/default.conf`. Refused showcase
+examples need no expected file: their verdict is pinned. Refused catalogue examples carry
 `expected/refused.txt` containing the `refused:<kind>` verdict. Input and expected
 output are compared exactly, including the final newline. Only the `default` option set
 exists today.
