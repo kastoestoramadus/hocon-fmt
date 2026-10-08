@@ -101,6 +101,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("core"))
   .settings(
     name := "hocon-fmt-core",
+    Test / sourceGenerators += Def.task {
+      ExampleGenerator.generate(
+        (ThisBuild / baseDirectory).value / "examples",
+        (Test / sourceManaged).value
+      )
+    }.taskValue,
     libraryDependencies ++= Seq(
       "org.ekrich"    %%% "sconfig"          % sconfig,
       "org.scalameta" %%% "munit"            % munit           % Test,
@@ -258,7 +264,13 @@ lazy val site = project
   .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
   .dependsOn(coreJS)
   .settings(
-    name           := "hocon-fmt-site",
+    name := "hocon-fmt-site",
+    Compile / sourceGenerators += Def.task {
+      ExampleGenerator.generate(
+        (ThisBuild / baseDirectory).value / "examples",
+        (Compile / sourceManaged).value
+      )
+    }.taskValue,
     publish / skip := true,
     announceRuntime("site on Scala.js"),
     // sconfig reaches for java.time, which the Scala.js javalib does not carry; the site is the
