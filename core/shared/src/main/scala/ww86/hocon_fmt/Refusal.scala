@@ -11,6 +11,12 @@ enum Refusal derives CanEqual {
   /** The input is not HOCON that sconfig can read. */
   case NotHocon(detail: String)
 
+  /** The file is named as a format of its own that Lightbend's loader also reads, and this
+    * formatter writes HOCON only. A round trip would hand back HOCON: a `.json` file's objects
+    * reordered and its quoting gone, a `.properties` value such as a JDBC URL not even parseable.
+    */
+  case OtherFormat(format: String)
+
   /** sconfig rendered text it cannot read back: one of the defects in `SconfigDefectsSpec`. */
   case BrokenOutput(detail: String)
 
@@ -38,6 +44,7 @@ enum Refusal derives CanEqual {
   def reason: String = this match {
     case NotUtf8              => "not valid UTF-8"
     case NotHocon(detail)     => s"not valid HOCON: $detail"
+    case OtherFormat(format)  => s"a $format file, and hocon-fmt formats HOCON only"
     case BrokenOutput(detail) => s"the output would not parse again: $detail"
     case LostComment(text)    => s"a comment would be lost: $text"
     case LostInclude(text)    => s"an include would be lost: $text"

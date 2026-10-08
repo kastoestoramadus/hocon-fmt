@@ -42,6 +42,14 @@ class HoconFormatterJsSpec extends munit.FunSuite {
     assert(field(result, "reason").exists(_.startsWith("not valid HOCON: ")), field(result, "reason"))
   }
 
+  // The page is where a refusal's place names come from: text typed into a browser has no file
+  // name, so the parse failure says where it happened instead.
+  test("a parse failure names the playground as the place it tripped") {
+    val result = format("a : ${")
+    assertEquals(field(result, "refusal"), Some("notHocon"))
+    assert(field(result, "reason").exists(_.startsWith("not valid HOCON: playground: ")), field(result, "reason"))
+  }
+
   test("a comment that would be lost is a refusal of its own") {
     val result = format("a : 1\n# trailing\n")
     assertEquals(field(result, "refusal"), Some("lostComment"))
@@ -50,13 +58,14 @@ class HoconFormatterJsSpec extends munit.FunSuite {
 
   test("every refusal has a name a page can branch on") {
     val names = Map(
-      Refusal.NotUtf8          -> "notUtf8",
-      Refusal.NotHocon("")     -> "notHocon",
-      Refusal.BrokenOutput("") -> "brokenOutput",
-      Refusal.LostComment("")  -> "lostComment",
-      Refusal.LostInclude("")  -> "lostInclude",
-      Refusal.MovedInclude("") -> "movedInclude",
-      Refusal.UnstableOutput   -> "unstableOutput"
+      Refusal.NotUtf8             -> "notUtf8",
+      Refusal.NotHocon("")        -> "notHocon",
+      Refusal.OtherFormat("JSON") -> "otherFormat",
+      Refusal.BrokenOutput("")    -> "brokenOutput",
+      Refusal.LostComment("")     -> "lostComment",
+      Refusal.LostInclude("")     -> "lostInclude",
+      Refusal.MovedInclude("")    -> "movedInclude",
+      Refusal.UnstableOutput      -> "unstableOutput"
     )
     names.foreach((refusal, name) => assertEquals(HoconFormatterJs.nameOf(refusal), name))
   }

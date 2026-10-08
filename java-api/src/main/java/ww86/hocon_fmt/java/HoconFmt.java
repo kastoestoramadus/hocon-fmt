@@ -9,6 +9,10 @@ import ww86.hocon_fmt.FormatRefusedException;
  * Static entry points for Java and Kotlin callers. Every method returns a {@link Verdict} —
  * including the refusals, which are values here rather than exceptions — and never accepts or
  * returns null.
+ *
+ * <p>A name is the name the caller knows the text or file by: a refusal reports it as the place a
+ * parse tripped, and a name promising another format (a {@code .json} or {@code .properties} file)
+ * is refused rather than rewritten as HOCON.
  */
 public final class HoconFmt {
 
@@ -19,14 +23,24 @@ public final class HoconFmt {
         return mirror(ww86.hocon_fmt.Verdict.of(text));
     }
 
+    /** What the formatter makes of HOCON text the caller knows a name for. */
+    public static Verdict check(String text, String name) {
+        return mirror(ww86.hocon_fmt.Verdict.of(text, name));
+    }
+
     /** What the formatter makes of UTF-8 bytes; bytes that are not valid UTF-8 are refused. */
     public static Verdict check(byte[] content) {
         return mirror(ww86.hocon_fmt.Verdict.of(content));
     }
 
+    /** What the formatter makes of UTF-8 bytes the caller knows a name for. */
+    public static Verdict check(byte[] content, String name) {
+        return mirror(ww86.hocon_fmt.Verdict.of(content, name));
+    }
+
     /** Reads the file as UTF-8 bytes and judges its content, without touching it. */
     public static Verdict checkFile(Path file) throws IOException {
-        return check(Files.readAllBytes(file));
+        return check(Files.readAllBytes(file), file.toString());
     }
 
     /**
@@ -37,7 +51,7 @@ public final class HoconFmt {
      * @return the verdict, so a caller can tell a write from a pass without rereading
      */
     public static Verdict formatFile(Path file) throws IOException {
-        Verdict verdict = check(Files.readAllBytes(file));
+        Verdict verdict = check(Files.readAllBytes(file), file.toString());
         if (verdict instanceof Verdict.NeedsFormatting needed) {
             Files.writeString(file, needed.formatted());
         }
@@ -49,7 +63,15 @@ public final class HoconFmt {
      * comes back as it is.
      */
     public static String formatOrThrow(String text) throws FormatRefusedException {
-        ww86.hocon_fmt.Verdict verdict = ww86.hocon_fmt.Verdict.of(text);
+        return textOf(ww86.hocon_fmt.Verdict.of(text), text);
+    }
+
+    /** As {@link #formatOrThrow(String)}, with the name the caller knows the text by. */
+    public static String formatOrThrow(String text, String name) throws FormatRefusedException {
+        return textOf(ww86.hocon_fmt.Verdict.of(text, name), text);
+    }
+
+    private static String textOf(ww86.hocon_fmt.Verdict verdict, String text) throws FormatRefusedException {
         if (verdict instanceof ww86.hocon_fmt.Verdict.NeedsFormatting needed) {
             return needed.formatted();
         }

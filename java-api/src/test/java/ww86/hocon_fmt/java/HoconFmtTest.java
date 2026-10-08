@@ -88,6 +88,53 @@ class HoconFmtTest {
     }
 
     @Test
+    void checkNamesTheFileAParseFailedIn() {
+        Verdict verdict = HoconFmt.check(NOT_HOCON, "conf/application.conf");
+        Verdict.Refused refused = assertInstanceOf(Verdict.Refused.class, verdict);
+        assertEquals(RefusalKind.NotHocon, refused.kind());
+        assertTrue(refused.reason().startsWith("not valid HOCON: conf/application.conf:"), refused.reason());
+    }
+
+    // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
+    // file its name promises, so the name alone decides, whatever the content.
+    @Test
+    void checkRefusesAFileNamedAsAnotherFormat() {
+        Verdict verdict = HoconFmt.check("{\"a\": 1}", "application.json");
+        Verdict.Refused refused = assertInstanceOf(Verdict.Refused.class, verdict);
+        assertEquals(RefusalKind.OtherFormat, refused.kind());
+        assertEquals("a JSON file, and hocon-fmt formats HOCON only", refused.reason());
+    }
+
+    @Test
+    void checkFileNamesTheFile(@TempDir Path dir) throws IOException {
+        // Valid HOCON, and already formatted: only the name refuses it.
+        Path file = dir.resolve("application.json");
+        Files.writeString(file, FORMATTED);
+        Verdict verdict = HoconFmt.checkFile(file);
+        Verdict.Refused refused = assertInstanceOf(Verdict.Refused.class, verdict);
+        assertEquals(RefusalKind.OtherFormat, refused.kind());
+    }
+
+    @Test
+    void formatFileLeavesAFileNamedAsAnotherFormatAlone(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("application.json");
+        byte[] original = "{\n    \"a\": 1\n}\n".getBytes(StandardCharsets.UTF_8);
+        Files.write(file, original);
+        long stamp = Files.getLastModifiedTime(file).toMillis();
+        Verdict verdict = HoconFmt.formatFile(file);
+        assertInstanceOf(Verdict.Refused.class, verdict);
+        assertArrayEquals(original, Files.readAllBytes(file));
+        assertEquals(stamp, Files.getLastModifiedTime(file).toMillis());
+    }
+
+    @Test
+    void formatOrThrowNamesTheFileAndRaises() {
+        FormatRefusedException exception =
+                assertThrows(FormatRefusedException.class, () -> HoconFmt.formatOrThrow(NOT_HOCON, "conf/app.conf"));
+        assertTrue(exception.getMessage().startsWith("not valid HOCON: conf/app.conf:"), exception.getMessage());
+    }
+
+    @Test
     void formatFileRewritesOnlyWhatNeedsIt(@TempDir Path dir) throws IOException {
         Path file = dir.resolve("app.conf");
         Files.writeString(file, UNFORMATTED);

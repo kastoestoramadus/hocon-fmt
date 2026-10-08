@@ -54,7 +54,10 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 `Verdict.of(bytes)` wraps this for one file: it decodes strictly as UTF-8 (`Refusal.NotUtf8`
 rather than replacing bytes it cannot decode) and says whether the file is already formatted,
 needs formatting, or must be left alone. Every integration acts on a `Verdict`; they differ only
-in how they find files and report.
+in how they find files and report — and in the name they pass (`Verdict.of(bytes, name)`,
+`HoconFormatter.format(text, origin)`), which a refusal reports as where a parse tripped and which
+rules out a file named `.json` or `.properties`. Formatting those writes HOCON where the name
+promises another format, so nothing here touches them (`Refusal.OtherFormat`).
 
 ## Include masking
 

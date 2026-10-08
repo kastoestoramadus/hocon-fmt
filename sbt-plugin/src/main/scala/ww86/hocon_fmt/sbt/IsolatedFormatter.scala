@@ -16,14 +16,15 @@ object Verdict {
 
 /** The Scala 3 formatter, loaded apart from sbt's own Scala 2.12 library.
   *
-  * Only JDK types cross over: `JvmFacade.reformat` takes a file's bytes and returns the text it
-  * should have, empty when it already has it, or throws with the reason it refused.
+  * Only JDK types cross over: `JvmFacade.reformat` takes a file's bytes and the name the plugin
+  * knows the file by, and returns the text it should have, empty when it already has it, or throws
+  * with the reason it refused.
   */
 final class IsolatedFormatter private (reformat: Method) {
 
-  def verdictFor(content: Array[Byte]): Verdict =
+  def verdictFor(content: Array[Byte], name: String): Verdict =
     try {
-      val formatted = reformat.invoke(null, content).asInstanceOf[Optional[String]]
+      val formatted = reformat.invoke(null, content, name).asInstanceOf[Optional[String]]
       if (formatted.isPresent) Verdict.NeedsFormatting(formatted.get) else Verdict.AlreadyFormatted
     } catch {
       // Matched by name: the exception's class belongs to the other class loader.
@@ -41,7 +42,9 @@ object IsolatedFormatter {
     // Scala 2.12 library cannot shadow the formatter's Scala 3 one.
     val loader = new URLClassLoader(classpath.map(_.toURI.toURL).toArray, ClassLoader.getPlatformClassLoader)
     try {
-      val reformat = loader.loadClass("ww86.hocon_fmt.JvmFacade").getMethod("reformat", classOf[Array[Byte]])
+      val reformat = loader
+        .loadClass("ww86.hocon_fmt.JvmFacade")
+        .getMethod("reformat", classOf[Array[Byte]], classOf[String])
       use(new IsolatedFormatter(reformat))
     } finally loader.close()
   }

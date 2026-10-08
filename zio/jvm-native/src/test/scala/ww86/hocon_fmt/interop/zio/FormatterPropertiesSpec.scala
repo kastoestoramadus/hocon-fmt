@@ -19,7 +19,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite {
         val result = Unsafe.unsafe { implicit unsafe =>
           Runtime.default.unsafe.run(ZioFiles.format(path).either).getOrThrowFiberFailure()
         }
-        val expected = Verdict.of(original)
+        // The file's own name is what the decision is made under.
+        val expected = Verdict.of(original, path.toString)
         expected match {
           case Verdict.Refused(reason) =>
             assertEquals(result, Left(FileError.Refused(reason)))

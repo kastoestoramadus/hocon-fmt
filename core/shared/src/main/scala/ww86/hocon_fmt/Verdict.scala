@@ -18,14 +18,56 @@ enum Verdict derives CanEqual {
 object Verdict {
 
   def of(source: String): Verdict =
-    HoconFormatter.format(source) match {
-      case Left(refusal)                           => Refused(refusal)
-      case Right(formatted) if formatted == source => AlreadyFormatted
-      case Right(formatted)                        => NeedsFormatting(formatted)
-    }
+    decide(source, None)
+
+  /** As [[of(String)]], with `name` the name the caller knows the text by: a name promising
+    * another format rules the text out, and a parse failure reports it as the origin.
+    */
+  def of(source: String, name: String): Verdict =
+    decide(source, Some(name))
 
   def of(content: Array[Byte]): Verdict =
-    decodeUtf8(content).fold(Refused(_), of)
+    decide(content, None)
+
+  /** As [[of(Array[Byte])]], with `name` the name the caller knows the file by. */
+  def of(content: Array[Byte], name: String): Verdict =
+    decide(content, Some(name))
+
+  // The name decides a format of its own before anything is read: whatever the content, this
+  // formatter would hand it back as HOCON, which is not what the name promises.
+  private def decide(content: Array[Byte], name: Option[String]): Verdict =
+    namedFormat(name) match {
+      case Some(refusal) => Refused(refusal)
+      case None          => decodeUtf8(content).fold(Refused(_), decide(_, name))
+    }
+
+  private def decide(source: String, name: Option[String]): Verdict =
+    namedFormat(name) match {
+      case Some(refusal) => Refused(refusal)
+      case None          =>
+        val formatted = name match {
+          case Some(origin) => HoconFormatter.format(source, origin)
+          case None         => HoconFormatter.format(source)
+        }
+        formatted match {
+          case Left(refusal)                 => Refused(refusal)
+          case Right(text) if text == source => AlreadyFormatted
+          case Right(text)                   => NeedsFormatting(text)
+        }
+    }
+
+  // The formats Lightbend's loader also picks by extension. A round trip would hand back HOCON:
+  // a `.json` file's objects reordered, a `.properties` value such as a JDBC URL not even read.
+  private val OtherFormats = List(".json" -> "JSON", ".properties" -> "Java properties")
+
+  private def namedFormat(name: Option[String]): Option[Refusal] =
+    name.flatMap { fileName =>
+      val dot       = fileName.lastIndexOf('.')
+      val extension = if (dot < 0) "" else fileName.substring(dot)
+      OtherFormats.collectFirst {
+        case (known, format) if known.equalsIgnoreCase(extension) => Refusal.OtherFormat(format)
+      }
+    }
 
   // The default decoder reports malformed input instead of replacing it.
   private def decodeUtf8(content: Array[Byte]): Either[Refusal, String] =

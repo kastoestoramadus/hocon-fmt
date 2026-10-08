@@ -37,9 +37,11 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
 
         record Refused(String reason) implements Outcome {}
 
-        static Outcome of(byte[] content) {
+        /** The name is how the build reports the file: a refusal carries it, and a name promising
+         * another format is refused outright. */
+        static Outcome of(byte[] content, String name) {
             try {
-                return JvmFacade.reformat(content)
+                return JvmFacade.reformat(content, name)
                         .<Outcome>map(NeedsFormatting::new)
                         .orElseGet(AlreadyFormatted::new);
             } catch (FormatRefusedException e) {
@@ -58,7 +60,10 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         List<Examined> examined = getParameters().getFiles().getFiles().stream()
                 .map(File::toPath)
                 .sorted(Comparator.naturalOrder())
-                .map(file -> new Examined(file, root.relativize(file).toString(), Outcome.of(read(file))))
+                .map(file -> {
+                    String path = root.relativize(file).toString();
+                    return new Examined(file, path, Outcome.of(read(file), path));
+                })
                 .toList();
 
         for (Examined file : examined) {

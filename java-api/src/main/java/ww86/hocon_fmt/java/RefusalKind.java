@@ -10,6 +10,8 @@ public enum RefusalKind {
     NotUtf8,
     /** The input is not HOCON that sconfig can read. */
     NotHocon,
+    /** The file is named as a format of its own that Lightbend's loader also reads. */
+    OtherFormat,
     /** sconfig rendered text it cannot read back. */
     BrokenOutput,
     /** sconfig would drop a comment that no field follows. */
@@ -33,6 +35,7 @@ public enum RefusalKind {
         return switch (refusal.productPrefix()) {
             case "NotUtf8" -> NotUtf8;
             case "NotHocon" -> NotHocon;
+            case "OtherFormat" -> OtherFormat;
             case "BrokenOutput" -> BrokenOutput;
             case "LostComment" -> LostComment;
             case "LostInclude" -> LostInclude;

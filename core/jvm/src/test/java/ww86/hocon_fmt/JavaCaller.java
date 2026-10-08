@@ -16,4 +16,16 @@ final class JavaCaller {
       return "refused: " + e.getMessage();
     }
   }
+
+  /** The name a plugin knows the file under: the refusal names it, and the name decides the
+   * format the file promises.
+   */
+  static String describeNamed(byte[] content, String name) {
+    try {
+      Optional<String> formatted = JvmFacade.reformat(content, name);
+      return formatted.map(text -> "reformat to: " + text).orElse("already formatted");
+    } catch (FormatRefusedException e) {
+      return "refused: " + e.getMessage();
+    }
+  }
 }

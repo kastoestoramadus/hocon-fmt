@@ -13,9 +13,11 @@ sealed interface Outcome {
   /** The formatter will not handle this content, so the file has to stay exactly as it is. */
   record Refused(String reason) implements Outcome {}
 
-  static Outcome of(byte[] content) {
+  /** The name is how the build reports the file: a refusal carries it, and a name promising
+   * another format is refused outright. */
+  static Outcome of(byte[] content, String name) {
     try {
-      return JvmFacade.reformat(content)
+      return JvmFacade.reformat(content, name)
           .<Outcome>map(NeedsFormatting::new)
           .orElseGet(AlreadyFormatted::new);
     } catch (FormatRefusedException e) {
