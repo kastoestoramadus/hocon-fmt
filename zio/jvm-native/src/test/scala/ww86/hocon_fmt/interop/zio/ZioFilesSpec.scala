@@ -92,6 +92,68 @@ class ZioFilesSpec extends munit.FunSuite {
     }
   }
 
+  // A replacement may only change the file's identity when it can be kept: the same owner, group
+  // and mode bits, setgid included. Otherwise the file is written in place.
+  test("a replacement keeps the owner, group and every mode bit of the file") {
+    withFile(bytes("a=1")) { path =>
+      TestPosix.chmod(path, 0x5a0) // 02640: setgid, rw-r-----
+      val before = TestPosix.stat(path)
+      val _      = run(ZioFiles.format(path))
+      assertEquals(TestPosix.stat(path), before)
+      assertEquals(Verdict.of(Files.readAllBytes(path)), Verdict.AlreadyFormatted)
+    }
+  }
+
+  // The group is not the process's primary one, so a staged copy would silently change it.
+  test("a replacement keeps a group that is only a supplementary group of this process") {
+    withFile(bytes("a=1")) { path =>
+      TestPosix.otherGroup(path).foreach { group =>
+        val _ = TestPosix.chgrp(path, group)
+        TestPosix.chmod(path, 0x1a0) // 0640: rw-r-----
+        val before = TestPosix.stat(path)
+        val _      = run(ZioFiles.format(path))
+        assertEquals(TestPosix.stat(path), before)
+        assertEquals(Verdict.of(Files.readAllBytes(path)), Verdict.AlreadyFormatted)
+      }
+    }
+  }
+
+  // The file is writable but no staged copy can be put beside it, so the write has to happen in
+  // place, as it did before this adapter.
+  test("a writable file in a directory that cannot be written is still formatted") {
+    val directory = Files.createTempDirectory("hocon-zio").nn // JDK creates a non-null path.
+    val locked    = directory.resolve("locked").nn            // resolve returns a path.
+    val file      = locked.resolve("a.conf").nn               // resolve returns a path.
+    try {
+      val _ = Files.createDirectory(locked)
+      val _ = Files.write(file, bytes("a=1"))
+      TestPosix.chmod(locked, 0x16d) // 0555
+      try {
+        assertEquals(run(ZioFiles.format(file)), Verdict.of("a=1"))
+        assertEquals(Verdict.of(Files.readAllBytes(file)), Verdict.AlreadyFormatted)
+      } finally TestPosix.chmod(locked, 0x1ed) // 0755, so the fixture can delete it
+    } finally {
+      val _ = Files.deleteIfExists(file)
+      val _ = Files.deleteIfExists(locked)
+      val _ = Files.deleteIfExists(directory)
+    }
+  }
+
+  // A read-only file is not replaced either, the way an in-place write refuses it. Root writes
+  // any file, so there the replacement is allowed.
+  test("a read-only file is left unchanged") {
+    withFile(bytes("a=1")) { path =>
+      TestPosix.chmod(path, 0x124) // 0444
+      val writable = Files.isWritable(path)
+      val result   = run(ZioFiles.format(path).either)
+      if writable then assertEquals(result, Right(Verdict.of("a=1")))
+      else {
+        assert(result.isLeft)
+        assertEquals(Files.readAllBytes(path).toSeq, bytes("a=1").toSeq)
+      }
+    }
+  }
+
   test("check streams every path including I/O errors and refusals without writing") {
     withFile(bytes("a=1")) { path =>
       val missing = path.resolveSibling("missing.conf").nn // resolveSibling returns a path.
