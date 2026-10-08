@@ -16,10 +16,10 @@ app {
 $ hocon-fmt application.conf && cat application.conf
 Running HOCON formatter for 1 files.
 app {
-  name: svc
-  port: 8080
+  name = svc
+  port = 8080
   include "local.conf"
-  db.url: "jdbc:postgresql://localhost/app"
+  db.url = "jdbc:postgresql://localhost/app"
 }
 ```
 

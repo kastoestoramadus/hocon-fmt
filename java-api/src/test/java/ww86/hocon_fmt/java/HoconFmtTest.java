@@ -21,7 +21,7 @@ import ww86.hocon_fmt.FormatRefusedException;
 class HoconFmtTest {
 
     static final String UNFORMATTED = "a = 1\n";
-    static final String FORMATTED = "a: 1\n";
+    static final String FORMATTED = "a = 1\n";
     static final String NOT_HOCON = "server {\n    listen 80;\n}\n";
 
     @Test

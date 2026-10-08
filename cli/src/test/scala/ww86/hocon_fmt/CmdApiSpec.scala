@@ -30,7 +30,7 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   def rewrite(files: Path*): IO[CmdApi.Run] = CmdApi.examineAll(Arguments(files.toList, checkOnly = false))
 
   val unformatted = "a   :    1"
-  val formatted   = "a: 1\n"
+  val formatted   = "a = 1\n"
 
   tmp.test("--check reports exit code 1 for an unformatted file") { dir =>
     write(dir, "a.conf", unformatted).flatMap(check(_)).map(run => assertEquals(run.exitCode, ExitCode(1)))

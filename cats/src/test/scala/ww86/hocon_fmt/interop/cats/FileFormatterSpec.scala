@@ -19,28 +19,28 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
 
   tmp.test("verdict and check read every file without writing") { dir =>
     for {
-      a       <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
-      b       <- write(dir, "b.conf", "b: 2\n".getBytes(UTF_8))
+      a       <- write(dir, "a.conf", "a : 1".getBytes(UTF_8))
+      b       <- write(dir, "b.conf", "b = 2\n".getBytes(UTF_8))
       v       <- formatter.verdict(a)
       results <- Stream.emits(List(a, b)).covary[IO].through(formatter.check).compile.toList
       bytes   <- read(a)
     } yield {
-      assertEquals(v, Verdict.NeedsFormatting("a: 1\n"))
+      assertEquals(v, Verdict.NeedsFormatting("a = 1\n"))
       assertEquals(results, List(a -> v, b -> Verdict.AlreadyFormatted))
-      assertEquals(bytes, "a=1".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a : 1".getBytes(UTF_8).toList)
     }
   }
 
   tmp.test("format writes complete output, is idempotent, and removes its temporary file") { dir =>
     for {
-      file    <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      file    <- write(dir, "a.conf", "a : 1".getBytes(UTF_8))
       first   <- formatter.format(file)
       bytes   <- read(file)
       second  <- formatter.format(file)
       entries <- Files[IO].list(dir).compile.toList
     } yield {
       assertEquals(first, FormatOutcome.Formatted)
-      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
       assertEquals(second, FormatOutcome.AlreadyFormatted)
       assertEquals(entries, List(file))
     }
@@ -123,7 +123,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
 
   tmp.test("format follows symlinks and preserves permissions") { dir =>
     for {
-      file                <- write(dir, "target.conf", "a=1".getBytes(UTF_8))
+      file                <- write(dir, "target.conf", "a : 1".getBytes(UTF_8))
       canonical           <- Files[IO].realPath(file)
       originalPermissions <- Files[IO].getPosixPermissions(file)
       permissions          = originalPermissions.add(PosixPermission.OwnerExecute)
@@ -138,7 +138,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
       assertEquals(outcome, FormatOutcome.Formatted)
       assert(isLink)
       assertEquals(after, permissions)
-      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
     }
   }
 
@@ -146,7 +146,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   // owner, group and mode bits, setgid included. Otherwise the file is written in place.
   tmp.test("a replacement keeps the owner, group and every mode bit of the file") { dir =>
     for {
-      file   <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      file   <- write(dir, "a.conf", "a : 1".getBytes(UTF_8))
       other  <- TestPosix.otherGroup(file)
       _      <- other.traverse_(TestPosix.chgrp(file, _))
       _      <- TestPosix.chmod(file, 0x400 | 0x1b0) // 02660: setgid, rw-rw----
@@ -156,7 +156,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
       bytes  <- read(file)
     } yield {
       assertEquals(after, before)
-      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
     }
   }
 
@@ -167,13 +167,13 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
     val file   = locked / "a.conf"
     val run    = for {
       _       <- Files[IO].createDirectory(locked)
-      _       <- write(locked, "a.conf", "a=1".getBytes(UTF_8))
+      _       <- write(locked, "a.conf", "a : 1".getBytes(UTF_8))
       _       <- TestPosix.chmod(locked, 0x16d) // 0555
       outcome <- formatter.format(file)
       bytes   <- read(file)
     } yield {
       assertEquals(outcome, FormatOutcome.Formatted)
-      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
     }
     run.guarantee(TestPosix.chmod(locked, 0x1ed).attempt.void) // 0755, so the fixture can delete it
   }
@@ -182,7 +182,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   // any file, so there the replacement is allowed.
   tmp.test("a read-only file is left unchanged") { dir =>
     for {
-      file     <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      file     <- write(dir, "a.conf", "a : 1".getBytes(UTF_8))
       _        <- TestPosix.chmod(file, 0x124) // 0444
       writable <- Files[IO].isWritable(file)
       result   <- formatter.format(file).attempt
@@ -191,7 +191,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
       if writable then assertEquals(result, Right(FormatOutcome.Formatted))
       else {
         assert(result.isLeft)
-        assertEquals(bytes, "a=1".getBytes(UTF_8).toList)
+        assertEquals(bytes, "a : 1".getBytes(UTF_8).toList)
       }
     }
   }

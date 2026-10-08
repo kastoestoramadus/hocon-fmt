@@ -47,7 +47,7 @@ class ZioFilesSpec extends munit.FunSuite {
   }
 
   test("already formatted files are never replaced") {
-    withFile(bytes("a: 1\n")) { path =>
+    withFile(bytes("a = 1\n")) { path =>
       val before = Files.getLastModifiedTime(path)
       assertEquals(run(ZioFiles.format(path)), Verdict.AlreadyFormatted)
       assertEquals(Files.getLastModifiedTime(path), before)

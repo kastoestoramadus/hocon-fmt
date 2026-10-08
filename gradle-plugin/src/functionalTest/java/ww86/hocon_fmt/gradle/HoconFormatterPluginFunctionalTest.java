@@ -26,7 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
 class HoconFormatterPluginFunctionalTest {
 
     static final String UNFORMATTED = "a=1\nb {c=2}\n";
-    static final String FORMATTED = "a: 1\nb.c: 2\n";
+    static final String FORMATTED = "a = 1\nb.c = 2\n";
 
     @TempDir
     Path projectDir;
@@ -104,14 +104,14 @@ class HoconFormatterPluginFunctionalTest {
 
     @Test
     void anIncludeSurvivesFormatting() throws IOException {
-        write("src/main/resources/other.conf", "b: 2\n");
+        write("src/main/resources/other.conf", "b = 2\n");
         Path app = write("src/main/resources/app.conf", "include \"other.conf\"\na = 1\n");
 
         build("hoconFormat");
 
         String formatted = read(app);
         assertTrue(formatted.contains("include \"other.conf\"\n"), formatted);
-        assertTrue(formatted.contains("a: 1\n"), formatted);
+        assertTrue(formatted.contains("a = 1\n"), formatted);
     }
 
     @Test
