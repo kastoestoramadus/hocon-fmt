@@ -84,6 +84,25 @@ ThisBuild / publishTo := {
 def announceRuntime(label: String): Setting[?] =
   Test / testOptions += Tests.Cleanup(() => println(s"========== $label =========="))
 
+/** Coverage rewrites classes to call scala.runtime.coverage.Invoker, which nothing outside a
+  * coverage run provides, so a jar built with it on is unusable. `coverageJvm` switches coverage
+  * off when it finishes, but a run that fails midway never gets there; these guards make the
+  * publication fail rather than let instrumented classes ship.
+  */
+def guardPublish(p: Project): Project =
+  Seq(publish, publishLocal, publishM2, PgpKeys.publishSigned, PgpKeys.publishLocalSigned)
+    .foldLeft(p) { (proj, pub) =>
+      proj.settings(
+        pub := {
+          if (coverageEnabled.?.value.contains(true))
+            sys.error(
+              s"${pub.key.label} would publish instrumented jars: coverage is enabled. Run `coverageOff` first."
+            )
+          pub.value
+        }
+      )
+    }
+
 lazy val root = project
   .in(file("."))
   // Aggregation drives compile, scalafmt and the rest.
@@ -170,9 +189,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     libraryDependencies += "org.ekrich" %%% "sjavatime" % sjavatime % Provided
   )
 
-lazy val coreJVM    = core.jvm
-lazy val coreJS     = core.js
-lazy val coreNative = core.native
+lazy val coreJVM    = guardPublish(core.jvm)
+lazy val coreJS     = guardPublish(core.js)
+lazy val coreNative = guardPublish(core.native)
 
 /** Effectful file operations shared by applications and the CLI. */
 lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
@@ -201,9 +220,9 @@ lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     Test / nativeConfig ~= { _.withMode(Mode.debug).withLTO(LTO.none) }
   )
 
-lazy val catsJVM    = cats.jvm
-lazy val catsJS     = cats.js
-lazy val catsNative = cats.native
+lazy val catsJVM    = guardPublish(cats.jvm)
+lazy val catsJS     = guardPublish(cats.js)
+lazy val catsNative = guardPublish(cats.native)
 
 lazy val zio = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .crossType(CrossType.Full)
@@ -231,9 +250,9 @@ lazy val zio = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .jsSettings(announceRuntime("ZIO text adapter on Scala.js"))
   .nativeSettings(announceRuntime("ZIO adapter on Scala Native"))
 
-lazy val zioJVM    = zio.jvm
-lazy val zioJS     = zio.js
-lazy val zioNative = zio.native
+lazy val zioJVM    = guardPublish(zio.jvm)
+lazy val zioJS     = guardPublish(zio.js)
+lazy val zioNative = guardPublish(zio.native)
 
 /** The command line tool, on every platform: the native binary, the Node bundle behind the
   * pre-commit hook, and the JVM. File effects live in the cats adapter, so `core` stays pure.
@@ -297,9 +316,9 @@ cliJS / npmPackage := {
   staging
 }
 
-lazy val cliJVM    = cli.jvm
-lazy val cliJS     = cli.js
-lazy val cliNative = cli.native
+lazy val cliJVM    = guardPublish(cli.jvm)
+lazy val cliJS     = guardPublish(cli.js)
+lazy val cliNative = guardPublish(cli.native)
 
 val bundle = taskKey[File]("The playground's script: the optimised web module under a licence banner.")
 
@@ -437,6 +456,30 @@ addCommandAlias(
   Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec").mkString("; ")
 )
 
+// Statement and branch coverage for the JVM modules, aggregate last. Dotty's coverage runtime
+// needs java.util.UUID over java.security.SecureRandom, which neither the Scala.js nor the Scala
+// Native javalib carries, so instrumenting those platforms stops at link time; the Gradle and
+// Maven plugins are Java builds without unit tests, so JaCoCo there has nothing to measure.
+// Reports land under */target/scala-*/scoverage-report. coverageOff at the end keeps the flag in
+// the session; guardPublish covers the run that dies before reaching it.
+addCommandAlias(
+  "coverageJvm",
+  Seq(
+    "clean",
+    "coverage",
+    "coreJVM/test",
+    "cliJVM/test",
+    "catsJVM/test",
+    "zioJVM/test",
+    "coreJVM/coverageReport",
+    "cliJVM/coverageReport",
+    "catsJVM/coverageReport",
+    "zioJVM/coverageReport",
+    "coverageAggregate",
+    "coverageOff"
+  ).mkString("; ")
+)
+
 /** Timings of each formatter phase on each platform; see `scripts/bench.py`. Not published. The
   * mutable loop in `Bench.measure` is deliberate: an allocation-free timing loop is the one place
   * where the functional style would distort what it measures.
@@ -470,37 +513,39 @@ lazy val benchNative = bench.native
   * scripted tests in `sbt-plugin/src/sbt-test`, run with `sbtPluginTest`: each starts a fresh
   * sbt, which is too slow for the `test` sequence.
   */
-lazy val sbtPlugin = project
-  .in(file("sbt-plugin"))
-  .enablePlugins(SbtPlugin, BuildInfoPlugin)
-  .settings(
-    name         := "sbt-hocon-fmt",
-    scalaVersion := "2.12.21",
-    // ThisBuild's options are Scala 3's; the same checks, as far as 2.12 has them.
-    scalacOptions := Seq(
-      "-deprecation",
-      "-feature",
-      "-unchecked",
-      "-Xfatal-warnings",
-      "-Xlint",
-      "-Ywarn-unused",
-      "-Ywarn-value-discard"
-    ),
-    // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
-    buildInfoPackage := "ww86.hocon_fmt.sbt",
-    buildInfoObject  := "FormatterArtifact",
-    buildInfoKeys    := Seq[BuildInfoKey](
-      "organization" -> (coreJVM / organization).value,
-      "name"         -> s"${(coreJVM / moduleName).value}_${(coreJVM / scalaBinaryVersion).value}",
-      "version"      -> (coreJVM / version).value,
-      "scalaVersion" -> (coreJVM / scalaVersion).value
-    ),
-    scriptedLaunchOpts += s"-Dplugin.version=${version.value}",
-    // The tests read sbt's logs; on CI, sbt colours them, and the escape codes hide `[warn]`.
-    scriptedLaunchOpts += "-Dsbt.log.noformat=true",
-    // The plugin fetches the core by its coordinates, so scripted needs it published first.
-    scriptedDependencies := scriptedDependencies.dependsOn(coreJVM / publishLocal).value
-  )
+lazy val sbtPlugin = guardPublish(
+  project
+    .in(file("sbt-plugin"))
+    .enablePlugins(SbtPlugin, BuildInfoPlugin)
+    .settings(
+      name         := "sbt-hocon-fmt",
+      scalaVersion := "2.12.21",
+      // ThisBuild's options are Scala 3's; the same checks, as far as 2.12 has them.
+      scalacOptions := Seq(
+        "-deprecation",
+        "-feature",
+        "-unchecked",
+        "-Xfatal-warnings",
+        "-Xlint",
+        "-Ywarn-unused",
+        "-Ywarn-value-discard"
+      ),
+      // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
+      buildInfoPackage := "ww86.hocon_fmt.sbt",
+      buildInfoObject  := "FormatterArtifact",
+      buildInfoKeys    := Seq[BuildInfoKey](
+        "organization" -> (coreJVM / organization).value,
+        "name"         -> s"${(coreJVM / moduleName).value}_${(coreJVM / scalaBinaryVersion).value}",
+        "version"      -> (coreJVM / version).value,
+        "scalaVersion" -> (coreJVM / scalaVersion).value
+      ),
+      scriptedLaunchOpts += s"-Dplugin.version=${version.value}",
+      // The tests read sbt's logs; on CI, sbt colours them, and the escape codes hide `[warn]`.
+      scriptedLaunchOpts += "-Dsbt.log.noformat=true",
+      // The plugin fetches the core by its coordinates, so scripted needs it published first.
+      scriptedDependencies := scriptedDependencies.dependsOn(coreJVM / publishLocal).value
+    )
+)
 
 addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
 

@@ -30,6 +30,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `HoconFmtTest`, `KotlinInteropTest` | `java-api/src/test` | the Java API for Java and Kotlin callers: the mirrored verdicts and refusal kinds and the parity tests that pin the mirror to the core, file checks and the write only on `NeedsFormatting`, `formatOrThrow`, and what Kotlin sees — a value-used `when` with no `else` and JSpecify's non-null returns |
 | e2e | `scripts/pre-commit-e2e.sh` | both families of pre-commit hooks, native and Node, installed from this repository as a user would |
 | `CliAcceptanceSuite` | `acceptance` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, redirected files and pipes, input beyond one read, refusals, `--version`, argument errors; `sbt acceptance/test` |
+| scoverage report | `coverageJvm`: core, cats, cli, zio on the JVM | which statements and branches the JVM tests reach, per module; CI's `coverage` job publishes the HTML and a per-module summary, and nothing fails on it |
 
 ## Property tests
 
@@ -73,6 +74,16 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **Order.** `sbt test` runs core, cats, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
+- **Coverage.** `sbt coverageJvm` measures what the JVM tests reach, statement and branch, per
+  module; the HTML lands under `*/target/scala-*/scoverage-report` and CI's `coverage` job
+  publishes it as an artifact with a per-module table in the job summary. It runs separately
+  from `sbt test`, which stays uninstrumented, and ends with `coverageOff`; publish, publishLocal,
+  publishM2 and publishSigned refuse to run while coverage is on, so a jar carrying the coverage
+  runtime's calls cannot ship even when the run fails midway. Scala.js and Scala Native cannot be
+  measured: dotty's coverage runtime needs `java.util.UUID` over `java.security.SecureRandom`,
+  which neither javalib carries, so the instrumented code stops at link time. No number fails
+  anything — coverage says what ran, not what the assertions check; mutation testing is the
+  follow-up in [ideas](ideas.md).
 
 ## Shared examples
 

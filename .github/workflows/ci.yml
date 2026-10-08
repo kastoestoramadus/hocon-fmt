@@ -196,3 +196,35 @@ jobs:
       - name: Keep the history
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: git push origin refs/notes/benchmarks
+
+  # Report-only, like the benchmarks: coverage records which statements the tests reached, not
+  # whether the assertions would notice a change, so it is not a required check and no threshold
+  # fails it. JVM only: dotty's coverage runtime needs java.util.UUID over java.security.SecureRandom,
+  # which the Scala.js and Scala Native javalibs do not carry, so those links fail instrumented.
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - name: Instrumented tests
+        run: sbt coverageJvm
+      - name: Publish the HTML reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoverage-html
+          path: |
+            core/jvm/target/scala-*/scoverage-report
+            cli/.jvm/target/scala-*/scoverage-report
+            cats/.jvm/target/scala-*/scoverage-report
+            zio/jvm/target/scala-*/scoverage-report
+            target/scala-*/scoverage-report
+      # Runs even when the tests fail, so one run reports both signals; the script prints a
+      # dash for any module whose report is missing.
+      - name: Summarise per module
+        if: ${{ !cancelled() }}
+        run: scripts/coverage-summary.py >> "$GITHUB_STEP_SUMMARY"

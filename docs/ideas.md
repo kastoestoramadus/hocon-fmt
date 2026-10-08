@@ -152,6 +152,17 @@ already warns that `actions/checkout@v4` and `actions/setup-java@v4` run on a de
 Renovate or Scala Steward would propose the updates as pull requests; which one covers all four
 build tools is the first thing to find out. **Your part:** installing the chosen app.
 
+### Mutation testing of core (stryker4s) (M)
+
+The coverage report shows which statements the tests reach; it does not show whether the
+assertions behind them would notice a change. Stryker4s mutates `core`'s code — flips a
+comparison, drops a negation, swaps a branch — and reports how many mutants the suites kill;
+statements covered yet not killed mark assertions that only exercise. Run it by hand before a
+release rather than in CI: a full mutation run costs hours of CPU for a number that moves
+slowly, and every surviving mutant needs reading to decide whether it is a real gap or an
+equivalent mutant. **Code:** a `stryker4s.conf` for `coreJVM`, whose 97.68% statement coverage
+is the reason to expect the kill score to be the informative number.
+
 ## Editors
 
 ### VS Code extension (M)
