@@ -90,11 +90,12 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   why. Catch with `NonFatal`, never `Throwable`.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
-- Attribution names the model, its effort and the tool it ran in, never a bare tool name. A commit ends
-  with `Co-Authored-By: <model-id>/<effort> through <tool> <noreply@anthropic.com>`; a PR body ends with
-  `Generated with <model-id>/<effort> through <tool>`, e.g. `Generated with glm-5.3-flash/max through ZCode`.
-  Effort is `l`, `m`, `h`, `xh` or `max`. Whoever later changes the PR adds `Revised by …` in the same form,
-  and every review pass adds `Reviewed by …`, e.g. `Reviewed by deepseek-flash/h through ZCode`.
+- Attribution names the model, its effort and the tool it ran in, never a bare tool name: the model id and
+  effort as given by whoever launched the agent (effort `l`, `m`, `h`, `xh` or `max`; `?` if not given). A
+  commit ends with `Co-Authored-By: <model-id>/<effort> through <tool> <noreply@anthropic.com>`. A PR body ends
+  with an attribution block: `Generated with <model-id>/<effort> through <tool>` (the tool may be a link), then
+  one line per later pass in the same form, `Revised by …` for whoever changed the PR and `Reviewed by …` for
+  each review, e.g. `Reviewed by deepseek-flash/h through ZCode`; whoever relays a review adds its line.
 - Every merged improvement gets a line in [docs/improvement-log.md](docs/improvement-log.md), with
   what to look at again before a release.
 
