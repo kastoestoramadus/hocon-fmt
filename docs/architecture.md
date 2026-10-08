@@ -16,6 +16,7 @@ around it in `HoconFormatter`.
 | `cats` | `FileFormatter[F]`: file verdicts, identity-preserving formatting, streaming checks, opt-in refusal errors | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io |
 | `zio` | `ZioFormatter`, blocking `ZioFiles`, identity-preserving formatting, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
 | `cli` | `CmdApi`, an `IOApp`: arguments, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
+| `java-api` | `HoconFmt` and the mirrored `Verdict` records and `RefusalKind` for Java and Kotlin callers; published as `eu.ww86:hocon-fmt-java-api` from sbt, tested by the standalone Gradle build in `java-api/` | JVM, Java 17 | core, jspecify |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | core, at run time |
@@ -117,7 +118,14 @@ A formatter written in Scala 3 has to reach hosts that are not:
 - **Maven** gives every plugin its own class loader, so the plugin depends on the core directly.
 
 `JvmFacade.reformat(byte[]): Optional<String>`, throwing a checked `FormatRefusedException` whose
-message is the reason, is the JDK-typed boundary all three share.
+message is the reason, is the JDK-typed boundary all three share. `java-api` publishes that
+boundary as the artifact `eu.ww86:hocon-fmt-java-api`: Java-only, so no `_3` suffix and no Scala
+library inside, with the verdicts as records and a `RefusalKind` per refusal case — the mirror
+exists because Scala 3 writes sealed-ness to TASTy, not the class file, so no Java compiler can
+switch over the core's enums exhaustively. sbt builds it over the same sources the standalone
+Gradle build in `java-api/` tests, and a contract suite in that build loads the sbt-published jar
+the way the sbt plugin will: a `URLClassLoader` over the platform loader, reached reflectively,
+since the two loaders hold distinct classes under equal names and only values cross.
 
 **Mill** needs none of this: from 1.1.4 it runs on Scala 3.8.2, as the core does, so its plugin is
 a Scala 3 trait that depends on the core and matches on `Verdict` directly. A Mill plugin works on

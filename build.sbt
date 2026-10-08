@@ -119,6 +119,7 @@ lazy val root = project
     cliJVM,
     cliJS,
     cliNative,
+    javaApi,
     acceptance,
     web,
     site,
@@ -444,6 +445,7 @@ addCommandAlias(
     zioJVM,
     zioJS,
     zioNative,
+    javaApi,
     web,
     site
   )
@@ -549,6 +551,36 @@ lazy val sbtPlugin = guardPublish(
 
 addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
 
+/** The Java and Kotlin API over the core: static methods returning the mirrored `Verdict` records,
+  * the boundary the Gradle and Maven plugins are written against and the one the sbt plugin loads
+  * across an isolated class loader. The sources are the ones the standalone Gradle build in
+  * `java-api/` compiles for its tests; sbt builds the artifact itself, so `publishM2` in
+  * development and CI and `publishSigned` on release all serve the same packaging. Java-only: no
+  * Scala library inside, no `_3` suffix, and a POM that carries the core and jspecify.
+  */
+lazy val javaApi = guardPublish(
+  project
+    .in(file("java-api"))
+    .settings(
+      name             := "hocon-fmt-java-api",
+      autoScalaLibrary := false,
+      crossPaths       := false,
+      // Scala 3.8 needs Java 17, so a lower target would only move the failure to the first format.
+      // The Gradle build compiles the same sources with the same flags; -g is Gradle's debug
+      // default, and without it sbt's jar would drop the LocalVariableTable Gradle's classes keep.
+      Compile / javacOptions ++= Seq("-g", "--release", "17", "-Xlint:all", "-Werror"),
+      // The doc task inherits the compile options through scope delegation, where -Xlint:all is a
+      // javac-only flag; javadoc's own doclint stays on at its default and the sources must pass it.
+      Compile / doc / javacOptions := Seq("--release", "17"),
+      // The JUnit and Kotlin tests belong to the Gradle build, which is what runs them; sbt
+      // compiles and publishes the main sources only.
+      Test / unmanagedSourceDirectories := Seq(),
+      // @NullMarked sits on the package, so consumers read it from their classpath too.
+      libraryDependencies += "org.jspecify" % "jspecify" % "1.0.0"
+    )
+    .dependsOn(coreJVM)
+)
+
 // What a release uploads: the libraries and the sbt plugin, signed. Stops at the upload, so the
 // deployment waits in the portal until someone clicks Publish.
 val signedReleaseTasks =
@@ -560,6 +592,7 @@ val signedReleaseTasks =
     catsJS.id,
     catsNative.id,
     cliJVM.id,
+    javaApi.id,
     zioJVM.id,
     zioJS.id,
     zioNative.id,

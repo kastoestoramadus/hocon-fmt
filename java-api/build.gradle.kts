@@ -45,6 +45,9 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // The contract suite loads exactly the jar this version names in Maven Local, so a stale jar
+    // of another version there cannot pass for the packaging under test.
+    systemProperty("hocon-fmt-java-api.version", version.toString())
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = TestExceptionFormat.FULL
