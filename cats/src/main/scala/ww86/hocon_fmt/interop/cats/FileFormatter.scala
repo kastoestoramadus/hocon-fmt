@@ -4,7 +4,7 @@ import _root_.cats.effect.Async
 import _root_.cats.syntax.all.*
 import fs2.{Pipe, Stream}
 import fs2.io.file.{Files, Path}
-import ww86.hocon_fmt.{FormatRefusedException, Refusal, Verdict}
+import ww86.hocon_fmt.{FormatOptions, FormatRefusedException, Refusal, Verdict}
 
 /** Result of formatting a file in place. IO failures remain in the effect's error channel. */
 enum FormatOutcome derives CanEqual {
@@ -20,7 +20,11 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
 
   /** The path is what the file's verdict is named by, and what a refusal reports. */
   def verdict(path: Path): F[Verdict] =
-    files.readAll(path).compile.to(Array).map(Verdict.of(_, path.toString))
+    verdict(path, FormatOptions.default)
+
+  /** As [[verdict(Path)]], with the style options the caller asks for. */
+  def verdict(path: Path, options: FormatOptions): F[Verdict] =
+    files.readAll(path).compile.to(Array).map(Verdict.of(_, path.toString, options))
 
   /** Canonicalises and deduplicates aliases before parallel work. Missing paths are retained so
     * callers can report their IO errors alongside the other files.
@@ -39,8 +43,12 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
     * survives.
     */
   def format(path: Path): F[FormatOutcome] =
+    format(path, FormatOptions.default)
+
+  /** As [[format(Path)]], with the style options the caller asks for. */
+  def format(path: Path, options: FormatOptions): F[FormatOutcome] =
     files.realPath(path).flatMap { target =>
-      verdict(target).flatMap {
+      verdict(target, options).flatMap {
         case Verdict.AlreadyFormatted         => FormatOutcome.AlreadyFormatted.pure[F]
         case Verdict.Refused(refusal)         => FormatOutcome.Refused(refusal).pure[F]
         case Verdict.NeedsFormatting(content) => replace(target, content).as(FormatOutcome.Formatted)

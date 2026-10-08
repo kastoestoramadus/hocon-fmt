@@ -10,7 +10,7 @@ class StatusSpec extends munit.FunSuite {
   }
 
   test("an already formatted verdict reports no change") {
-    assertEquals(Status.of(Verdict.of("a: 1\n"), "a: 1\n"), Status.AlreadyFormatted)
+    assertEquals(Status.of(Verdict.of("a = 1\n"), "a = 1\n"), Status.AlreadyFormatted)
   }
 
   test("lines are compared from the top, so a reordering counts each moved line once") {
@@ -73,6 +73,7 @@ class StatusSpec extends munit.FunSuite {
     case RefusalKind.LostComment    => ww86.hocon_fmt.Refusal.LostComment("# gone")
     case RefusalKind.LostInclude    => ww86.hocon_fmt.Refusal.LostInclude("include \"x.conf\"")
     case RefusalKind.MovedInclude   => ww86.hocon_fmt.Refusal.MovedInclude("include \"x.conf\"")
+    case RefusalKind.ReservedName   => ww86.hocon_fmt.Refusal.ReservedName
     case RefusalKind.UnstableOutput => ww86.hocon_fmt.Refusal.UnstableOutput
     case RefusalKind.NotUtf8        => ww86.hocon_fmt.Refusal.NotUtf8
   }

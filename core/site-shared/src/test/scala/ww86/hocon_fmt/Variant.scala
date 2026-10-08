@@ -26,4 +26,9 @@ object Variant {
   )
 
   def differs(id: String): Boolean = ledger.contains(id)
+
+  /** The examples `ExamplesSpec` pins as refused differently depending on the style options; with
+    * the fork every one of them renders whatever the options, so nothing differs here.
+    */
+  val refusedDifferently: List[(String, List[String])] = Nil
 }

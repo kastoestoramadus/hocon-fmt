@@ -217,7 +217,7 @@ already does for Mill.
 
 The largest item and the one that removes most limitations. Formatting through sconfig means
 parsing into a configuration and rendering it again, which is why: `include` needs masking; every
-sconfig rendering defect ([limitations](limitations.md)) becomes a refusal; `=` becomes `:`, `//`
+sconfig rendering defect ([limitations](limitations.md)) becomes a refusal; `:` becomes `=`, `//`
 becomes `#` and paths get flattened whether the author wanted it or not; and parsing is 27 times
 slower on Scala Native than on the JVM. A concrete syntax tree for HOCON, parsed with cats-parse
 and printed by our own printer, keeps every token the author wrote, so the formatter changes only
@@ -254,7 +254,7 @@ at [ekrich/sconfig](https://github.com/ekrich/sconfig) helps everyone on sconfig
 ### Render `+=` back as `+=` upstream (S)
 
 Formatting expands the append shorthand to the specification's form, `a += 2` becoming
-`a: ${?a}[` with the `2` and the closing bracket on their own lines below, recorded as an
+`a = ${?a}[` with the `2` and the closing bracket on their own lines below, recorded as an
 intentional normalisation in [limitations](limitations.md). The value
 is the same, but the spelling the author wrote is not kept, and sconfig is why: its parse tree
 desugars `+=` at parse time, so the renderer cannot tell the shorthand from the expansion written

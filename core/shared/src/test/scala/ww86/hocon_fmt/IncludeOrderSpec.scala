@@ -53,19 +53,19 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
   def kept = Map(
     "the include on its own line, first" -> (
       "include \"defaults.conf\"\nzone = \"us\"",
-      "include \"defaults.conf\"\nzone: us\n"
+      "include \"defaults.conf\"\nzone = us\n"
     ),
     "the include on its own line, last" -> (
       "zone = \"us\"\ninclude \"defaults.conf\"",
-      "zone: us\ninclude \"defaults.conf\"\n"
+      "zone = us\ninclude \"defaults.conf\"\n"
     ),
     "an include in an object, own lines" -> (
       "app {\n  include \"defaults.conf\"\n  zone = \"us\"\n}",
-      "app {\n  include \"defaults.conf\"\n  zone: us\n}\n"
+      "app {\n  include \"defaults.conf\"\n  zone = us\n}\n"
     ),
     "a field before the include on its line" -> (
       "zone = \"us\", include \"defaults.conf\"",
-      "zone: us\ninclude \"defaults.conf\"\n"
+      "zone = us\ninclude \"defaults.conf\"\n"
     ),
     "an include alone in its object" -> ("app { include \"defaults.conf\" }", "app {\n  include \"defaults.conf\"\n}\n")
   )

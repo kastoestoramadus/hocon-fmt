@@ -11,11 +11,11 @@ import scala.util.{Failure, Success, Try}
   */
 class TryAndFutureSpec extends munit.FunSuite {
 
-  val formatted = "a: 1\n"
+  val formatted = "a = 1\n"
   val invalid   = Array(0xff.toByte)
 
   test("a Try caller turns a verdict into the text or a refusal exception") {
-    val source = "a=1".getBytes(UTF_8)
+    val source = "a : 1".getBytes(UTF_8)
 
     val formatted: Try[String] = Try(Verdict.of(source)).flatMap {
       case Verdict.NeedsFormatting(text) => Success(text)
@@ -38,7 +38,7 @@ class TryAndFutureSpec extends munit.FunSuite {
   test("a Future caller does the same in its error channel") {
     given ExecutionContext = munitExecutionContext
 
-    val source = "a=1".getBytes(UTF_8)
+    val source = "a : 1".getBytes(UTF_8)
 
     val formatted: Future[String] = Future(Verdict.of(source)).flatMap {
       case Verdict.NeedsFormatting(text) => Future.successful(text)

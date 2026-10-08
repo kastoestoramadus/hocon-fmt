@@ -1,2 +1,2 @@
-retries: 3
-timeout: "10s"
+retries = 3
+timeout = "10s"

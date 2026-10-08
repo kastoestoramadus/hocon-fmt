@@ -18,9 +18,12 @@ import scala.collection.mutable
   * other. A block in an array or parentheses stays unmasked, since no field can stand there; the
   * formatter then refuses the file, as it does for any lost comment.
   *
-  * The placeholder prefix is chosen so that it occurs nowhere in the text being masked, so a
-  * restore can only ever match what this pass generated; text that merely looks like a placeholder
-  * is not touched and is not mistaken for one.
+  * User text is never altered. The prefix is chosen to occur nowhere the parse could put it: not
+  * in the text, and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where
+  * `"__COMM""ENT_0"` and `"\u005f..."` spell a name this pass would otherwise write. And a
+  * rendered text whose prefix occurrences are not exactly the ones the placeholders wrote is left
+  * alone: the block is then missing from the output, and the formatter's lost-comment check
+  * refuses the file rather than restore on a guess.
   *
   * The regexes must hold on RE2 and ES2015: no lookaround, no backreferences, no multiline `^`.
   * A character scanner like [[IncludeMasking]], written with loops; the suppression is for this
@@ -34,6 +37,11 @@ import scala.collection.mutable
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
 private[hocon_fmt] object CommentCarrier {
+
+  private val CommentPrefix = "__COMMENT_"
+
+  /** How often each placeholder writes its prefix: the key, the value and the guard's key. */
+  private val PrefixPerPlaceholder = 3
 
   def parseOptions(base: ConfigParseOptions): ConfigParseOptions = base.setKeepDetachedComments(true)
 
@@ -54,28 +62,90 @@ private[hocon_fmt] object CommentCarrier {
     }
   }
 
-  /** The first prefix that does not occur in `source`: `__COMMENT_`, then `__COMMENT_X_` and so on. */
+  /** The first prefix the parse cannot spell from the text: `__COMMENT_` when the text does not
+    * mention it, `__COMMENTX_` and so on otherwise. Each step appends an `X`, so a finite text
+    * always leaves one.
+    */
   @tailrec
-  private def prefixFor(source: String, prefix: String = "__COMMENT_"): String =
-    if (source.contains(prefix)) prefixFor(source, prefix.dropRight(1) + "X_") else prefix
+  private def prefixFor(source: String, prefix: String = CommentPrefix): String =
+    if (mentions(source, prefix)) prefixFor(source, prefix.dropRight(1) + "X_") else prefix
+
+  /** Whether the text can spell the prefix, literally or as the parse would put it back together.
+    */
+  private def mentions(source: String, prefix: String): Boolean =
+    source.contains(prefix) || materialised(source).contains(prefix)
+
+  /** What quoting can spell: `"` dropped, `\uXXXX` resolved (`\u005f` is `_`). An
+    * over-approximation — it also joins pieces sconfig would keep apart — which only ever makes
+    * [[prefixFor]] pick a longer prefix.
+    */
+  private def materialised(source: String): String = {
+    val out = new StringBuilder
+    var i   = 0
+    while (i < source.length)
+      if (source.charAt(i) == '"') i += 1
+      else
+        escapeAt(source, i) match {
+          case Some((char, next)) =>
+            val _ = out.append(char)
+            i = next
+          case None =>
+            val _ = out.append(source.charAt(i))
+            i += 1
+        }
+    out.toString
+  }
+
+  /** The character `\uXXXX` at `i` stands for, and where the escape ends; `None` for anything
+    * else, including the escapes sconfig resolves to characters of their own.
+    */
+  private def escapeAt(source: String, i: Int): Option[(Char, Int)] =
+    Option
+      .when(
+        i + 6 <= source.length && source.charAt(i) == '\\' && (source.charAt(i + 1) == 'u' || source.charAt(
+          i + 1
+        ) == 'U')
+      ) {
+        val hex = source.substring(i + 2, i + 6)
+        Option.when(hex.forall(c => Character.digit(c, 16) >= 0))(hex).map { digits =>
+          Integer.parseInt(digits, 16).toChar -> (i + 6)
+        }
+      }
+      .flatten
 
   // ---- restoring -----------------------------------------------------------------------------
 
-  private def restore(rendered: String, prefix: String, originals: Map[Int, String]): String = {
-    val guard = s"""$OptionalQuote${prefix}GUARD_(\\d+)$OptionalQuote[ \\t]*:[ \\t]*${OptionalQuote}g$OptionalQuote"""
-    val field =
-      s"""([ \\t]*)$OptionalQuote$prefix(\\d+)$OptionalQuote[ \\t]*:[ \\t]*$OptionalQuote$prefix(\\d+)$OptionalQuote"""
-    val ours                     = originals.keySet
-    def dropOurs(guard: Matcher) = Option.when(ours(guard.group(1).toInt))("")
-    // As in IncludeMasking.unmask: own-line guards first, with a newline lent for the pass.
-    val noOwnLine = replaceEachMatch("\n" + rendered, Pattern.compile(s"""\\n[ \\t]*$guard"""))(dropOurs).drop(1)
-    val noGuards  = replaceEachMatch(noOwnLine, Pattern.compile(s""",?[ \\t]*$guard"""))(dropOurs)
-    replaceEachMatch(noGuards, Pattern.compile(field)) { f =>
-      Option
-        .when(f.group(2) == f.group(3))(f.group(2).toInt)
-        .flatMap(originals.get)
-        .map(renderBlock(f.group(1), _))
+  private def restore(rendered: String, prefix: String, originals: Map[Int, String]): String =
+    // Only the placeholders write the prefix here; anything else in the render is the user's text
+    // spelled through quoting, which this pass cannot tell apart. Restoring nothing makes the
+    // comments missing, and `HoconFormatter.commentsKept` refuses the file.
+    if (occurrences(rendered, prefix) != PrefixPerPlaceholder * originals.size) rendered
+    else {
+      val guard =
+        s"""$OptionalQuote${prefix}GUARD_(\\d+)$OptionalQuote[ \\t]*[:=][ \\t]*$OptionalQuote$GuardValue$OptionalQuote"""
+      val field =
+        s"""([ \\t]*)$OptionalQuote$prefix(\\d+)$OptionalQuote[ \\t]*[:=][ \\t]*$OptionalQuote$prefix(\\d+)$OptionalQuote"""
+      val ours                     = originals.keySet
+      def dropOurs(guard: Matcher) = Option.when(ours(guard.group(1).toInt))("")
+      // As in IncludeMasking.unmask: own-line guards first, with a newline lent for the pass.
+      val noOwnLine = replaceEachMatch("\n" + rendered, Pattern.compile(s"""\\n[ \\t]*$guard"""))(dropOurs).drop(1)
+      val noGuards  = replaceEachMatch(noOwnLine, Pattern.compile(s""",?[ \\t]*$guard"""))(dropOurs)
+      replaceEachMatch(noGuards, Pattern.compile(field)) { f =>
+        Option
+          .when(f.group(2) == f.group(3))(f.group(2).toInt)
+          .flatMap(originals.get)
+          .map(renderBlock(f.group(1), _))
+      }
     }
+
+  /** How often `needle` occurs in `text`. */
+  private def occurrences(text: String, needle: String): Int = {
+    @tailrec
+    def count(from: Int, found: Int): Int = {
+      val at = text.indexOf(needle, from)
+      if (at < 0) found else count(at + needle.length, found + 1)
+    }
+    count(0, 0)
   }
 
   // Comments are stored trimmed and re-markered with `#`, the spelling formatting gives every
@@ -90,9 +160,10 @@ private[hocon_fmt] object CommentCarrier {
       .mkString("\n")
 
   private val OptionalQuote = """["]?"""
+  private val GuardValue    = "g"
 
   private def placeholderFor(prefix: String, index: Int): String =
-    s"""$prefix$index : "$prefix$index", ${prefix}GUARD_$index : "g""""
+    s"""$prefix$index : "$prefix$index", ${prefix}GUARD_$index : "$GuardValue""""
 
   private def replaceEachMatch(text: String, pattern: Pattern)(
       replacement: Matcher => Option[String]

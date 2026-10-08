@@ -65,7 +65,7 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
 - **`core` depends on sconfig only.** The plugins load it into sbt, Gradle and Maven; effects and
   libraries belong in `cats` and `cli`. `JvmFacade` is the JDK-typed boundary the sbt, Gradle and
   Maven plugins share; Mill runs Scala 3, and its plugin matches on `Verdict`.
-- **Do not "fix" the intentional normalisations** (`//` to `#`, `=` to `:`, flattened paths, …)
+- **Do not "fix" the intentional normalisations** (`//` to `#`, `:` to `=` by default, flattened paths, …)
   listed in [docs/limitations.md](docs/limitations.md).
 <!-- UPSTREAM-SCONFIG: delete this rule and the `coreSite` mention under Layout when the fork goes; docs/site.md has the steps. -->
 - **The page runs on a sconfig fork, temporarily.** `coreSite` is the core's sources against

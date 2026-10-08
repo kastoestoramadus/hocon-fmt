@@ -27,7 +27,8 @@ object ExampleGenerator {
         "lost-comment",
         "lost-include",
         "moved-include",
-        "unstable-output"
+        "unstable-output",
+        "reserved-name"
       )
     def verdict(value: String, target: Boolean = false): String = {
       require(

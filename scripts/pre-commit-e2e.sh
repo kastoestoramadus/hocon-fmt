@@ -35,7 +35,7 @@ repos:
 EOF
 
 unformatted=$(printf 'app {\n    name = "svc"\n   port =8080\n}')
-formatted=$(printf 'app {\n  name: svc\n  port: 8080\n}')
+formatted=$(printf 'app {\n  name = svc\n  port = 8080\n}')
 
 # Runs one family of hooks, the formatter and the check, against fresh fixtures.
 scenario() {
