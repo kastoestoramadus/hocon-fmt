@@ -205,6 +205,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     // are open. Scoped to the `test` task only, so `testOnly` can still run it on demand.
     Test / test / testOptions += Tests.Exclude(Seq("ww86.hocon_fmt.SconfigDefectsSpec"))
   )
+  // UPSTREAM-SCONFIG: red until released sconfig has the option the page's fork carries; excluded
+  // from `test` like the defects spec. Delete with the fork (docs/site.md, "Returning to upstream").
+  .jvmSettings(
+    Test / test / testOptions += Tests.Exclude(Seq("ww86.hocon_fmt.KeepDetachedCommentsGuardSpec"))
+  )
   .jvmSettings(announceRuntime("core on the JVM"))
   .jsSettings(announceRuntime("core on Scala.js"))
   .nativeSettings(announceRuntime("core on Scala Native"))
@@ -522,7 +527,9 @@ addCommandAlias(
 // On every platform: sconfig's Scala.js and Scala Native builds have defects of their own.
 addCommandAlias(
   "libraryDefects",
-  Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec").mkString("; ")
+  (Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec") :+
+    // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
+    s"${coreJVM.id}/testOnly ww86.hocon_fmt.KeepDetachedCommentsGuardSpec").mkString("; ")
 )
 
 // Statement and branch coverage for the JVM modules, aggregate last. Dotty's coverage runtime
