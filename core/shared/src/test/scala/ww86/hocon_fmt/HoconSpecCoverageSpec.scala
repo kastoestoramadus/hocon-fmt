@@ -78,6 +78,27 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The commonest lost comment in the wild: a blank line between the comment and the field that
+  // follows, as under a licence header or a banner, or inside a comment block split by one.
+  // sconfig drops the comment outright (see SconfigDefectsSpec), so the only safe answer is to
+  // refuse; 20 of 23 reference.conf files in the Akka, Pekko, Play, Kamon, Gatling and ssl-config
+  // corpus hold such a comment.
+  val commentAboveBlankLine = Map(
+    "a header followed by a blank line"     -> "# Copyright 2025\n\na : 1",
+    "a comment block split by a blank line" ->
+      "o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"
+  )
+
+  commentAboveBlankLine.foreach { case (name, raw) =>
+    test(s"formatter: never loses a comment: $name") {
+      assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
+      refusalOf(raw) match {
+        case Refusal.LostComment(_) => ()
+        case other                  => fail(s"$name: refused for the wrong reason: ${other.reason}")
+      }
+    }
+  }
+
   // --- Normalised on purpose: meaning kept, original spelling not ------------------------------
 
   val normalised = List(
