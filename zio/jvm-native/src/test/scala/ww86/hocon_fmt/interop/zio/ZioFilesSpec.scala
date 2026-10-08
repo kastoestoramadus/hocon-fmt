@@ -11,9 +11,9 @@ class ZioFilesSpec extends munit.FunSuite {
     Runtime.default.unsafe.run(effect).getOrThrowFiberFailure()
   }
 
-  def withFile(bytes: Array[Byte])(body: Path => Unit): Unit = {
+  def withFile(bytes: Array[Byte], name: String = "application.conf")(body: Path => Unit): Unit = {
     val directory = Files.createTempDirectory("hocon-zio").nn // JDK creates a non-null path.
-    val path      = directory.resolve("application.conf").nn  // resolve returns a path.
+    val path      = directory.resolve(name).nn                // resolve returns a path.
     val _         = Files.write(path, bytes)
     try body(path)
     finally {
@@ -64,6 +64,28 @@ class ZioFilesSpec extends munit.FunSuite {
         }
         assertEquals(Files.readAllBytes(path).toSeq, original.toSeq)
         assertEquals(Files.getLastModifiedTime(path), before)
+      }
+    }
+  }
+
+  // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
+  // file its name promises, so the name alone decides, whatever the content.
+  test("a file named as another format is refused, and left alone") {
+    withFile(bytes("a: 1\n"), "application.json") { path =>
+      val before = Files.getLastModifiedTime(path)
+      val reason = Refusal.OtherFormat("JSON")
+      assertEquals(run(ZioFiles.verdict(path).flip), FileError.Refused(reason))
+      assertEquals(run(ZioFiles.format(path).flip), FileError.Refused(reason))
+      assertEquals(Files.readAllBytes(path).toSeq, bytes("a: 1\n").toSeq)
+      assertEquals(Files.getLastModifiedTime(path), before)
+    }
+  }
+
+  test("a refusal names the file it came from") {
+    withFile(bytes("a={")) { path =>
+      run(ZioFiles.verdict(path).flip) match {
+        case FileError.Refused(Refusal.NotHocon(detail)) => assert(detail.startsWith(path.toString + ":"), detail)
+        case other                                       => fail(s"expected a HOCON refusal, got $other")
       }
     }
   }
