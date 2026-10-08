@@ -160,6 +160,41 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // The identity test above would also pass if the file were written in place, so only an
+  // assertion on the inode pins that the rename still happens where it can.
+  tmp.test("a writable file in a writable directory is replaced by a rename") { dir =>
+    for {
+      file   <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      before <- TestPosix.ino(file)
+      _      <- formatter.format(file)
+      after  <- TestPosix.ino(file)
+      bytes  <- read(file)
+    } yield {
+      assertNotEquals(after, before, "inode unchanged: the file was written in place")
+      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+    }
+  }
+
+  // The documented consequence of the rename: the hard link keeps pointing at the old inode, so
+  // it holds the old content and the formatted file has none of its links left.
+  tmp.test("a replacement leaves a hard link holding the old content") { dir =>
+    for {
+      file   <- write(dir, "a.conf", "a=1".getBytes(UTF_8))
+      sibling = dir / "hardlinked.conf"
+      _      <- TestPosix.link(sibling, file)
+      before <- TestPosix.nlink(file)
+      _      <- formatter.format(file)
+      after  <- TestPosix.nlink(file)
+      linked <- read(sibling)
+      bytes  <- read(file)
+    } yield {
+      assertEquals(before, 2L)
+      assertEquals(after, 1L, "the file still shares its inode: it was written in place")
+      assertEquals(linked, "a=1".getBytes(UTF_8).toList)
+      assertEquals(bytes, "a: 1\n".getBytes(UTF_8).toList)
+    }
+  }
+
   // The file is writable but no staged copy can be put beside it, so the write has to happen in
   // place, as it did before this adapter.
   tmp.test("a writable file in a directory that cannot be written is still formatted") { dir =>
