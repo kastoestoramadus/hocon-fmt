@@ -61,13 +61,15 @@ Standard input to standard output and `--version` are implemented; see [usage](u
 ruff and prettier do; today the caller expands globs. Maybe
 `--strict`, turning a refusal into a failure, for teams that want every `.conf` to be HOCON.
 
-### Report dead duplicate keys (M)
+### Report dead duplicate keys (M) — implemented
 
-Sconfig merges repeated keys: a later plain value silently overrides an earlier one, a
-"dead duplicate" that is often a mistake. A CLI report could point at both definitions,
-without refusing formatting; this is analysis rather than formatting, so it may belong behind a
-separate flag. Exclude the common, deliberate `x = default` then `x = ${?ENV}` idiom and
-object merges of disjoint fields (`a { x = 1 }` then `a { y = 2 }`), which kill nothing.
+The CLI reports them as warnings, `DuplicateReport` in the core computes them, and
+`--fail-on-duplicates` (or its `.hocon-fmt.conf` key) makes one fail a run; see
+[usage](usage.md#the-duplicate-report) and [architecture](architecture.md#the-duplicate-report).
+Sconfig merges repeated keys: a later plain value overrides an earlier one, a
+"dead duplicate" that is often a mistake, and the report points at both definitions without
+refusing formatting. The common, deliberate `x = default` then `x = ${?ENV}` idiom and
+object merges of disjoint fields (`a { x = 1 }` then `a { y = 2 }`) kill nothing and are exempt.
 When both objects define the same field, the later value can kill the earlier one like any other
 dead duplicate: `a { x = 1 }` then `a { x = 2, y = 3 }` loses `a.x = 1`. A sweep of real files from
 GitHub (October 2026) found the idiom in 626 of 1,650 GitHub files and dead
@@ -77,11 +79,11 @@ changes from `localhost:8182` to `localhost:9042`; other examples are
 [DataDog's `ssl-config.logger`](https://github.com/DataDog/system-tests/blob/1d664089d6aaac7e0fcd5f8a3ad21ddcbfdaa0fa/utils/build/docker/java/akka-http/src/main/resources/reference.conf#L645-L649)
 and [Macrometa's `akka.logging-filter`](https://github.com/Macrometacorp/macrometa-connector-databricks/blob/9b24097996e04c17786af33c16cef34c3ce08104/app/src/main/resources/application.conf#L5-L21).
 
-**Code:** the merged `Config` loses overridden values' origins, so inspect the pre-merge
-`ConfigDocument` tree or use a parse-time hook. In sconfig 1.12.4, `ConfigDocument` preserves
-syntax but exposes only editing, path checks and rendering; `ConfigNode` has no public accessor,
-and `ConfigParseOptions` offers no field hook. Neither route is available through the public API:
-an upstream tree-traversal API or hook is needed; its implementation cost is unknown.
+**Code:** as expected, the merged `Config` loses an overridden value's origins, so the report reads
+the pre-merge `ConfigDocument` tree instead — through its implementation, since `ConfigNode` still
+has no public accessor in sconfig 1.12.4: `DuplicateReport` matches the document against
+`SimpleConfigDocument` and walks `configNodeTree`. That is the piece to revisit when
+[upstream](https://github.com/lightbend/config/issues/300) publishes a traversal API.
 
 ## Distribution
 

@@ -8,6 +8,9 @@ Every channel runs the same formatter and follows the same rules:
   [known sconfig defect](limitations.md)) is reported with the reason and left byte-for-byte
   untouched. A refusal never fails the run: a `.conf` file that is not HOCON at all, such as an
   nginx config, is common enough that failing on it would make the tool unusable.
+- Where a key is defined more than once, the later definition wins and the earlier one never takes
+  effect; the CLI says so as a warning. It changes nothing that is written and no exit code, unless
+  `--fail-on-duplicates` asks for it — [the duplicate report](#the-duplicate-report).
 
 Library adapters expose refusals to the caller: the ZIO adapter uses a typed error for a
 single operation and a per-file outcome for a streamed check, so the application controls its
@@ -18,15 +21,15 @@ All JVM channels need Java 17 or newer, as Scala 3.8 does.
 ## Command line
 
 ```
-hocon-fmt [--check] [--separator =|:] [--config <file>] <file>...
-hocon-fmt --stdin [--stdin-filename <name>]
+hocon-fmt [--check] [--separator =|:] [--config <file>] [--fail-on-duplicates] <file>...
+hocon-fmt --stdin [--stdin-filename <name>] [--fail-on-duplicates]
 hocon-fmt --version
 ```
 
 | exit code | meaning |
 |---|---|
-| 0 | done; with `--check`, every file is formatted or refused |
-| 1 | `--check` found an unformatted file, or stdin was refused |
+| 0 | done; with `--check`, every file is formatted or refused, and no finding failed the run |
+| 1 | `--check` found an unformatted file, stdin was refused, or a finding met `--fail-on-duplicates` |
 | 2 | the arguments could not be parsed, a config file could not be read or trusted, or stdin could not be read |
 
 `--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
@@ -78,6 +81,32 @@ The build-tool plugins below format with the default style; plugin settings and 
 lookup there come after their migration to the java API.
 
 `--version` prints the build version shared by all CLI runtimes and needs no input.
+
+### The duplicate report
+
+A key defined more than once resolves to its later definition: the earlier one, its text dropped
+from the formatted file, takes no effect. The CLI points at both lines where it sees them:
+
+```
+config/application.conf:12: akka.logging-filter defined again at line 21; the earlier value never takes effect
+```
+
+Findings are warnings. They are printed in `format`, `--check` and `--stdin` runs (on stderr in
+stdin mode, which keeps stdout the formatted text alone) and change nothing that is written. By
+default they change no exit code either: a refusal still fails nothing, and a file that needs
+formatting still fails `--check`. `--fail-on-duplicates` makes any finding fail the run with exit
+1, and `--no-fail-on-duplicates` clears it again; a repository can ask for the failure in its
+`.hocon-fmt.conf`:
+
+```hocon
+fail-on-duplicates = true
+```
+
+Not every repeated path is a finding. The `x = "default"` then `x = ${?ENV}` idiom is not: the
+earlier value is what an unset variable leaves standing. Neither is an object defined twice, which
+merges, nor a later definition that holds a substitution, whose unresolved merge may still reach
+the earlier value — see [what the report does not
+claim](limitations.md#what-the-duplicate-report-does-not-claim).
 
 Three builds of the same program:
 
