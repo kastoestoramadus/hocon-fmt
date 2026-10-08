@@ -9,6 +9,10 @@ Every channel runs the same formatter and follows the same rules:
   untouched. A refusal never fails the run: a `.conf` file that is not HOCON at all, such as an
   nginx config, is common enough that failing on it would make the tool unusable.
 
+Library adapters expose refusals to the caller: the ZIO adapter uses a typed error for a
+single operation and a per-file outcome for a streamed check, so the application controls its
+run policy.
+
 All JVM channels need Java 17 or newer, as Scala 3.8 does.
 
 ## Command line
@@ -117,6 +121,54 @@ Both recipes are compiled in `TryAndFutureSpec`. Nothing refuses on its own: `Ve
 and `FormatRefusedException` exists only where a caller or an adapter raises it — the same type the
 build-tool facade and the cats adapter raise.
 
+## Java and Kotlin
+
+`eu.ww86:hocon-fmt-java-api` puts the same core behind types the JVM speaks natively: static
+methods on `ww86.hocon_fmt.java.HoconFmt` return a `Verdict` that is a sealed interface of records —
+`AlreadyFormatted`, `NeedsFormatting(formatted)` and `Refused(kind, reason)` — with a `RefusalKind`
+constant per core `Refusal` case. The mirror exists because Scala 3 writes sealed-ness to TASTy and
+not to the class file, so no Java compiler can switch over the core's enum exhaustively; the mirror
+can, on Java 21. Nothing accepts or returns null: the package is JSpecify `@NullMarked`, which
+Kotlin enforces as compile errors.
+
+```java
+import ww86.hocon_fmt.java.HoconFmt;
+import ww86.hocon_fmt.java.RefusalKind;
+import ww86.hocon_fmt.java.Verdict;
+
+Verdict verdict = HoconFmt.checkFile(path);
+if (verdict instanceof Verdict.NeedsFormatting needed) {
+    System.out.println("Run me to rewrite " + path);
+} else if (verdict instanceof Verdict.Refused refused
+        && refused.kind() == RefusalKind.NotHocon) {
+    logger.warn("Leaving {} alone: {}", path, refused.reason());
+}
+```
+
+```kotlin
+val verdict = HoconFmt.checkFile(path)
+val shape = when (verdict) {
+    is Verdict.AlreadyFormatted -> "$path is formatted"
+    is Verdict.NeedsFormatting -> "would become: ${verdict.formatted()}"
+    is Verdict.Refused -> "leaving alone: ${verdict.reason()}"
+}
+println(shape)
+```
+
+`check` judges text or bytes, `checkFile` a path, `formatFile` rewrites a file only when the
+formatted text differs — the same whole-file `Files.writeString` the Gradle and Maven plugins
+make, so a refused file is never touched — and `formatOrThrow` raises the core's
+`FormatRefusedException` for callers that prefer an exception. Both compilers hold the caller to
+the full set: the Kotlin `when` above is value-used with no `else`, and a Java 21 `switch` needs
+no `default`; a missing branch is a compile error, not a run-time surprise. Over the core's own
+enum Kotlin is worse than unchecked — a `when` missing a branch compiles and then throws
+`NoWhenBranchMatchedException` at run time — which is the trap the mirror removes. On Java 17
+every outcome is an `instanceof` away.
+
+The module builds in `java-api/` like the Gradle plugin does, resolving the core from Maven Local
+until it reaches Maven Central; a consumer declares
+`implementation("eu.ww86:hocon-fmt-java-api:0.1.0")`.
+
 ## pre-commit
 
 ```yaml
@@ -219,3 +271,48 @@ override def hoconFormatSources = Task.Sources("conf")
 | `includes` | `src/**/*.conf`, `src/**/*.hocon` |
 | `excludes` | none |
 | `skip` (`-Dhocon-fmt.skip`) | `false` |
+
+## ZIO library
+
+Add `"eu.ww86" %% "hocon-fmt-zio" % "0.1.0"` on the JVM, or use `%%%` in a
+Scala.js / Scala Native build. From a checkout, run
+`sbt coreJVM/publishLocal zioJVM/publishLocal` and use `0.1.0-SNAPSHOT`, adding the
+`coreJS`/`zioJS` or `coreNative`/`zioNative` pair for those platforms: the adapter
+depends on `hocon-fmt-core`, so publishing it alone resolves nothing.
+The adapter uses ZIO 2.1.26 and has no cats or cats-effect dependency.
+
+```scala
+import java.nio.file.Paths
+import zio.{IO, UIO}
+import ww86.hocon_fmt.{Refusal, Verdict}
+import ww86.hocon_fmt.interop.zio.{FileError, ZioFiles, ZioFormatter}
+
+val formatted: IO[Refusal, String] = ZioFormatter.format("app.port=8080")
+val decision: UIO[Verdict] = ZioFormatter.verdict("app.port=8080")
+val path = Paths.get("application.conf")
+val rewrite: IO[FileError, Verdict] = ZioFiles.format(path)
+val report = ZioFiles.check(List(path, Paths.get("local.conf"))).runCollect
+```
+
+`ZioFiles.verdict(path)` checks without writing. It and `format(path)` put content
+refusals in `FileError.Refused(reason)` and filesystem errors in `FileError.Io(cause)`,
+wrapping a JDK call that fails unchecked (a path on a closed ZIP filesystem, say) in an
+`IOException` that keeps the original as its cause. `format` returns the original decision:
+`NeedsFormatting` means the write completed; `AlreadyFormatted` leaves the file untouched.
+`check` is a lazy `ZStream` of `FileOutcome(path, Either[FileError, Verdict])`: it retains
+failures as per-file outcomes and continues to the next path. The application decides how
+to report them.
+
+Files are read strictly as UTF-8 through blocking `java.nio` operations. Only a
+`NeedsFormatting` verdict writes: the adapter stages complete output beside the original, then
+atomically replaces the original only when the staged copy can be given the original's owner,
+group and every mode bit, setgid included, and when both the file and its directory can be
+written; otherwise the formatted text is written in place, which keeps the file but loses the
+crash-atomicity of the rename. A failed or cancelled staged write leaves the original intact
+and removes the temporary file; filesystems without atomic replacement produce an I/O error.
+Symbolic links are followed and retained. A replacement is a new file, so other hard links keep
+the old content; an in-place write keeps them too. Avoid concurrent edits to the same file
+while formatting.
+
+JVM and Scala Native provide both APIs. Scala.js provides `ZioFormatter` for text only;
+`java.nio` file operations belong to the JVM and Native builds.

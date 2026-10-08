@@ -19,11 +19,14 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
 | `FileFormatterSpec` | `cats` | file verdicts, no-write checks and refusals, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and canonical paths on JVM, Node and Native |
 | `FileFormatterFailureSpec` | `cats/.jvm` | a failure or cancellation after a partial staged write preserves the original bytes and cleans up staging |
+| `ZioFormatterSpec`, `ZioFilesSpec`, adapter `FormatterPropertiesSpec` | `zio/shared`, `zio/jvm-native` | typed text refusals on all runtimes; file decisions, untouched refusals, atomic replacement cleanup, replacement that keeps the file's owner, group and mode bits, the write in place when it cannot, symlinks and permissions, plus 1000 arbitrary byte sequences on JVM / Native |
+| `ZioFilesJvmSpec` | `zio/jvm` | a path on a closed ZIP filesystem, whose unchecked `ClosedFileSystemException` must stay that file's outcome; Scala Native serves no jar provider, so the mechanism is JVM-only |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
 | scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
 | invoker | `maven-plugin/src/it` | the Maven plugin in real Maven builds |
 | unit, integration | `mill-plugin/test`, `mill-plugin/integration` | the Mill plugin in process through `UnitTester`, and in a real Mill: 1.1.4, the oldest supported, and 1.1.10 |
+| `HoconFmtTest`, `KotlinInteropTest` | `java-api/src/test` | the Java API for Java and Kotlin callers: the mirrored verdicts and refusal kinds and the parity tests that pin the mirror to the core, file checks and the write only on `NeedsFormatting`, `formatOrThrow`, and what Kotlin sees — a value-used `when` with no `else` and JSpecify's non-null returns |
 | e2e | `scripts/pre-commit-e2e.sh` | both families of pre-commit hooks, native and Node, installed from this repository as a user would |
 | `CliAcceptanceSuite` | `acceptance` | the CLI as a process on JVM, Node and Native: `--stdin` bytes under `LC_ALL=C` and UTF-8, redirected files and pipes, input beyond one read, refusals, `--version`, argument errors; `sbt acceptance/test` |
 
@@ -66,7 +69,7 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
   to ignore it. `sbt libraryDefects` runs it on all three platforms, since sconfig's Scala.js and
   Native builds have defects of their own.
-- **Order.** `sbt test` runs core, cats and cli on the JVM, Scala.js and Scala Native, one project at a
+- **Order.** `sbt test` runs core, cats, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
 
