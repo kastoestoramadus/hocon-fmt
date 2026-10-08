@@ -118,8 +118,10 @@ jobs:
           java-version: '17'
           cache: maven
       - uses: sbt/setup-sbt@v1
-      - name: Publish the core locally
-        run: sbt coreJVM/publishM2
+      # The plugin resolves the Java API, and the core through it, from Maven Local until they are
+      # on Maven Central.
+      - name: Publish the core and the Java API locally
+        run: sbt coreJVM/publishM2 javaApi/publishM2
       - name: Integration tests
         working-directory: maven-plugin
         run: ./mvnw -B verify
