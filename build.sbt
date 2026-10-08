@@ -3,6 +3,9 @@ import scala.scalanative.build.{LTO, Mode}
 val scala3    = "3.8.2"
 val sconfig   = "1.12.4"
 val munit     = "1.2.4"
+// UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
+// Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
+val sconfigFork = "2.0.0-hocon-fmt-efb66e0131"
 val osLib     = "0.11.8"
 val sjavatime = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
@@ -102,6 +105,20 @@ def guardPublish(p: Project): Project =
         }
       )
     }
+
+// UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
+// releases the option (#646/#647); see "Returning to upstream sconfig" in docs/site.md.
+val checkSconfigFork = taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
+
+ThisBuild / checkSconfigFork := {
+  val ivyHome  = ivyPaths.value.ivyHome.getOrElse(Path.userHome / ".ivy2")
+  val artifact = ivyHome / "local" / "org.ekrich" / "sconfig_sjs1_3" / sconfigFork
+  if (!artifact.isDirectory)
+    sys.error(
+      s"The sconfig fork $sconfigFork is not published ($artifact is missing). " +
+        "Run scripts/fetch-sconfig-fork.sh once, then retry."
+    )
+}
 
 lazy val root = project
   .in(file("."))
