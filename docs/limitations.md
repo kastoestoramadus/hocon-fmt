@@ -22,10 +22,10 @@ Rendered as text that will not parse again (`Refusal.BrokenOutput`):
 - **String concatenation with a substitution**: `path : ${path}":d"`
 - **Nested self-reference**: `foo : ${foo.a}`
 - **Object concatenation with a substitution**: `e = ${g} { name = "east" }`, the ordinary
-  config-inheritance idiom, which sconfig renders as `e: ${g}name: east`. The one worth reporting
+  config-inheritance idiom, which sconfig renders as `e = ${g}name = east`. The one worth reporting
   upstream first: short, obviously wrong, and common.
 - **A one-field object inside an array that does not fit on one line** loses its braces: holding
-  a substitution, `a : [ { b : ${?X} } ]` renders as `a: [ b: ${?X} ]`; so does one whose field is
+  a substitution, `a : [ { b : ${?X} } ]` renders as `a = [ b = ${?X} ]`; so does one whose field is
   an object and that holds a comment. Two fields, or a field that fits on one line, keep them.
 
 Rendered without a comment (`Refusal.LostComment`); a comment has no meaning to compare, so only
@@ -108,10 +108,11 @@ These are sconfig's renderer doing what the `ConfigFormatOptions` in `HoconForma
 not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpecCoverageSpec`:
 
 - `//` comments become `#`
-- `=` becomes `:`
+- `:` becomes `=` — the default separator, and `:` on request (`--separator :`, or a
+  [`.hocon-fmt.conf`](usage.md#style-the-separator-and-friends))
 - nested objects are flattened to path keys (`setSimplifyNestedObjects`)
 - triple-quoted strings become escaped single-line strings
-- `+=` appends become the specification's expansion (`a += 2` renders as `a: ${?a}[2]`), the same
+- `+=` appends become the specification's expansion (`a += 2` renders as `a = ${?a}[2]`), the same
   value: sconfig renders the expanded form, keeping no trace of the shorthand (an append after an
   earlier definition of the key is instead the `+=` field-separator defect above, and is refused)
 - number literals are canonicalised (`1.5e3` becomes `1500`)

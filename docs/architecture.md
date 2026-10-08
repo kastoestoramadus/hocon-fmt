@@ -12,10 +12,10 @@ around it in `HoconFormatter`.
 
 | module | what it is | platforms | depends on |
 |---|---|---|---|
-| `core` | `HoconFormatter.format: String => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
+| `core` | `HoconFormatter.format: (String, FormatOptions) => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
 | `cats` | `FileFormatter[F]`: file verdicts, identity-preserving formatting, streaming checks, opt-in refusal errors | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io |
 | `zio` | `ZioFormatter`, blocking `ZioFiles`, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
-| `cli` | `CmdApi`, an `IOApp`: arguments, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
+| `cli` | `CmdApi`, an `IOApp`: arguments, the `.hocon-fmt.conf` lookup, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling the core directly; see [site](site.md) | Scala.js | core |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | core, at run time |
@@ -33,7 +33,8 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 ## The pipeline
 
 1. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
-2. sconfig parses and renders the masked text with the options in `HoconFormatter`.
+2. sconfig parses and renders the masked text with the `FormatOptions` asked for: the default
+   style (`=`), or what the caller — the CLI's flags over a `.hocon-fmt.conf` — requested.
 3. `IncludeMasking.unmask` puts the original statements back.
 4. The result is refused if an include statement did not come back (`Refusal.LostInclude`) or a
    comment of the source is missing from it (`Refusal.LostComment`), and unless a second pass
@@ -51,9 +52,10 @@ their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delega
 `HoconText` finds the strings and comments of a text in one pass. Masking asks it whether an
 `include` is code, and the comment check asks it for each comment's text.
 
-`Verdict.of(bytes)` wraps this for one file: it decodes strictly as UTF-8 (`Refusal.NotUtf8`
-rather than replacing bytes it cannot decode) and says whether the file is already formatted,
-needs formatting, or must be left alone. Every integration acts on a `Verdict`; they differ only
+`Verdict.of(bytes, options)` wraps this for one file: it decodes strictly as UTF-8
+(`Refusal.NotUtf8` rather than replacing bytes it cannot decode) and says whether the file is
+already formatted, needs formatting, or must be left alone — under the style options given,
+`FormatOptions.default` when none are. Every integration acts on a `Verdict`; they differ only
 in how they find files and report — and in the name they pass (`Verdict.of(bytes, name)`,
 `HoconFormatter.format(text, origin)`), which a refusal reports as where a parse tripped and which
 rules out a file named `.json` or `.properties`. Formatting those writes HOCON where the name
