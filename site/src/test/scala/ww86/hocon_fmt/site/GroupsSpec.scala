@@ -1,6 +1,6 @@
 package ww86.hocon_fmt.site
 
-class GroupsSpec extends munit.FunSuite:
+class GroupsSpec extends munit.FunSuite {
 
   val entries = List(
     Contribution(Library.LightbendConfig, 815, "t", Theme.FormatterProposal, PrState.Closed, "n"),
@@ -33,3 +33,4 @@ class GroupsSpec extends munit.FunSuite:
     val grouped = Groups(entries).flatMap(_.groups).flatMap(_.entries)
     assertEquals(grouped.sortBy(_.number), entries.sortBy(_.number))
   }
+}

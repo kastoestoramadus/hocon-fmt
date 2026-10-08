@@ -21,7 +21,9 @@ ThisBuild / version      := "0.1.0-SNAPSHOT"
 // The compiler enforces what review would otherwise have to catch: a match that misses a case (a
 // new Refusal reaching code that does not handle it), a value computed and dropped, == between
 // types that can never be equal, a null from a Java API used as a value, an object read before it
-// is initialised. Every warning fails the build. The sbt plugin is Scala 2.12 and sets its own.
+// is initialised, and an indentation block: braces, not significant indentation — `-no-indent`
+// makes the unbraced form a parse error, both the header form and the body form.
+// Every warning fails the build. The sbt plugin is Scala 2.12 and sets its own.
 ThisBuild / scalacOptions ++= {
   if (scalaBinaryVersion.value == "3")
     Seq(
@@ -29,6 +31,7 @@ ThisBuild / scalacOptions ++= {
       "-feature",
       "-unchecked",
       "-Werror",
+      "-no-indent",
       "-Wunused:all",
       "-Wvalue-discard",
       "-Wnonunit-statement",

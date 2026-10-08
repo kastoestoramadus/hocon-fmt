@@ -13,12 +13,12 @@ import Browser.given
   * answers. Failure is quiet and visible: any repository that does not answer leaves its part of
   * the snapshot standing, and the state line says as much.
   */
-object ContributionsView:
+object ContributionsView {
 
   private def prUrl(library: Library, number: Int): String =
     s"https://github.com/${library.repo}/pull/$number"
 
-  def apply(): HtmlElement =
+  def apply(): HtmlElement = {
     val board = Var(Board.snapshot)
 
     sectionTag(
@@ -41,6 +41,7 @@ object ContributionsView:
       div(children <-- board.signal.map(sections)),
       defectTable()
     )
+  }
 
   /** The section owns delivery of the answer; an unmounted section receives no late updates. */
   private[site] def boardUpdates(refresh: Future[Board]): EventStream[Board] = {
@@ -56,11 +57,13 @@ object ContributionsView:
       asOf: String,
       liveLibraries: List[Library],
       failedLibraries: List[Library]
-  ):
+  ) {
     def checking: Boolean = liveLibraries.isEmpty && failedLibraries.isEmpty
+  }
 
-  object Board:
+  object Board {
     val snapshot = Board(Contributions.all, Map.empty, Contributions.readOn, Nil, Nil)
+  }
 
   /** Every repository, cache first and the search after; a failure becomes a `Left`, so the
     * whole refresh always completes.
@@ -88,11 +91,12 @@ object ContributionsView:
   private def refreshLibrary(library: Library)(using
       http: GitHubApi.Http,
       storage: GitHubApi.Storage
-  ): Future[Either[Library, (Library, Map[Int, Contribution], List[LivePr])]] =
+  ): Future[Either[Library, (Library, Map[Int, Contribution], List[LivePr])]] = {
     val key                         = s"hocon-fmt-github:${library.repo}"
-    def merged(items: List[LivePr]) =
+    def merged(items: List[LivePr]) = {
       val result = Merge(Contributions.all.filter(_.library == library), items)
       (library, result.entries.map(e => e.number -> e).toMap, result.others)
+    }
 
     GitHubApi.readCache(storage, key, js.Date.now()) match {
       case Some(items) => Future.successful(Right(merged(items)))
@@ -105,18 +109,20 @@ object ContributionsView:
           }
           .recover(_ => Left(library))
     }
+  }
 
   // --- rendering -------------------------------------------------------------------------------
 
   private def stateLine(board: Board): HtmlElement =
     if board.checking then span("checking GitHub…")
-    else
+    else {
       val scope =
         if board.failedLibraries.isEmpty then "refreshed from GitHub"
         else if board.liveLibraries.nonEmpty then
           s"snapshot; GitHub did not answer for ${board.failedLibraries.map(_.label).mkString(", ")}"
         else "the shipped snapshot"
       span(s"State as of ${board.asOf} ($scope).")
+    }
 
   private def sections(board: Board): List[HtmlElement] =
     if board.checking then Nil
@@ -168,7 +174,7 @@ object ContributionsView:
   /** The state decides the colour; matching on the label would let a reworded state fall through
     * to "closed" without the compiler saying a word.
     */
-  private def badge(state: PrState): HtmlElement =
+  private def badge(state: PrState): HtmlElement = {
     val style = state match {
       case PrState.Open             => "badge open"
       case PrState.Released         => "badge released"
@@ -176,6 +182,7 @@ object ContributionsView:
       case PrState.Closed           => "badge closed"
     }
     span(cls := style, state.label)
+  }
 
   /** The defect rows: what the formatter refuses, and what aims to fix it upstream. */
   private def defectTable(): HtmlElement =
@@ -227,3 +234,4 @@ object ContributionsView:
       }
       fragment
     }
+}

@@ -8,7 +8,7 @@ import ww86.hocon_fmt.site.Library.Sconfig
   * upstream. A row without a fix says so; an include in a replaced object carries no fix because
   * merging repeated keys is by design — carrying includes across is the formatter's own job.
   */
-object DefectTable:
+object DefectTable {
 
   val rows: List[DefectRow] = List(
     DefectRow(
@@ -102,3 +102,4 @@ object DefectTable:
       DefectRow.noFixYet
     )
   )
+}

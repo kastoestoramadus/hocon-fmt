@@ -7,9 +7,9 @@ import ww86.hocon_fmt.{ExampleData, Verdict}
 /** The page's first two parts: what the formatter is, and the playground on the core itself.
   * The third part lives in [[ContributionsView]].
   */
-object Playground:
+object Playground {
 
-  def apply(): HtmlElement =
+  def apply(): HtmlElement = {
     val first   = ExampleData.showcase.headOption.fold("")(_.input)
     val input   = Var(first)
     val verdict = verdicts(input.signal, first)
@@ -118,6 +118,7 @@ object Playground:
         p(cls := "status", aria.live := "polite", child <-- verdict.map(statusLine))
       )
     )
+  }
 
   /** One verdict per settled input; kept separate from the DOM for reactive tests. Typed text has
     * no file name behind it, so a refusal names the playground as the place a parse tripped.
@@ -136,7 +137,7 @@ object Playground:
     case (text, _)                               => text
   }
 
-  private def statusLine(entry: (String, Verdict)): HtmlElement =
+  private def statusLine(entry: (String, Verdict)): HtmlElement = {
     val (text, verdict) = entry
     Status.of(verdict, text) match {
       case Status.Formatted(changed) =>
@@ -156,3 +157,5 @@ object Playground:
           )
         )
     }
+  }
+}

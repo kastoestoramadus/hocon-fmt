@@ -4,11 +4,12 @@ package ww86.hocon_fmt.site
   * written; this is the one place that decides which words are code, so every part of the page
   * renders them the same way.
   */
-object Prose:
+object Prose {
 
-  enum Part:
+  enum Part {
     case Code(text: String)
     case Text(text: String)
+  }
 
   /** A fragment that is empty carries nothing — and an empty code part would draw an empty box
     * on the page — so the parts that mean something are the ones that come back.
@@ -25,3 +26,4 @@ object Prose:
         else if i % 2 == 1 then Some(Part.Code(part))
         else Some(Part.Text(part))
       }
+}

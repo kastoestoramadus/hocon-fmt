@@ -8,7 +8,7 @@ import ww86.hocon_fmt.site.GitHubApi.{GitHubError, Http, Response}
 /** The fetch path against a fake: success, a rate limit, a malformed body, and the cache that
   * keeps a reload from burning the ten-searches-a-minute limit.
   */
-class GitHubApiSpec extends munit.FunSuite:
+class GitHubApiSpec extends munit.FunSuite {
 
   val body =
     """{"total_count":2,"items":[
@@ -77,9 +77,10 @@ class GitHubApiSpec extends munit.FunSuite:
   }
 
   test("an unavailable or broken storage is survived: reads and writes degrade to no cache") {
-    val throwing = new GitHubApi.Storage:
+    val throwing = new GitHubApi.Storage {
       def get(key: String): Option[String]      = throw new RuntimeException("storage unavailable")
       def set(key: String, value: String): Unit = throw new RuntimeException("storage unavailable")
+    }
 
     assertEquals(GitHubApi.readCache(throwing, "k", nowMs = 1), None)
     GitHubApi.writeCache(throwing, "k", nowMs = 1, items = Nil) // must not throw
@@ -87,9 +88,10 @@ class GitHubApiSpec extends munit.FunSuite:
 
   test("a written cache answers within the window and goes stale after it") {
     val memory  = scala.collection.mutable.Map.empty[String, String]
-    val storage = new GitHubApi.Storage:
+    val storage = new GitHubApi.Storage {
       def get(key: String): Option[String]      = memory.get(key)
       def set(key: String, value: String): Unit = memory(key) = value
+    }
 
     val items = List(LivePr(598, "renderer", LiveState.Merged))
     GitHubApi.writeCache(storage, "sconfig", nowMs = 1000, items = items)
@@ -98,3 +100,4 @@ class GitHubApiSpec extends munit.FunSuite:
   }
 
   def ok(text: String, status: Int = 200): Http = _ => Future.successful(Response(status, text))
+}

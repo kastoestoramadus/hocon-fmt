@@ -21,7 +21,9 @@ object `package` extends ScalaModule, PublishModule {
   // The suffix names the Mill the plugin runs on; the core is an ordinary Scala 3 library.
   protected def resolvedDepsWarnNonPlatform = Task { false }
 
-  def scalacOptions = Seq("-deprecation", "-feature", "-Werror")
+  // As in build.sbt: the repository's brace rule is a compile error here too, and the nested
+  // test and integration modules inherit these options.
+  def scalacOptions = Seq("-deprecation", "-feature", "-Werror", "-no-indent")
 
   // Mill loads its own libraries at run time; its tests need them on the classpath.
   object test extends ScalaTests, TestModule.Munit {

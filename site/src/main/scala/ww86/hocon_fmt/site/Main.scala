@@ -4,7 +4,7 @@ import com.raquo.laminar.api.L.*
 import org.scalajs.dom
 
 /** Mounts the page into #root of index.html; see docs/site.md. */
-@main def main(): Unit =
+@main def main(): Unit = {
   // The page lives as long as the tab, so the subscription is never cancelled.
   val _ = documentEvents(_.onDomContentLoaded).foreach { _ =>
     Option(dom.document.getElementById("root")).foreach { container =>
@@ -12,3 +12,4 @@ import org.scalajs.dom
       render(container, Page())
     }
   }(using unsafeWindowOwner)
+}
