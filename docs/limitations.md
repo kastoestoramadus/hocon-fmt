@@ -9,9 +9,9 @@ Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought
 expected text is not guessed: each case is paired with a plainly written config that means the same
 thing and renders correctly, and the test first asserts both `resolve()` to the same value. A
 failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 15 failures on the JVM and Native, 16 on Scala.js. When a
-sconfig release fixes one, its test turns green: that is the signal to drop the refusal and the
-entry below. sconfig 2.0.0 was tried on 2026-09-25: the regular suites pass on it, and the nine
+`sbt libraryDefects`, on all three platforms: 17 failures on the JVM and Native, 18 on Scala.js.
+When a sconfig release fixes one, its test turns green: that is the signal to drop the refusal and
+the entry below. sconfig 2.0.0 was tried on 2026-09-25: the regular suites pass on it, and the
 defects then known remain.
 
 Rendered as text that will not parse again (`Refusal.BrokenOutput`):
@@ -29,10 +29,25 @@ Rendered as text that will not parse again (`Refusal.BrokenOutput`):
   an object and that holds a comment. Two fields, or a field that fits on one line, keep them.
 
 Rendered without a comment (`Refusal.LostComment`); a comment has no meaning to compare, so only
-this check notices:
+this check notices. sconfig attaches a comment to the field after it; one that ends up attached
+to no field is dropped:
 
 - **A comment no field follows**: after the last field of the file or of an object, and every
-  comment of a file that holds nothing else. sconfig attaches a comment to the field after it.
+  comment of a file that holds nothing else.
+- **A comment a blank line follows**: the blank line ends the attachment, so the comment is
+  dropped although a field does come after it, and a blank line inside a comment block takes the
+  part above it with it. This is what real files hit, since nearly all open with a licence header
+  or a banner followed by a blank line: 20 of 23 reference.conf files from Akka, Pekko, Play,
+  Kamon, Gatling and ssl-config are refused over one, 343 of their 5692 comments lost; so are
+  263 of the 265 `.conf` files in the scala/community-build, which each open with `// <repo url>`
+  and a blank line — strip those comment blocks and 261 of the 265 format. Nothing on sconfig
+  main, among its open pull requests, or on the sHOCON `bugs-comments` branch fixes it (checked
+  2026-10-08), and the gap is the same on sconfig 2.0.0.
+
+Blank lines meet the same blind spot: the parse tree holds values and their comments and nothing
+else, so blank lines are not kept at all — formatting the reference.conf corpus turns 1713 of its
+11132 lines into 0. That is spacing rather than a comment, so the checks pass and the output is
+accepted.
 
 Dropped with its object (`Refusal.LostInclude`):
 

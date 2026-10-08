@@ -11,11 +11,12 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeDetectionSpec` | `core/shared` | which occurrences of `include` are a directive; the contract of the detection regex |
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
+| `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8 |
 | `JvmFacadeSpec` | `core/jvm` | the JDK-typed boundary, called from Java (`JavaCaller.java`) and reflectively |
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
-| site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake, the five playground examples against the core; see [site](site.md#testing) |
+| site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
 | `CmdApiSpec` | `cli` | the CLI on real temp files, on JVM, Node and Native: exit codes, every file examined once, unformattable and non-UTF-8 files never written, arguments |
 | scripted | `sbt-plugin/src/sbt-test` | the sbt plugin in a real sbt build |
 | functional | `gradle-plugin/src/functionalTest` | the Gradle plugin through TestKit, including configuration cache and up-to-date checks |
@@ -66,3 +67,30 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **Order.** `sbt test` runs core and cli on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
+
+## Shared examples
+
+`examples/showcase/NN-slug/` holds the playground examples in directory order.
+`examples/catalogue/slug/` holds examples for tests only. Both contain `input.conf`,
+`example.conf`, and, for successful examples, `expected/default.conf`. Refused showcase
+examples need no expected file: their verdict is pinned. Refused catalogue examples carry
+`expected/refused.txt` containing the `refused:<kind>` verdict. Input and expected
+output are compared exactly, including the final newline. Only the `default` option set
+exists today.
+
+The sbt source generator reads `example.conf` with sconfig and embeds both directories
+in core test and site Scala data; tests and the site use it without runtime file I/O. Metadata carries
+`title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
+`target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
+Verdicts are `formatted`, `already-formatted` (only for now or pending), or
+`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `broken-output`, `lost-comment`,
+`lost-include`, and `unstable-output`. When `now != target`, `reason-if-different` is
+required. `ExamplesSpec` asserts `now` and output and prints gaps as
+`now / pending / target`; absent pending is shown as “—”. Optional `pending` records
+a verdict from a local sconfig build with the author’s open PRs merged; this build
+does not compute it and the suite does not assert it. Optional `findings: [...]`
+reserves identifiers for a later duplicate report.
+
+`source` records `kind: synthetic | distilled | verbatim` and `pattern`; verbatim
+examples also require `url` and `licence`. Add fixtures only after reviewing their
+inputs, metadata, and expected output; the generator never derives the target.

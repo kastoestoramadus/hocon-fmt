@@ -99,7 +99,20 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
     "last in an object"    -> ("o {\n  a : 1\n  # last in the object\n}", "last in the object")
   )
 
-  commentsWithNoFieldAfter.foreach { case (name, (raw, comment)) =>
+  // A blank line ends the attachment as well: a comment above one is dropped even though a field
+  // does follow, as a parse shows - the comment never reaches the field's origin. Verified with
+  // ConfigFactory.parseString("# head\n\na = 1"): a's origin.comments is empty, while without the
+  // blank line it holds " head". A blank line inside a comment block does the same to the part
+  // above it. This is what nearly every real file trips over, since most start with a licence
+  // header or a banner followed by a blank line: of 23 reference.conf files from Akka, Pekko,
+  // Play, Kamon, Gatling and ssl-config, 20 hold such a comment and are refused.
+  val commentAboveABlankLine = Map(
+    "above a blank line at the top of the file" -> ("# Copyright 2025\n\na : 1", "Copyright 2025"),
+    "above a blank line inside an object"       ->
+      ("o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}", "one")
+  )
+
+  (commentsWithNoFieldAfter ++ commentAboveABlankLine).foreach { case (name, (raw, comment)) =>
     test(s"library: a comment $name should survive rendering") {
       val rendered = raw.renderedByLibrary
       assert(rendered.contains(comment), s"OPEN sconfig BUG: comment [$comment] dropped: [$rendered]")

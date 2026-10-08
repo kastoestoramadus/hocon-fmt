@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.github.kastoestoramadus</groupId>
+  <groupId>eu.ww86</groupId>
   <!-- The `<prefix>-maven-plugin` form is what gives the goals the `hocon-fmt:` prefix. -->
   <artifactId>hocon-fmt-maven-plugin</artifactId>
   <version>0.1.0-SNAPSHOT</version>
@@ -49,7 +49,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.github.kastoestoramadus</groupId>
+      <groupId>eu.ww86</groupId>
       <artifactId>hocon-fmt-core_3</artifactId>
       <version>0.1.0-SNAPSHOT</version>
     </dependency>
@@ -138,4 +138,70 @@
       </plugin>
     </plugins>
   </build>
+
+  <!-- Everything Maven Central demands of a release, kept out of the default build so that
+       `verify` needs neither a signing key nor credentials. `deploy` uploads the signed bundle and
+       stops once the portal has validated it, so the release waits for someone to click Publish.
+       The `central` server in settings.xml carries the Central Portal token. -->
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.12.0</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <!-- The passphrase arrives as MAVEN_GPG_PASSPHRASE, which the plugin reads itself. -->
+                  <bestPractices>true</bestPractices>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+              <waitUntil>validated</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

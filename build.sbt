@@ -19,7 +19,7 @@ ThisBuild / version      := "0.1.0-SNAPSHOT"
 
 // Coordinates and the metadata Sonatype requires before anything can reach Maven Central,
 // which is what `cs` and therefore the pre-commit coursier hook resolve from.
-ThisBuild / organization     := "io.github.kastoestoramadus"
+ThisBuild / organization     := "eu.ww86"
 ThisBuild / organizationName := "kastoestoramadus"
 ThisBuild / homepage         := Some(url("https://github.com/kastoestoramadus/hocon-fmt"))
 ThisBuild / licenses         := Seq("GPL-3.0" -> url("https://www.gnu.org/licenses/gpl-3.0.html"))
@@ -37,6 +37,13 @@ ThisBuild / developers := List(
     url("https://github.com/kastoestoramadus")
   )
 )
+
+// Releases are staged locally and uploaded to the Central Portal bundle by `sonaUpload`; snapshots
+// go to the portal's snapshot repository. sbt reads SONATYPE_USERNAME and SONATYPE_PASSWORD itself.
+ThisBuild / publishTo := {
+  if (isSnapshot.value) Some("central-snapshots" at "https://central.sonatype.com/repository/maven-snapshots/")
+  else localStaging.value
+}
 
 /** sbt prints one unlabelled "Passed: Total N" per aggregated project, and the Scala.js block
   * arrives without the `[info]` prefix, so nothing says which runtime a result came from. The
@@ -94,6 +101,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("core"))
   .settings(
     name := "hocon-fmt-core",
+    Test / sourceGenerators += Def.task {
+      ExampleGenerator.generate(
+        (ThisBuild / baseDirectory).value / "examples",
+        (Test / sourceManaged).value
+      )
+    }.taskValue,
     libraryDependencies ++= Seq(
       "org.ekrich"    %%% "sconfig"          % sconfig,
       "org.scalameta" %%% "munit"            % munit           % Test,
@@ -251,7 +264,13 @@ lazy val site = project
   .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
   .dependsOn(coreJS)
   .settings(
-    name           := "hocon-fmt-site",
+    name := "hocon-fmt-site",
+    Compile / sourceGenerators += Def.task {
+      ExampleGenerator.generate(
+        (ThisBuild / baseDirectory).value / "examples",
+        (Compile / sourceManaged).value
+      )
+    }.taskValue,
     publish / skip := true,
     announceRuntime("site on Scala.js"),
     // sconfig reaches for java.time, which the Scala.js javalib does not carry; the site is the
@@ -354,3 +373,11 @@ lazy val sbtPlugin = project
   )
 
 addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
+
+// What a release uploads: the libraries and the sbt plugin, signed. Stops at the upload, so the
+// deployment waits in the portal until someone clicks Publish.
+addCommandAlias(
+  "publishRelease",
+  // `sbtPlugin` is also an sbt key, so the plugin's project is named by its id.
+  Seq(coreJVM.id, cliJVM.id, "sbtPlugin").map(id => s"$id/publishSigned").mkString("; ") + "; sonaUpload"
+)
