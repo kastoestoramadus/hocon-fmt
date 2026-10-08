@@ -54,27 +54,29 @@ class HoconFmtTest {
 
     @Test
     void everyCoreRefusalCaseHasAKind() {
-        // The core's companion holds one public static singleton field per case, so a case the
-        // mirror does not know shows up here as a list mismatch.
-        List<String> coreCases = Stream.of(ww86.hocon_fmt.Refusal$.class.getDeclaredFields())
-                .filter(field -> field.getType().equals(ww86.hocon_fmt.Refusal.class))
-                .filter(field -> Modifier.isPublic(field.getModifiers())
-                        && Modifier.isStatic(field.getModifiers()))
-                .map(Field::getName)
-                .toList();
-        List<String> kinds = Stream.of(RefusalKind.values()).map(Enum::name).toList();
+        // The core's companion holds one public static final field per case (typed with the case's
+        // own companion), so a case the mirror does not know shows up here as a list mismatch.
+        // Field order is unspecified, so both sides are sorted.
+        List<String> coreCases = caseFields(ww86.hocon_fmt.Refusal$.class);
+        List<String> kinds = Stream.of(RefusalKind.values()).map(Enum::name).sorted().toList();
         assertEquals(coreCases, kinds);
     }
 
     @Test
     void everyCoreVerdictCaseIsMirrored() {
-        List<String> coreCases = Stream.of(ww86.hocon_fmt.Verdict$.class.getDeclaredFields())
-                .filter(field -> field.getType().equals(ww86.hocon_fmt.Verdict.class))
-                .filter(field -> Modifier.isPublic(field.getModifiers())
-                        && Modifier.isStatic(field.getModifiers()))
-                .map(Field::getName)
-                .toList();
+        List<String> coreCases = caseFields(ww86.hocon_fmt.Verdict$.class);
         assertEquals(List.of("AlreadyFormatted", "NeedsFormatting", "Refused"), coreCases);
+    }
+
+    private static List<String> caseFields(Class<?> companion) {
+        return Stream.of(companion.getDeclaredFields())
+                .filter(field -> Modifier.isPublic(field.getModifiers())
+                        && Modifier.isStatic(field.getModifiers())
+                        && Modifier.isFinal(field.getModifiers())
+                        && !field.getName().equals("MODULE$"))
+                .map(Field::getName)
+                .sorted()
+                .toList();
     }
 
     @Test
