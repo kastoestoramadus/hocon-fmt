@@ -5,7 +5,6 @@ import com.raquo.laminar.api.L.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
-import scala.util.{Failure, Success}
 
 import Browser.given
 
@@ -21,15 +20,10 @@ object ContributionsView:
 
   def apply(): HtmlElement =
     val board = Var(Board.snapshot)
-    // One quiet refresh per page load, guarded on every side: a completed future always sets
-    // the board, so "checking GitHub…" cannot outlive the answer.
-    refreshBoard.onComplete {
-      case Success(updated) => board.set(updated)
-      case Failure(_)       => () // per-library recovery makes this unreachable; the snapshot stands
-    }
 
     sectionTag(
       idAttr := "contributions",
+      onMountBind(_ => boardUpdates(refreshBoard) --> board),
       h2("The work upstream"),
       p(
         "The formatter refuses a file when the library mis-renders it — and the same defects get ",
@@ -47,6 +41,13 @@ object ContributionsView:
       div(children <-- board.signal.map(sections)),
       defectTable()
     )
+
+  /** The section owns delivery of the answer; an unmounted section receives no late updates. */
+  private[site] def boardUpdates(refresh: Future[Board]): EventStream[Board] = {
+    EventStream.fromFuture(refresh).recover { case _ =>
+      Some(Board.snapshot.copy(failedLibraries = Library.values.toList))
+    }
+  }
 
   /** What the section knows: the snapshot alone, or the snapshot with some libraries refreshed. */
   final case class Board(

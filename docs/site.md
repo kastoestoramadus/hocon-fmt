@@ -98,6 +98,29 @@ platform, for coverage that a real browser check gives back with interest. Rende
 verified by running the page: served (`python3 -m http.server -d site/target/site 4001`) with the
 live search answering, and from `file://` in a fetch-less browser where the snapshot must stand.
 
+## Laminar practices
+
+Reviewed against [Laminar 17.2.1's tagged docs (including the Modifiers FAQ)](https://github.com/raquo/Laminar/blob/v17.2.1/website/docs/documentation.md),
+[the official documentation](https://laminar.dev/documentation), and
+[Airstream 17.2.1's README](https://github.com/raquo/Airstream/blob/v17.2.1/README.md).
+Locations below are in `site/src/main/scala/ww86/hocon_fmt/site/` at the reviewed base
+`08b38f5`; use the named methods after edits.
+
+| Practice and source | Audit location | Decision and reason |
+|---|---|---|
+| [Ownership and memory safety](https://laminar.dev/documentation#ownership) | `ContributionsView.scala:26`, `apply` | Applied: replace the construction-time Future callback with a section-owned `-->` subscription. Detached sections must not receive late board updates. Unmount stops delivery; the existing request deadline still governs the underlying Future. |
+| [onMountBind vs onMountCallback](https://laminar.dev/documentation#onmountbind) and [Modifiers FAQ](https://laminar.dev/documentation#modifiers-faq) | `ContributionsView.scala:26`, `apply` | Applied: start the refresh in `onMountBind`, returning its binder. Do not add binders inside `onMountCallback`: remounting would accumulate subscriptions. Use callbacks for effects such as focus. |
+| [Window ownership](https://laminar.dev/documentation#window--document-events) | `Main.scala:9`, `main` | Retained: `unsafeWindowOwner` is confined to the tab-lifetime DOM-ready bootstrap, as in the docs. Never use it for component subscriptions. No bootstrap redesign needed. |
+| [Var, Signal, EventStream](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#relationship-between-eventstream-and-signal) and [state placement](https://laminar.dev/documentation#redundant-vars) | `Playground.scala:14–20`, `ContributionsView.scala:22` | Retained: Vars hold input and board state at their component roots; derived Signals hold output/status; changes are events. Keep one source of state. If child components are extracted, pass Signals and Observers rather than copying state into child Vars. |
+| [Observers and arrows](https://laminar.dev/documentation#binding-observables) | `Playground.scala:96,109–110`, `ContributionsView.scala:26` | Retained for input, applied to refresh: `-->` sends events to observers; `<--` renders values. Element binders manage ownership without manual `foreach`. |
+| [Distinct signals](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#distinction-operators) | `Playground.scala:16`, `verdicts` | Applied before debounce and before formatting: equal input must not restart the timer; a burst ending at the last settled text must not recompute the verdict or replace status DOM. Signals no longer deduplicate automatically. |
+| [Debounce and throttle](https://laminar.dev/documentation#compose-and-flatmap-events) | `Playground.scala:18`, `verdicts` | Retained: 150 ms debounce waits for typing to settle. Throttle would format intermediate text and change the page's timing; do not substitute it. |
+| [Effects belong in observers](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#tapeach) | `Playground.scala:20,119,123`, `ContributionsView.scala:102` | Retained: reactive maps derive verdicts and presentation, with no network/storage or Var writes. DOM factories in maps are intentional presentation. Cache writes remain at the Future-based IO boundary, not in an Airstream map. |
+| [Error recovery](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#recovering-from-errors) | `ContributionsView.scala:28,105`, `boardUpdates`; `Browser.scala:32` | Applied: recover an unexpected refresh-stream error to a settled snapshot board. Keep per-library recovery, fetch deadline and guarded cache; ordinary failures remain visible data, not unhandled stream errors. |
+| [Keyed split for dynamic lists](https://laminar.dev/documentation#performant-children-rendering--split) | `ContributionsView.scala:47,120`, `sections` | Deferred: the list is initially empty and inserted once after the refresh. There is no repeated list replacement to optimise today. Before adding polling/filtering, use library/theme keys and `(library, number)` PR keys, and bind item Signals so updates preserve DOM/focus. Showcase buttons and defect rows are static lists. |
+| [Components as functions](https://laminar.dev/documentation#reusing-elements) | `Page.scala:8`, `Playground.scala:12`, `ContributionsView.scala:21` | Retained: functions return fresh elements; never reuse an element across parents. Splitting the page into more components now would add structure without a reuse need. |
+| [Testing observables](https://github.com/raquo/Airstream/blob/v17.2.1/README.md#documentation) | `Playground.verdicts`, `ContributionsView.boardUpdates` | Applied: Node tests exercise the actual observable graph with explicit owners, including disposal and recovery. Keep pure-model/fake-browser suites and real-browser served/offline rendering checks; no jsdom dependency added. |
+
 ## Publishing
 
 Not done yet, deliberately: DNS and Pages are the user's to switch on. When it happens, serve
