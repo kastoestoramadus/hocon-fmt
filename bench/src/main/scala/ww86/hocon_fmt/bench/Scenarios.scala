@@ -12,7 +12,8 @@ object Scenarios {
     Scenario("large", sections(5000)),
     Scenario("includes", includes(300)),
     Scenario("comments", commented(2000)),
-    Scenario("nested", nested(150))
+    Scenario("nested", nested(150)),
+    Scenario("probe-family", probeFamily(30000))
   )
 
   /** A service's application.conf: what a pre-commit hook meets on most commits. */
@@ -47,4 +48,10 @@ object Scenarios {
 
   def nested(depth: Int): String =
     (0 until depth).map(i => s"k$i { ").mkString + "v = 1" + " }" * depth + "\n"
+
+  /** A comment spelling the probe-prefix family, under an include so the probe runs. Finding the
+    * first index no text spells must not rescan either text once per candidate index.
+    */
+  def probeFamily(count: Int): String =
+    "include \"defaults.conf\"\n# " + (0 until count).map(i => s"__HOCON_MASK_${i}_").mkString(" ") + "\na = 1\n"
 }

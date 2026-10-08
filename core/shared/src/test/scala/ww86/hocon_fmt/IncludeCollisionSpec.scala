@@ -62,6 +62,28 @@ class IncludeCollisionSpec extends munit.FunSuite {
     assertEquals(HoconFormatter.format(source, options), Left(Refusal.ReservedName))
   }
 
+  // --- The probe prefix -------------------------------------------------------------------------
+  // `collisionProbe` masks the source again under a prefix family no user field can spell, so a
+  // mimic that overwrote a generated field shows up as the user's. It must take the first index
+  // absent from both texts, found by one scan per text: asking `contains` per candidate index
+  // rescanned both texts once per index, which a comment listing thousands of them turned
+  // quadratic.
+
+  test("the probe prefix is the first index neither text spells") {
+    val probe = IncludeMasking.collisionProbe(include, "# __HOCON_MASK_0_ and __HOCON_MASK_2_\n")
+    assert(probe.text.contains("__HOCON_MASK_1_0 :"), probe.text)
+  }
+
+  test("a leading zero does not hide the index it spells") {
+    val probe = IncludeMasking.collisionProbe(include, "# __HOCON_MASK_01_\n")
+    assert(probe.text.contains("__HOCON_MASK_0_0 :"), probe.text)
+  }
+
+  test("an index spelled in the source is skipped too") {
+    val probe = IncludeMasking.collisionProbe(include + "# __HOCON_MASK_0_\n", "")
+    assert(probe.text.contains("__HOCON_MASK_1_0 :"), probe.text)
+  }
+
   for {
     (name, source, kept) <- cases
     options              <- allOptions
