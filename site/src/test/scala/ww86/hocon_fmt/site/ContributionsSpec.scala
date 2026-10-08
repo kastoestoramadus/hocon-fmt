@@ -3,7 +3,7 @@ package ww86.hocon_fmt.site
 /** The shipped snapshot itself: completeness the refresh script can lean on, and defect rows
   * that resolve to entries which really exist.
   */
-class ContributionsSpec extends munit.FunSuite:
+class ContributionsSpec extends munit.FunSuite {
 
   test("the snapshot carries every entry read from GitHub on the date it names") {
     assertEquals(Contributions.all.size, 58)
@@ -72,3 +72,4 @@ class ContributionsSpec extends munit.FunSuite:
       Contributions.all.sortBy(c => (c.library.toString, c.number))
     )
   }
+}

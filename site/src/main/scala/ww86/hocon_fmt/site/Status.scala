@@ -5,7 +5,7 @@ import ww86.hocon_fmt.{Refusal, Verdict}
 /** Why the formatter left a text alone, named for the page. A browser string cannot fail UTF-8
   * decoding, so `NotUtf8` exists here only to make the mapping total.
   */
-enum RefusalKind derives CanEqual:
+enum RefusalKind derives CanEqual {
 
   case NotHocon, BrokenOutput, LostComment, LostInclude, MovedInclude, UnstableOutput, NotUtf8
 
@@ -21,8 +21,9 @@ enum RefusalKind derives CanEqual:
     case UnstableOutput => "unstableOutput"
     case NotUtf8        => "notUtf8"
   }
+}
 
-object RefusalKind:
+object RefusalKind {
   def of(refusal: Refusal): RefusalKind = refusal match {
     case Refusal.NotUtf8         => RefusalKind.NotUtf8
     case Refusal.NotHocon(_)     => RefusalKind.NotHocon
@@ -32,9 +33,10 @@ object RefusalKind:
     case Refusal.MovedInclude(_) => RefusalKind.MovedInclude
     case Refusal.UnstableOutput  => RefusalKind.UnstableOutput
   }
+}
 
 /** The one status line the playground shows under the output pane. */
-enum Status derives CanEqual:
+enum Status derives CanEqual {
   case Formatted(changedLines: Int)
   case AlreadyFormatted
   case LeftUnchanged(
@@ -43,8 +45,9 @@ enum Status derives CanEqual:
       explanation: String,
       learnMore: Option[String]
   )
+}
 
-object Status:
+object Status {
 
   /** Known limitations in the repository: where each refusal is described and reproduced. */
   val limitationsPage = "https://github.com/kastoestoramadus/hocon-fmt/blob/main/docs/limitations.md"
@@ -61,11 +64,12 @@ object Status:
   /** How many lines differ, comparing input and output line by line from the top. No diff
     * machinery: the status line needs a feel for the change, not a patch.
     */
-  def changedLines(before: String, after: String): Int =
+  def changedLines(before: String, after: String): Int = {
     val beforeLines = before.linesIterator.toVector
     val afterLines  = after.linesIterator.toVector
     (0 until math.max(beforeLines.size, afterLines.size))
       .count(i => beforeLines.lift(i) != afterLines.lift(i))
+  }
 
   private def explanation(kind: RefusalKind): String = kind match {
     case RefusalKind.NotHocon     => "sconfig cannot read this text as HOCON, so there is nothing to format."
@@ -88,3 +92,4 @@ object Status:
         RefusalKind.UnstableOutput =>
       Some(defectsSection)
   }
+}

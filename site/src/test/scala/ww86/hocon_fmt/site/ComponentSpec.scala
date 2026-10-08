@@ -16,32 +16,33 @@ import ww86.hocon_fmt.{ExampleData, Verdict}
   * answer. The wiring this pins down (a verdict per keystroke, a refresh started while building
   * the section) once passed every other suite in this project.
   */
-class ComponentSpec extends munit.FunSuite:
+class ComponentSpec extends munit.FunSuite {
 
   /** A GitHub that answers only when the test says so, and counts what was asked. */
-  final class Github:
+  final class Github {
     val searched = scala.collection.mutable.ListBuffer.empty[String]
     val waiting  = scala.collection.mutable.ListBuffer.empty[() => Unit]
     val store    = scala.collection.mutable.Map.empty[String, String]
 
-    def answer(): Unit =
+    def answer(): Unit = {
       val pending = waiting.toList
       waiting.clear()
       pending.foreach(_.apply())
+    }
 
     def window(document: js.Dynamic): js.Dynamic = js.Dynamic.literal(
       document = document,
       fetch = js.Any.fromFunction2 { (url: String, _: js.Any) =>
         searched += url
         new js.Promise[js.Any]((resolve, _) => {
-          waiting += (() =>
+          waiting += (() => {
             val _ = resolve(
               js.Dynamic.literal(
                 status = 200,
                 text = js.Any.fromFunction0(() => js.Promise.resolve("""{"total_count":0,"items":[]}"""))
               )
             )
-          )
+          })
         })
       },
       localStorage = js.Dynamic.literal(
@@ -52,18 +53,20 @@ class ComponentSpec extends munit.FunSuite:
         }
       )
     )
+  }
 
-  override def afterEach(context: AfterEach): Unit =
+  override def afterEach(context: AfterEach): Unit = {
     // Node has no window or document of its own; a fake left behind would be a trap for the next suite.
     val global = js.Dynamic.global.globalThis
     global.updateDynamic("document")(js.undefined)
     global.updateDynamic("window")(js.undefined)
     super.afterEach(context)
+  }
 
   /** Installs the fake browser and returns the container its body holds: a mounted element has to
     * be inside the fake document's tree, or Laminar refuses to render into it.
     */
-  def install(github: Github): js.Dynamic =
+  def install(github: Github): js.Dynamic = {
     val document = FakeDom.document()
     val global   = js.Dynamic.global.globalThis
     global.updateDynamic("document")(document)
@@ -71,14 +74,16 @@ class ComponentSpec extends munit.FunSuite:
     val container = document.createElement("div")
     val _         = document.selectDynamic("body").appendChild(container)
     container
+  }
 
   def mount(container: js.Dynamic)(element: => HtmlElement): RootNode =
     render(container.asInstanceOf[dom.Element], element)
 
-  def settle(ms: Int): Future[Unit] =
+  def settle(ms: Int): Future[Unit] = {
     val done = Promise[Unit]()
     val _    = js.timers.setTimeout(ms) { done.success(()); () }
     done.future
+  }
 
   def hasClass(name: String)(node: js.Dynamic): Boolean =
     node.className.asInstanceOf[String].split(" ").contains(name)
@@ -105,18 +110,21 @@ class ComponentSpec extends munit.FunSuite:
 
   /** The playground's two panes, in the page's order: input first, output second. */
   def panes(container: js.Dynamic): (js.Dynamic, js.Dynamic) =
-    findAll(container, "conf") match
+    findAll(container, "conf") match {
       case input :: output :: Nil => (input, output)
       case areas                  => fail(s"expected two panes, found ${areas.size}")
+    }
 
-  def type_(pane: js.Dynamic, text: String): Unit =
+  def type_(pane: js.Dynamic, text: String): Unit = {
     pane.updateDynamic("value")(text)
     val _ = pane.fire("input")
+  }
 
   /** What the page is supposed to show for a text: the core's own answer, not a second opinion. */
-  def formatted(text: String): String = Verdict.of(text) match
+  def formatted(text: String): String = Verdict.of(text) match {
     case Verdict.NeedsFormatting(output) => output
     case _                               => text
+  }
 
   // --- the playground --------------------------------------------------------------------------
 
@@ -255,3 +263,4 @@ class ComponentSpec extends munit.FunSuite:
       ()
     }
   }
+}

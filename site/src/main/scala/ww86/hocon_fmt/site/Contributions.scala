@@ -11,7 +11,7 @@ import ww86.hocon_fmt.site.Library.Sconfig
   * 2026-08-24 and lightbend/config v1.4.9 on 2026-06-03, so anything merged after those dates is
   * in no release yet. A pull request counts as fixed only in that released state.
   */
-object Contributions:
+object Contributions {
 
   /** The day `gh search prs --author kastoestoramadus` last fed this file. */
   val readOn = "2026-10-07"
@@ -547,3 +547,4 @@ object Contributions:
 
   /** The whole snapshot, after both halves so no field initialises to null. */
   val all: List[Contribution] = sconfig ++ lightbendConfig
+}

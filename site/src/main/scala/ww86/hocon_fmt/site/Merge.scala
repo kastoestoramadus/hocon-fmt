@@ -6,12 +6,13 @@ import scala.scalajs.js
 final case class LivePr(number: Int, title: String, state: LiveState)
 
 /** The search API tells a merge from a rejection only through `pull_request.merged_at`. */
-enum LiveState derives CanEqual:
+enum LiveState derives CanEqual {
   case Open
   case Merged
   case ClosedUnmerged
+}
 
-object LivePr:
+object LivePr {
 
   /** Reads one `items` entry of the search/issues response. Anything the page cannot interpret —
     * a missing number or title, or no `pull_request` part, which is an issue — is dropped, never
@@ -26,7 +27,7 @@ object LivePr:
         state  <- readState(item)
       yield LivePr(number, title, state)
 
-  private def readState(item: js.Dynamic): Option[LiveState] =
+  private def readState(item: js.Dynamic): Option[LiveState] = {
     val pr = item.pull_request
     if js.isUndefined(pr) || Option(pr).isEmpty then None
     else
@@ -38,6 +39,7 @@ object LivePr:
           else Some(LiveState.Merged)
         case _ => None
       }
+  }
 
   private[site] def asInt(v: js.Dynamic): Option[Int] =
     asDouble(v).filter(_.isValidInt).map(_.toInt)
@@ -54,19 +56,20 @@ object LivePr:
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private[site] def asArray(v: js.Dynamic): Option[js.Array[js.Dynamic]] =
     if js.Array.isArray(v) then Some(v.asInstanceOf[js.Array[js.Dynamic]]) else None
+}
 
 /** The snapshot updated with what the live search says. Pure, so the page shows the same thing
   * offline as online and the rules have tests.
   */
 final case class MergeResult(entries: List[Contribution], others: List[LivePr])
 
-object Merge:
+object Merge {
 
   /** Snapshot entries keep their place; a live result may only raise `Open` to merged or closed.
     * `Released` and `Closed` stand, because the search API knows less than the snapshot there.
     * Live pull requests missing from the snapshot come back as `others`, newest first.
     */
-  def apply(snapshot: List[Contribution], live: List[LivePr]): MergeResult =
+  def apply(snapshot: List[Contribution], live: List[LivePr]): MergeResult = {
     val byNumber = live.map(pr => pr.number -> pr).toMap
     val entries  = snapshot.map { entry =>
       byNumber.get(entry.number) match {
@@ -80,3 +83,5 @@ object Merge:
     val known  = snapshot.map(_.number).toSet
     val others = live.filterNot(pr => known.contains(pr.number)).sortBy(-_.number)
     MergeResult(entries, others)
+  }
+}

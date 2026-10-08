@@ -1,6 +1,6 @@
 package ww86.hocon_fmt.site
 
-class MergeSpec extends munit.FunSuite:
+class MergeSpec extends munit.FunSuite {
 
   val snapshot = List(
     Contribution(Library.Sconfig, 598, "renderer", Theme.UnresolvedMerges, PrState.Open, "note"),
@@ -51,3 +51,4 @@ class MergeSpec extends munit.FunSuite:
     val result = Merge(snapshot, List(pr(600, LiveState.Open)))
     assertEquals(result.others, Nil)
   }
+}

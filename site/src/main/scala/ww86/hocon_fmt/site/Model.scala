@@ -3,7 +3,7 @@ package ww86.hocon_fmt.site
 /** The two libraries whose pull requests the page lists. Both carry the author's real account,
   * which the live refresh searches; `repo` is the `owner/repo` the search API wants.
   */
-enum Library(val repo: String, val label: String, val blurb: String) derives CanEqual:
+enum Library(val repo: String, val label: String, val blurb: String) derives CanEqual {
   case Sconfig
       extends Library(
         "ekrich/sconfig",
@@ -16,11 +16,12 @@ enum Library(val repo: String, val label: String, val blurb: String) derives Can
         "lightbend/config",
         "the original HOCON library, which sconfig keeps in step with"
       )
+}
 
 /** Where an entry belongs on the page. The declaration order is the reading order, so the theme
   * the formatter lives from — unresolved merges, the round trip — comes first.
   */
-enum Theme(val label: String) derives CanEqual:
+enum Theme(val label: String) derives CanEqual {
   case FormatterProposal              extends Theme("making a formatter possible")
   case UnresolvedMerges               extends Theme("unresolved merges")
   case RendererRoundTrip              extends Theme("renderer round trip")
@@ -31,15 +32,17 @@ enum Theme(val label: String) derives CanEqual:
   case EnvironmentOverrides           extends Theme("environment overrides")
   case Performance                    extends Theme("performance")
   case Project                        extends Theme("project and tooling")
+}
 
 /** A pull request's state as the snapshot recorded it. `Released` is snapshot knowledge only —
   * the search API cannot see a release — so a merge never overwrites it.
   */
-enum PrState(val label: String) derives CanEqual:
+enum PrState(val label: String) derives CanEqual {
   case Open             extends PrState("open")
   case MergedUnreleased extends PrState("merged upstream, not yet in a release")
   case Released         extends PrState("in a release")
   case Closed           extends PrState("closed without a merge")
+}
 
 /** One pull request of the snapshot: the number to link, the GitHub title for the refresh
   * script's report, the theme it is listed under, and one sentence in domain terms on what was
@@ -62,13 +65,15 @@ final case class DefectRow(
     whenNoFix: String
 )
 
-object DefectRow:
+object DefectRow {
   val noFixYet = "no pull request yet"
+}
 
 /** A reference from a defect row into the snapshot, resolved for display and state. */
 final case class PrLink(library: Library, number: Int)
 
 /** The formatter's own repository: the page's one home on GitHub. */
-object Repo:
+object Repo {
   val url                       = "https://github.com/kastoestoramadus/hocon-fmt"
   def tree(ref: String): String = s"$url/tree/$ref"
+}

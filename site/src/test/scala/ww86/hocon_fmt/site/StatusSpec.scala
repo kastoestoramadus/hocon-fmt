@@ -2,7 +2,7 @@ package ww86.hocon_fmt.site
 
 import ww86.hocon_fmt.Verdict
 
-class StatusSpec extends munit.FunSuite:
+class StatusSpec extends munit.FunSuite {
 
   test("a verdict that needs formatting reports how many lines differ") {
     val Verdict.NeedsFormatting(formatted) = Verdict.of("a  = 1"): @unchecked
@@ -64,3 +64,4 @@ class StatusSpec extends munit.FunSuite:
     case RefusalKind.UnstableOutput => ww86.hocon_fmt.Refusal.UnstableOutput
     case RefusalKind.NotUtf8        => ww86.hocon_fmt.Refusal.NotUtf8
   }
+}

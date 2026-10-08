@@ -2,7 +2,7 @@ package ww86.hocon_fmt.site
 
 import ww86.hocon_fmt.site.Prose.Part
 
-class ProseSpec extends munit.FunSuite:
+class ProseSpec extends munit.FunSuite {
 
   test("plain words are one text part") {
     assertEquals(Prose.parts("no code here"), List(Part.Text("no code here")))
@@ -26,3 +26,4 @@ class ProseSpec extends munit.FunSuite:
   test("a fragment with no words in it is dropped, not drawn as an empty box") {
     assertEquals(Prose.parts("a``b"), List(Part.Text("a"), Part.Text("b")))
   }
+}

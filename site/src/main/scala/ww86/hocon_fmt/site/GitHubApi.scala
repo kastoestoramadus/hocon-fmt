@@ -10,15 +10,16 @@ import scala.util.control.NonFatal
   * requests, with a small cache so reloading does not burn the unauthenticated rate limit of ten
   * searches a minute. No token, and no token belongs in a public page.
   */
-object GitHubApi:
+object GitHubApi {
 
   final case class Response(status: Int, body: String)
   type Http = String => Future[Response]
 
   /** A failed `Future` needs a `Throwable`, so both failures carry their detail as one. */
-  enum GitHubError(detail: String) extends RuntimeException(detail):
+  enum GitHubError(detail: String) extends RuntimeException(detail) {
     case Http(status: Int)         extends GitHubError(s"HTTP $status")
     case Malformed(detail: String) extends GitHubError(detail)
+  }
 
   def searchUrl(repo: String): String =
     s"https://api.github.com/search/issues?q=author:kastoestoramadus+type:pr+repo:$repo&per_page=100"
@@ -30,9 +31,10 @@ object GitHubApi:
     http(searchUrl(repo)).flatMap { response =>
       if response.status != 200 then Future.failed(GitHubError.Http(response.status))
       else
-        parse(response.body) match
+        parse(response.body) match {
           case Right(items) => Future.successful(items)
           case Left(detail) => Future.failed(detail)
+        }
     }
 
   /** The `items` of a search/issues response body. Fails when the body is not JSON or carries no
@@ -54,11 +56,12 @@ object GitHubApi:
   val cacheTtlMs: Double = 10 * 60 * 1000
 
   /** Stored as JSON so a guarded `try` and a fresh page can both read it back. */
-  def encode(items: List[LivePr], fetchedAtMs: Double): String =
+  def encode(items: List[LivePr], fetchedAtMs: Double): String = {
     val itemsJson = items
       .map(pr => s"""{"number":${pr.number},"title":${js.JSON.stringify(pr.title)},"state":"${stateName(pr.state)}"}""")
       .mkString(",")
     s"""{"fetchedAt":$fetchedAtMs,"items":[$itemsJson]}"""
+  }
 
   /** `None` when the entry is stale, malformed, or not JSON at all. */
   def decode(cached: String, nowMs: Double): Option[List[LivePr]] =
@@ -96,9 +99,10 @@ object GitHubApi:
   /** localStorage, hidden behind two methods so the tests can supply a fake — and so a page
     * opened where storage is unavailable formats the same, only without a cache.
     */
-  trait Storage:
+  trait Storage {
     def get(key: String): Option[String]
     def set(key: String, value: String): Unit
+  }
 
   def readCache(storage: Storage, key: String, nowMs: Double): Option[List[LivePr]] =
     try storage.get(key).flatMap(decode(_, nowMs))
@@ -107,3 +111,4 @@ object GitHubApi:
   def writeCache(storage: Storage, key: String, nowMs: Double, items: List[LivePr]): Unit =
     try storage.set(key, encode(items, nowMs))
     catch case NonFatal(_) => ()
+}
