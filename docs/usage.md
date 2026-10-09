@@ -288,6 +288,8 @@ if (inspection.failsOnDuplicates()) throw new IllegalStateException("Dead duplic
 
 ## pre-commit
 
+The hooks ship in wave 2: they pin PyPI and npm versions published only then.
+
 ```yaml
 repos:
   - repo: https://github.com/kastoestoramadus/hocon-fmt

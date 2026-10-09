@@ -5,6 +5,9 @@ import org.scalajs.dom
 
 object UseIt {
   val usageDoc = "https://github.com/kastoestoramadus/hocon-fmt/blob/main/docs/usage.md"
+  // The hooks pin PyPI and npm versions wave 1 does not publish; the same sentence heads the
+  // pre-commit section of docs/usage.md.
+  val wave2Note = "The hooks ship in wave 2: they pin PyPI and npm versions published only then."
   final case class Integration(id: String, title: String, module: Option[String] = None)
   val integrations = List(
     Integration("native", "CLI native"),
@@ -57,6 +60,7 @@ object UseIt {
             integration.module.fold[HtmlElement](
               div(
                 pre(code(UseItExamples.commands.getOrElse(id, ""))),
+                if (id == "pre-commit") p(wave2Note) else emptyNode,
                 p(UseItExamples.actions.getOrElse(id, Nil).map(command => code(command + " "))),
 
                 p(

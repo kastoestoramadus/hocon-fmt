@@ -48,7 +48,7 @@ with the formatter version and a minimal example.
 |---|---|
 | ZIO library | `hocon-fmt-zio`: typed refusals, file formatting and streamed checks; JVM / Native, text on Scala.js |
 | command line | `hocon-fmt [--check] [--separator =|:] <file>...`: `pipx install hocon-fmt` (native), `npx hocon-fmt` (Node), binaries on GitHub releases |
-| pre-commit | hooks `hocon-fmt` and `hocon-fmt-check` from this repository, running the native binary |
+| pre-commit | hooks `hocon-fmt` and `hocon-fmt-check` from this repository, running the native binary. The hooks ship in wave 2: they pin PyPI and npm versions published only then |
 | sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
 | Gradle | `id("eu.ww86.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
 | Maven | `hocon-fmt-maven-plugin`, goals `format` / `check` (bound to `verify`) |
