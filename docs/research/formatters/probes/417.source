@@ -1,0 +1,4 @@
+# Source: https://github.com/scalameta/scalafmt
+# Licence: Apache-2.0
+# Research: safety-and-ux-history-tests-api.md:348
+# Input is a newly written HOCON analogue, not formatter code.

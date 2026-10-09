@@ -1,0 +1,4 @@
+# Source: https://github.com/hashicorp/hcl
+# Licence: MPL-2.0
+# Research: config-siblings-history-tests-api.md:375
+# Input is a newly written HOCON analogue, not formatter code.

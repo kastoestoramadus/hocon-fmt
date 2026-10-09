@@ -1,0 +1,137 @@
+{
+  "config-file": {
+    "actual": "a: 1\n",
+    "owner": "ours",
+    "result": {
+      "exit": 0,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 1 files.\n"
+    }
+  },
+  "config-invalid": {
+    "bytes_kept": true,
+    "owner": "ours",
+    "result": {
+      "exit": 2,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n<work>/.hocon-fmt.conf: unknown option: unknown\n",
+      "stdout": ""
+    }
+  },
+  "hardlink-atomic": {
+    "hardlink": "a=1",
+    "owner": "ours",
+    "result": {
+      "exit": 0,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 1 files.\n"
+    },
+    "same_inode": false,
+    "target": "a = 1\n"
+  },
+  "ignored-directory": {
+    "ignored_kept": true,
+    "owner": "ours",
+    "result": {
+      "exit": 1,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/target.conf .\nAfter formatting:\na = 1\n\n\n"
+    }
+  },
+  "ignored-explicit": {
+    "owner": "ours",
+    "result": {
+      "exit": 1,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/ignored.conf .\nAfter formatting:\na = 1\n\n\n"
+    }
+  },
+  "kill-atomic": {
+    "exit": -9,
+    "original_kept": true,
+    "owner": "ours",
+    "remaining_bytes": 8000004,
+    "signal": "staging file appeared",
+    "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+    "stdout": "",
+    "write_observed": true
+  },
+  "kill-fallback": {
+    "exit": -9,
+    "original_kept": false,
+    "owner": "ours",
+    "remaining_bytes": 0,
+    "signal": "target size changed",
+    "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+    "stdout": "",
+    "write_observed": true
+  },
+  "missing": {
+    "owner": "ours",
+    "result": {
+      "exit": 2,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot read <work>/missing.conf: no such file\n",
+      "stdout": "Running HOCON formatter for 1 files.\n"
+    }
+  },
+  "mixed-clean-refused": {
+    "owner": "ours",
+    "result": {
+      "exit": 0,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 2 files.\n.ERROR: cannot format, leaving unchanged: <work>/bad.conf (not valid HOCON: <work>/bad.conf: 1: expecting a close parentheses ')' here, not: end of file)\nWARNING: duplicate report could not run for <work>/bad.conf: not valid HOCON: <work>/bad.conf: 1: expecting a close parentheses ')' here, not: end of file\n"
+    }
+  },
+  "mixed-dirty-refused": {
+    "owner": "ours",
+    "result": {
+      "exit": 1,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 2 files.\nFound a not formatted file: <work>/ignored.conf .\nAfter formatting:\na = 1\n\n\nERROR: cannot format, leaving unchanged: <work>/bad.conf (not valid HOCON: <work>/bad.conf: 1: expecting a close parentheses ')' here, not: end of file)\nWARNING: duplicate report could not run for <work>/bad.conf: not valid HOCON: <work>/bad.conf: 1: expecting a close parentheses ')' here, not: end of file\n"
+    }
+  },
+  "mixed-missing-dirty": {
+    "owner": "ours",
+    "result": {
+      "exit": 2,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot read <work>/missing.conf: no such file\n",
+      "stdout": "Running HOCON formatter for 2 files.\nFound a not formatted file: <work>/ignored.conf .\nAfter formatting:\na = 1\n\n\n"
+    }
+  },
+  "read-only": {
+    "bytes_kept": true,
+    "mode": "0o444",
+    "mtime_kept": true,
+    "owner": "ours",
+    "result": {
+      "exit": 2,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot write <work>/target.conf: access denied\n",
+      "stdout": "Running HOCON formatter for 1 files.\n"
+    }
+  },
+  "stdin-check-invalid-combination": {
+    "owner": "ours",
+    "result": {
+      "exit": 2,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n--stdin cannot be combined with files, --check or --config.\n\nUsage: hocon-fmt [--check] [--stdin] [--stdin-filename <string>] [--version] [--config <string>] [--separator <string>] [--double-indent] [--no-double-indent] [--simplify-nested-objects] [--no-simplify-nested-objects] [--fail-on-duplicates] [--no-fail-on-duplicates] [<file>...]\n\nFormats HOCON files in place. Files it cannot format safely are left alone.\n\nOptions and flags:\n    --help\n        Display this help text.\n    --check, -c\n        Report unformatted files instead of rewriting them; exit 1 if any are found.\n    --stdin\n        Read UTF-8 from stdin and write only formatted text to stdout.\n    --stdin-filename <string>\n        Name used in stdin diagnostics; no file is read or written.\n    --version\n        Print the formatter version and exit.\n    --config <string>\n        Use this .hocon-fmt.conf for every file instead of the one found from each file's directory.\n    --separator <string>\n        The key-value separator: = (the default) or :; overrides the config file.\n    --double-indent\n        Indent the contents of nested objects four spaces; overrides the config file.\n    --no-double-indent\n        The opposite of --double-indent.\n    --simplify-nested-objects\n        Flatten nested objects to path keys; overrides the config file.\n    --no-simplify-nested-objects\n        The opposite of --simplify-nested-objects.\n    --fail-on-duplicates\n        Exit 1 when a key is defined again and the earlier value never takes effect; overrides the config file.\n    --no-fail-on-duplicates\n        The opposite of --fail-on-duplicates.\n",
+      "stdout": ""
+    }
+  },
+  "stdin-filename-no-lookup": {
+    "exit": 0,
+    "owner": "ours",
+    "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+    "stdout": "a = 1\n"
+  },
+  "symlink": {
+    "actual": "a = 1\n",
+    "link_kept": true,
+    "mode_kept": true,
+    "owner": "ours",
+    "owner_kept": true,
+    "result": {
+      "exit": 0,
+      "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
+      "stdout": "Running HOCON formatter for 1 files.\n"
+    }
+  }
+}

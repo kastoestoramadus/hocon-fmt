@@ -1,0 +1,4 @@
+# Source: https://github.com/NixOS/nixfmt
+# Licence: MPL-2.0
+# Research: config-siblings-history-tests-api.md:461
+# Input is a newly written HOCON analogue, not formatter code.

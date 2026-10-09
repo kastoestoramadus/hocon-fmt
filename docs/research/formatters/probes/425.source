@@ -1,0 +1,4 @@
+# Source: https://github.com/astral-sh/ruff
+# Licence: MIT
+# Research: safety-and-ux-history-tests-api.md:362
+# Input is a newly written HOCON analogue, not formatter code.
