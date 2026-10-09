@@ -89,6 +89,27 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // A concatenation's pieces count their own positions: the second piece of `rows=[0] [{...}]`
+  // counts no element for the first one, while the merged list does. A definition inside the later
+  // piece therefore stands at an element the document parse numbers from zero and the merge numbers
+  // after the piece before it, and a lookup by the document's own path reads the wrong element —
+  // here the scalar `0`, which says nothing about the object the merge put at `q`.
+  val arrayConcatenations = List(
+    ("an object piece before", "rows=[{q=22}] [{\ninclude \"f.conf\"\nq=false\nq.child=8\n}]\n"),
+    ("a scalar piece before", "rows=[0] [{\ninclude \"f.conf\"\nq=false\nq.child=8\n}]\n"),
+    ("a two-element piece before", "rows=[0,1] [{\ninclude \"f.conf\"\nq=null, q.child=8\n}]\n"),
+    ("two pieces before", "rows=[0] [1] [{\ninclude \"f.conf\"\nq=[2,3]\nq.child=8\n}]\n")
+  )
+
+  test("a definition in a later piece of a concatenation: refused by the path it really stands at") {
+    arrayConcatenations.foreach { case (name, text) =>
+      val reason = refusalOf(text).reason
+      assert(reason.contains("out of rows[0].q"), s"$name: $reason")
+      assert(reason.contains("line 3"), s"$name: $reason")
+      assert(reason.contains("line 2"), s"$name: $reason")
+    }
+  }
+
   test("the shapes the refusal protects, without a dropped definition, still format") {
     // A definition before the include is folded into one value before the include reads it, and a
     // later definition wins over it; only a definition the formatting drops can let values
@@ -106,7 +127,10 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
       "the include writes another object"     -> "a {\n  include \"f.conf\"\n}\nb { o=3\no.c=7 }\n",
       "an empty object first"                 -> "x {}\ninclude \"scalar.conf\"\n",
       "the definitions after the include"     -> "x {}\ninclude \"scalar.conf\"\nx.a=5\n",
-      "dotted definitions before the include" -> "a.o = 3\na.o.c = 7\ninclude \"g.conf\"\n"
+      "dotted definitions before the include" -> "a.o = 3\na.o.c = 7\ninclude \"g.conf\"\n",
+      // Nothing is dropped: the later scalar erases the earlier one the same way with or without
+      // it, so the include's own value never reaches a path the output leaves open.
+      "a concatenated array with nothing dropped" -> "rows=[0] [{\ninclude \"f.conf\"\nq=1\nq=2\n}]\n"
     )
     stillFormats.foreach { case (name, text) =>
       val formatted = HoconFormatter.format(text).fold(refusal => fail(s"$name: ${refusal.reason}"), identity)

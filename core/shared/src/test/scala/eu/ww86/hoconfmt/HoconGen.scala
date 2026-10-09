@@ -358,15 +358,16 @@ object HoconGen {
   final case class ShadowCase(text: String, includeBody: String)
 
   /** How a case's statements stand: each on a line of its own, the definitions sharing one line,
-    * or every statement on one line with the file's closing newline left out. A comma is what puts
-    * two statements on one line. Two definitions on one line carry one origin line between them,
-    * which the shadow check has to tell apart; a file with no newline at all is where an include
-    * shares a line with the fields around it.
+    * every statement on one line with the file's closing newline left out, or the case in the third
+    * piece of an array concatenation, `rows=[{...}] [{...}] [{\n...\n}]`. A definition in a later
+    * piece counts its position inside that piece, which is not the position the merged list carries
+    * — the check must not read the merged list by the document's path.
     */
   enum Layout derives CanEqual {
     case OwnLines
     case DefinitionsJoined
     case OneLine
+    case ConcatenatedSegments
   }
 
   /** The lines of a case, each a group of statements joined with a comma where the layout puts
@@ -375,7 +376,8 @@ object HoconGen {
   def shadowLines(definitions: List[String], at: Int, layout: Layout): List[List[String]] = {
     val (before, after) = (definitions.take(at), definitions.drop(at))
     layout match {
-      case Layout.OwnLines          => before.map(List(_)) ++ List(List(shadowInclude)) ++ after.map(List(_))
+      case Layout.OwnLines | Layout.ConcatenatedSegments =>
+        before.map(List(_)) ++ List(List(shadowInclude)) ++ after.map(List(_))
       case Layout.DefinitionsJoined =>
         List(before).filter(_.nonEmpty) ++ List(List(shadowInclude)) ++ List(after).filter(_.nonEmpty)
       case Layout.OneLine => List(before ++ List(shadowInclude) ++ after)
@@ -384,11 +386,16 @@ object HoconGen {
 
   /** The layouts worth generating for a placement: sharing a line only says something new where
     * there are two definitions to put on it, and the joined layout repeats the plain one when the
-    * include splits them.
+    * include splits them. The concatenation is only worth generating where a definition stands
+    * after the include, since a piece's shifted positions matter for a definition the formatting
+    * may drop and the include may then reach.
     */
-  def shadowLayouts(definitions: List[String], at: Int): List[Layout] =
-    if (definitions.size < 2 || at == 1) List(Layout.OwnLines, Layout.OneLine)
-    else List(Layout.OwnLines, Layout.DefinitionsJoined, Layout.OneLine)
+  def shadowLayouts(definitions: List[String], at: Int): List[Layout] = {
+    val layouts =
+      if (definitions.size < 2 || at == 1) List(Layout.OwnLines, Layout.OneLine)
+      else List(Layout.OwnLines, Layout.DefinitionsJoined, Layout.OneLine)
+    if (at < definitions.size) layouts :+ Layout.ConcatenatedSegments else layouts
+  }
 
   /** Every way one or two of the shapes stand around an include, in every layout, with every body
     * beside it, at the file root and inside an object. The included file cannot be read at format
@@ -399,8 +406,19 @@ object HoconGen {
     */
   lazy val shadowCases: List[ShadowCase] = {
     def around(definitions: List[String], at: Int, layout: Layout): String = {
-      val lines = shadowLines(definitions, at, layout).map(_.mkString(", "))
-      lines.mkString("\n") + (if (layout == Layout.OneLine) "" else "\n")
+      val lines = shadowLines(definitions, at, layout).filter(_.nonEmpty)
+      layout match {
+        case Layout.ConcatenatedSegments =>
+          // Two pieces before the one holding the case: its element is not the merged list's
+          // first, so the positions its definitions count are shifted. The case itself stays one
+          // element, since only definitions beside the include are the check's business.
+          def piece(body: String) = s"[{\n$body\n}]"
+          val caseLines           = lines.map(_.mkString(", ")).mkString("\n")
+          s"rows = ${piece("filler = 1")} ${piece("filler = 2")} ${piece(caseLines)}"
+        case _ =>
+          val text = lines.map(_.mkString(", ")).mkString("\n")
+          text + (if (layout == Layout.OneLine) "" else "\n")
+      }
     }
 
     def insideAnObject(text: String): String =
