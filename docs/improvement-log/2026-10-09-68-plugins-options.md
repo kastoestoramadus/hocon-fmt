@@ -1,4 +1,4 @@
-# 2026-10-09 — — — Build plugins use repository options and report dead duplicates
+# 2026-10-09 — [#68](https://github.com/kastoestoramadus/hocon-fmt/pull/68) — Build plugins use repository options and report dead duplicates
 
 **Change:** A repository with `separator = ":"` in `.hocon-fmt.conf` used to format differently
 through the CLI and build plugins. sbt, Gradle, Maven and Mill now discover the nearest config,
