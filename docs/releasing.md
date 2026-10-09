@@ -210,7 +210,7 @@ Three scratch consumer builds resolved from it alone, with no Maven Local or Ivy
 - `hocon-fmt-cli_3` resolves and runs. No launcher script ships, so the jar is what runs; coursier
   does it directly (`cs launch eu.ww86:hocon-fmt-cli_3:0.1.0 -- --version` against the private
   repository, `-r file://<dir>/m2`, prints `hocon-fmt 0.1.0`), and the manifest's
-  `Main-Class: ww86.hocon_fmt.CmdApi` serves a `java -cp` run. `--check` exits 1 then 0 after
+  `Main-Class: ww86.hoconfmt.CmdApi` serves a `java -cp` run. `--check` exits 1 then 0 after
   formatting, a missing path exits 2 with `cannot read <path>: no such file`. Resolving it without
   `hocon-fmt-cats_3` fails, which is why the adapter is in the set.
 

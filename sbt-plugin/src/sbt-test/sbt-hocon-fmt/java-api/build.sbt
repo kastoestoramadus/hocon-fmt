@@ -1,5 +1,5 @@
 import java.nio.charset.StandardCharsets.UTF_8
-import ww86.hocon_fmt.sbt.{IsolatedFormatter, Verdict}
+import ww86.hoconfmt.sbt.{IsolatedFormatter, Verdict}
 
 TaskKey[Unit]("assertJavaApiWorker") := {
   val classpath = TaskKey[Seq[File]]("hoconFormatterClasspath").value

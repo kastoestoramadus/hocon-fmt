@@ -39,7 +39,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 them the ways people write HOCON: `:`, `=` or nothing before `{`, `#` and `//` comments holding
 quotes and the word include, quoted and dotted keys. Knowing what went in lets a property check
 what came out without parsing it with the code under test. Each property runs 1000 documents on
-every platform; `sbt -Dhocon.properties=20000 "coreJVM/testOnly ww86.hocon_fmt.FormatterPropertiesSpec"`
+every platform; `sbt -Dhocon.properties=20000 "coreJVM/testOnly ww86.hoconfmt.FormatterPropertiesSpec"`
 searches deeper. A failure prints the document and the seed that reproduces it.
 
 They found what no example covered: a quote inside a comment hid the next include, which on the
@@ -63,7 +63,7 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 ## Conventions
 
 - **Golden files.** Adding a fixture is a two-file drop. Regenerate with
-  `UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hocon_fmt.GoldenFileSpec"` and read the diff before
+  `UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hoconfmt.GoldenFileSpec"` and read the diff before
   committing: a golden file is worth what the human who approved it looked at.
 - **Meaning preservation** is asserted on include-free inputs only: an include of a missing file
   cannot be parsed on its own. Files with includes are covered by idempotence.
@@ -105,7 +105,7 @@ exists today.
 
 To regenerate a successful shared example with the golden-file workflow, copy its
 `input.conf` to `core/jvm-native/src/test/resources/shared-example.conf`, run
-`UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hocon_fmt.GoldenFileSpec"`, and copy
+`UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hoconfmt.GoldenFileSpec"`, and copy
 `shared-example.expected.conf` back to the example's `expected/default.conf`.
 Remove both temporary resource files, inspect the expected-output diff, then run
 `ExamplesSpec` without `UPDATE_GOLDEN`. Refused inputs are never combined: one

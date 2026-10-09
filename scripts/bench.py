@@ -67,7 +67,7 @@ def startup_results(runs: int = 20) -> list:
     commands = {
         "native": [str(ROOT / "cli/.native/target/scala-3.8.2/hocon-fmt")],
         "js": ["node", str(ROOT / "cli/.js/target/scala-3.8.2/hocon-fmt-cli-opt/main.js")],
-        "jvm": ["java", "-cp", classpath, "ww86.hocon_fmt.CmdApi"],
+        "jvm": ["java", "-cp", classpath, "ww86.hoconfmt.CmdApi"],
     }
     results = []
     with tempfile.TemporaryDirectory() as tmp:

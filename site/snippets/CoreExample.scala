@@ -1,4 +1,4 @@
-import ww86.hocon_fmt.{HoconFormatter, Verdict}
+import ww86.hoconfmt.{HoconFormatter, Verdict}
 
 object CoreExample {
   def main(args: Array[String]): Unit = {
