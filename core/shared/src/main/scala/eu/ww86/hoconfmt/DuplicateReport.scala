@@ -112,6 +112,7 @@ object DuplicateReport {
     * own. A literal written beside another is one piece of the merged value, and it counts its
     * elements from zero while the merged list counts them across the pieces: positions inside such
     * a piece name another element of the merged list, so nothing there vouches for the definition.
+    * A path of names alone holds no position at all, so no piece's counting can move it.
     */
   private[hoconfmt] case class Definition(
       keyPath: KeyPath,
@@ -161,7 +162,8 @@ object DuplicateReport {
     * A concatenation's pieces each count their elements from zero, so a literal reached through one
     * — through its objects too, since two objects of one concatenation merge and a key they share
     * may be what joins two of their literals — carries positions the merged list numbers
-    * differently.
+    * differently. Only a definition whose path goes through such a position carries the doubt:
+    * [[arrayPositionsTrusted]] reads it off the path.
     */
   private def walk(
       node: ConfigNode,
@@ -228,6 +230,19 @@ object DuplicateReport {
       }
       .match { case (end, outline, _) => (end, outline) }
 
+  /** Whether the `Index` segments of a definition's path are the merged list's own. A definition
+    * written inside a piece of a concatenation is read off the merged tree with doubt only where
+    * its path goes through an array: the piece counts its elements from zero, so an `Index` there
+    * names another element. A path of names alone counts no element, and which piece it stands in
+    * moves nothing about it — an object concatenation's definitions keep their path, and the merged
+    * tree answers for them like any other.
+    */
+  private def arrayPositionsTrusted(positionsTrusted: Boolean, path: List[KeyPath.Segment]): Boolean =
+    positionsTrusted || !path.exists {
+      case KeyPath.Segment.Index(_) => true
+      case KeyPath.Segment.Name(_)  => false
+    }
+
   private def walkField(
       field: ConfigNodeField,
       at: List[KeyPath.Segment],
@@ -255,7 +270,7 @@ object DuplicateReport {
           holdsSubstitution = holds,
           writesNothing = writesNothing(field.value),
           arrayScope = arrayScope,
-          arrayPositionsTrusted = positionsTrusted
+          arrayPositionsTrusted = arrayPositionsTrusted(positionsTrusted, path)
         )
         found.addAll(implicitObjects(at, segments, line, position, holds, arrayScope, positionsTrusted)).add(own)
       }
@@ -293,8 +308,9 @@ object DuplicateReport {
       positionsTrusted: Boolean
   ): Vector[Definition] =
     (1 until segments.size).toVector.map { length =>
+      val path = at ++ segments.take(length)
       Definition(
-        KeyPath(at ++ segments.take(length)),
+        KeyPath(path),
         line,
         position,
         objectValued = true,
@@ -302,7 +318,7 @@ object DuplicateReport {
         // A leaf stands below it, so it writes something.
         writesNothing = false,
         arrayScope = arrayScope,
-        arrayPositionsTrusted = positionsTrusted
+        arrayPositionsTrusted = arrayPositionsTrusted(positionsTrusted, path)
       )
     }
 
