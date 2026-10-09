@@ -106,6 +106,7 @@ object CmdApi extends IOApp {
     case AlreadyFormatted
     case NeedsFormatting(formatted: String)
     case Unformattable(reason: String)
+    case Unreadable(reason: String)
   }
 
   /** One file's run: what was made of it, the findings the report made of the text it was read
@@ -120,8 +121,14 @@ object CmdApi extends IOApp {
       reportFailure: Option[Refusal] = None
   ) {
 
+    def unreadable: Boolean = result match {
+      case Result.Unreadable(_) => true
+      case _                    => false
+    }
+
     def fails: Boolean = result match {
       case Result.NeedsFormatting(_) => true
+      case Result.Unreadable(_)      => false
       case _                         => failOnDuplicates && findings.nonEmpty
     }
   }
@@ -129,11 +136,21 @@ object CmdApi extends IOApp {
   /** Every file's outcome, and what the process prints and exits with because of them. */
   final case class Run(outcomes: List[Outcome]) {
 
-    // 1 rather than -1: an exit status is a byte, so -1 would reach the shell as 255.
-    def exitCode: ExitCode = if (outcomes.exists(_.fails)) ExitCode(1) else ExitCode.Success
+    // 2 rather than 1 when a file could not be read: a run that never saw what it was named is
+    // broken, not merely unformatted — a typo in a CI script's path must not pass silently. And
+    // an exit status is a byte, so -1 would reach the shell as 255.
+    def exitCode: ExitCode =
+      if (outcomes.exists(_.unreadable)) ExitCode(2)
+      else if (outcomes.exists(_.fails)) ExitCode(1)
+      else ExitCode.Success
 
     def rendered: String =
       (s"Running HOCON formatter for ${outcomes.size} files.\n" :: outcomes.map(render)).mkString
+
+    // An unreadable file is an error, not a refusal: its line goes to stderr, as a usage error does.
+    def errors: String = outcomes.collect { case Outcome(Result.Unreadable(reason), path, _, _, _) =>
+      s"cannot read $path: $reason\n"
+    }.mkString
   }
 
   // Scala.js hands `main` no arguments; under Node they are in `process.argv`.
@@ -145,7 +162,8 @@ object CmdApi extends IOApp {
             // A config nobody asked for must not decide what happens to the files, so the run
             // stops before any of them is read, the way a usage error does.
             Console[IO].errorln(error).as(ExitCode(2))
-          case Right(run) => IO.print(run.rendered).as(run.exitCode)
+          case Right(run) =>
+            (IO.print(run.rendered) *> Console[IO].error(run.errors)).as(run.exitCode)
         }
       case Right(Invocation.Version)                => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
       case Right(Invocation.Stdin(filename, style)) =>
@@ -193,13 +211,25 @@ object CmdApi extends IOApp {
     }
 
   /** The whole file pipeline: canonical paths, each file's style resolved, every file examined.
-    * `Left` is a config-file error, decided before any file is read.
+    * A directory argument is walked first, for the HOCON files it holds; the arguments that could
+    * not be read report alongside the files' outcomes. `Left` is a config-file error, decided
+    * before any file is read.
     */
   def examineAll(arguments: Arguments): IO[Either[String, Run]] =
     formatter.distinctPaths(arguments.files).flatMap { paths =>
-      styleFor(paths, arguments).flatMap {
-        case Left(error)   => Left(error).pure[IO]
-        case Right(styled) => examineAll(styled, arguments.checkOnly).map(Right(_))
+      Walk.expand[IO](paths).flatMap { expanded =>
+        formatter.distinctPaths(expanded.files).flatMap { files =>
+          styleFor(files, arguments).flatMap {
+            case Left(error)   => Left(error).pure[IO]
+            case Right(styled) =>
+              examineAll(styled, arguments.checkOnly).map { run =>
+                val unreadable = expanded.unreadable.map { case Walk.Unreadable(path, reason) =>
+                  Outcome(Result.Unreadable(reason), path.toString, Nil, failOnDuplicates = false)
+                }
+                Right(Run(unreadable ++ run.outcomes))
+              }
+          }
+        }
       }
     }
 
@@ -207,7 +237,8 @@ object CmdApi extends IOApp {
     *
     * Exiting from inside a parallel loop used to kill the JVM mid-iteration, so `--check` could
     * miss files entirely; now nothing exits until every outcome is in. The paths arrive from
-    * `distinctPaths`, so a file named twice, however spelled, is not written by two fibers.
+    * `distinctPaths`, so a file named twice — however spelled, or once given and once walked — is
+    * not written by two fibers.
     */
   def examineAll(styled: List[(Path, FormatOptions)], checkOnly: Boolean): IO[Run] =
     styled.parTraverse { case (file, options) => examine(file, file.toString, checkOnly, options) }.map(Run(_))
@@ -217,21 +248,40 @@ object CmdApi extends IOApp {
   private def examine(file: Path, path: String, checkOnly: Boolean, options: FormatOptions): IO[Outcome] =
     formatter
       .inspect(file, options)
-      .flatMap { inspection =>
-        def outcome(result: Result) =
-          Outcome(result, path, inspection.findings, options.failOnDuplicates, inspection.reportFailure)
-        inspection.verdict match {
-          case Verdict.AlreadyFormatted           => outcome(Result.AlreadyFormatted).pure[IO]
-          case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal.reason.take(120))).pure[IO]
-          case Verdict.NeedsFormatting(formatted) =>
-            if (checkOnly) outcome(Result.NeedsFormatting(formatted)).pure[IO]
-            else formatter.write(file, formatted).as(outcome(Result.Rewritten))
-        }
+      .attempt
+      .flatMap {
+        // A read failure is not a refusal of the file's content, so it is not left to the catch
+        // all below: it is the run's own error, in words to act on rather than an exception's.
+        case Left(e) =>
+          Outcome(Result.Unreadable(ReadFailure.message(e)), path, Nil, failOnDuplicates = false).pure[IO]
+        case Right(inspection) =>
+          def outcome(result: Result) =
+            Outcome(result, path, inspection.findings, options.failOnDuplicates, inspection.reportFailure)
+          inspection.verdict match {
+            case Verdict.AlreadyFormatted           => outcome(Result.AlreadyFormatted).pure[IO]
+            case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal.reason.take(120))).pure[IO]
+            case Verdict.NeedsFormatting(formatted) =>
+              if (checkOnly) outcome(Result.NeedsFormatting(formatted)).pure[IO]
+              else
+                formatter
+                  .write(file, formatted)
+                  .as(outcome(Result.Rewritten))
+                  // A write that fails leaves the file byte-for-byte as it was: the text was
+                  // verified first, so this too is not a refusal of its content.
+                  .handleError(e =>
+                    Outcome(
+                      Result.Unformattable(Option(e.getMessage).getOrElse(e.toString).take(120)),
+                      path,
+                      Nil,
+                      false
+                    )
+                  )
+          }
       }
-      .handleError(e => Outcome(Result.Unformattable(Option(e.getMessage).getOrElse(e.toString)), path, Nil, false))
 
   private def render(outcome: Outcome): String = {
     val result = outcome.result match {
+      case Result.Unreadable(_)         => "" // the error line goes to stderr
       case Result.Unformattable(reason) =>
         s"ERROR: cannot format, leaving unchanged: ${outcome.path} ($reason)\n"
       case Result.NeedsFormatting(formatted) =>
