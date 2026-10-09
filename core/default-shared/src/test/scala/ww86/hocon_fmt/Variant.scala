@@ -18,7 +18,7 @@ object Variant {
     * `core/site-shared`.
     */
   val refusedDifferently: List[(String, List[String])] = List(
-    "showcase/05-sconfig-defect" -> List(
+    "catalogue/sconfig-defect" -> List(
       "simplify=true: refused:broken-output",
       "simplify=false: refused:unstable-output"
     ),
