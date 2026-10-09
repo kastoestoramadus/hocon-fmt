@@ -77,7 +77,7 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
   /** The case's text beside the file its include names, formatted and resolved against the input:
     * a refusal passes, any other verdict must keep the values.
     */
-  private def refusedOrUnchanged(root: Path, index: Int, shadowCase: HoconGen.ShadowCase): Verdict = {
+  def refusedOrUnchanged(root: Path, index: Int, shadowCase: HoconGen.ShadowCase): Verdict = {
     val input  = beside(root.resolve(s"in-$index"), shadowCase)
     val output = beside(root.resolve(s"out-$index"), shadowCase)
     Verdict.of(Files.readAllBytes(input), "main.conf") match {
@@ -98,7 +98,7 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
   }
 
   /** `main.conf` holding the case's text, with the file its include names beside it. */
-  private def beside(dir: Path, shadowCase: HoconGen.ShadowCase): Path = {
+  def beside(dir: Path, shadowCase: HoconGen.ShadowCase): Path = {
     val _    = Files.createDirectories(dir)
     val main = dir.resolve("main.conf")
     write(dir.resolve("inc.conf"), shadowCase.includeBody + "\n")
@@ -106,12 +106,12 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
     main
   }
 
-  private def write(file: Path, text: String): Unit = {
+  def write(file: Path, text: String): Unit = {
     val _ = Files.write(file, text.getBytes(UTF_8))
   }
 
   /** The file's values, or none when it does not resolve at all. */
-  private def resolved(file: Path): Option[Any] =
+  def resolved(file: Path): Option[Any] =
     try Some(ConfigFactory.parseFile(file.toFile).resolve(ConfigResolveOptions.noSystem).root.unwrapped)
     catch { case _: ConfigException => None }
 }
