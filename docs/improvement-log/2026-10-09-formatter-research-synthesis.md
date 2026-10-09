@@ -16,8 +16,12 @@ interruption warning accurate: the actual kill probe left its target empty, whil
 kill kept original bytes. The research's CRLF-inside-string hypothesis did not reproduce.
 
 **Validation:** Real JVM CLI process matrix and filesystem probes; `FileFormatterFailureSpec`
-reported `Passed: Total 2, Failed 0, Errors 0, Passed 2` for staged failure/cancellation. Runner
-syntax and Python compilation checked. See REPORT for the final probe counts and replay result;
-no production formatter changes, no upstream messages, and no JS/Native execution claim.
+reported `Passed: Total 2, Failed 0, Errors 0, Passed 2` for staged failure/cancellation. Replaying
+the recording now reports 958 observations, 0 differences, in about 12 minutes; that required
+`-XX:-UsePerfData` in the runner (parallel JVMs raced on `/tmp/hsperfdata_<user>`) and normalising
+the temporary path inside the hex-encoded bare-sconfig evidence, since unresolved-merge banners
+name their source path. Two probe files whose names read like an injection payload were renamed to
+`case-placeholder-collision*` with their inputs unchanged. See REPORT for the final probe counts
+and replay cost; no production formatter changes, no upstream messages, and no JS/Native claim.
 
 Generated with gpt-6.1-sol/m through [Codex](https://developers.openai.com/codex).

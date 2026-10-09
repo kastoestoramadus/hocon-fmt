@@ -288,6 +288,11 @@ Top ten to add first, in order:
 Run `scripts/run-research-probes.sh` before every release. It builds the real JVM CLI, uses a private
 Maven repository and compares observations, including stdout/stderr/exits/bytes, with the baseline.
 Use `--record` only after reviewing changed observations; an improving refusal requires ledger triage.
+A full replay takes about 12 minutes on the recording host (12 JVM workers, 958 CLI observations plus
+the filesystem setups) over 967 small files, heavy for PR CI; the runner disables JVM perf data and
+normalizes the temporary path inside `bare_sconfig_hex`, so the recording reproduces on another host.
+If either becomes a burden, one packed corpus file (inputs and provenance in a JSON/TSV the runner
+unpacks; per-input `.source` files kept only for promoted cases) is the cheap shape.
 Run the three-platform suites separately; these JVM observations establish no JS/Native result.
 Re-check citations with `scripts/verify-research-urls.py` from PR #98 (when merged); record source SHA,
 new dead links and title mismatches, without silently rewriting historical research.

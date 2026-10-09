@@ -10,8 +10,10 @@ scripts/run-research-probes.sh --record
 
 Requires sbt, Java/javac (recorded with Temurin 25.0.4), Python 3 and a POSIX filesystem as an
 ordinary user; root does not exercise permission failures. Defaults to 12 parallel JVM **processes**;
-`HOCON_RESEARCH_JOBS=4` reduces memory/CPU pressure. Each process gets two available processors
-and a 4 MB stack; depth results therefore depend on that budget. Per-process timeout is 45 seconds.
+`HOCON_RESEARCH_JOBS=4` reduces memory/CPU pressure. Each process gets two available processors,
+a 4 MB stack and `-XX:-UsePerfData`: without the last flag parallel short-lived JVMs race on
+`/tmp/hsperfdata_<user>` and one prints a locked-file warning into the recorded stdout. Depth
+results therefore depend on that budget. Per-process timeout is 45 seconds.
 `HOCON_RESEARCH_M2` overrides the task-private `../m2`; `HOCON_RESEARCH_RUNTIME` defaults to `/tmp`.
 The shell builds released-sconfig `cliJVM`, not the playground fork. Fork fetch is run as required
 by the repository; it may publish its pinned Scala.js artifact to Ivy, as its own script documents.
@@ -41,7 +43,9 @@ bare-library rendering. Its resolver uses `noSystem`, with the deterministic `f.
 or invalid inputs are explicitly labelled by the oracle; they are not counted as semantic checks.
 An ordinary bare renderer expands includes; it is not expected to preserve source directives.
 
-Temporary directory and dependency cache paths are normalized; runtime warnings and formatter
+Temporary directory and dependency cache paths are normalized, including the source path inside
+sconfig's unresolved-merge banner in `bare_sconfig_hex` (the bytes are normalized before hex
+encoding, since a hex string has no other place for it); runtime warnings and formatter
 messages are retained. No production source is changed by the runner. Filesystem setups and
 observations are in `filesystem-actual.json`, including style lookup, ignores, mixed batches,
 read-only/symlink/hard-link behavior and actual process kills when staging or truncation is observed.

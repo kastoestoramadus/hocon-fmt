@@ -19,7 +19,9 @@ RECORD = '--record' in sys.argv[3:]
 ORACLE_ONLY = '--oracle-only' in sys.argv[3:]
 OBSERVED = {}
 ONLY = sys.argv[sys.argv.index('--only') + 1].split(',') if '--only' in sys.argv else []
-CMD = ['java', '-XX:ActiveProcessorCount=2', '-Xss4m', '-cp', CP, os.environ.get('HOCON_RESEARCH_MAIN_CLASS', 'ww86.hocon_fmt.CmdApi')]
+# UsePerfData off: parallel short-lived JVMs otherwise race on /tmp/hsperfdata_<user> and print
+# a locked-file warning that made the recorded stdout differ between replays.
+CMD = ['java', '-XX:ActiveProcessorCount=2', '-XX:-UsePerfData', '-Xss4m', '-cp', CP, os.environ.get('HOCON_RESEARCH_MAIN_CLASS', 'ww86.hocon_fmt.CmdApi')]
 
 
 def comments(data):
@@ -112,12 +114,15 @@ def run_case(case):
             source = work / ('source' + target.suffix)
             source.write_bytes(data)
             bare = work / 'bare.txt'
-            oracle = subprocess.run(['java', '-Xss4m', '-cp', CP + os.pathsep + BUILD,
+            oracle = subprocess.run(['java', '-XX:-UsePerfData', '-Xss4m', '-cp', CP + os.pathsep + BUILD,
                                      'Oracle', str(source), str(target), separator, str(bare),
                                      str('--no-simplify-nested-objects' not in case.get('args', [])).lower(),
                                      str('--double-indent' in case.get('args', [])).lower()],
                                     cwd=work, capture_output=True, timeout=45)
             evidence = oracle.stdout.decode('utf-8', errors='backslashreplace').strip()
+            # sconfig's unresolved-merge banner names the source path; hex would otherwise carry
+            # this run's temporary directory and never match the recording.
+            bare_hex = bare.read_bytes().replace(str(work).encode(), b'<work>').hex() if bare.exists() else None
             issues = []
             refused = 'cannot format, leaving unchanged' in written['stderr'] + written['stdout']
             verdict = 'refused as designed' if refused else 'ok'
@@ -156,7 +161,7 @@ def run_case(case):
             results[separator] = dict(verdict=verdict,issues=issues,
                 check=normalize(check,work),write=normalize(written,work),
                 second=normalize(second,work),check_after=normalize(checked,work),
-                stdin=normalize(stdin,work),actual_hex=first.hex(),bare_sconfig_hex=bare.read_bytes().hex() if bare.exists() else None,
+                stdin=normalize(stdin,work),actual_hex=first.hex(),bare_sconfig_hex=bare_hex,
                 oracle=normalize({'text':evidence,'exit':oracle.returncode,'stderr':oracle.stderr.decode(errors='backslashreplace')},work),
                 mode_preserved=(stat.st_mode == stat_first.st_mode),
                 owner_preserved=(stat.st_uid,stat.st_gid)==(stat_first.st_uid,stat_first.st_gid))
@@ -175,13 +180,13 @@ def refresh_oracle(case):
             target = work / case['file']
             target.write_bytes(bytes.fromhex(r['actual_hex']))
             bare = work / 'bare.txt'
-            p = subprocess.run(['java', '-XX:ActiveProcessorCount=2', '-Xss4m', '-cp', CP + os.pathsep + BUILD,
+            p = subprocess.run(['java', '-XX:ActiveProcessorCount=2', '-XX:-UsePerfData', '-Xss4m', '-cp', CP + os.pathsep + BUILD,
                                 'Oracle', str(source), str(target), separator, str(bare),
                                      str('--no-simplify-nested-objects' not in case.get('args', [])).lower(),
                                      str('--double-indent' in case.get('args', [])).lower()],
                                cwd=work, capture_output=True, timeout=45)
             evidence = p.stdout.decode(errors='backslashreplace').strip()
-            r['bare_sconfig_hex'] = bare.read_bytes().hex() if bare.exists() else None
+            r['bare_sconfig_hex'] = bare.read_bytes().replace(str(work).encode(), b'<work>').hex() if bare.exists() else None
             r['oracle'] = normalize(dict(text=evidence, exit=p.returncode,
                                          stderr=p.stderr.decode(errors='backslashreplace')), work)
             if 'LITERAL-CHANGED' in evidence and r['verdict'] != 'refused as designed':

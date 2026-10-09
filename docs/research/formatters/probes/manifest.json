@@ -3427,7 +3427,7 @@
     "expectation_original": "json-conf"
   },
   {
-    "file": "case-prose-placeholder.conf",
+    "file": "case-placeholder-collision.conf",
     "source": "https://github.com/kastoestoramadus/hocon-fmt",
     "licence": "GPL-3.0-only (new HOCON analogue)",
     "research": "profile prose/matrix",
@@ -3435,7 +3435,7 @@
     "expectation_original": "prose-placeholder"
   },
   {
-    "file": "case-prose-placeholder-no-include.conf",
+    "file": "case-placeholder-collision-no-include.conf",
     "source": "https://github.com/kastoestoramadus/hocon-fmt",
     "licence": "GPL-3.0-only (new HOCON analogue)",
     "research": "profile prose/matrix",
