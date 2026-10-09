@@ -534,13 +534,30 @@ addCommandAlias(
     .map(p => s"${p.id}/Test/compile")
     .mkString("; ")
 )
-// On every platform: sconfig's Scala.js and Scala Native builds have defects of their own.
-addCommandAlias(
-  "libraryDefects",
-  (Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec") :+
-    // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
-    s"${coreJVM.id}/testOnly ww86.hocon_fmt.KeepDetachedCommentsGuardSpec").mkString("; ")
-)
+
+/** On every platform: sconfig's Scala.js and Scala Native builds have defects of their own. These
+  * suites are red by design, and sbt drops the rest of a command sequence at the first failure, so
+  * as a chain of `testOnly`s only the JVM one ever ran. A task runs each, takes the failure as a
+  * value, and names every red at the end.
+  */
+val libraryDefects =
+  taskKey[Unit]("Runs the library-defect suites on every platform; red by design while the upstream bugs are open.")
+
+Global / libraryDefects := {
+  val jvmDefects    = (coreJVM / Test / testOnly).toTask(" ww86.hocon_fmt.SconfigDefectsSpec").result.value
+  val jsDefects     = (coreJS / Test / testOnly).toTask(" ww86.hocon_fmt.SconfigDefectsSpec").result.value
+  val nativeDefects = (coreNative / Test / testOnly).toTask(" ww86.hocon_fmt.SconfigDefectsSpec").result.value
+  // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
+  val guard = (coreJVM / Test / testOnly).toTask(" ww86.hocon_fmt.KeepDetachedCommentsGuardSpec").result.value
+  val red   = Seq(
+    "coreJVM/SconfigDefectsSpec"            -> jvmDefects,
+    "coreJS/SconfigDefectsSpec"             -> jsDefects,
+    "coreNative/SconfigDefectsSpec"         -> nativeDefects,
+    "coreJVM/KeepDetachedCommentsGuardSpec" -> guard
+  ).collect { case (label, Inc(_)) => label }
+  if (red.nonEmpty)
+    sys.error(s"library defects remain on: ${red.mkString(", ")}. Red by design while the upstream bugs are open.")
+}
 
 // Statement and branch coverage for the JVM modules, aggregate last. Dotty's coverage runtime
 // needs java.util.UUID over java.security.SecureRandom, which neither the Scala.js nor the Scala
