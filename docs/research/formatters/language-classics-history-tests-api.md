@@ -177,7 +177,7 @@ clang-format Apache-2.0 WITH LLVM-exception — permit reading for ideas only.
 | `ruff/fmt_on_off/no_fmt_on.py` | unclosed `fmt: off` extends to EOF | `# fmt: off` / `a  =  1` | unchanged after the pragma |
 | `ruff/fmt_skip/top_level_semicolon.py` | skip scope = whole logical line | `a=1,b=2  # fmt: skip` | unchanged including spacing; other lines formatted |
 | `ruff/fmt_skip/reason.py` | skip with a reason vs an unsupported form | `a =  1  # fmt: skip because generated` | first unchanged; the unsupported form decided and documented, not guessed |
-| `ruff/comment_prefixes.py` | prefixes that must stay verbatim (`#!`, `#:`, `#|`, `##`) | `#\| table: x` / `#!env` / `k=1` | formats `k = 1`; comment bodies byte-identical |
+| `ruff/comment_prefixes.py` | prefixes that must stay verbatim (`#!`, `#:`, `#\|`, `##`) | `#\| table: x` / `#!env` / `k=1` | formats `k = 1`; comment bodies byte-identical |
 | `black/cases/comments_tab_indent.py` | tab after `#`; comment with no space after `#` | `#\tTabbed` / `a = 1\t#\tTabbed` | comment bodies byte-identical (no tab→space) |
 | `ruff/expression/dict.py` | comments at every token boundary of a mapping-ish value | `{  # open` / ` key# k` / ` : # c` / ` value# v` / `} # close` | formats the layout, keeps all five comments on the same tokens |
 | `ruff/carriage_return/string.py` (+ `.gitattributes`) | CRLF file, CRLF inside a multi-line string | `# c\r\n` / `a = """l1\r\n` / `l2"""\r\n` | formats; EOL policy honoured; string interior byte-preserved |
@@ -218,7 +218,7 @@ clang-format Apache-2.0 WITH LLVM-exception — permit reading for ideas only.
 | `unit/Comment.stat` | comments before/after tokens, inline binding, doubled blank lines, nested block comments | `a {` / `  # lead` / `  b = 1 # trail` / `  c = [1, # one` / `       2]` / `}` | formats; every comment in place and verbatim |
 | `unit/FormatOff.stat` | `format: off/on`, whole-file off, off inside comments | `a {` / `  # format: off` / `  b=1     # keep   this` / `  # format: on` / `  c=2` / `}` | with the feature, the region is byte-identical; refuse if that cannot be guaranteed |
 | `test/JavaDoc.stat` | block-comment reflow, code fences, markdown, blank first line | `# block of #` / `#` / `# markdown-ish text` / `a = 1` | comment text and `#` layout unchanged |
-| `test/StripMargin.stat` | margin alignment of embedded multi-line strings (29 cases) | `s = """` / `  | line two` / `  """` | never touch string interior bytes; unchanged |
+| `test/StripMargin.stat` | margin alignment of embedded multi-line strings (29 cases) | `s = """` / `  \| line two` / `  """` | never touch string interior bytes; unchanged |
 | `rewrite/RedundantBraces.stat` | delimiter removal next to standalone/trailing comments | `a { b { c = 1 } # inner` / `}` / `outer = 1` | no delimiter deleted; the comment stays with the inner object |
 | `rewrite/Imports.source` | sort/fold/regroup with per-element comments | `b = 1 # first` / `# note` / `a = 2` / `b = 3 # last wins` | order preserved (duplicate keys carry meaning); comments stay with their line |
 | `default/String.stat` | long triple-quoted/interpolated strings vs `maxColumn` | `s = """short line` / long line `…"""` | unchanged; no rewrap of literal content |
