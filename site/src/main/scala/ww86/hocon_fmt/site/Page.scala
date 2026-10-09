@@ -12,7 +12,9 @@ object Page {
     div(
       cls := "page",
       headerTag(
+        cls := "page-head",
         h1("hocon-fmt"),
+        deployStamp(),
         p(cls := "tagline", "hocon-fmt formats HOCON configuration files consistently."),
         ul(
           cls := "tldr",
@@ -34,6 +36,19 @@ object Page {
       ContributionsView(),
       pageFooter()
     )
+
+  /** The build's mark in the corner: what was deployed and when, from the build rather than the
+    * browser. The stylesheet puts it top-right on a desktop and in the flow under the title on a
+    * phone, where there is no corner to spare.
+    */
+  private def deployStamp(): HtmlElement = {
+    val stamp = DeployStamp.of(BuildInfo.deploySha, BuildInfo.deployTime)
+    span(
+      cls := "deploy muted",
+      stamp.lead,
+      stamp.sha.map { case (short, url) => a(href := url, short) }
+    )
+  }
 
   private def pageFooter(): HtmlElement = {
     val version = BuildInfo.version

@@ -94,7 +94,14 @@ jobs:
         run: scripts/fetch-sconfig-fork.sh
 
       # As in CI, Ubuntu runners supply Node for Scala.js.
+      - name: Note what is being deployed
+        id: stamp
+        run: echo "now=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
       - name: Build the site
+        env:
+          # The page stamps these in its top-right corner; a build told nothing says "local build".
+          HOCON_FMT_DEPLOY_SHA: ${{ github.sha }}
+          HOCON_FMT_DEPLOY_TIME: ${{ steps.stamp.outputs.now }}
         run: sbt site/build
       - name: Upload the site
         uses: actions/upload-pages-artifact@v3

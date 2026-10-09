@@ -477,7 +477,14 @@ lazy val site = project
       "org.scalameta" %%% "munit"     % munit % Test
     ),
     buildInfoPackage := "ww86.hocon_fmt.site",
-    buildInfoKeys    := Seq[BuildInfoKey](version),
+    buildInfoKeys    := Seq[BuildInfoKey](
+      version,
+      // What the Pages workflow deploys, passed into `sbt site/build` as environment variables
+      // (.github/workflows/pages.yml); the page stamps it in its corner. A local build, told
+      // nothing, says "local build" — see ww86.hocon_fmt.site.DeployStamp.
+      BuildInfoKey("deploySha"  -> sys.env.get("HOCON_FMT_DEPLOY_SHA")),
+      BuildInfoKey("deployTime" -> sys.env.get("HOCON_FMT_DEPLOY_TIME"))
+    ),
     // The linked script runs the page itself on load; tests link their own module without it.
     Compile / scalaJSUseMainModuleInitializer := true,
     Compile / fullLinkJS / scalaJSLinkerConfig ~= (_.withClosureCompilerIfAvailable(true)),

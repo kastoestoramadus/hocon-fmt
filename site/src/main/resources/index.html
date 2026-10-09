@@ -65,6 +65,17 @@
       .tldr li {
         margin: 0.3rem 0;
       }
+      /* the build's mark, in the header's corner */
+      .page-head {
+        position: relative;
+      }
+      .deploy {
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
       h2 {
         font-size: 1.35rem;
         margin: 2.5rem 0 0.75rem;
@@ -336,6 +347,12 @@
         }
         .panes {
           grid-template-columns: 1fr;
+        }
+        /* A stamp in the corner would run into the title; under it there is room. */
+        .deploy {
+          position: static;
+          display: block;
+          margin-top: 0.15rem;
         }
         textarea.conf {
           min-height: 10rem;
