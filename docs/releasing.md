@@ -1,8 +1,16 @@
 # Releasing
 
-Every channel ships the same core, so all of them are released together, at one version. Nothing
-has been released yet: Maven Central is set up (below), the other registries are still to do, and
-the `Release` workflow has never run.
+Every channel ships the same core, so all of them are released together, at one version. The
+first publish is **wave 1** only: the JVM artifacts sbt builds, below. Wave 2 turns on the rest
+of the table: the Maven and Mill plugins, the Gradle Plugin Portal, PyPI, npm, the native
+binaries and the pre-commit hooks.
+Nothing has been released yet: Maven Central is set up (below), the other registries are still
+to do, and the `Release` workflow has never run.
+
+The `Release` workflow reads one switch, the repository variable `RELEASE_WAVE` (Settings →
+Secrets and variables → Actions → Variables): unset or `1` ships wave 1, `2` ships everything.
+The wave-2 jobs stay in the workflow, skipped; a wave-2 release sets the variable, makes its
+release, and can leave it set afterwards.
 
 **Wave 1 is the JVM artifacts**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
 `hocon-fmt-cli_3`, `hocon-fmt-java-api` and `sbt-hocon-fmt`. `sbt publishRelease` uploads exactly
@@ -52,7 +60,9 @@ Done; recorded here so it can be redone. Artifacts are published under the group
 4. The repository secrets are `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `PGP_SECRET` and
    `PGP_PASSPHRASE`.
 
-The `central` job in `release.yml` does the rest. sbt-ci-release is not used: it publishes without
+The `central` job in `release.yml` does the rest, per wave. A tag in wave 1 imports the key,
+signs the wave-1 artifacts (`signRelease`) and uploads the sbt deployment; the Maven signing
+check and the Maven and Mill uploads are wave-2 steps, skipped until `RELEASE_WAVE=2`. sbt-ci-release is not used: it publishes without
 a pause and takes the version from tags, where this repository sets it by hand. Instead, sbt's own
 Central Portal support (`publishRelease`, which signs and calls `sonaUpload`), the `release`
 profile of `maven-plugin/pom.xml` (`central-publishing-maven-plugin` with `autoPublish` off) and
@@ -113,24 +123,31 @@ workflow" for workflows on the default branch.
    and zio platform artifacts and the Java API also inherit that version. `signRelease` and
    `publishRelease` name the wave-1 projects directly (`releaseProjectIds` in `build.sbt`), and
    `sbt test` fails when that set stops being closed under its dependencies.
-2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
-   artifact without releasing anything, which is how to find out the matrix works. Its `central`
-   job also signs with the real key and passphrase, uploading nothing: the passphrase is checked
-   there, because a typo cannot be seen from outside. `signRelease` checks the wave-1 artifacts on
-   the machine that runs it, without uploading anything, and needs `PGP_PASSPHRASE` to sign.
+   A wave-1 tag commits only two of the six: `build.sbt`, which every sbt artifact takes its
+   version from, and `java-api/build.gradle.kts`, whose Gradle build resolves the wave-1 artifacts
+   for its tests (`scripts/check-release-version.sh` checks just those unless `RELEASE_WAVE=2`).
+   The other four may trail until their wave ships.
+2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds and
+   signs what the wave ships without releasing anything, which is how to find out the run works.
+   Its `central` job also signs with the real key and passphrase, uploading nothing: the
+   passphrase is checked there, because a typo cannot be seen from outside. In wave 1 `signRelease`
+   touches the wave-1 artifacts on the machine that runs it and needs `PGP_PASSPHRASE` to sign.
 3. Push a tag `v<version>`. `scripts/check-release-version.sh <version>` runs first and stops the
-   job if any place that carries the version disagrees with the tag. The workflow links native binaries for Linux (x86_64, aarch64) and
-   macOS (aarch64), smoke-tests them, wraps each in a wheel, packs the npm package, builds the web
-   script, and attaches all of it to a GitHub release.
+   job if a place the wave touches disagrees with the tag. A wave-1 tag signs the sbt artifacts
+   and uploads the sbt deployment to Central, and stops there. A wave-2 tag (`RELEASE_WAVE=2`)
+   also links native binaries for Linux (x86_64, aarch64) and macOS (aarch64), smoke-tests them,
+   wraps each in a wheel, packs the npm package, builds the web script, and attaches all of it to
+   a GitHub release.
 4. Publish, in dependency order:
    - Maven Central, first: the Gradle and Maven plugins resolve the Java API, and the core through
-     it, from there, while the Mill and sbt plugins resolve the core. Look the deployments over in
+     it, from there, while the Mill and sbt plugins resolve the core. A wave-1 tag leaves one
+     deployment in the portal (sbt); a wave-2 tag three (sbt, Maven, Mill). Look each over in
      Publish → Deployments, then publish the sbt one first: it carries the wave-1 JVM artifacts
-     (core, cats, cli, the Java API and the sbt plugin). A release cannot be undone. The Maven and
-     Mill deployments the tag stages belong to wave 2; until then, leave them unpublished.
-   - The Gradle Plugin Portal.
-   - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
-5. Try every channel as a user would (below).
+     (core, cats, cli, the Java API and the sbt plugin). A release cannot be undone.
+   - The Gradle Plugin Portal (wave 2).
+   - PyPI and npm, before announcing the tag (wave 2): the hooks at that tag pin those exact
+     versions.
+5. Try every channel the wave shipped as a user would (below).
 
 Until the artifacts are on Maven Central, the Gradle and Maven builds resolve the Java API, and the
 core through it, from Maven Local: run `sbt coreJVM/publishM2 javaApi/publishM2` before either
@@ -155,6 +172,12 @@ pre-commit clones the tag, reads `.pre-commit-hooks.yaml` and installs the hook'
 published, and nothing else about the hooks needs releasing. Users move to a new release with
 `pre-commit autoupdate`. The hooks install everything at install time, so they also run on
 pre-commit.ci.
+
+At a wave-1 tag the hooks do not install: their pins name PyPI and npm versions that wave never
+publishes, so the install of the hook environment fails — pip with `No matching distribution
+found for hocon-fmt==<version>`, npm with a 404 — and the repository is left untouched. Wave 1
+users format through the sbt plugin and the JVM cli; the hooks are worth announcing only from
+the first wave-2 tag, whose pins are published.
 
 The wheels cover Linux x86_64 and aarch64 with glibc 2.34 or newer and macOS on Apple silicon.
 Anywhere else (Windows, Intel Macs, older Linux) pip finds no wheel, and the `-node` hooks are the
