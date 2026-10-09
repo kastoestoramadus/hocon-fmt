@@ -107,6 +107,7 @@ object CmdApi extends IOApp {
     case NeedsFormatting(formatted: String)
     case Unformattable(reason: String)
     case Unreadable(reason: String)
+    case Unwritable(reason: String)
   }
 
   /** One file's run: what was made of it, the findings the report made of the text it was read
@@ -121,36 +122,38 @@ object CmdApi extends IOApp {
       reportFailure: Option[Refusal] = None
   ) {
 
-    def unreadable: Boolean = result match {
-      case Result.Unreadable(_) => true
-      case _                    => false
+    def ioFailed: Boolean = result match {
+      case Result.Unreadable(_) | Result.Unwritable(_) => true
+      case _                                           => false
     }
 
     def fails: Boolean = result match {
-      case Result.NeedsFormatting(_) => true
-      case Result.Unreadable(_)      => false
-      case _                         => failOnDuplicates && findings.nonEmpty
+      case Result.NeedsFormatting(_)                   => true
+      case Result.Unreadable(_) | Result.Unwritable(_) => false
+      case _                                           => failOnDuplicates && findings.nonEmpty
     }
   }
 
   /** Every file's outcome, and what the process prints and exits with because of them. */
   final case class Run(outcomes: List[Outcome]) {
 
-    // 2 rather than 1 when a file could not be read: a run that never saw what it was named is
-    // broken, not merely unformatted — a typo in a CI script's path must not pass silently. And
+    // A filesystem failure is a broken run, whether reading or writing failed. A typo in a
+    // CI script's path or a denied write must not pass silently. And
     // an exit status is a byte, so -1 would reach the shell as 255.
     def exitCode: ExitCode =
-      if (outcomes.exists(_.unreadable)) ExitCode(2)
+      if (outcomes.exists(_.ioFailed)) ExitCode(2)
       else if (outcomes.exists(_.fails)) ExitCode(1)
       else ExitCode.Success
 
     def rendered: String =
       (s"Running HOCON formatter for ${outcomes.size} files.\n" :: outcomes.map(render)).mkString
 
-    // An unreadable file is an error, not a refusal: its line goes to stderr, as a usage error does.
-    def errors: String = outcomes.collect { case Outcome(Result.Unreadable(reason), path, _, _, _) =>
-      s"cannot read $path: $reason\n"
+    // Filesystem failures are errors, so their diagnostics go to stderr like usage errors.
+    def errors: String = outcomes.collect {
+      case Outcome(Result.Unreadable(reason), path, _, _, _) => s"cannot read $path: $reason\n"
+      case Outcome(Result.Unwritable(reason), path, _, _, _) => s"cannot write $path: $reason\n"
     }.mkString
+
   }
 
   // Scala.js hands `main` no arguments; under Node they are in `process.argv`.
@@ -266,23 +269,14 @@ object CmdApi extends IOApp {
                 formatter
                   .write(file, formatted)
                   .as(outcome(Result.Rewritten))
-                  // A write that fails leaves the file byte-for-byte as it was: the text was
-                  // verified first, so this too is not a refusal of its content.
-                  .handleError(e =>
-                    Outcome(
-                      Result.Unformattable(Option(e.getMessage).getOrElse(e.toString).take(120)),
-                      path,
-                      Nil,
-                      false
-                    )
-                  )
+                  .handleError(e => outcome(Result.Unwritable(ReadFailure.message(e))))
           }
       }
 
   private def render(outcome: Outcome): String = {
     val result = outcome.result match {
-      case Result.Unreadable(_)         => "" // the error line goes to stderr
-      case Result.Unformattable(reason) =>
+      case Result.Unreadable(_) | Result.Unwritable(_) => "" // the error line goes to stderr
+      case Result.Unformattable(reason)                =>
         s"ERROR: cannot format, leaving unchanged: ${outcome.path} ($reason)\n"
       case Result.NeedsFormatting(formatted) =>
         s"Found a not formatted file: ${outcome.path} .\nAfter formatting:\n$formatted\n\n"
