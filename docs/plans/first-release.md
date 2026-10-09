@@ -25,7 +25,7 @@ jobs. The hooks pin PyPI and npm versions, so they must not be advertised before
   environment `pypi`), the `pypi` environment.
 - [ ] npm: account; the first version is published by hand from the release's tarball, then the
   trusted publisher is configured.
-- [ ] Decide the first version (the build says `0.1.0-SNAPSHOT`).
+- [x] Decide the first version: `0.1.0`.
 - [ ] After publish: tighten the process (see the end).
 
 ## Code

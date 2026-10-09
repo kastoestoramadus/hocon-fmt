@@ -148,6 +148,10 @@ workflow" for workflows on the default branch.
    - PyPI and npm, before announcing the tag (wave 2): the hooks at that tag pin those exact
      versions.
 5. Try every channel the wave shipped as a user would (below).
+6. After publishing, open a follow-up PR setting the development version to
+   `0.1.1-SNAPSHOT` after `0.1.0` (or the next planned version after later releases).
+   Update the build versions and checkout instructions together; keep the hook pins and
+   released usage examples on the published version until the next release.
 
 Until the artifacts are on Maven Central, the Gradle and Maven builds resolve the Java API, and the
 core through it, from Maven Local: run `sbt coreJVM/publishM2 javaApi/publishM2` before either
@@ -192,7 +196,7 @@ pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --re
 ## Wave 1, tried before the first tag
 
 The wave-1 set was published into a private Maven repository with the release version set for the
-one session (`build.sbt` stays at `0.1.0-SNAPSHOT`; nothing reached `~/.m2`):
+one session (`build.sbt` was then at `0.1.0-SNAPSHOT`; nothing reached `~/.m2`):
 
 ```bash
 sbt -Dmaven.repo.local=<dir>/m2 \
