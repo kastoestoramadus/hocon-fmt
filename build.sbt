@@ -19,7 +19,7 @@ val munitCatsEffect = "2.2.1"
 val munitScalaCheck = "1.2.0"
 
 ThisBuild / scalaVersion := scala3
-ThisBuild / version      := "0.1.0-SNAPSHOT"
+ThisBuild / version      := "0.1.0"
 
 // The compiler enforces what review would otherwise have to catch: a match that misses a case (a
 // new Refusal reaching code that does not handle it), a value computed and dropped, == between

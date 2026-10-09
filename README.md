@@ -110,7 +110,7 @@ and Node, the same way in a throwaway repository.
 
 ```scala
 // project/plugins.sbt
-addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0-SNAPSHOT")
+addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")
 ```
 
 **Gradle**: `(cd gradle-plugin && ./gradlew publishToMavenLocal)`, then in a project with
@@ -123,7 +123,7 @@ a Gradle of your own, this checkout's wrapper works from the project:
 pluginManagement { repositories { mavenLocal(); gradlePluginPortal() } }
 
 // build.gradle.kts
-plugins { id("eu.ww86.hocon-fmt") version "0.1.0-SNAPSHOT" }
+plugins { id("eu.ww86.hocon-fmt") version "0.1.0" }
 repositories { mavenLocal(); mavenCentral() }
 ```
 
@@ -135,7 +135,7 @@ or `/path/to/hocon-fmt/maven-plugin/mvnw` in place of `mvn`.
 <plugin>
   <groupId>eu.ww86</groupId>
   <artifactId>hocon-fmt-maven-plugin</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 </plugin>
 ```
 
@@ -145,7 +145,7 @@ a build with `app/resources/application.conf`, and run `./mill __.hoconFormatChe
 
 ```scala
 //| mvnDeps:
-//| - eu.ww86::mill-hocon-fmt::0.1.0-SNAPSHOT
+//| - eu.ww86::mill-hocon-fmt::0.1.0
 package build
 import mill.*, javalib.*
 import ww86.hocon_fmt.mill.HoconFormatterModule
