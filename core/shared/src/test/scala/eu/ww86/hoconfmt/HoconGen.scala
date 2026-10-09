@@ -354,8 +354,11 @@ object HoconGen {
 
   val shadowInclude: String = "include \"inc.conf\""
 
-  /** One case: the text, and what the file it includes holds. */
-  final case class ShadowCase(text: String, includeBody: String)
+  /** One case: the text, the layout it is written in, and what the file it includes holds. The
+    * layout is carried along because the resolve suites check one layout per test: the family is
+    * large, and a test's own timeout should answer for one layout rather than for all of them.
+    */
+  final case class ShadowCase(text: String, layout: Layout, includeBody: String)
 
   /** How a case's statements stand: each on a line of its own, the definitions sharing one line,
     * every statement on one line with the file's closing newline left out, or the case in the third
@@ -440,9 +443,13 @@ object HoconGen {
       body              <- shadowBodies
     } yield {
       val text = around(definitions, at, layout)
-      ShadowCase(if (nested) insideAnObject(text) else text, body)
+      ShadowCase(if (nested) insideAnObject(text) else text, layout, body)
     }
   }
+
+  /** The cases of one layout. */
+  def shadowCases(layout: Layout): List[ShadowCase] =
+    shadowCases.filter(_.layout == layout)
   def withDistinctKeys(nodes: List[Node]): List[Node] =
     nodes.zipWithIndex.map {
       case (Node.Field(key, separator, value, joined), i) =>
