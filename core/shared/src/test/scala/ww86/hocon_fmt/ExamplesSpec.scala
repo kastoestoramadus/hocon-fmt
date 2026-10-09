@@ -34,6 +34,13 @@ class ExamplesSpec extends munit.FunSuite {
     assert(ExampleData.all.filter(e => e.now == "formatted").forall(_.input.linesIterator.size > 4))
   }
 
+  test("catalogue shows nested comments, detached array comments and merges in arrays") {
+    val ids = ExampleData.all.map(_.id).toSet
+    assert(ids.contains("catalogue/commented-nested-paths"))
+    assert(ids.contains("catalogue/detached-array-comment"))
+    assert(ids.contains("catalogue/unresolved-merge-in-array"))
+  }
+
   test("every refusal maps to a kind the generator accepts") {
     // `Refusal.values` is not defined for enums with non-singleton cases ("a values array is not
     // defined"), so one sample instance per case stands in; a case missing from the list still
