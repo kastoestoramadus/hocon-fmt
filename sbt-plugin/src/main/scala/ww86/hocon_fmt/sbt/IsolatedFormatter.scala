@@ -3,6 +3,7 @@ package ww86.hocon_fmt.sbt
 import java.io.File
 import java.lang.reflect.{InvocationTargetException, Method}
 import java.net.URLClassLoader
+import java.nio.file.Path
 
 /** What the formatter makes of one file, as the plugin sees it from across the class loaders. */
 sealed trait Verdict
@@ -18,11 +19,16 @@ object Verdict {
   * Only JDK types are shared: the Java API takes the original bytes and a name, and its
   * verdict records are read reflectively. Decoding here would hide invalid UTF-8 from the core.
   */
-final class IsolatedFormatter private (check: Method) {
+final class IsolatedFormatter private (check: Method, formatFile: Method) {
 
   def verdictFor(content: Array[Byte], name: String): Verdict =
+    invoke(check, content, name)
+
+  def format(file: Path): Verdict = invoke(formatFile, file)
+
+  private def invoke(entry: Method, arguments: AnyRef*): Verdict =
     try {
-      val verdict                        = check.invoke(null, content, name)
+      val verdict                        = entry.invoke(null, arguments: _*)
       def read(accessor: String): AnyRef = verdict.getClass.getMethod(accessor).invoke(verdict)
       verdict.getClass.getSimpleName match {
         case "AlreadyFormatted" => Verdict.AlreadyFormatted
@@ -36,6 +42,7 @@ final class IsolatedFormatter private (check: Method) {
       // Refusals are values; a failure inside the formatter must fail the task.
       case e: InvocationTargetException => throw e.getCause
     }
+
 }
 
 object IsolatedFormatter {
@@ -45,10 +52,13 @@ object IsolatedFormatter {
     // Scala 2.12 library cannot shadow the formatter's Scala 3 one.
     val loader = new URLClassLoader(classpath.map(_.toURI.toURL).toArray, ClassLoader.getPlatformClassLoader)
     try {
-      val check = loader
-        .loadClass("ww86.hocon_fmt.java.HoconFmt")
-        .getMethod("check", classOf[Array[Byte]], classOf[String])
-      use(new IsolatedFormatter(check))
+      val api = loader.loadClass("ww86.hocon_fmt.java.HoconFmt")
+      use(
+        new IsolatedFormatter(
+          api.getMethod("check", classOf[Array[Byte]], classOf[String]),
+          api.getMethod("formatFile", classOf[Path])
+        )
+      )
     } finally loader.close()
   }
 }

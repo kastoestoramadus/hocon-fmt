@@ -3,7 +3,6 @@ package ww86.hocon_fmt.gradle;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
@@ -37,12 +36,10 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
 
         record Refused(String reason) implements Outcome {}
 
-        /** The name is how the build reports the file: a refusal carries it, and a name promising
-         * another format is refused outright. */
-        static Outcome of(byte[] content, String name) {
+        /** Both tasks report the verdict returned by the Java API's file operation. */
+        static Outcome of(Verdict verdict) {
             // The plugin targets Java 17, where a pattern switch does not compile; the sealed
             // Verdict is read with instanceof and a verdict this code does not know fails loudly.
-            Verdict verdict = HoconFmt.check(content, name);
             if (verdict instanceof Verdict.NeedsFormatting needed) {
                 return new NeedsFormatting(needed.formatted());
             }
@@ -68,7 +65,7 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
                 .sorted(Comparator.naturalOrder())
                 .map(file -> {
                     String path = root.relativize(file).toString();
-                    return new Examined(file, path, Outcome.of(read(file), path));
+                    return new Examined(file, path, Outcome.of(examine(file, getParameters().getCheckOnly().get())));
                 })
                 .toList();
 
@@ -86,8 +83,7 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
 
     static void format(List<Examined> examined) {
         for (Examined file : examined) {
-            if (file.outcome() instanceof Outcome.NeedsFormatting needed) {
-                write(file.file(), needed.formatted());
+            if (file.outcome() instanceof Outcome.NeedsFormatting) {
                 LOGGER.lifecycle("Formatted {}", file.path());
             }
         }
@@ -119,17 +115,9 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         return examined.stream().filter(file -> kind.isInstance(file.outcome())).count();
     }
 
-    static byte[] read(Path file) {
+    static Verdict examine(Path file, boolean checkOnly) {
         try {
-            return Files.readAllBytes(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    static void write(Path file, String content) {
-        try {
-            Files.writeString(file, content);
+            return checkOnly ? HoconFmt.checkFile(file) : HoconFmt.formatFile(file);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

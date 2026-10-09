@@ -199,6 +199,22 @@ class HoconFormatterPluginFunctionalTest {
         assertTrue(output.contains("worker: hocon-fmt-core_3-"), output);
     }
 
+    @Test
+    void formatUsesIdentityPreservingReplacement() throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                projectDir.getFileSystem().supportedFileAttributeViews().contains("unix"));
+        Path target = write("src/main/resources/app.conf", UNFORMATTED);
+        Files.setAttribute(target, "unix:mode", 02750);
+        var identity = Files.readAttributes(target, "unix:uid,gid,mode");
+        Path other = Files.createLink(projectDir.resolve("old-content"), target);
+        Path link = Files.createSymbolicLink(target.resolveSibling("alias.conf"), target.getFileName());
+        build("hoconFormat");
+        assertEquals(FORMATTED, read(target));
+        assertEquals(UNFORMATTED, read(other));
+        assertTrue(Files.isSymbolicLink(link));
+        assertEquals(identity, Files.readAttributes(target, "unix:uid,gid,mode"));
+    }
+
     void writeBuild(String extraPlugins, String configuration) throws IOException {
         write(
                 "build.gradle.kts",

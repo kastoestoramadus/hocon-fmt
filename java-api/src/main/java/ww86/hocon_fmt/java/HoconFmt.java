@@ -73,17 +73,22 @@ public final class HoconFmt {
 
     /**
      * Rewrites the file when the formatted text differs, and leaves it byte for byte when it is
-     * already formatted or refused. The write itself is the one the Gradle and Maven plugins make:
-     * {@link Files#writeString} over the whole file.
+     * already formatted or refused, including its modification time. Symlinks are resolved first.
+     * Complete output is staged beside the target and atomically renamed only when the target
+     * and directory are writable and the staged owner, group and all mode bits are verified.
+     * Otherwise it writes in place, retaining the inode but losing crash-atomicity. Other hard
+     * links keep old content after replacement and share new content after an in-place write.
+     * Calls on the same file must be serialised.
      *
      * @param file the file to read, and to rewrite when formatting changes it
      * @return the verdict, so a caller can tell a write from a pass without rereading
      * @throws IOException when the file cannot be read or written
      */
     public static Verdict formatFile(Path file) throws IOException {
-        Verdict verdict = check(Files.readAllBytes(file), file.toString());
+        Path target = file.toRealPath();
+        Verdict verdict = check(Files.readAllBytes(target), target.toString());
         if (verdict instanceof Verdict.NeedsFormatting needed) {
-            Files.writeString(file, needed.formatted());
+            AtomicFile.write(target, needed.formatted());
         }
         return verdict;
     }
