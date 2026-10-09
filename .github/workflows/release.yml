@@ -1,9 +1,17 @@
 name: Release
 
-# A version tag builds the native binaries, their wheels, the npm package and the web script and
-# attaches them to a GitHub release. Run by hand, it builds the same artifacts without releasing anything, which is
-# how to try the matrix before tagging. A tag also uploads to Maven Central, where every deployment
-# waits for a click on Publish; the Gradle Plugin Portal, PyPI and npm are not automated here yet.
+# A version tag publishes the sbt-built artifacts to Maven Central, and — in wave 2 — builds the
+# native binaries, their wheels, the npm package and the web script and attaches them to a GitHub
+# release. Run by hand, it builds and signs the same artifacts without releasing anything, which
+# is how to try the wave before tagging. Every Central deployment waits for a click on Publish;
+# the Gradle Plugin Portal, PyPI and npm are not automated here yet.
+#
+# How much a run ships is one switch, the repository variable RELEASE_WAVE (Settings → Secrets
+# and variables → Actions → Variables): unset or 1 ships wave 1 only — the sbt-built artifacts,
+# core, cli, the Java API and the sbt plugin, this repository's first publish — and 2 turns the
+# wave-2 jobs and uploads below back on. A repository variable, and not a workflow_dispatch
+# input, because it must gate tag pushes, where no input exists; and not a single env at the
+# top, because a job-level `if` cannot read a workflow-level `env`, while it reads `vars`.
 on:
   push:
     tags: ['v*']
@@ -13,7 +21,11 @@ permissions:
   contents: write
 
 jobs:
+  # Wave 2: the native binaries and the wheel each carries. A tag runs them once RELEASE_WAVE=2;
+  # the wheel behind the pre-commit hooks and the binary behind the GitHub release are wave-2
+  # channels (PyPI, the release attachments).
   native:
+    if: vars.RELEASE_WAVE == '2'
     name: native binary (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -50,7 +62,9 @@ jobs:
             hocon-fmt-${{ matrix.target }}
             hocon_fmt-*.whl
 
+  # Wave 2: the npm package for the Node pre-commit hooks.
   npm:
+    if: vars.RELEASE_WAVE == '2'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,8 +83,9 @@ jobs:
           name: npm-package
           path: hocon-fmt-*.tgz
 
-  # The playground's script, fetched by release so a page pins the formatter it runs.
+  # Wave 2: the playground's script, fetched by release so a page pins the formatter it runs.
   web:
+    if: vars.RELEASE_WAVE == '2'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,8 +101,9 @@ jobs:
           name: web-script
           path: web/target/bundle/hocon-fmt.js
 
+  # Wave 2: attaching the wave-2 artifacts to the GitHub release the tag names.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
     needs: [native, npm, web]
     runs-on: ubuntu-latest
     steps:
@@ -99,11 +115,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-fmt-* hocon_fmt-*.whl hocon-fmt.js
 
-  # Signs everything bound for Maven Central. Run by hand it only proves the signing key and its
-  # passphrase work, and uploads nothing; a tag goes on to upload, and each of the three deployments
-  # (sbt, Maven, Mill) is left in the portal, validated, until someone clicks Publish. The Maven
-  # and Mill builds resolve the core from the local repositories sbt fills here, since it is not on
-  # Central until the first deployment is published.
+  # Signs and, on a tag, uploads what the current wave publishes. Run by hand it only proves the
+  # signing key and its passphrase work, and uploads nothing; a tag goes on to upload, and each
+  # deployment is left in the portal, validated, until someone clicks Publish. Wave 1 is the sbt
+  # deployment alone; the Maven signing check and the Maven and Mill uploads wait for
+  # RELEASE_WAVE=2, since their builds resolve the core from the local repositories sbt fills
+  # here, where it is not on Central until the first deployment is published.
   central:
     runs-on: ubuntu-latest
     steps:
@@ -114,8 +131,10 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      - name: Tag matches the versions in the build
+      - name: Tag matches the versions this wave publishes
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_WAVE: ${{ vars.RELEASE_WAVE || '1' }}
         run: scripts/check-release-version.sh "${GITHUB_REF_NAME#v}"
       - name: Import the signing key
         env:
@@ -126,6 +145,7 @@ jobs:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
         run: sbt signRelease && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
       - name: Signing check, Maven
+        if: vars.RELEASE_WAVE == '2'
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
         run: |
@@ -139,7 +159,7 @@ jobs:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
         run: sbt publishRelease
       - name: Upload, Maven
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -155,7 +175,7 @@ jobs:
           XML
           cd maven-plugin && ./mvnw -B -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
       - name: Upload, Mill
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
         env:
           MILL_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MILL_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
