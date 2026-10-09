@@ -293,7 +293,7 @@ class ComponentSpec extends munit.FunSuite {
     val (input, output) = panes(container)
     val buttons         = findAll(container, "example")
     val example         = ExampleData.showcase.headOption.fold("")(_.input)
-    assertEquals(buttons.size, ExampleData.showcase.size + 5)
+    assertEquals(buttons.size, ExampleData.showcase.size + ExampleData.more.size)
     type_(input, "[1, 2]\n")
     settle(500)
       .flatMap { _ =>
@@ -343,18 +343,18 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
-  def moreIds = List("messy", "includes", "comments", "not-hocon", "sconfig-defect")
-
-  test("the five original examples follow the stories and every refusal explains preserved input") {
+  test("the catalogue examples follow the stories and every refusal explains preserved input") {
     val container = install(Github())
     val root      = mount(container)(Playground())
-    val originals = moreIds.map(id => ExampleData.all.find(_.id == s"catalogue/$id").get)
     val buttons   = findAll(container, "example")
-    assertEquals(buttons.drop(6).map(_.textContent.asInstanceOf[String]), originals.map(_.title))
+    assertEquals(
+      buttons.drop(ExampleData.showcase.size).map(_.textContent.asInstanceOf[String]),
+      ExampleData.more.map(_.title)
+    )
     assert(find(container, "more-examples").textContent.asInstanceOf[String].contains("More examples"))
     val (input, output) = panes(container)
     buttons
-      .zip(ExampleData.showcase ++ originals)
+      .zip(ExampleData.showcase ++ ExampleData.more)
       .foldLeft(Future.successful(())) { case (done, (button, example)) =>
         done.flatMap { _ =>
           val _ = button.fire("click")
