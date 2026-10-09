@@ -87,6 +87,8 @@ object ExampleGenerator {
     val text   = "package ww86.hocon_fmt\n\n" +
       """final case class ExampleSource(kind: String, pattern: String, url: Option[String], licence: Option[String], sha: Option[String])
 
+final case class ExampleUpstream(issue: String, fix: Option[String], state: String)
+
 /** Human-authored expectations, embedded at build time without runtime file access. */
 final case class Example(
     id: String,
@@ -102,7 +104,8 @@ final case class Example(
     findings: List[String],
     source: ExampleSource,
     options: List[String],
-    expected: Map[String, String]
+    expected: Map[String, String],
+    upstream: Option[ExampleUpstream] = None
 )
 """ + "\nobject ExampleData {\n" +
       entries.mkString("  val all: List[Example] = List(\n    ", ",\n    ", "\n  )\n") +
