@@ -17,10 +17,10 @@ about a file.
 ## What it formats
 
 A `.conf` or `.hocon` file in a directory that is walked, or a file named on the command line —
-which is formatted whatever its extension, unless it is `.json` or `.properties`. The default
-style is `key = value`, nested objects
-flattened to path keys (`a { b = 1 }` becomes `a.b = 1`), and no extra indentation for nested
-objects. `.hocon-fmt.conf` in the file's directory or above it, up to the directory holding
+which is formatted whatever its extension, unless it is `.json` or `.properties`. The default style
+is `key = value`, nested objects flattened to path keys (`a { b = 1 }` becomes `a.b = 1`), and no
+extra indentation for nested objects. `.hocon-fmt.conf` in the file's directory or above it, up to
+the directory holding
 `.git`, can set `separator`, `double-indent`, `simplify-nested-objects` and `fail-on-duplicates`;
 a flag on the command line beats the file, and an unknown key is an error, never ignored.
 
@@ -37,9 +37,9 @@ not UTF-8, a `.json` file, a file whose formatting would lose a comment or an in
 sconfig defects listed in [limitations](../limitations.md) all end that way. The name is the one
 the file is known by: a symlink is followed first, so a `.json` alias of a `.conf` target is
 formatted, and a `.conf` alias of a `.json` target is refused — tell us if you need a link's own
-name to decide instead. A file that cannot be
-*read or written* is a different thing: `cannot read <path>: <reason>` on stderr and exit code 2,
-so a typo in a CI path cannot pass silently.
+name to decide instead. A file that cannot be *read or written* is a different thing:
+`cannot read <path>: <reason>` on stderr and exit code 2, so a typo in a CI path cannot pass
+silently.
 
 `--check` writes nothing and exits 1 when a file needs formatting; `format` rewrites only the files
 whose text differs, as UTF-8. The library and the plugins act on the same `Verdict`: a refusal is
