@@ -23142,7 +23142,7 @@
         "stderr": "",
         "text": "MEANING-CHANGED\nsource={x={retained=9}, o={c=7}}\noutput={x={retained=9}, o={retained=9, c=7}}"
       },
-      "owner": "shared",
+      "owner": "ours",
       "owner_preserved": true,
       "second": {
         "exit": 0,
@@ -23183,7 +23183,7 @@
         "stderr": "",
         "text": "MEANING-CHANGED\nsource={x={retained=9}, o={c=7}}\noutput={x={retained=9}, o={retained=9, c=7}}"
       },
-      "owner": "shared",
+      "owner": "ours",
       "owner_preserved": true,
       "second": {
         "exit": 0,
@@ -34186,7 +34186,7 @@
         "stderr": "",
         "text": "MEANING-CHANGED\nsource={x={}}\noutput={x=3}"
       },
-      "owner": "shared",
+      "owner": "ours",
       "owner_preserved": true,
       "second": {
         "exit": 0,
@@ -34227,7 +34227,7 @@
         "stderr": "",
         "text": "MEANING-CHANGED\nsource={x={}}\noutput={x=3}"
       },
-      "owner": "shared",
+      "owner": "ours",
       "owner_preserved": true,
       "second": {
         "exit": 0,

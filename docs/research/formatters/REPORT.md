@@ -6,7 +6,9 @@
 - Ran 479 physical inputs with both separators: 958 CLI observations, plus 15 filesystem setups.
 - 648 observations met the invariants; 306 were refused safely; four reproduced real bugs.
 - Those four are two already documented include override-barrier failures, each in both styles.
-- Both parse and stabilize while changing resolved values; the ownership is shared.
+- Both parse and stabilize while changing resolved values; the gap is ours: sconfig dropping a
+  definition a later one overrides is its expected merge behaviour, and the guard that has to
+  account for it is ours.
 - No other invariant failures or CLI crashes were found in this JVM sample.
 - CRLF inside a string is preserved; several profile expectations needed correction.
 - Symlinks/read-only checks passed; killing the in-place fallback left an empty file, as documented.
@@ -84,6 +86,13 @@ The top three: **changed meaning** silently changes what a service loads, even w
 **crashes** prevent the hook/editor from delivering a trustworthy result, and become dangerous
 if they reach a truncating write. Fixed points and exit agreement remain cheap, mandatory defenses.
 
+Two data/markup tags are debatable and are flagged, not changed: `semantic-change` on the Biome
+comment-caused invalid HTML fix (`data-markup.md`:167) and on the prettier-xml csproj-whitespace /
+libxml2 tag-dropping pair (`data-markup.md`:255) describes validity or layout rather than changed
+values. Retagging both would move `semantic-change`'s weighted frequency from 89 to 85 and its score
+from 1335 to 1275, still first by a wide margin. The profile documents are research inputs and stay
+unedited; the tag stands as recorded.
+
 
 ## Probe results
 
@@ -99,7 +108,7 @@ concrete input or an explicit abstract/API setup disposition. No research source
 |---|---:|---|
 | Accepted, invariants met | 648 | shared core/library; observed, not a proof for all inputs |
 | Refused, bytes/mtime kept, file exits 0 and stdin exits 1 | 306 | 182 sconfig rendering guards; byte/name/masking boundaries also classified in TSV |
-| Accepted but meaning changed | 4 | shared; B1/B2 below, twice each |
+| Accepted but meaning changed | 4 | ours; B1/B2 below, twice each |
 | Initial file check 1 / 0 | 626 / 332 | ours; agrees with whether a write changes bytes for every case |
 | Accepted value comparisons equal / changed / unavailable | 628 / 4 / 20 | bare sconfig resolver; 10 unresolved, 10 required-include IO cases unavailable |
 | All examples and JVM/Native golden files, both styles | 116 (58 files) | 82 accepted fixed points, 34 refused; includes example metadata files |
@@ -109,8 +118,8 @@ concrete input or an explicit abstract/API setup disposition. No research source
 
 | ID / minimal input | expected versus actual | invariant / severity | owner / evidence |
 |---|---|---|---|
-| B1: [438.conf](probes/438.conf): `include "f.conf"\no=3\no.c=7`; [f.conf](probes/support/f.conf) defines `o.retained=9` | expected `o={c:7}`; actual `include "f.conf"\no.c = 7\n`, resolves to `o={retained:9,c:7}` | Meaning/precedence preserved; **high**, silent config change | **shared**: sconfig's value tree drops `o=3`; our masked-include guard misses the barrier. Bare unmasked render retains correct values; no new upstream defect claimed |
-| B2: [empty barrier](probes/case-include-empty-barrier.conf): `x.a=5\ninclude "scalar.conf"\nx {}`; [scalar.conf](probes/support/scalar.conf) defines `x=3` | expected `x={}`; actual `x.a = 5\ninclude "scalar.conf"\n`, resolves to numeric `x=3` | Meaning/type preserved; **high**, silent config change | **shared**, same guard gap: empty object disappears before restoring include; bare unmasked render is `x {}` |
+| B1: [438.conf](probes/438.conf): `include "f.conf"\no=3\no.c=7`; [f.conf](probes/support/f.conf) defines `o.retained=9` | expected `o={c:7}`; actual `include "f.conf"\no.c = 7\n`, resolves to `o={retained:9,c:7}` | Meaning/precedence preserved; **high**, silent config change | **ours**: our masked-include guard misses the barrier. sconfig's value tree drops `o=3` — its expected merge behaviour, and a fact the guard must account for, not an upstream defect. Bare unmasked render retains correct values |
+| B2: [empty barrier](probes/case-include-empty-barrier.conf): `x.a=5\ninclude "scalar.conf"\nx {}`; [scalar.conf](probes/support/scalar.conf) defines `x=3` | expected `x={}`; actual `x.a = 5\ninclude "scalar.conf"\n`, resolves to numeric `x=3` | Meaning/type preserved; **high**, silent config change | **ours**, same guard gap: empty object disappears before restoring include; bare unmasked render is `x {}` |
 
 Both styles: check-before **1**, write **0**, second write **0**, check-after **0**, stdin **0**.
 The colon variant changes only separator spelling. Bare resolution is recorded beside the exact
@@ -119,6 +128,17 @@ controlled includes. Our guard needs a follow-up; upstream value rendering is be
 No specific upstream fix was located for either; [Java #733](https://github.com/lightbend/config/issues/733)
 (ordering) and [#300](https://github.com/lightbend/config/issues/300) (document traversal) are related,
 not fixes. No upstream messages were posted and no formatter implementation was changed.
+
+**A run that fails on duplicates still writes the file.** Re-measured on this JVM CLI with a
+private Maven repository: with `--fail-on-duplicates` and no `--check`, a B1 run exits **1** and
+writes the changed output (the file becomes `include "f.conf"` then `o.c = 7`); `--check` exits 1 without
+writing, and `--fail-on-duplicates --check` writes nothing either. Findings "change nothing that is
+written" ([usage](../../usage.md#the-duplicate-report)), so the failure arrives after the meaning
+changed on disk — the one signal a B1 file gets comes from a run that already rewrote it. The
+duplicate report fires for B1 (`438.conf:2: o defined again at line 3; the earlier value never
+takes effect`) but **not for B2**: `--fail-on-duplicates` on B2 exits **0** and writes, because a
+repeated object merges rather than replacing
+([limitations](../../limitations.md#what-the-duplicate-report-does-not-claim)).
 
 ### Surprises, not product bugs
 
@@ -149,16 +169,25 @@ external 1,650-file corpus was not re-run; local example/golden coverage tests t
 
 Ranked by value/cost; S afternoon, M days, L longer. These are recommendations, not new guarantees.
 
-1. **S, high:** every approved golden and example gets a second pass under both separators;
-   existing core already checks stability on accepted input. Cue, gofmt and dprint run this at fixture level.
+1. **S, high:** the approved fixtures should get the second separator the properties already have.
+   The second pass exists per fixture under the default options (`HoconFormatterInvariantsSpec`:19-25)
+   and generated documents run every option combination (`FormatterPropertiesSpec`), but the golden
+   bytes are compared under the default options only, the 21 examples are pinned under
+   `options: [default]` only, and `ExamplesSpec`'s option sweep compares refusal kinds, not output.
+   Cue, gofmt and dprint run the byte comparison at fixture level.
 2. **S, high:** exact normalized comment **multiset equality**, including duplication; pair it with
    lexical boundaries so comment text cannot turn into code. Keep intentional marker/trim policy explicit.
 3. **M, high:** an independent JVM value oracle, controlled includes and environment states. A reparse
    by the renderer's own parser is insufficient evidence of source meaning.
 4. **M, high:** pinned licensed corpus, bounded by files/bytes/time, refusals per kind and ceilings;
    retain minimal cases instead of copying an unbounded external repository into CI.
-5. **S, high:** a known-bad ledger asserts today's failure and fails when it improves. Existing
-   `SconfigDefectsSpec` already supplies this; automate triage rather than add a second silent allowlist.
+5. **S, high:** the improvement-detecting ledger is missing for **our own** refusals, not for
+   sconfig's: `SconfigDefectsSpec` already asserts what sconfig ought to produce and turns green when
+   a defect is fixed. Ours (`Refusal.ReservedName`, the byte/name boundary, and every refusal the
+   probes record as "refused as designed") are pinned as the expected outcome, so a case that starts
+   formatting reads as a regression and one that stops needs `--record`. What is missing is a ledger
+   of those cases whose improvement fails a check and routes to triage; the probe replay's refused
+   rows are the natural seed. Automate triage rather than add a second silent allowlist.
 6. **S, medium:** nightly seeded property runs with saved minimal inputs. Promote each found invariant
    failure into the fast tier; do not make every PR pay the exploration budget.
 7. **M, medium:** source-level re-lex checks compare delimiters, literals and comment membership;
@@ -170,15 +199,26 @@ Ranked by value/cost; S afternoon, M days, L longer. These are recommendations, 
    File refusals must stay non-failing; stdin refusals must remain failures so editors retain buffers.
 2. **S, high:** `--diff` builds on the existing report-format idea; define it as a non-writing view,
    test combinations, and distinguish refusal from a clean file. Prettier #6885 and taplo #416 show demand/traps.
-3. **M, medium:** `--json` with versioned per-file verdict, changed flag, refusal kind and duplicate
+3. **M, high:** refuse the B1/B2 shapes instead of formatting them: an `include` followed, on the
+   same path chain, by a definition a later definition kills — the scalar a dotted path replaces,
+   or the empty object a merge makes dead. The duplicate report already walks sconfig's
+   definition-preserving document tree, so that walk can see the include the dead definition stood
+   beside and return a typed `Refusal`; sconfig dropping the definition is expected merge behaviour
+   the guard has to account for, and no upstream change is coming. Questions to settle before the
+   design: what the include target may contain (the guard opens none today, so a path the include
+   might define is unknown); env overrides (`x = 1`, `x = ${?ENV}`, `x = 2` resolves to `2`, and the
+   optional form is exempt from the report); arrays and concatenation, where a later value merges
+   rather than replaces. Until then `--fail-on-duplicates` is the only signal, and it writes before
+   it fails (see the B1/B2 section).
+4. **M, medium:** `--json` with versioned per-file verdict, changed flag, refusal kind and duplicate
    warnings; clean stdout, diagnostics stderr. Never imply that refused means successfully formatted.
-4. **M, medium:** diagnostics `path:line:col` when known; current parse diagnostics already name paths
+5. **M, medium:** diagnostics `path:line:col` when known; current parse diagnostics already name paths
    and lines. Keep byte offsets distinct from display columns, especially Unicode (rustfmt #7029).
-5. **L, defer:** `# hocon-fmt: off/on` needs a written contract before code: whole-file off is the
+6. **L, defer:** `# hocon-fmt: off/on` needs a written contract before code: whole-file off is the
    cheapest honest start; paired regions would preserve exact bytes, delimiters and includes, reject
    unpaired/nested markers, ignore marker-looking strings, and still validate the whole result.
    sconfig's value tree cannot splice arbitrary original regions safely. Never bypass safety checks.
-6. **Already present:** stdin filename; document its intentional lack of config discovery and use flags
+7. **Already present:** stdin filename; document its intentional lack of config discovery and use flags
    for editor style. Do not advertise filesystem style parity for an input filter that reads no files.
 
 ### Process and docs
@@ -220,10 +260,10 @@ text probe is recorded in `actual.json`; upstream attribution needs that evidenc
 | Object substitution concat `${g} {name=east}` | 7/1,650 corpus inputs refused | sconfig | #598 merged 2026-09-30, unreleased | refusal S; **fixable upstream soon** |
 | One-field array object loses braces (substitution or nested commented value) | valid array becomes invalid text; not counted | sconfig | #598 tests merge-array shapes; no verified released fix for all variants | refusal S; **uncertain** |
 | Substitution cycles | unresolved banner is not a fixed point; not counted | sconfig | #598 merged; [Java #868](https://github.com/lightbend/config/pull/868) related open draft in source ledger | second pass S; **uncertain** per cycle |
-| Default/env override | 157 root broken + 200 nested unstable = 357/1,650 | sconfig | #598 merged, #600 open, neither in v2.0.0 | second-pass refusal S; **fixable upstream soon** |
+| Default/env override | the idiom shows in 626/1,650 files ([ideas](../../ideas.md)); 157 root broken + 200 nested unstable = **357 files refused** | sconfig | #598 merged, #600 open, neither in v2.0.0 | second-pass refusal S; **fixable upstream soon** |
 | Include object later replaced | `LostInclude`; not counted | shared | value parser drops the object intentionally; no specific upstream fix identified | masking/order guard M; **may never land** as a value-renderer feature |
 | Same-line fields/include and merged paths crossing include | `MovedInclude`; no per-shape corpus count | shared | [Java #733](https://github.com/lightbend/config/issues/733) open since 2021; line origins lack column | order validation M; **uncertain** |
-| Override barrier beside include disappears | accepted semantic corruption, two documented shapes; not counted | shared | no specific upstream fix located; value-tree deletion itself is expected behavior | source-definition safety design M/L; **may never land** upstream |
+| Override barrier beside include disappears | accepted semantic corruption, two documented shapes; not counted | ours | no specific upstream fix located; value-tree deletion itself is expected behavior | source-definition safety design M/L; **ours to close** |
 | `[]` environment list suffix | 1 genuine HOCON case among 142 not-HOCON refusals in corpus | sconfig | [#29](https://github.com/ekrich/sconfig/issues/29); [#605](https://github.com/ekrich/sconfig/pull/605) merged 2026-10-06, unreleased | refusal S; **fixable upstream soon** |
 | Root array | valid HOCON cannot become a Config object; not counted | sconfig | documented API restriction; no release fix verified | refuse S; **may never land** without a different API |
 | JS nesting ≥32 / JS direct includes | broken render / parser NotImplementedError; no corpus counts | sconfig | documented platform gaps; no verified release fix | masking M plus refusal S; **uncertain**; JVM probe results do not prove JS behavior |
@@ -275,7 +315,9 @@ Top ten to add first, in order:
 1. Include overridden scalar/object barrier with real included fields (semantic-change, PR).
 2. Literal CRLF string value equality (semantic-change, commit).
 3. Repeated identical comment equality and injected duplication (comment-loss/other, commit).
-4. Every golden's approved output is a fixed point (idempotence, commit).
+4. Every approved output is a fixed point under the colon separator too: the default-options second
+   pass already exists per fixture (`HoconFormatterInvariantsSpec`:19-25) and the properties cover
+   both separators on generated documents; the approved goldens and examples are the gap (commit).
 5. Each file verdict check/write/mtime agreement (check-exit-codes, PR).
 6. Stdin unchanged/refused/invalid UTF-8 stdout and exits (check-exit-codes, PR; extend existing suite).
 7. Key/separator/comma/array/end comment slots (comment-movement, PR).
