@@ -19,9 +19,9 @@ import scala.util.Try
   *
   *   - the definitions and includes, from the document tree of the text sconfig parsed (the masked
   *     text, whose lines are the parse's own), and
-  *   - the lines that survived the merge, from the origins of the parsed tree: a value carries the
-  *     line of the field that put it there, so a definition's line that no value carries is one the
-  *     formatting dropped.
+  *   - the values that survived the merge, from the origins of the parsed tree: a value carries the
+  *     path it stands at and the line of the field that put it there, so a definition whose path
+  *     carries no value on its own line is one the formatting dropped.
   *
   * A dropped definition is refused over when the include could have written its path, that is when
   * it stands in the include's object and another definition of the same object names the same path
@@ -59,36 +59,51 @@ private[hoconfmt] object IncludeShadow {
       Try(DuplicateReport.outline(masked).toOption.flatMap(outline => first(outline, root))).toOption.flatten
   }
 
-  /** The lines the merge kept something on. The root's own origin is left out: it is the text's
-    * first line, which a definition can share only by standing at the very top, where no include
-    * can stand before it. Objects, arrays and values all carry theirs.
+  /** The values the merge kept: each value of the parsed tree stands at a path, and its origin
+    * names the line of the field that put it there. A definition survives exactly when its path and
+    * its line are one of these pairs. The line alone cannot decide it, since `a.o = 3` writes the
+    * object `a` and the value `a.o` on one line, and the object the merge keeps would make the
+    * dropped leaf look kept.
+    *
+    * The root's own origin is left out: it is the text's first line, which a definition can share
+    * only by standing at the very top, where no include can stand before it. Objects, arrays and
+    * values all carry theirs.
     */
-  private def linesOfTree(root: ConfigObject): Set[Int] =
-    root.entrySet.asScala.iterator.flatMap(entry => linesOf(entry.getValue)).toSet
+  private def keptValues(root: ConfigObject): Set[(KeyPath, Int)] =
+    root.entrySet.asScala.iterator
+      .flatMap(entry => valuesAt(List(KeyPath.Segment.Name(entry.getKey)), entry.getValue))
+      .toSet
 
-  private def linesOf(value: ConfigValue): Set[Int] = value match {
+  private def valuesAt(path: List[KeyPath.Segment], value: ConfigValue): Set[(KeyPath, Int)] = value match {
     case objectValue: ConfigObject =>
       objectValue.entrySet.asScala.iterator
-        .flatMap(entry => linesOf(entry.getValue))
+        .flatMap(entry => valuesAt(path :+ KeyPath.Segment.Name(entry.getKey), entry.getValue))
         .toSet
-        .incl(objectValue.origin.lineNumber)
+        .incl(KeyPath(path) -> objectValue.origin.lineNumber)
     case list: ConfigList =>
-      list.asScala.iterator.flatMap(linesOf).toSet.incl(list.origin.lineNumber)
-    case leaf => Set(leaf.origin.lineNumber)
+      list.asScala.iterator.zipWithIndex
+        .flatMap { case (item, at) => valuesAt(path :+ KeyPath.Segment.Index(at), item) }
+        .toSet
+        .incl(KeyPath(path) -> list.origin.lineNumber)
+    case leaf => Set(KeyPath(path) -> leaf.origin.lineNumber)
   }
 
+  /** Whether the merge kept the definition: a value stands at its path on its line. */
+  private def survives(kept: Set[(KeyPath, Int)], definition: DuplicateReport.Definition): Boolean =
+    kept.contains((definition.keyPath, definition.line))
+
   private def first(outline: DuplicateReport.Outline, root: ConfigObject): Option[Refusal.ShadowedByInclude] = {
-    val survived = linesOfTree(root)
+    val kept = keptValues(root)
     outline.includes
       .sortBy(_.line)
       .iterator
       .flatMap { include =>
         val inItsObject = outline.definitions.filter(definition => standsIn(definition, include))
         inItsObject
-          .filter(definition => definition.line > include.line && !survived(definition.line))
+          .filter(definition => definition.line > include.line && !survives(kept, definition))
           .sortBy(_.line)
           .iterator
-          .flatMap(definition => shadowOf(definition, include, inItsObject, root, survived))
+          .flatMap(definition => shadowOf(definition, include, inItsObject, root, kept))
       }
       .nextOption()
   }
@@ -104,7 +119,7 @@ private[hoconfmt] object IncludeShadow {
       include: DuplicateReport.Include,
       inItsObject: Vector[DuplicateReport.Definition],
       root: ConfigObject,
-      survived: Set[Int]
+      kept: Set[(KeyPath, Int)]
   ): Option[Refusal.ShadowedByInclude] = {
     val later   = inItsObject.filter(_.line > definition.line)
     val related =
@@ -118,9 +133,9 @@ private[hoconfmt] object IncludeShadow {
         // object already — a dropped one may have done nothing itself. And a later definition the
         // rendering keeps ends the merge with a value of its own.
         definition.writesNothing &&
-        !later.exists(other => survived(other.line) && sameOrBelow(other.keyPath, definition.keyPath)) &&
+        !later.exists(other => survives(kept, other) && sameOrBelow(other.keyPath, definition.keyPath)) &&
         !inItsObject.exists(other =>
-          other.line > include.line && other.line < definition.line && survived(other.line) &&
+          other.line > include.line && other.line < definition.line && survives(kept, other) &&
             (sameOrBelow(other.keyPath, definition.keyPath) && other.objectValued ||
               sitsBelow(definition.keyPath, other.keyPath))
         )
