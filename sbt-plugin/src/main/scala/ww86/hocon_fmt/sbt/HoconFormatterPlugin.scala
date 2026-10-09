@@ -1,7 +1,5 @@
 package ww86.hocon_fmt.sbt
 
-import java.nio.charset.StandardCharsets.UTF_8
-
 import sbt._
 import sbt.Keys._
 import lmcoursier.CoursierDependencyResolution
@@ -52,10 +50,14 @@ object HoconFormatterPlugin extends AutoPlugin {
     },
     hoconFormat := {
       val log      = streams.value.log
-      val examined = examineAll.value
+      val examined = examine(
+        (ThisBuild / baseDirectory).value,
+        hoconFormatSources.all(ScopeFilter(inAggregates(ThisProject))).value.flatten,
+        hoconFormatterClasspath.value,
+        write = true
+      )
       examined.foreach {
-        case Examined(file, path, Verdict.NeedsFormatting(formatted)) =>
-          IO.write(file, formatted, UTF_8)
+        case Examined(_, path, Verdict.NeedsFormatting(_)) =>
           log.info(s"Formatted $path")
         case Examined(_, path, Verdict.Refused(_, reason)) => log.warn(refusal(path, reason))
         case _                                             => ()
@@ -82,15 +84,22 @@ object HoconFormatterPlugin extends AutoPlugin {
   )
 
   private val examineAll: Def.Initialize[Task[Seq[Examined]]] = Def.task {
-    val root  = (ThisBuild / baseDirectory).value.getCanonicalFile
-    val files = hoconFormatSources.all(ScopeFilter(inAggregates(ThisProject))).value.flatten
-    IsolatedFormatter.using(hoconFormatterClasspath.value) { formatter =>
+    examine(
+      (ThisBuild / baseDirectory).value,
+      hoconFormatSources.all(ScopeFilter(inAggregates(ThisProject))).value.flatten,
+      hoconFormatterClasspath.value,
+      write = false
+    )
+  }
+
+  private def examine(root: File, files: Seq[File], classpath: Seq[File], write: Boolean): Seq[Examined] =
+    IsolatedFormatter.using(classpath) { formatter =>
       files.map(_.getCanonicalFile).distinct.sorted.map { file =>
-        val path = IO.relativize(root, file).getOrElse(file.getPath)
-        Examined(file, path, formatter.verdictFor(IO.readBytes(file), path))
+        val path    = IO.relativize(root.getCanonicalFile, file).getOrElse(file.getPath)
+        val verdict = if (write) formatter.format(file.toPath) else formatter.verdictFor(IO.readBytes(file), path)
+        Examined(file, path, verdict)
       }
     }
-  }
 
   private def refusal(path: String, reason: String): String = s"Leaving $path unchanged: $reason"
 
