@@ -155,6 +155,7 @@ md, stub = map(Path, sys.argv[1:])
 fixtures = {
     "prose": '[fixed in #83](https://github.com/acme/widgets/pull/83)',
     "quoted-label": '["WRONG title"](https://github.com/acme/widgets/issues/5)',
+    "embedded-quoted-title": '[acme/widgets#5 “WRONG title”](https://github.com/acme/widgets/issues/5)',
     "backtick-title": '[#5](https://github.com/acme/widgets/issues/5) `WRONG title`',
     "literal-underscore": 'https://example.com/name_',
     "unclosed-code": '~~~md\nhttps://example.com/gone',
@@ -221,7 +222,8 @@ chmod +x "$work/bin/gh"
 expect_run 'prose labels claim no title' 0 'ok (no title claimed)' --verbose "$md/prose.md"
 expect_run 'a quoted wrong link label still mismatches' 1 'WRONG title' "$md/quoted-label.md"
 expect_run 'a backticked wrong title still mismatches' 1 'WRONG title' "$md/backtick-title.md"
-expect_run 'a real unquoted title passes' 0 '1 ok' "$md/real-title.md"
+expect_run 'a wrong quoted title after a reference inside a label mismatches' 1 'WRONG title' "$md/embedded-quoted-title.md"
+expect_run 'a real unquoted title passes'  0 '1 ok' "$md/real-title.md"
 expect_run 'fenced and inline code links are skipped' 0 'skipped 4 in code' "$md/code.md"
 expect_run 'plain query strings identify distinct resources' 1 'checked 2 urls: 1 ok, 0 mismatch, 1 dead' "$md/queries.md"
 expect_run 'markdown emphasis wrappers are stripped' 0 'checked 2 urls: 2 ok' "$md/emphasis.md"
