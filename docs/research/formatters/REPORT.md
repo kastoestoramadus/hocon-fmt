@@ -131,7 +131,7 @@ not fixes. No upstream messages were posted and no formatter implementation was 
 
 **A run that fails on duplicates still writes the file.** Re-measured on this JVM CLI with a
 private Maven repository: with `--fail-on-duplicates` and no `--check`, a B1 run exits **1** and
-writes the changed output (`include "f.conf"` then `o.c = 7`, exit 1); `--check` exits 1 without
+writes the changed output (the file becomes `include "f.conf"` then `o.c = 7`); `--check` exits 1 without
 writing, and `--fail-on-duplicates --check` writes nothing either. Findings "change nothing that is
 written" ([usage](../../usage.md#the-duplicate-report)), so the failure arrives after the meaning
 changed on disk — the one signal a B1 file gets comes from a run that already rewrote it. The
@@ -200,8 +200,8 @@ Ranked by value/cost; S afternoon, M days, L longer. These are recommendations, 
 2. **S, high:** `--diff` builds on the existing report-format idea; define it as a non-writing view,
    test combinations, and distinguish refusal from a clean file. Prettier #6885 and taplo #416 show demand/traps.
 3. **M, high:** refuse the B1/B2 shapes instead of formatting them: an `include` followed, on the
-   same path chain, by a definition a later definition kills (the scalar replaced by a dotted path,
-   or the empty object a merge makes dead). The duplicate report already walks sconfig's
+   same path chain, by a definition a later definition kills — the scalar a dotted path replaces,
+   or the empty object a merge makes dead. The duplicate report already walks sconfig's
    definition-preserving document tree, so that walk can see the include the dead definition stood
    beside and return a typed `Refusal`; sconfig dropping the definition is expected merge behaviour
    the guard has to account for, and no upstream change is coming. Questions to settle before the
