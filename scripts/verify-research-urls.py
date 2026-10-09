@@ -7,7 +7,8 @@ Every `[text](https://…)` link and every bare URL in the given files is checke
 
   * a github.com issue, pull or commit URL is resolved through `gh api` (unauthenticated
     api.github.com when gh is not installed) and its title is compared with the link's text, or
-    with a quoted title right after the link — `[#149](…) "Preserve comments across newlines?"`;
+    with a double-quoted title right after the link — `[#149](…) "Preserve comments across
+    newlines?"`; a backticked word there is code, the research files quote titles with `"`;
   * any other URL gets a HEAD status check (GET after a 403/405/501).
 
 Exit status 1 when a citation is DEAD (404/410) or its title MISMATCHes; 0 otherwise, including a
