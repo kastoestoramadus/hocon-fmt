@@ -336,8 +336,8 @@ idempotence or round-trip tests exist to copy; the value here is the comment-pos
 | `tests/test_config_parser.py::test_with_comment_on_last_line` | comment at end of file | `a = 1\n# the end\n` | refuses (`LostComment`) |
 | `tests/test_config_parser.py` (trailing-ws case, ≈line 2372) | concatenation with a comment after trailing space | `foo = "a" "b" // c\n` | formats |
 | `tests/test_config_parser.py` (newline case, #324) | value on the line after `=` | `a =\n  1\n` | formats |
-| `samples/animals.conf` | substitutions plus blank lines | `animals.dog.legs = 4\n\nanimals.dog.sound = woof\n` | formats; blank lines dropped |
-| `samples/aws.conf` | dotted keys and includes | `include "common.conf"\naws.region = eu\n` | formats (include masked) |
+| `samples/animals.conf` | includes inside objects | `animals {\ninclude "animals.d/cat.conf"\n}\n` | formats; include masked, its comments not read |
+| `samples/aws.conf` | dict merge and list merge via substitution | `dc = { size = 6 }\ndc-east = ${dc} { name = "east" }\n` | refuses (sconfig renders `${dc}name = east`) |
 | `tests/test_periods.py` | duration values | `timeout = 10 seconds\n` | formats |
 | `tests/test_config_tree.py` | duplicate keys | `a = 1\na = 2\n` | formats; duplicate report names `a` |
 
@@ -370,12 +370,12 @@ successful write for arbitrary bytes. The verbatim round-trip + fuzz pair is the
 
 | source (path @ HEAD) | exercises | HOCON rendering | hocon-fmt today |
 |---|---|---|---|
-| `hclwrite/round_trip_test.go` (cases 1–3) | empty file, one attribute, no final newline | ``, `foo = 1\n`, `foo = 1` | formats (final newline added) |
+| `hclwrite/round_trip_test.go` (cases 1–3) | empty file, one attribute, leading newline with aligned `=` | ``, `foo = 1\n`, `\nfoo = 1\nbar = 1\n` | formats |
 | same (case 4) | leading blank line, aligned `=`, comments, nested blocks | `# c\n\nfoo = 1\nbar = 1\nb {\na = 1\n}\n` | refuses (`# c` above a blank line) |
-| `hclwrite/format_test.go::TestFormat` | comment-only line between blocks | `a { }\n# between\nb { }\n` | formats |
+| `hclwrite/format_test.go::TestFormat` | comment-only line inside an entry group (breaks the alignment group) | `a = 1\n# c\nb = 2\n` | formats |
 | same | trailing comment on a block's line | `a { } # after\n` | formats (comment moves above) |
-| same | blank lines inside an object | `a {\n\nb = 1\n\n}\n` | formats; output has no blank lines |
-| same | CRLF line endings | `a = 1\r\n# c\r\nb = 2\r\n` | formats; normalised to `\n` |
+| same | spaces inside a template interpolation | `a = "${ x }"\n` | refuses (`NotHocon`: no spaces in a substitution) |
+| same | nested lists, including a degenerate asymmetric-bracket case | `a = [[\n  [\n    1\n  ]\n]]\n` | formats |
 | same | alignment of `=` across entries | `a = 1\nlong = 2\n` | formats, no alignment |
 | `hclwrite/fuzz/fuzz_test.go` corpus | arbitrary bytes never panic the writer | random bytes | refuses (`NotHocon`), never panics |
 | [#285](https://github.com/hashicorp/hcl/issues/285) | many trailing newlines at EOF | `a = 1\n\n\n` | formats; output ends with one `\n` |
@@ -399,9 +399,9 @@ gate), and `toml-test` integration gives differential testing against TOML's con
 | `…::test_comments_in_array` | comments before and after elements | `a = [1, # x\n2 # y\n]\n` | refuses |
 | `…::test_align_comments` | consecutive trailing comments | `a = 1 # one\nbb = 2 # two\n` | formats; alignment not offered |
 | `…::test_nested_arrays` | nested arrays | `a = [[1, 2], [3]]\n` | formats |
-| `test-data/rewrite/nothing.toml` | empty document | `` (empty) | already formatted |
-| `test-data/rewrite/table.toml` | a table with an entry and a comment | `[t]\n# c\na = 1\n` | formats |
-| `test-data/invalid/*` | documents that must fail | `a = = 1\n` | refuses (`NotHocon`) |
+| `…::comment_indentation` | banner comments at column 0, an indented comment normalised to the table's indent | `o {\n  # c\n  a = 1\n}\n` | formats |
+| `test-data/rewrite/nothing.toml` | the realistic corpus file the rewrite test must leave unchanged (banner comments, tables, arrays, inline tables, multi-line strings) | a 200-line application.conf | formats; a corpus gate in CI is the analogue |
+| `test-data/rewrite/key.toml` + `table.toml` | key-renaming rewrites that keep comments and structure | n/a (we never rename keys) | — |
 
 ### google/go-jsonnet (jsonnetfmt)
 
@@ -417,12 +417,12 @@ bug survived; no `format(format(x)) == format(x)` check exists.
 | `…/regular_expression.jsonnet` + golden | a string the style pass cannot unescape | n/a | — |
 | `…/object_implicit_plus1.jsonnet` + golden | implicit `+` between braces | `a = ${b} { c = 1 }\n` | refused (sconfig renders `${b}c = 1`) |
 | `formatter/formatter_test.go::TestFormatNoImplicitPlus` | precedence-preserving rewrite contexts | n/a | — |
-| `TestFormatter` goldens | comment style conversion `#` → `//` | `// c\n# d\nk = v\n` | formats (all become `#`) |
-| same | string quote style `'` → `"` | `a = 'x'\nb = "y"\n` | formats (quoting normalised) |
-| same | a file that is one comment and nothing else | `# only\n` | refuses (`LostComment`) |
-| `TestFormatter` goldens | long object with many fields | `o { a = 1\nb = 2\n … }\n` | formats; no width logic |
-| `TestFormatter` goldens | trailing whitespace after a value | `a = 1   \n` | formats |
-| `TestFormatter` goldens | no final newline / CRLF variants | `a = 1`, `a = 1\r\n` | formats; `\n` and one final newline |
+| `internal/formatter/enforce_comment_style.go` | comment style conversion (`--comment-style`, default `leave`) | `# c\n# d\nk = v\n` | formats (all become `#`) |
+| `internal/formatter/enforce_string_style.go` | string/escape validation pass; an unescape it cannot do is a static error (#724) | `a = "x\\"y"\n` | formats |
+| `internal/formatter/fix_*.go` (indentation, newlines, trailing commas, parens) | the pass pipeline: each transform is one file and one concern | any | layout is one system, not one pass |
+| `testdata/object.jsonnet` (and ~700 other programs) | the language corpus, which jsonnetfmt is *not* run over in CI | a reference.conf corpus | corpus gate in CI (nixfmt runs one) |
+| `testdata/cpp-tests-override/fmt_simple4.golden.stderr` | fmt diagnostics pinned as goldens, error text included | an invalid file | our refusal kinds are pinned the same way |
+| `cmd/jsonnetfmt/cmd.go` usage | `--test` exits non-zero if changing; `--indent 0` means no change | n/a | `--check` + exit codes |
 
 ### cue-lang/cue (cue fmt)
 
