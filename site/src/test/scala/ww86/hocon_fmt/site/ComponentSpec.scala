@@ -60,7 +60,14 @@ class ComponentSpec extends munit.FunSuite {
           store.update(key, value)
           ()
         }
-      )
+      ),
+      // The pane sync writes on the next animation frame, so that a browser finishes delivering
+      // its resize observations first. The fake runs that frame at once: the reaction chain stays
+      // synchronous, which is what the fake DOM's depth cap counts.
+      requestAnimationFrame = js.Any.fromFunction1 { (callback: js.Function1[Double, Unit]) =>
+        callback(0.0)
+        0
+      }
     )
   }
 
@@ -129,6 +136,17 @@ class ComponentSpec extends munit.FunSuite {
     val _ = pane.fire("input")
   }
 
+  /** What a browser reports once a drag has resized a pane: the fake ResizeObserver hears of the
+    * new box height, and every height write the page answers with re-fires it.
+    */
+  def fireResize(pane: js.Dynamic, heightPx: Int): Unit = {
+    val _ = js.Dynamic.global.document.fireResize(pane, heightPx)
+  }
+
+  /** The height a pane carries in its inline style, the way a browser reports it. */
+  def styleHeight(pane: js.Dynamic): String =
+    pane.style.getPropertyValue("height").asInstanceOf[String]
+
   /** What the page is supposed to show for a text: the core's own answer, not a second opinion. */
   def formatted(text: String): String = Verdict.of(text) match {
     case Verdict.NeedsFormatting(output) => output
@@ -169,6 +187,52 @@ class ComponentSpec extends munit.FunSuite {
     assert(
       upstream.textContent.asInstanceOf[String].contains("What the formatter refuses"),
       "the lists and the table are all there, only hidden"
+    )
+    val _ = root.unmount()
+  }
+
+  test("the page opens with a short TL;DR and a copyable quick start") {
+    val container = install(Github())
+    val root      = mount(container)(Page())
+    val tagline   = find(container, "tagline")
+    val tldr      = find(container, "tldr")
+    val bullets   = children(tldr).filter(_.nodeName.asInstanceOf[String] == "LI")
+    assertEquals(bullets.size, 3, "what it is and what it refuses, where it runs, and try it")
+    val prose = tagline.textContent.asInstanceOf[String] + " " +
+      bullets.map(_.textContent.asInstanceOf[String]).mkString(" ")
+    val words = prose.split("\\s+").count(_.nonEmpty)
+    println(s"TL;DR: $words words")
+    assert(words < 60, s"the TL;DR must stay short, found $words words")
+    val links = bullets.last
+      .findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
+      .asInstanceOf[js.Array[js.Dynamic]]
+      .toList
+      .map(_.getAttribute("href").asInstanceOf[String])
+    assertEquals(links, List("#playground"), "the third bullet points at the playground below")
+    val sections = children(find(container, "page")).filter(node => idOf(node) == "playground")
+    assertEquals(
+      sections.map(_.nodeName.asInstanceOf[String]),
+      List("SECTION"),
+      "and the playground is a real section to land on"
+    )
+    val quickStart = find(container, "quick-start").textContent.asInstanceOf[String]
+    assert(quickStart.contains("pipx install hocon-fmt"), quickStart)
+    assert(quickStart.contains("hocon-fmt --check"), quickStart)
+    val _ = root.unmount()
+  }
+
+  test("the header carries the build's stamp, a muted local build when the build was told nothing") {
+    val container = install(Github())
+    val root      = mount(container)(Page())
+    val header    = find(container, "page-head")
+    assertEquals(header.nodeName.asInstanceOf[String], "HEADER")
+    val stamp = find(container, "deploy")
+    assert(children(header).exists(_ eq stamp), "the stamp belongs to the header, whose corner it marks")
+    assert(hasClass("muted")(stamp), "small and muted, not shouting")
+    assertEquals(
+      stamp.textContent.asInstanceOf[String],
+      "local build",
+      "a test build inherits no deploy values, so it says so"
     )
     val _ = root.unmount()
   }
@@ -222,6 +286,22 @@ class ComponentSpec extends munit.FunSuite {
     }
   }
 
+  test("a pane dragged to a height takes the other pane with it, and settles") {
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    assertEquals(styleHeight(input), "", "the stylesheet's default height rules until the first drag")
+    fireResize(input, 420)
+    assertEquals(styleHeight(input), "420px")
+    assertEquals(styleHeight(output), "420px", "the owner: grab one window, both grow")
+    fireResize(output, 260)
+    assertEquals(styleHeight(input), "260px")
+    assertEquals(styleHeight(output), "260px")
+    // The fake re-fires the observers on every height write, one chain deeper each time, so a
+    // sync that answered its own writes with a fresh height would fail here instead of hanging.
+    val _ = root.unmount()
+  }
+
   test("an example button puts its example back into both panes") {
     val github          = Github()
     val container       = install(github)
@@ -229,7 +309,7 @@ class ComponentSpec extends munit.FunSuite {
     val (input, output) = panes(container)
     val buttons         = findAll(container, "example")
     val example         = ExampleData.showcase.headOption.fold("")(_.input)
-    assertEquals(buttons.size, ExampleData.showcase.size + 5)
+    assertEquals(buttons.size, ExampleData.showcase.size + ExampleData.more.size)
     type_(input, "[1, 2]\n")
     settle(500)
       .flatMap { _ =>
@@ -279,18 +359,18 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
-  def moreIds = List("messy", "includes", "comments", "not-hocon", "sconfig-defect")
-
-  test("the five original examples follow the stories and every refusal explains preserved input") {
+  test("the catalogue examples follow the stories and every refusal explains preserved input") {
     val container = install(Github())
     val root      = mount(container)(Playground())
-    val originals = moreIds.map(id => ExampleData.all.find(_.id == s"catalogue/$id").get)
     val buttons   = findAll(container, "example")
-    assertEquals(buttons.drop(6).map(_.textContent.asInstanceOf[String]), originals.map(_.title))
+    assertEquals(
+      buttons.drop(ExampleData.showcase.size).map(_.textContent.asInstanceOf[String]),
+      ExampleData.more.map(_.title)
+    )
     assert(find(container, "more-examples").textContent.asInstanceOf[String].contains("More examples"))
     val (input, output) = panes(container)
     buttons
-      .zip(ExampleData.showcase ++ originals)
+      .zip(ExampleData.showcase ++ ExampleData.more)
       .foldLeft(Future.successful(())) { case (done, (button, example)) =>
         done.flatMap { _ =>
           val _ = button.fire("click")

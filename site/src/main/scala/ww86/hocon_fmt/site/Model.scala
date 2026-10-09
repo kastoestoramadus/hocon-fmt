@@ -74,6 +74,7 @@ final case class PrLink(library: Library, number: Int)
 
 /** The formatter's own repository: the page's one home on GitHub. */
 object Repo {
-  val url                       = "https://github.com/kastoestoramadus/hocon-fmt"
-  def tree(ref: String): String = s"$url/tree/$ref"
+  val url                         = "https://github.com/kastoestoramadus/hocon-fmt"
+  def tree(ref: String): String   = s"$url/tree/$ref"
+  def commit(sha: String): String = s"$url/commit/$sha"
 }

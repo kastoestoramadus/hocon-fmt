@@ -84,14 +84,13 @@ object Status {
       "Formatting would produce text that the parser cannot read back."
     case RefusalKind.LostComment =>
       "Formatting would lose the comment shown below. This can happen when a later definition replaces a commented field, or when the library drops a detached comment."
-    case RefusalKind.LostInclude =>
-      "the configuration library would drop an include directive, so the formatter leaves the file alone."
+    case RefusalKind.LostInclude  => "Formatting would drop an include directive."
     case RefusalKind.MovedInclude =>
-      "formatting would put an include on the other side of a field, and a later definition wins, so the formatter leaves the file alone."
+      "Formatting would put an include on the other side of a field, so a later definition wins."
     case RefusalKind.ReservedName =>
-      "the text uses __INCLUDE_, a name the formatter writes include placeholders with, so it cannot tell your text from its own."
+      "The text uses __INCLUDE_, the name the formatter writes include placeholders with, so it cannot tell your text from its own."
     case RefusalKind.UnstableOutput => "Formatting would not settle: a second pass would change the output again."
-    case RefusalKind.NotUtf8        => "the bytes are not valid UTF-8."
+    case RefusalKind.NotUtf8        => "The bytes are not valid UTF-8."
   }
 
   private def learnMore(kind: RefusalKind): Option[String] = kind match {
