@@ -138,5 +138,8 @@ fix: "https://github.com/ekrich/sconfig/pull/…", state: "…" }`. `ExamplesSpe
 without a note. `fix` is optional only when no upstream fix exists; the state must
 say so rather than imply a fix is pending. A PR may serve as the upstream report
 when there is no separate issue. States are snapshots verified with `gh`, not build-time
-network requests. `ComponentSpec` clicks all eleven buttons, checks each refusal in
-both output tabs, and checks the selected upstream links and waiting states.
+network requests, and short enough to sit on the one-line note the page renders.
+`ComponentSpec` clicks all eleven buttons, checks each refusal in
+both output tabs, and checks the selected upstream links and waiting states. It also mounts the
+whole page and pins the owner's section order — playground, use it, limits, upstream — and that
+the upstream `<details>` ships without the `open` attribute.

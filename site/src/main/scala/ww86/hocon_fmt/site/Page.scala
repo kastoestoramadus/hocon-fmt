@@ -2,7 +2,9 @@ package ww86.hocon_fmt.site
 
 import com.raquo.laminar.api.L.*
 
-/** The whole page: the formatter presented, the playground, the upstream work, the footer. */
+/** The whole page, in the owner's order: what the formatter is in one line, the playground, how
+  * to use it, the known limits, and — collapsed by default — the work upstream.
+  */
 object Page {
 
   def apply(): HtmlElement =
@@ -12,10 +14,13 @@ object Page {
         h1("hocon-fmt"),
         p(
           cls := "tagline",
-          "A formatter for HOCON configuration files — it would rather refuse a file than corrupt it."
+          "A formatter for HOCON configuration files — it would rather refuse a file than corrupt it: ",
+          "it never writes a broken file."
         )
       ),
       Playground(),
+      UseIt(),
+      KnownLimits(),
       ContributionsView(),
       pageFooter()
     )

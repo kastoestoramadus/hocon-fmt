@@ -8,10 +8,10 @@ import scala.scalajs.js
 
 import Browser.given
 
-/** The page's third part: the author's pull requests against the libraries hocon-fmt depends on,
-  * rendered from the shipped snapshot and refreshed in place by the live GitHub search when it
-  * answers. Failure is quiet and visible: any repository that does not answer leaves its part of
-  * the snapshot standing, and the state line says as much.
+/** The page's collapsed last part: the author's pull requests against the libraries hocon-fmt
+  * depends on, behind a one-sentence summary, rendered from the shipped snapshot and refreshed in
+  * place by the live GitHub search when it answers. Failure is quiet and visible: any repository
+  * that does not answer leaves its part of the snapshot standing, and the state line says as much.
   */
 object ContributionsView {
 
@@ -21,17 +21,15 @@ object ContributionsView {
   def apply(): HtmlElement = {
     val board = Var(Board.snapshot)
 
-    sectionTag(
+    detailsTag(
       idAttr := "contributions",
+      cls    := "upstream",
+      // Closed by default: the visitor comes for what works and how to use it, and opens this
+      // only to read the work behind it. The refresh starts on mount all the same, so the answer
+      // is here the moment the section is opened.
       onMountBind(_ => boardUpdates(refreshBoard) --> board),
-      h2("The work upstream"),
-      p(
-        "The formatter refuses a file when the library mis-renders it — and the same defects get ",
-        "reported and fixed upstream. Below is what ",
-        a(href := "https://github.com/kastoestoramadus", "kastoestoramadus"),
-        " reported and proposed on the two libraries hocon-fmt depends on, grouped by library ",
-        "and theme. A pull request counts as fixed only once a release carries it, so a merge ",
-        "reads “merged upstream, not yet in a release”."
+      summaryTag(
+        "The work upstream: the author's pull requests on sconfig and lightbend/config, and the defects they fix."
       ),
       p(
         cls       := "muted state-line",
@@ -184,17 +182,13 @@ object ContributionsView {
     span(cls := style, state.label)
   }
 
-  /** The defect rows: what the formatter refuses, and what aims to fix it upstream. */
+  /** The defect rows: what the formatter refuses, and what aims to fix it upstream. Kept prose
+    * to nothing — the rows carry the story, and the refusals explain themselves in the playground.
+    */
   private def defectTable(): HtmlElement =
     div(
       cls := "defects",
       h3("What the formatter refuses, upstream by pull request"),
-      p(
-        "Each row is an input, from the repository's known-limitations page, that the formatter ",
-        "refuses because the library mis-renders it — the refusal the playground above shows — ",
-        "and the pull requests that aim to fix it. The refusal names are the formatter's; the ",
-        "playground explains each one when it happens."
-      ),
       table(
         thead(tr(th("the input"), th("the refusal"), th("upstream"))),
         tbody(DefectTable.rows.map { row =>

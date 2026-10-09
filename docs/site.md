@@ -1,9 +1,10 @@
 # The site
 
-The project page: the formatter presented, a playground, and the author's contributions to the
-libraries it depends on. Meant to be served as `https://hocon-fmt.ww86.eu` from this repository's
-GitHub Pages. `sbt site/build` writes everything to `site/target/site`, and the page also works
-from `file://` as every ww86.eu page does.
+The project page: the formatter in one line, a playground, how to use it, the known limits, and
+— collapsed — the author's contributions to the libraries it depends on. Meant to be served as
+`https://hocon-fmt.ww86.eu` from this repository's GitHub Pages. `sbt site/build` writes
+everything to `site/target/site`, and the page also works from `file://` as every ww86.eu page
+does.
 
 ## The module
 
@@ -24,16 +25,17 @@ needs, the way `web` does.
 
 ## The page
 
-One page, three parts, all rendered by Laminar into `#root`.
+One page, five parts, all rendered by Laminar into `#root`. The order is the owner's: what
+already works and how to use it first; the work behind it last, and collapsed.
 
-1. **What it is**: what HOCON is, what the formatter adds to a plain parse-render round trip
-   (includes survive, refuse rather than corrupt), where it runs, and the privacy promise, stated
-   as the page behaves: nothing pasted leaves the browser; the only network requests are the
-   read-only GitHub lookups of part three.
+1. **One line, the promise**: the header — a formatter for HOCON configuration files that
+   would rather refuse a file than corrupt it, and so never writes a broken file.
 2. **The playground**: input and output panes, formatting as you type with a 150 ms debounce, and
    one status line — "Formatted" with how many lines changed (input and output compared line by
    line), "Already formatted", or "Left unchanged" with the refusal, one sentence per refusal
-   kind, and a link into [limitations](limitations.md). Example buttons come from
+   kind, and a link into [limitations](limitations.md). The privacy promise heads the section,
+   stated as the page behaves: nothing pasted leaves the browser; the only network requests are
+   the read-only GitHub lookups of part five. Example buttons come from
    `examples/showcase/NN-slug/` in directory order, using `title` and `shows` from
    `example.conf`. The sbt generator embeds the same data that core’s `ExamplesSpec`
    pins on JVM, Scala.js and Native. `examples/catalogue/` also supplies tested fixtures and
@@ -42,17 +44,26 @@ One page, three parts, all rendered by Laminar into `#root`.
    defaults and production overrides, a verbatim Pekko excerpt, a typo, and the comment
    safety net. The original messy, includes, comments, not-HOCON and sconfig-defect
    buttons follow them, with no duplicate fixture files. A selected example’s `upstream`
-   note links its report and our fix and records the verified merge/release status; it
-   explicitly names the published core’s result even when the fork formats the input.
-   Refusals show a plain explanation and an unchanged-input promise, followed by the
+   note is one short line: the published core’s result, the report, our fix, and the verified
+   status. Refusals show a plain explanation and an unchanged-input promise, followed by the
    diagnostic on a separate, wrapping line. Style controls select separator, nesting and indentation. The duplicate
    report names the dead path and both lines below the status, even on refused text.
    Formatted preserves includes and optional substitutions; Resolved previews only
    local values, with includes unloaded and environment variables unset. Resolution
    errors are shown in the output pane; refused inputs stay untouched in both tabs.
-3. **The work upstream**: the author's pull requests on sconfig and lightbend/config, grouped by
-   library and theme, each with its state, and the defect table tying every refusal of
-   [limitations](limitations.md) to the pull requests that aim to fix it.
+3. **Use it**: install and one usage line per channel that exists today — command line (native
+   binary from the Python wheel, npm package, JVM build), pre-commit hooks, sbt, Gradle, Maven
+   and Mill plugins, and the Java API — each with a snippet copied from
+   [usage](usage.md), then the choices a repository can make (`.hocon-fmt.conf`, the separator,
+   the duplicate report) in a few lines.
+4. **Known limits**: five bullets — the refused defect inputs, the lost detached comments, the
+   intentional normalisations, the refused `.json`/`.properties` names, and what the duplicate
+   report does not claim — each backed by [limitations](limitations.md).
+5. **The work upstream**: a `<details>` collapsed by default, its summary one sentence. Inside:
+   the author's pull requests on sconfig and lightbend/config, grouped by library and theme,
+   each with its state, and the defect table tying every refusal of [limitations](limitations.md)
+   to the pull requests that aim to fix it. The refresh starts on mount even closed, so the
+   answer is there the moment the section is opened.
 
 ## The snapshot and the live refresh
 
