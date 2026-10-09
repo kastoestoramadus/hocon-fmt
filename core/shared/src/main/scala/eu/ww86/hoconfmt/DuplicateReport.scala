@@ -107,6 +107,11 @@ object DuplicateReport {
     * `position` counts the statements the walk has passed, so two definitions sharing a line can
     * still be told apart by which stands first. A line carries no column, and an include on the
     * same line as a definition is either before it or after it; only the position says which.
+    *
+    * `arrayPositionsTrusted` says whether the `Index` segments of `keyPath` are the merged list's
+    * own. A literal written beside another is one piece of the merged value, and it counts its
+    * elements from zero while the merged list counts them across the pieces: positions inside such
+    * a piece name another element of the merged list, so nothing there vouches for the definition.
     */
   private[hoconfmt] case class Definition(
       keyPath: KeyPath,
@@ -115,7 +120,8 @@ object DuplicateReport {
       objectValued: Boolean,
       holdsSubstitution: Boolean,
       writesNothing: Boolean,
-      arrayScope: List[Int]
+      arrayScope: List[Int],
+      arrayPositionsTrusted: Boolean
   )
 
   /** One `include` directive: the line it stands on, its position among the statements, the object
@@ -143,29 +149,47 @@ object DuplicateReport {
   private val emptyOutline = Outline(Vector.empty, Vector.empty)
 
   private def outlineOf(tree: ConfigNodeRoot): Outline =
-    walk(tree, Nil, 1, emptyOutline, Nil)._2
+    walk(tree, Nil, 1, emptyOutline, Nil, positionsTrusted = true)._2
 
   private def defined(tree: ConfigNodeRoot): Vector[Definition] =
     outlineOf(tree).definitions
 
   /** The definitions and includes `node` holds, and the line the text after it starts on. The line
     * advances by the newlines of every render in source order.
+    *
+    * `positionsTrusted` is true while every array position on the way here is the merged list's own.
+    * A concatenation's pieces each count their elements from zero, so a literal reached through one
+    * — through its objects too, since two objects of one concatenation merge and a key they share
+    * may be what joins two of their literals — carries positions the merged list numbers
+    * differently.
     */
   private def walk(
       node: ConfigNode,
       at: List[KeyPath.Segment],
       line: Int,
       found: Outline,
-      arrayScope: List[Int]
+      arrayScope: List[Int],
+      positionsTrusted: Boolean
   ): (Int, Outline) =
     node match {
-      case field: ConfigNodeField => walkField(field, at, line, found, arrayScope)
+      case field: ConfigNodeField => walkField(field, at, line, found, arrayScope, positionsTrusted)
       // The definition offset identifies each array with fields uniquely; empty arrays have no
       // descendants to compare. Nesting keeps even arrays starting at the same offset apart.
       case array: ConfigNodeArray =>
-        walkItems(array.children.asScala.toList, at, line, found, 0, arrayScope :+ found.definitions.size)
-      case complex: ConfigNodeComplexValue => walkAll(complex.children.asScala.toList, at, line, found, arrayScope)
-      case _                               => (line + newlines(node.render), found)
+        walkItems(
+          array.children.asScala.toList,
+          at,
+          line,
+          found,
+          0,
+          arrayScope :+ found.definitions.size,
+          positionsTrusted
+        )
+      case concat: ConfigNodeConcatenation =>
+        walkAll(concat.children.asScala.toList, at, line, found, arrayScope, positionsTrusted = false)
+      case complex: ConfigNodeComplexValue =>
+        walkAll(complex.children.asScala.toList, at, line, found, arrayScope, positionsTrusted)
+      case _ => (line + newlines(node.render), found)
     }
 
   private def walkAll(
@@ -173,9 +197,12 @@ object DuplicateReport {
       at: List[KeyPath.Segment],
       line: Int,
       found: Outline,
-      arrayScope: List[Int]
+      arrayScope: List[Int],
+      positionsTrusted: Boolean
   ): (Int, Outline) =
-    children.foldLeft((line, found)) { case ((current, acc), child) => walk(child, at, current, acc, arrayScope) }
+    children.foldLeft((line, found)) { case ((current, acc), child) =>
+      walk(child, at, current, acc, arrayScope, positionsTrusted)
+    }
 
   /** The objects in an array are reached by their position, which is part of where their fields
     * stand: the same key in two elements is not two definitions of one path.
@@ -186,13 +213,15 @@ object DuplicateReport {
       line: Int,
       found: Outline,
       index: Int,
-      arrayScope: List[Int]
+      arrayScope: List[Int],
+      positionsTrusted: Boolean
   ): (Int, Outline) =
     children
       .foldLeft((line, found, index)) { case ((current, acc, next), child) =>
         child match {
           case value: AbstractConfigNodeValue =>
-            val (after, outline) = walk(value, at :+ KeyPath.Segment.Index(next), current, acc, arrayScope)
+            val (after, outline) =
+              walk(value, at :+ KeyPath.Segment.Index(next), current, acc, arrayScope, positionsTrusted)
             (after, outline, next + 1)
           case other => (current + newlines(other.render), acc, next)
         }
@@ -204,7 +233,8 @@ object DuplicateReport {
       at: List[KeyPath.Segment],
       line: Int,
       found: Outline,
-      arrayScope: List[Int]
+      arrayScope: List[Int],
+      positionsTrusted: Boolean
   ): (Int, Outline) = {
     val segments = pathOf(field.path)
     val path     = at ++ segments
@@ -224,14 +254,15 @@ object DuplicateReport {
           objectValued = objectValued(field.value),
           holdsSubstitution = holds,
           writesNothing = writesNothing(field.value),
-          arrayScope = arrayScope
+          arrayScope = arrayScope,
+          arrayPositionsTrusted = positionsTrusted
         )
-        found.addAll(implicitObjects(at, segments, line, position, holds, arrayScope)).add(own)
+        found.addAll(implicitObjects(at, segments, line, position, holds, arrayScope, positionsTrusted)).add(own)
       }
     // The path and the separator only advance the line; the value may hold fields of its own.
     field.children.asScala.toList.foldLeft((line, contents)) { case ((current, acc), child) =>
       child match {
-        case value: AbstractConfigNodeValue => walk(value, path, current, acc, arrayScope)
+        case value: AbstractConfigNodeValue => walk(value, path, current, acc, arrayScope, positionsTrusted)
         case other                          => (current + newlines(other.render), acc)
       }
     }
@@ -258,7 +289,8 @@ object DuplicateReport {
       line: Int,
       position: Int,
       holdsSubstitution: Boolean,
-      arrayScope: List[Int]
+      arrayScope: List[Int],
+      positionsTrusted: Boolean
   ): Vector[Definition] =
     (1 until segments.size).toVector.map { length =>
       Definition(
@@ -269,7 +301,8 @@ object DuplicateReport {
         holdsSubstitution = holdsSubstitution,
         // A leaf stands below it, so it writes something.
         writesNothing = false,
-        arrayScope = arrayScope
+        arrayScope = arrayScope,
+        arrayPositionsTrusted = positionsTrusted
       )
     }
 

@@ -39,6 +39,11 @@ import scala.util.Try
   *     rendering tell one of the two from the other — a line carries no column, and fields sharing
   *     a line come out in no defined order — so the survivor cannot vouch for the dropped one.
   *
+  * A definition inside a piece of an array concatenation stands at positions the merged list
+  * numbers differently, so the merged tree cannot answer for it at all: it is never read as kept,
+  * and it is refused whenever the rest of the check could let the include's values through, rather
+  * than skipped over a value that belongs to another element.
+  *
   * Refusing a little too much is the point: the included file cannot be read at format time (a
   * web page has no filesystem, and the include may name a URL), so the contents that could arrive
   * are unknown, and a file is only formatted when every definition that could matter survives.
@@ -95,9 +100,13 @@ private[hoconfmt] object IncludeShadow {
     case leaf => Set(KeyPath(path) -> leaf.origin.lineNumber)
   }
 
-  /** Whether the merge kept the definition: a value stands at its path on its line. */
+  /** Whether the merge kept the definition: a value stands at its path on its line. A definition
+    * inside a piece of a concatenation is not read off the merged tree at all: the piece counts its
+    * elements from zero and the merged list counts them across the pieces, so the path names
+    * another element there and no value on it vouches for this definition.
+    */
   private def survives(kept: Set[(KeyPath, Int)], definition: DuplicateReport.Definition): Boolean =
-    kept.contains((definition.keyPath, definition.line))
+    definition.arrayPositionsTrusted && kept.contains((definition.keyPath, definition.line))
 
   private def first(outline: DuplicateReport.Outline, root: ConfigObject): Option[Refusal.ShadowedByInclude] = {
     val kept = keptValues(root)
@@ -190,9 +199,17 @@ private[hoconfmt] object IncludeShadow {
       later.exists(other =>
         (other.keyPath == definition.keyPath && other.objectValued) ||
           sitsBelow(definition.keyPath, other.keyPath)
-      ) && objectAt(root, definition.keyPath)
+      ) && couldHoldObject(root, definition)
     }
   }
+
+  /** Whether the merged tree could hold an object where a definition writes. A definition inside a
+    * piece of a concatenation writes positions the merged list numbers differently, so the merged
+    * tree cannot answer for it; the check assumes the worst rather than read the value of another
+    * element, which would let the included file's values through unnoticed.
+    */
+  private def couldHoldObject(root: ConfigObject, definition: DuplicateReport.Definition): Boolean =
+    !definition.arrayPositionsTrusted || objectAt(root, definition.keyPath)
 
   /** Whether the merged tree holds an object at the path. */
   private def objectAt(root: ConfigObject, path: KeyPath): Boolean =
