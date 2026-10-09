@@ -13,7 +13,7 @@ class PluginOptionsTest {
         Files.writeString(dir.resolve(".hocon-fmt.conf"), "separator = \":\"\nfail-on-duplicates = true\n");
         Path file = Files.writeString(dir.resolve("app.conf"), "a=1\na=2\nb {c=3}\n");
         Inspection result = HoconFmt.inspectFile(file, Map.of(), true);
-        assertEquals("a : 2\nb.c : 3\n", Files.readString(file));
+        assertEquals("a: 2\nb.c: 3\n", Files.readString(file));
         assertTrue(result.options().failOnDuplicates());
         assertEquals(1, result.report().findings().size());
         assertEquals("a", result.report().findings().get(0).keyPath());

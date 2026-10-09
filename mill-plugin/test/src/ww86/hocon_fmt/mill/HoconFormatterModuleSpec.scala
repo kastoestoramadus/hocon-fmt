@@ -32,18 +32,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     val stream = PrintStream(output, true, "UTF-8")
     UnitTester(module, os.temp.dir(), outStream = stream, errStream = stream).scoped { eval =>
       files.foreach((path, content) => os.write(module.moduleDir / os.RelPath(path), content, createFolders = true))
-      test("repository style and duplicate warnings match the CLI") {
-    withFiles(project,
-      ".hocon-fmt.conf" -> text("separator = \":\"\n"),
-      "resources/app.conf" -> text("a=1\na=2\nb {c=3}\n")
-    ) { run =>
-      assert(run.eval(project.hoconFormat()).isRight)
-      assertEquals(read(project, "resources/app.conf"), "a : 2\nb.c : 3\n")
-      assert(run.log.contains("defined again"), run.log)
-    }
-  }
-
-  test(Run(eval, output))
+        test(Run(eval, output))
     }
   }
 
@@ -57,6 +46,17 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
   def failure[A](result: Either[ExecResult.Failing[A], ?]): String = result match {
     case Left(ExecResult.Failure(message, _)) => message
     case other                                => fail(s"expected a failure, got $other")
+  }
+
+  test("repository style and duplicate warnings match the CLI") {
+    withFiles(project,
+      ".hocon-fmt.conf" -> text("separator = \":\"\n"),
+      "resources/app.conf" -> text("a=1\na=2\nb {c=3}\n")
+    ) { run =>
+      assert(run.eval(project.hoconFormat()).isRight)
+      assertEquals(read(project, "resources/app.conf"), "a: 2\nb.c: 3\n")
+      assert(run.log.contains("defined again"), run.log)
+    }
   }
 
   test("hoconFormat rewrites the files that are not formatted, and only those") {

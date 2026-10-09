@@ -48,6 +48,19 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   val formatted   = "a = 1\n"
   val duplicated  = "x = 1\nx = 2\n"
 
+  tmp.test("plugin parity fixture uses repository style and the original duplicate report") { dir =>
+    for {
+      _ <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file <- write(dir, "app.conf", "a=1\na=2\nb {c=3}\n")
+      run <- rewrite(file)
+      output <- textOf(file)
+    } yield {
+      assertEquals(output, "a: 2\nb.c: 3\n")
+      assertEquals(run.outcomes.flatMap(_.findings).size, 1)
+      assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
   tmp.test("--check reports exit code 1 for an unformatted file") { dir =>
     write(dir, "a.conf", unformatted).flatMap(check(_)).map(run => assertEquals(run.exitCode, ExitCode(1)))
   }

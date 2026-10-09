@@ -228,6 +228,21 @@ class HoconFormatterPluginFunctionalTest {
         assertEquals(identity, Files.readAttributes(target, "unix:uid,gid,mode"));
     }
 
+    @Test
+    void configChangesInvalidateAnUpToDateCheck() throws IOException {
+        write("src/main/resources/app.conf", "a = 1\n");
+        build("hoconFormatCheck");
+        assertEquals(UP_TO_DATE, build("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        write(".hocon-fmt.conf", "separator = \":\"\n");
+        assertEquals(FAILED, buildAndFail("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        build("hoconFormat");
+        build("hoconFormatCheck");
+        writeBuild("", "hoconFormatter { separator.set(\"=\"); doubleIndent.set(true); simplifyNestedObjects.set(false) }\n");
+        buildAndFail("hoconFormatCheck");
+        build("hoconFormat");
+        assertEquals("a = 1\n", read(projectDir.resolve("src/main/resources/app.conf")));
+    }
+
     void writeBuild(String extraPlugins, String configuration) throws IOException {
         write(
                 "build.gradle.kts",
@@ -255,6 +270,7 @@ class HoconFormatterPluginFunctionalTest {
         List<String> all = new ArrayList<>(List.of(arguments));
         // A deprecation in the plugin should fail here, not in a user's build after the next upgrade.
         all.add("--warning-mode=fail");
+        all.add("-Dmaven.repo.local=" + System.getProperty("maven.repo.local"));
         return GradleRunner.create()
                 .withProjectDir(projectDir.toFile())
                 .withPluginClasspath()
