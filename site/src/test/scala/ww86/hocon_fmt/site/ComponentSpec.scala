@@ -221,6 +221,22 @@ class ComponentSpec extends munit.FunSuite {
     val _ = root.unmount()
   }
 
+  test("the header carries the build's stamp, a muted local build when the build was told nothing") {
+    val container = install(Github())
+    val root      = mount(container)(Page())
+    val header    = find(container, "page-head")
+    assertEquals(header.nodeName.asInstanceOf[String], "HEADER")
+    val stamp = find(container, "deploy")
+    assert(children(header).exists(_ eq stamp), "the stamp belongs to the header, whose corner it marks")
+    assert(hasClass("muted")(stamp), "small and muted, not shouting")
+    assertEquals(
+      stamp.textContent.asInstanceOf[String],
+      "local build",
+      "a test build inherits no deploy values, so it says so"
+    )
+    val _ = root.unmount()
+  }
+
   // --- the playground --------------------------------------------------------------------------
 
   test("the playground formats the first example on the spot, and asks the network for nothing") {
