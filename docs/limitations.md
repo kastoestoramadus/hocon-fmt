@@ -101,6 +101,14 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
   `x` to `{}`; nothing of it survives the merge, it is dropped, and the include's scalar is what
   `x` resolves to. The report does not catch this one: a repeated object merges instead of
   replacing (see "What the duplicate report does not claim").
+- **A definition in a later piece of an array concatenation**: `rows = [0] [{ include "f.conf"`,
+  `q = false`, `q.child = 8 }]`, with `q = { retained = 91 }` in the included file. The file
+  resolves `rows[1].q` to `{ child = 8 }` — `q = false` erased the included object and
+  `q.child = 8` replaced the scalar — and formatted, the dropped `q = false` lets the included
+  object merge back in, resolving `{ child = 8, retained = 91 }`. Each piece of a concatenation
+  counts its elements from zero while the merged list counts them across the pieces, so the merged
+  tree cannot say what stands at the definition's own element; the check refuses the definition
+  rather than read the value of the element its path names there.
 
   The included file cannot be read at format time — a web page has no filesystem, and the target
   may be a URL — so the formatter cannot check whether the dropped definition mattered. It refuses,
@@ -113,8 +121,8 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
   This refuses a little too much. `x.a = 5`, the include, `x {}` is refused even when the included
   file says nothing about `x` (as one research probe's `f.conf` does): the check sees the text, not
   the included file, and a file whose included contents are unknown is not one to resolve on a guess.
-  Of the 524 files in `examples/`, the golden files and the research probes, exactly the three that
-  reproduce the two cases above are refused that were not before.
+  Of the files in `examples/`, the golden files and the research probes, exactly the three that
+  reproduce the cases above are refused that were not before.
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
