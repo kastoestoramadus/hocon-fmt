@@ -11,7 +11,8 @@ Every channel runs the same formatter and follows the same rules:
 - A file that cannot be **read** — missing, or refused by the filesystem — is a different thing
   from a refusal of its content: the run reports `cannot read <path>: <reason>` on stderr and
   exits 2, as a usage error does, so a typo in a CI script's path cannot pass silently. The
-  files it could read are still examined.
+  files it could read are still examined. A failed write similarly reports `cannot write <path>: <reason>`
+  on stderr and exits 2; other files are still processed.
 - Where a key is defined more than once, the later definition wins and the earlier one never takes
   effect; the CLI and every plugin say so as a warning. It changes nothing that is written and no exit code, unless
   `--fail-on-duplicates` asks for it — [the duplicate report](#the-duplicate-report).
@@ -43,7 +44,7 @@ pipeline; `hocon-fmt --check src/` is enough.
 |---|---|
 | 0 | done; with `--check`, every file is formatted or refused, and no finding failed the run |
 | 1 | `--check` found an unformatted file, stdin was refused, or a finding met `--fail-on-duplicates` |
-| 2 | the arguments could not be parsed, a file could not be read, a config file could not be read or trusted, or stdin could not be read |
+| 2 | the arguments could not be parsed, a file could not be read or written, a config file could not be read or trusted, or stdin could not be read |
 
 `--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
 summary. Already formatted input is returned unchanged. A refusal writes nothing to stdout,

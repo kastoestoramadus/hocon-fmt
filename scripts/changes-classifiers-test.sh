@@ -59,6 +59,7 @@ git -C "$repo" add -A
 git -C "$repo" commit -qm base
 base=$(git -C "$repo" rev-parse HEAD)
 
+# Each change is compared with its immediate parent, so earlier changes cannot satisfy it.
 # A docs-only edit stays docs-only, for both classifiers.
 printf 'edited\n' > "$repo/docs/readme.md"
 git -C "$repo" commit -qam "docs: edit"
@@ -67,11 +68,15 @@ check "a docs-only edit (ci.yml)" false \
 check "a docs-only edit (pages.yml)" false \
   "$(classify .github/workflows/pages.yml "$repo" "$base" site)"
 
+base=$(git -C "$repo" rev-parse HEAD)
+
 # A rename inside docs/ too.
 git -C "$repo" mv docs/readme.md docs/readme2.md
 git -C "$repo" commit -qam "docs: rename"
 check "a rename inside docs/ (ci.yml)" false \
   "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
+
+base=$(git -C "$repo" rev-parse HEAD)
 
 # A pure rename surfaces as its destination only under plain --name-only, so the source
 # must be listed too: a code file moved into docs/ would otherwise skip CI (ci.yml) and a
@@ -81,10 +86,14 @@ git -C "$repo" commit -qam "move a config into docs"
 check "a code file renamed into docs/ (ci.yml)" true \
   "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
 
+base=$(git -C "$repo" rev-parse HEAD)
+
 git -C "$repo" mv core/probe2.scala docs/probe2.md
 git -C "$repo" commit -qam "move a core file into docs"
 check "a core file renamed into docs/ (pages.yml)" true \
   "$(classify .github/workflows/pages.yml "$repo" "$base" site)"
+
+base=$(git -C "$repo" rev-parse HEAD)
 
 # The other rename direction is caught by the destination alone; pinned so --no-renames
 # keeps both directions working.
@@ -92,6 +101,14 @@ git -C "$repo" mv docs/readme2.md examples/moved.conf
 git -C "$repo" commit -qam "move docs into examples"
 check "a docs file renamed into code (ci.yml)" true \
   "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
+
+# NOTICE is copied into the site bundle, so changing only it must deploy the new bytes.
+base=$(git -C "$repo" rev-parse HEAD)
+printf 'updated attribution\n' > "$repo/NOTICE"
+git -C "$repo" add NOTICE
+git -C "$repo" commit -qm "update the shipped notice"
+check "the shipped NOTICE changes (pages.yml)" true \
+  "$(classify .github/workflows/pages.yml "$repo" "$base" site)"
 
 # An empty diff (BASE == HEAD) has no paths: docs-only, nothing to run for.
 check "no change at all (ci.yml)" false \

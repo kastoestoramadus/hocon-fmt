@@ -38,7 +38,7 @@ jobs:
           binary=cli/.native/target/scala-3.8.2/hocon-fmt
           printf 'a   =   1\n' > smoke.conf
           if "$binary" --check smoke.conf; then echo "check passed on an unformatted file"; exit 1; fi
-          "$binary" smoke.conf && [ "$(cat smoke.conf)" = "a: 1" ]
+          "$binary" smoke.conf && [ "$(cat smoke.conf)" = "a = 1" ]
       # The wheel behind the pre-commit hooks; its platform tag comes from the binary itself.
       - name: Wheel
         run: python3 python/build_wheel.py --binary cli/.native/target/scala-3.8.2/hocon-fmt

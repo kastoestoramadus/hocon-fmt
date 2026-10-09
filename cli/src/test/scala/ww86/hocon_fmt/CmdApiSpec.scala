@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets.{ISO_8859_1, UTF_8}
 
 import _root_.cats.effect.{ExitCode, IO}
 import _root_.cats.syntax.all.*
-import fs2.io.file.{Files, Path}
+import fs2.io.file.{Files, Path, PosixPermission}
 import fs2.{Chunk, Stream}
 
 import ww86.hocon_fmt.CmdApi.Arguments
@@ -58,6 +58,36 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       assertEquals(output, "a: 2\nb.c: 3\n")
       assertEquals(run.outcomes.flatMap(_.findings).size, 1)
       assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
+  tmp.test("a failed write exits 2 on stderr and other files are still formatted") { dir =>
+    for {
+      file        <- write(dir, "readonly.conf", unformatted)
+      other       <- write(dir, "writable.conf", unformatted)
+      permissions <- Files[IO].getPosixPermissions(file)
+      _           <- Files[IO].setPosixPermissions(
+             file,
+             permissions
+               .remove(PosixPermission.OwnerWrite)
+               .remove(PosixPermission.GroupWrite)
+               .remove(PosixPermission.OthersWrite)
+           )
+      writable  <- Files[IO].isWritable(file)
+      run       <- rewrite(file, other)
+      unchanged <- textOf(file)
+      rewritten <- textOf(other)
+    } yield {
+      assertEquals(run.outcomes.size, 2)
+      assertEquals(rewritten, formatted)
+      // Root may write a read-only file; every other caller must receive an I/O failure.
+      if (writable) assertEquals(run.exitCode, ExitCode.Success)
+      else {
+        assertEquals(run.exitCode, ExitCode(2))
+        assert(run.errors.contains(s"cannot write $file:"), run.errors)
+        assert(!run.rendered.contains(file.toString), run.rendered)
+        assertEquals(unchanged, unformatted)
+      }
     }
   }
 
@@ -237,6 +267,27 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     } yield {
       assertEquals(run.outcomes.map(_.path).toSet, wanted)
       assertEquals(run.exitCode, ExitCode(1))
+    }
+  }
+
+  List("", "unrelated.txt\n", "!keep.conf\n").foreach { local =>
+    tmp.test(s"an unmatched nested .gitignore preserves inherited exclusions: $local") { dir =>
+      val sub = dir / "sub"
+      for {
+        _      <- write(dir, ".gitignore", "ignored.conf\n")
+        _      <- Files[IO].createDirectory(sub)
+        _      <- write(sub, ".gitignore", local)
+        hidden <- write(sub, "ignored.conf", unformatted)
+        kept   <- write(sub, "keep.conf", unformatted)
+        run    <-
+          CmdApi.examineAll(CmdApi.Arguments(List(dir), checkOnly = false, config = None, style = StyleOverrides.none))
+        bytes  <- Files[IO].readAll(hidden).through(fs2.text.utf8.decode).compile.string
+        wanted <- Files[IO].realPath(kept)
+      } yield {
+        val outcomes = run.toOption.toList.flatMap(_.outcomes)
+        assertEquals(outcomes.map(_.path), List(wanted.toString))
+        assertEquals(bytes, unformatted)
+      }
     }
   }
 

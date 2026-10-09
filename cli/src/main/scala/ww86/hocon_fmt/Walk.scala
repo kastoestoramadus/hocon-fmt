@@ -110,7 +110,7 @@ object Walk {
     def relative(base: Path): Option[String] =
       Option.when(path.toString.startsWith(base.toString + "/"))(path.toString.drop(base.toString.length + 1))
     active.reverse.iterator
-      .flatMap(file => relative(file.base).map(rel => file.ignore.excluded(rel, isDirectory)))
+      .flatMap(file => relative(file.base).flatMap(rel => file.ignore.decision(rel, isDirectory)))
       .collectFirst { case answer => answer }
       .getOrElse(false)
   }

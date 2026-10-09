@@ -52,7 +52,7 @@ jobs:
               if [ -n "$files" ]; then
                 while IFS= read -r file; do
                   case "$file" in
-                    site/*|core/*|examples/*|build.sbt|project/*|scripts/fetch-sconfig-fork.sh|.github/workflows/pages.yml)
+                    site/*|core/*|examples/*|NOTICE|build.sbt|project/*|scripts/fetch-sconfig-fork.sh|.github/workflows/pages.yml)
                       site=true; break ;;
                   esac
                 done <<< "$files"
