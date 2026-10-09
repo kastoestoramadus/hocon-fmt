@@ -100,6 +100,35 @@ class CliAcceptanceSuite extends munit.FunSuite {
       assertEquals(r.stdoutText, "")
     }
 
+    test(s"[$runtime] a missing file exits 2 and is named on stderr, not stdout") {
+      val dir = os.temp.dir()
+      val r   = os
+        .proc(cli, "--check", "nope.conf")
+        .call(cwd = dir, stdout = os.Pipe, stderr = os.Pipe, env = Map("LC_ALL" -> "C", "LANG" -> "C"), check = false)
+      assertEquals(r.exitCode, 2)
+      val err = own(r.err.text())
+      assert(err.contains("cannot read"), err)
+      assert(err.contains("nope.conf"), err)
+      assert(err.contains("no such file"), err)
+      assert(!r.out.text().contains("nope.conf"), r.out.text())
+    }
+
+    test(s"[$runtime] a directory argument is walked and --check names the files inside") {
+      val dir = os.temp.dir()
+      os.makeDir.all(dir / "nested")
+      os.write(dir / "a.conf", unformatted)
+      os.write(dir / "b.txt", unformatted)
+      os.write(dir / "nested" / "c.hocon", unformatted)
+      val r = os
+        .proc(cli, "--check", dir)
+        .call(cwd = dir, stdout = os.Pipe, stderr = os.Pipe, env = Map("LC_ALL" -> "C", "LANG" -> "C"), check = false)
+      assertEquals(r.exitCode, 1)
+      val out = r.out.text()
+      assert(out.contains("a.conf"), out)
+      assert(out.contains("c.hocon"), out)
+      assert(!out.contains("b.txt"), out)
+    }
+
     test(s"[$runtime] --version prints the version") {
       val r = redirected(cli, "C", Array.emptyByteArray, "--version")
       assertEquals(r.exitCode, 0)

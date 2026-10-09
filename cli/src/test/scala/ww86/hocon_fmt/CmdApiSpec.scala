@@ -144,14 +144,34 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
-  tmp.test("a file that cannot be read is reported without stopping the others") { dir =>
+  // A missing file is not a refusal of any content: it is the run's own error, as a usage error
+  // is, so a typo in a CI script's path cannot pass silently.
+  tmp.test("a missing file is reported as unreadable and exits 2, without stopping the others") { dir =>
     for {
       file <- write(dir, "a.conf", unformatted)
       run  <- rewrite(dir / "missing.conf", file)
       text <- textOf(file)
     } yield {
-      assert(run.rendered.contains("missing.conf"), run.rendered)
+      assertEquals(run.exitCode, ExitCode(2))
+      assertEquals(run.errors, s"cannot read ${(dir / "missing.conf").absolute}: no such file\n")
+      assert(!run.rendered.contains("missing.conf"), run.rendered)
       assertEquals(text, formatted)
+    }
+  }
+
+  tmp.test("--check exits 2 when a file is missing even when another is unformatted") { dir =>
+    for {
+      unformattedFile <- write(dir, "present.conf", unformatted)
+      run             <- check(dir / "missing.conf", unformattedFile)
+    } yield assertEquals(run.exitCode, ExitCode(2))
+  }
+
+  tmp.test("a directory named for formatting that does not exist is unreadable too") { dir =>
+    for {
+      run <- rewrite(dir / "nope" / "deep.conf")
+    } yield {
+      assertEquals(run.exitCode, ExitCode(2))
+      assert(run.errors.contains("no such file"), run.errors)
     }
   }
 
@@ -164,6 +184,112 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     } yield {
       assertEquals(run.outcomes.size, 1, run.rendered)
       assertEquals(text, formatted)
+    }
+  }
+
+  // --- directories and ignores ------------------------------------------------------------------
+  //
+  // The walk mirrors prettier and ruff: a directory argument is walked for *.conf and *.hocon,
+  // hidden entries and what .gitignore excludes are skipped, and a file named outright is
+  // examined even when ignored — the user typed that path.
+
+  tmp.test("a directory argument is walked for conf and hocon files, and nothing else") { dir =>
+    val nested = dir / "nested"
+    for {
+      _      <- Files[IO].createDirectory(nested)
+      a      <- write(dir, "a.conf", unformatted)
+      b      <- write(dir, "b.hocon", unformatted)
+      _      <- write(dir, "c.txt", unformatted)
+      d      <- write(nested, "d.conf", unformatted)
+      run    <- check(dir)
+      wanted <- List(a, b, d).traverse(Files[IO].realPath).map(_.map(_.toString).toSet)
+    } yield {
+      assertEquals(run.exitCode, ExitCode(1))
+      assertEquals(run.outcomes.map(_.path).toSet, wanted)
+    }
+  }
+
+  tmp.test("hidden entries are not walked, and an empty walk is a successful run") { dir =>
+    for {
+      _   <- Files[IO].createDirectory(dir / ".cache")
+      _   <- write(dir, ".secret.conf", unformatted)
+      _   <- write(dir / ".cache", "d.conf", unformatted)
+      run <- check(dir)
+    } yield {
+      assertEquals(run.outcomes, Nil)
+      assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
+  tmp.test("the walk skips what .gitignore excludes, and a deeper .gitignore can re-include") { dir =>
+    val sub = dir / "sub"
+    for {
+      _      <- write(dir, ".gitignore", "ignored.conf\ngen/\n")
+      _      <- write(dir, "ignored.conf", unformatted)
+      _      <- Files[IO].createDirectory(dir / "gen")
+      _      <- write(dir / "gen", "x.conf", unformatted)
+      _      <- Files[IO].createDirectory(sub)
+      _      <- write(sub, ".gitignore", "*.conf\n!keep.conf\n")
+      _      <- write(sub, "other.conf", unformatted)
+      kept   <- write(sub, "keep.conf", unformatted)
+      run    <- check(dir)
+      wanted <- List(kept).traverse(Files[IO].realPath).map(_.map(_.toString).toSet)
+    } yield {
+      assertEquals(run.outcomes.map(_.path).toSet, wanted)
+      assertEquals(run.exitCode, ExitCode(1))
+    }
+  }
+
+  tmp.test("a file named on the command line is examined even when .gitignore excludes it") { dir =>
+    for {
+      _    <- write(dir, ".gitignore", "a.conf\n")
+      file <- write(dir, "a.conf", unformatted)
+      run  <- check(file)
+    } yield {
+      assertEquals(run.outcomes.size, 1)
+      assertEquals(run.exitCode, ExitCode(1))
+    }
+  }
+
+  tmp.test("a symlinked directory is not followed") { dir =>
+    val real = dir / "real"
+    for {
+      _      <- Files[IO].createDirectory(real)
+      linked <- write(real, "x.conf", unformatted)
+      _      <- Files[IO].createSymbolicLink(dir / "link", real)
+      run    <- check(dir)
+      wanted <- Files[IO].realPath(linked).map(path => Set(path.toString))
+    } yield {
+      assertEquals(run.outcomes.map(_.path).toSet, wanted)
+      assertEquals(run.exitCode, ExitCode(1))
+    }
+  }
+
+  tmp.test("a walked directory is rewritten file by file") { dir =>
+    val nested = dir / "nested"
+    for {
+      _     <- Files[IO].createDirectory(nested)
+      a     <- write(dir, "a.conf", unformatted)
+      b     <- write(nested, "b.conf", unformatted)
+      run   <- rewrite(dir)
+      aText <- textOf(a)
+      bText <- textOf(b)
+    } yield {
+      assertEquals(run.exitCode, ExitCode.Success)
+      assertEquals(aText, formatted)
+      assertEquals(bText, formatted)
+    }
+  }
+
+  tmp.test("an ignored file is not rewritten by a walked directory either") { dir =>
+    for {
+      _    <- write(dir, ".gitignore", "gen.conf\n")
+      file <- write(dir, "gen.conf", unformatted)
+      run  <- rewrite(dir)
+      text <- textOf(file)
+    } yield {
+      assertEquals(run.outcomes, Nil)
+      assertEquals(text, unformatted)
     }
   }
 
