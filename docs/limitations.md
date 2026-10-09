@@ -214,9 +214,9 @@ include that reaches one of these is reported and left alone.
   shows it does.
 - **A symlink is followed, and the name that decides is its target's.** So `alias.json` pointing at
   `target.conf` is formatted, and `alias.conf` pointing at `target.json` is refused as a JSON file.
-  A directory walk decides what to visit by the entry's own name: an `alias.json` symlink is not
-  visited there, while an `alias.conf` one is and formats its target. If you need the link's own
-  name to decide, open an issue and tell us — the behaviour can change.
+  A directory walk instead decides what to visit by the entry's own name: an `alias.json` symlink
+  is not visited there, while an `alias.conf` one is visited and the target's name then decides.
+  If you need the link's own name to decide, open an issue and tell us — the behaviour can change.
 - **When the staged replacement cannot prove it keeps the file's owner, group and mode bits — or
   the file or its directory is not writable — the formatted text is written in place.** That keeps
   the inode, but not the crash-atomicity of a rename: the write truncates first, so an interrupted

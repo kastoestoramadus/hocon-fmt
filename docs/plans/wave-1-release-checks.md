@@ -23,7 +23,7 @@ append-only, so a checked item is recorded here rather than ticked in its own fi
 
 The wave-1 suites ran green from this worktree: `coreJVM/test` 450 passed, `catsJVM/test` 18,
 `cliJVM/test` 64, `acceptance/test` 57 (the CLI's real-process suite), `checkReleaseSet` passed, and
-`scripts/improvement-log.py` exits 0 over 72 entries.
+`scripts/improvement-log.py` exits 0 over 73 entries.
 
 ## Remains
 
