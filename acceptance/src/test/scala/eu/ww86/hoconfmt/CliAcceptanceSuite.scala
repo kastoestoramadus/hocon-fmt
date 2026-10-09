@@ -12,7 +12,12 @@ class CliAcceptanceSuite extends munit.FunSuite {
       .getOrElse(sys.error(s"$name is not set; run this suite through sbt acceptance/test"))
 
   private val runtimes: List[(String, Seq[String])] = List(
-    "jvm"    -> Seq(s"${sys.props("java.home")}/bin/java", "-cp", property("cli.jvm.classpath"), "eu.ww86.hoconfmt.CmdApi"),
+    "jvm" -> Seq(
+      s"${sys.props("java.home")}/bin/java",
+      "-cp",
+      property("cli.jvm.classpath"),
+      "eu.ww86.hoconfmt.CmdApi"
+    ),
     "node"   -> Seq("node", property("cli.node.main")),
     "native" -> Seq(property("cli.native.binary"))
   )
