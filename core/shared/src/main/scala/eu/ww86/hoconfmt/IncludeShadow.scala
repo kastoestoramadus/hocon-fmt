@@ -69,8 +69,8 @@ private[hoconfmt] object IncludeShadow {
     * its line are one of these pairs. The line alone cannot decide it, since `a.o = 3` writes the
     * object `a` and the value `a.o` on one line, and the object the merge keeps would make the
     * dropped leaf look kept. Neither can the pair decide between two definitions written on one
-    * line, which share both halves; [[replacedOnItsLine]] refuses those rather than let one vouch
-    * for the other.
+    * line, which share both halves; [[overshadowedOnItsLine]] names those, and the candidate filter
+    * refuses one of the two rather than let the other vouch for it.
     *
     * The root's own origin is left out: it is the text's first line, which a definition can share
     * only by standing at the very top, where no include can stand before it. Objects, arrays and
