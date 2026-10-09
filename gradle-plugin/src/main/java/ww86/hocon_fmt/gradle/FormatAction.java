@@ -26,6 +26,10 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         DirectoryProperty getProjectDirectory();
 
         Property<Boolean> getCheckOnly();
+        Property<String> getSeparator();
+        Property<Boolean> getDoubleIndent();
+        Property<Boolean> getSimplifyNestedObjects();
+        Property<Boolean> getFailOnDuplicates();
     }
 
     /** What the formatter makes of one file's content. */
@@ -60,12 +64,26 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
     @Override
     public void execute() {
         Path root = getParameters().getProjectDirectory().get().getAsFile().toPath();
+        var overrides = new java.util.HashMap<String, String>();
+        if (getParameters().getSeparator().isPresent()) overrides.put("separator", getParameters().getSeparator().get().toString());
+        if (getParameters().getDoubleIndent().isPresent()) overrides.put("double-indent", getParameters().getDoubleIndent().get().toString());
+        if (getParameters().getSimplifyNestedObjects().isPresent()) overrides.put("simplify-nested-objects", getParameters().getSimplifyNestedObjects().get().toString());
+        if (getParameters().getFailOnDuplicates().isPresent()) overrides.put("fail-on-duplicates", getParameters().getFailOnDuplicates().get().toString());
+        var duplicateFailure = new java.util.concurrent.atomic.AtomicBoolean(false);
         List<Examined> examined = getParameters().getFiles().getFiles().stream()
                 .map(File::toPath)
                 .sorted(Comparator.naturalOrder())
                 .map(file -> {
                     String path = root.relativize(file).toString();
-                    return new Examined(file, path, Outcome.of(examine(file, getParameters().getCheckOnly().get())));
+                    try {
+                        var inspection = HoconFmt.inspectFile(file, overrides, !getParameters().getCheckOnly().get());
+                        inspection.report().findings().forEach(finding -> LOGGER.warn("{}: {}", path, finding.warning()));
+                        inspection.report().failure().ifPresent(reason -> LOGGER.warn("{}: duplicate report could not run: {}", path, reason));
+                        if (inspection.failsOnDuplicates()) duplicateFailure.set(true);
+                        return new Examined(file, path, Outcome.of(inspection.verdict()));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
                 })
                 .toList();
 
@@ -79,6 +97,7 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         } else {
             format(examined);
         }
+        if (duplicateFailure.get()) throw new GradleException("HOCON duplicate definitions found.");
     }
 
     static void format(List<Examined> examined) {
@@ -115,11 +134,4 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         return examined.stream().filter(file -> kind.isInstance(file.outcome())).count();
     }
 
-    static Verdict examine(Path file, boolean checkOnly) {
-        try {
-            return checkOnly ? HoconFmt.checkFile(file) : HoconFmt.formatFile(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
 }

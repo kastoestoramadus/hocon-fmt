@@ -12,7 +12,6 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.codehaus.plexus.util.DirectoryScanner;
 import ww86.hocon_fmt.java.HoconFmt;
-import ww86.hocon_fmt.java.Verdict;
 
 /** What both goals share: which files to look at, and what the formatter makes of each. */
 abstract class HoconFormatterMojo extends AbstractMojo {
@@ -31,6 +30,18 @@ abstract class HoconFormatterMojo extends AbstractMojo {
   @Parameter(property = "hocon-fmt.skip", defaultValue = "false")
   private boolean skip;
 
+  @Parameter(property = "hocon-fmt.separator", alias = "separator")
+  private String separator;
+
+  @Parameter(property = "hocon-fmt.double-indent", alias = "double-indent")
+  private String doubleIndent;
+
+  @Parameter(property = "hocon-fmt.simplify-nested-objects", alias = "simplify-nested-objects")
+  private String simplifyNestedObjects;
+
+  @Parameter(property = "hocon-fmt.fail-on-duplicates", alias = "fail-on-duplicates")
+  private String failOnDuplicates;
+
   /** A matching file, the path it is reported under, and what the formatter makes of it. */
   record Examined(Path file, String relativePath, Outcome outcome) {}
 
@@ -41,16 +52,32 @@ abstract class HoconFormatterMojo extends AbstractMojo {
       return;
     }
 
+    boolean duplicateFailure = false;
+    var overrides = new java.util.HashMap<String, String>();
+    if (separator != null) overrides.put("separator", separator);
+    if (doubleIndent != null) overrides.put("double-indent", doubleIndent);
+    if (simplifyNestedObjects != null) overrides.put("simplify-nested-objects", simplifyNestedObjects);
+    if (failOnDuplicates != null) overrides.put("fail-on-duplicates", failOnDuplicates);
     var examined = new ArrayList<Examined>();
     for (String relativePath : matchingFiles()) {
       Path file = baseDirectory.toPath().resolve(relativePath);
-      Outcome outcome = examine(file, relativePath);
+      Outcome outcome;
+      try {
+        var inspection = HoconFmt.inspectFile(file, overrides, this instanceof FormatMojo);
+        outcome = Outcome.of(inspection.verdict());
+        inspection.report().findings().forEach(finding -> getLog().warn(relativePath + ": " + finding.warning()));
+        inspection.report().failure().ifPresent(reason -> getLog().warn(relativePath + ": duplicate report could not run: " + reason));
+        duplicateFailure |= inspection.failsOnDuplicates();
+      } catch (IOException | IllegalArgumentException e) {
+        throw new MojoExecutionException("Cannot process " + relativePath + ": " + e.getMessage(), e);
+      }
       if (outcome instanceof Outcome.Refused refused) {
         getLog().warn("Leaving " + relativePath + " unchanged: " + refused.reason());
       }
       examined.add(new Examined(file, relativePath, outcome));
     }
     actOn(examined);
+    if (duplicateFailure) throw new MojoFailureException("HOCON duplicate definitions found.");
   }
 
   /** Receives every matching file; the ones the formatter refused are already reported. */
@@ -80,15 +107,4 @@ abstract class HoconFormatterMojo extends AbstractMojo {
     return Arrays.stream(scanner.getIncludedFiles()).sorted().toList();
   }
 
-  Verdict verdictFor(Path file) throws IOException {
-    return HoconFmt.checkFile(file);
-  }
-
-  private Outcome examine(Path file, String relativePath) throws MojoExecutionException {
-    try {
-      return Outcome.of(verdictFor(file));
-    } catch (IOException e) {
-      throw new MojoExecutionException("Cannot process " + relativePath, e);
-    }
-  }
 }

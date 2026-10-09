@@ -9,7 +9,7 @@ Every channel runs the same formatter and follows the same rules:
   untouched. A refusal never fails the run: a `.conf` file that is not HOCON at all, such as an
   nginx config, is common enough that failing on it would make the tool unusable.
 - Where a key is defined more than once, the later definition wins and the earlier one never takes
-  effect; the CLI says so as a warning. It changes nothing that is written and no exit code, unless
+  effect; the CLI and every plugin say so as a warning. It changes nothing that is written and no exit code, unless
   `--fail-on-duplicates` asks for it — [the duplicate report](#the-duplicate-report).
 
 Library adapters expose refusals to the caller: the ZIO adapter uses a typed error for a
@@ -251,6 +251,22 @@ puts it in Maven Local for development, and releases carry it to Maven Central w
 pulls in the core and jspecify. A consumer declares only
 `implementation("eu.ww86:hocon-fmt-java-api:0.1.0")`.
 
+The Java API also exposes `FormatOptions` and `DuplicateReport` as JSpecify-marked records.
+`HoconFmt.check(text, name, options)` uses explicit options;
+`parseOptions(text, name)` reuses the core's config parser. `optionsFor(path, overrides)` reads
+the repository config and applies a `Map<String, String>` of explicitly supplied CLI-named keys.
+`inspectFile(path, overrides, write)` reads the source once and returns an `Inspection` holding
+its verdict, original duplicate report and effective options. Callers decide how warnings fail
+their run; `failsOnDuplicates()` applies the repository policy. A report's `failure()` is an
+`Optional<String>` and must be surfaced instead of treating it as zero findings.
+
+```java
+var inspection = HoconFmt.inspectFile(path, Map.of("fail-on-duplicates", "true"), false);
+inspection.report().findings().forEach(finding -> logger.warn(finding.warning()));
+inspection.report().failure().ifPresent(logger::warn);
+if (inspection.failsOnDuplicates()) throw new IllegalStateException("Dead duplicate definitions");
+```
+
 ## pre-commit
 
 ```yaml
@@ -267,6 +283,62 @@ install ruff, so they need nothing but the Python pre-commit already runs on. Wh
 native build, such as Windows, use `hocon-fmt-node` and `hocon-fmt-check-node`, which
 run the Node build. On 20 files a hook run takes about 155 ms native against 290 ms on Node, and
 its environment is 29 MB against 233 MB, mostly the Node that pre-commit downloads.
+
+## Repository options in build tools
+
+Every plugin discovers `.hocon-fmt.conf` from each formatted file's directory upwards,
+including the first directory holding `.git` (a directory or a worktree's file), and stops there.
+The nearest config wins. Invalid UTF-8, unknown keys and invalid values fail the task with the
+config's name. Only explicit plugin settings override it; an unset setting preserves the
+repository value, then the formatter default.
+
+| CLI/config name | sbt key (`Option`) | Gradle property | Maven parameter / system property |
+|---|---|---|---|
+| `separator` | `hoconSeparator` | `separator` | `separator` / `hocon-fmt.separator` |
+| `double-indent` | `hoconDoubleIndent` | `doubleIndent` | `double-indent` / `hocon-fmt.double-indent` |
+| `simplify-nested-objects` | `hoconSimplifyNestedObjects` | `simplifyNestedObjects` | `simplify-nested-objects` / `hocon-fmt.simplify-nested-objects` |
+| `fail-on-duplicates` | `hoconFailOnDuplicates` | `failOnDuplicates` | `fail-on-duplicates` / `hocon-fmt.fail-on-duplicates` |
+
+Mill accepts these names as arguments to both commands: `--separator :`,
+`--double-indent true`, `--simplify-nested-objects false`, `--fail-on-duplicates true`.
+Boolean arguments take a value, so `false` explicitly overrides a repository's `true`.
+
+All plugins warn about dead duplicate definitions using the original text, before formatting
+removes them. Both format and check fail on findings only when `fail-on-duplicates` is true;
+format still writes the same output, as the CLI does. A report failure is a warning rather than
+an empty successful report. Formatting refusals retain their usual policy.
+
+```scala
+// sbt: each aggregated project keeps its own settings
+hoconSeparator := Some(":")
+hoconFailOnDuplicates := Some(true)
+```
+
+```kotlin
+// Gradle: these properties are unset by default
+hoconFormatter {
+    separator.set(":")
+    failOnDuplicates.set(true)
+}
+```
+
+```xml
+<!-- Maven plugin configuration -->
+<configuration>
+  <separator>:</separator>
+  <double-indent>true</double-indent>
+  <fail-on-duplicates>true</fail-on-duplicates>
+</configuration>
+```
+
+```sh
+./mill app.hoconFormat --separator : --fail-on-duplicates true
+mvn hocon-fmt:check -Dhocon-fmt.fail-on-duplicates=true
+```
+
+Gradle tracks ancestor config files as check inputs, including absent files, so adding, deleting
+or editing a config invalidates an up-to-date check. `scripts/plugin-parity.sh` runs the shared
+fixture through the CLI and scripted, TestKit, invoker and both supported Mill test hosts.
 
 ## sbt
 

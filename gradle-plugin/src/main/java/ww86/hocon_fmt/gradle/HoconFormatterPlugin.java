@@ -35,6 +35,10 @@ public final class HoconFormatterPlugin implements Plugin<Project> {
         project.getTasks().withType(HoconFormatterTask.class).configureEach(task -> {
             task.setGroup(GROUP);
             task.getSource().from(extension.getSource());
+            task.getSeparator().set(extension.getSeparator());
+            task.getDoubleIndent().set(extension.getDoubleIndent());
+            task.getSimplifyNestedObjects().set(extension.getSimplifyNestedObjects());
+            task.getFailOnDuplicates().set(extension.getFailOnDuplicates());
             task.getFormatterClasspath().from(formatterClasspath);
             task.getProjectDirectory().set(project.getLayout().getProjectDirectory());
         });

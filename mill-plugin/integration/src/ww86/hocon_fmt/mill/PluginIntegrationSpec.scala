@@ -22,6 +22,31 @@ class PluginIntegrationSpec extends munit.FunSuite {
                  |}
                  |""".stripMargin
 
+  test("repository config, explicit overrides and duplicate failures match the CLI fixture") {
+    val tester = IntegrationTester(
+      daemonMode = false,
+      workspaceSourcePath = os.Path(sys.env("MILL_TEST_RESOURCE_DIR")) / "options-project",
+      millExecutable = os.Path(sys.env("MILL_EXECUTABLE_PATH"))
+    )
+    try {
+      os.write(tester.workspacePath / "build.mill", build)
+      val file = tester.workspacePath / "app" / "resources" / "app.conf"
+      val input = os.read(tester.workspacePath / "input.conf")
+      val format = tester.eval("app.hoconFormat")
+      assert(format.isSuccess, format.debugString)
+      assert(format.err.contains("defined again"), format.debugString)
+      assertEquals(os.read(file), os.read(tester.workspacePath / "expected.conf"))
+      os.write.over(file, input)
+      val failure = tester.eval(Seq("app.hoconFormat", "--fail-on-duplicates", "true"))
+      assert(!failure.isSuccess, failure.debugString)
+      assert(failure.err.contains("duplicate definitions"), failure.debugString)
+      os.write.over(file, input)
+      val overrideStyle = tester.eval(Seq("app.hoconFormat", "--separator", "=", "--double-indent", "true", "--simplify-nested-objects", "false"))
+      assert(overrideStyle.isSuccess, overrideStyle.debugString)
+      assertEquals(os.read(file), "a = 2\nb {\n    c = 3\n}\n")
+    } finally tester.close()
+  }
+
   test("__.hoconFormatCheck names the unformatted files of every module, __.hoconFormat fixes them") {
     val tester = IntegrationTester(
       daemonMode = false,

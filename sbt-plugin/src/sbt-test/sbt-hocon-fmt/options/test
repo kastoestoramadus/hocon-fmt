@@ -1,0 +1,20 @@
+> hoconFormat
+$ must-mirror src/main/resources/app.conf expected.conf
+> assertFixtureBytes
+> assertWarning
+$ copy-file input.conf src/main/resources/app.conf
+> set hoconFailOnDuplicates := Some(true)
+-> hoconFormat
+$ copy-file input.conf src/main/resources/app.conf
+> set hoconFailOnDuplicates := Some(false)
+> set hoconSeparator := Some("=")
+> set hoconDoubleIndent := Some(true)
+> set hoconSimplifyNestedObjects := Some(false)
+> hoconFormat
+$ must-mirror src/main/resources/app.conf override.conf
+> set hoconSeparator := None
+> set hoconDoubleIndent := None
+> set hoconSimplifyNestedObjects := None
+> prepareAlias
+> hoconFormat
+> assertAliasStyle

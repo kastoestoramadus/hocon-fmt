@@ -38,6 +38,19 @@ class HoconFormatterPluginFunctionalTest {
     }
 
     @Test
+    void repositoryStyleAndDuplicatesMatchTheCli() throws IOException {
+        Path fixture = Path.of("../test-fixtures/plugin-options");
+        write(".hocon-fmt.conf", Files.readString(fixture.resolve(".hocon-fmt.conf")));
+        Path file = write("src/main/resources/app.conf", Files.readString(fixture.resolve("input.conf")));
+        String output = build("hoconFormat").getOutput();
+        assertEquals(Files.readString(fixture.resolve("expected.conf")), read(file));
+        assertTrue(output.contains("defined again"), output);
+        write("src/main/resources/app.conf", Files.readString(fixture.resolve("input.conf")));
+        writeBuild("", "hoconFormatter { failOnDuplicates.set(true) }\n");
+        assertTrue(buildAndFail("hoconFormat").getOutput().contains("duplicate"));
+    }
+
+    @Test
     void formatRewritesAnUnformattedFileAndLeavesAFormattedOneAlone() throws IOException {
         Path unformatted = write("src/main/resources/unformatted.conf", UNFORMATTED);
         Path formatted = write("src/main/resources/formatted.hocon", FORMATTED);
@@ -215,6 +228,31 @@ class HoconFormatterPluginFunctionalTest {
         assertEquals(identity, Files.readAttributes(target, "unix:uid,gid,mode"));
     }
 
+    @Test
+    void configChangesInvalidateAnUpToDateCheck() throws IOException {
+        write("src/main/resources/app.conf", "a = 1\n");
+        build("hoconFormatCheck");
+        assertEquals(UP_TO_DATE, build("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        write(".hocon-fmt.conf", "separator = \":\"\n");
+        assertEquals(FAILED, buildAndFail("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        build("hoconFormat");
+        build("hoconFormatCheck");
+        writeBuild("", "hoconFormatter { separator.set(\"=\"); doubleIndent.set(true); simplifyNestedObjects.set(false) }\n");
+        buildAndFail("hoconFormatCheck");
+        build("hoconFormat");
+        assertEquals("a = 1\n", read(projectDir.resolve("src/main/resources/app.conf")));
+    }
+
+    @Test
+    void duplicateFailureStillNamesEveryUnformattedFile() throws IOException {
+        write(".hocon-fmt.conf", "fail-on-duplicates = true\n");
+        write("src/main/resources/duplicate.conf", "a=1\na=2\n");
+        write("src/main/resources/other.conf", "b=3\n");
+        String output = buildAndFail("hoconFormatCheck").getOutput();
+        assertTrue(output.contains("defined again"), output);
+        assertTrue(output.contains("other.conf"), output);
+    }
+
     void writeBuild(String extraPlugins, String configuration) throws IOException {
         write(
                 "build.gradle.kts",
@@ -242,6 +280,7 @@ class HoconFormatterPluginFunctionalTest {
         List<String> all = new ArrayList<>(List.of(arguments));
         // A deprecation in the plugin should fail here, not in a user's build after the next upgrade.
         all.add("--warning-mode=fail");
+        all.add("-Dmaven.repo.local=" + System.getProperty("maven.repo.local"));
         return GradleRunner.create()
                 .withProjectDir(projectDir.toFile())
                 .withPluginClasspath()

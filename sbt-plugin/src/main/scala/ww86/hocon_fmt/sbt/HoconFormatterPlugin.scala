@@ -14,9 +14,13 @@ object HoconFormatterPlugin extends AutoPlugin {
   override def requires = plugins.JvmPlugin
 
   object autoImport {
-    val hoconFormat        = taskKey[Unit]("Rewrites the HOCON files that are not formatted.")
-    val hoconFormatCheck   = taskKey[Unit]("Fails if any HOCON file is not formatted, naming each one.")
-    val hoconFormatSources = taskKey[Seq[File]](
+    val hoconSeparator             = settingKey[Option[String]]("Overrides separator (= or :).")
+    val hoconDoubleIndent          = settingKey[Option[Boolean]]("Overrides double-indent.")
+    val hoconSimplifyNestedObjects = settingKey[Option[Boolean]]("Overrides simplify-nested-objects.")
+    val hoconFailOnDuplicates      = settingKey[Option[Boolean]]("Overrides fail-on-duplicates.")
+    val hoconFormat                = taskKey[Unit]("Rewrites the HOCON files that are not formatted.")
+    val hoconFormatCheck           = taskKey[Unit]("Fails if any HOCON file is not formatted, naming each one.")
+    val hoconFormatSources         = taskKey[Seq[File]](
       "The HOCON files to format: *.conf and *.hocon in the Compile and Test resource directories by default."
     )
   }
@@ -27,9 +31,31 @@ object HoconFormatterPlugin extends AutoPlugin {
     taskKey[Seq[File]]("The formatter and its dependencies, resolved apart from the build's own.")
       .withRank(KeyRanks.Invisible)
 
-  final case class Examined(file: File, path: String, verdict: Verdict)
+  private val hoconInputs =
+    taskKey[Seq[(File, Map[String, String])]]("Sources with their project's explicit overrides.")
+
+  final case class Examined(
+      file: File,
+      path: String,
+      verdict: Verdict,
+      warnings: Seq[String],
+      failsOnDuplicates: Boolean
+  )
 
   override def projectSettings: Seq[Setting[_]] = Seq(
+    hoconSeparator             := None,
+    hoconDoubleIndent          := None,
+    hoconSimplifyNestedObjects := None,
+    hoconFailOnDuplicates      := None,
+    hoconInputs                := {
+      val overrides = Seq(
+        hoconSeparator.value.map("separator" -> _),
+        hoconDoubleIndent.value.map(value => "double-indent" -> value.toString),
+        hoconSimplifyNestedObjects.value.map(value => "simplify-nested-objects" -> value.toString),
+        hoconFailOnDuplicates.value.map(value => "fail-on-duplicates" -> value.toString)
+      ).flatten.toMap
+      hoconFormatSources.value.map(_ -> overrides)
+    },
     hoconFormatSources := {
       val directories = (Compile / unmanagedResourceDirectories).value ++ (Test / unmanagedResourceDirectories).value
       directories.flatMap(directory => (directory ** ("*.conf" || "*.hocon")).get)
@@ -52,27 +78,31 @@ object HoconFormatterPlugin extends AutoPlugin {
       val log      = streams.value.log
       val examined = examine(
         (ThisBuild / baseDirectory).value,
-        hoconFormatSources.all(ScopeFilter(inAggregates(ThisProject))).value.flatten,
+        hoconInputs.all(ScopeFilter(inAggregates(ThisProject))).value.flatten,
         hoconFormatterClasspath.value,
         write = true
       )
+      examined.foreach(e => e.warnings.foreach(warning => log.warn(s"${e.path}: $warning")))
       examined.foreach {
-        case Examined(_, path, Verdict.NeedsFormatting(_)) =>
+        case Examined(_, path, Verdict.NeedsFormatting(_), _, _) =>
           log.info(s"Formatted $path")
-        case Examined(_, path, Verdict.Refused(_, reason)) => log.warn(refusal(path, reason))
-        case _                                             => ()
+        case Examined(_, path, Verdict.Refused(_, reason), _, _) => log.warn(refusal(path, reason))
+        case _                                                   => ()
       }
       log.info(summary(examined, needingFormatAre = "formatted"))
+      failOnDuplicates(examined)
     },
     hoconFormatCheck := {
       val log      = streams.value.log
       val examined = examineAll.value
+      examined.foreach(e => e.warnings.foreach(warning => log.warn(s"${e.path}: $warning")))
       examined.foreach {
-        case Examined(_, path, Verdict.NeedsFormatting(_)) => log.warn(s"Not formatted: $path")
-        case Examined(_, path, Verdict.Refused(_, reason)) => log.warn(refusal(path, reason))
-        case _                                             => ()
+        case Examined(_, path, Verdict.NeedsFormatting(_), _, _) => log.warn(s"Not formatted: $path")
+        case Examined(_, path, Verdict.Refused(_, reason), _, _) => log.warn(refusal(path, reason))
+        case _                                                   => ()
       }
       log.info(summary(examined, needingFormatAre = "not formatted"))
+      failOnDuplicates(examined)
       val unformatted = examined.count(_.verdict.isInstanceOf[Verdict.NeedsFormatting])
       if (unformatted > 0)
         throw new MessageOnlyException(s"$unformatted HOCON files are not formatted. Run hoconFormat to fix them.")
@@ -86,20 +116,34 @@ object HoconFormatterPlugin extends AutoPlugin {
   private val examineAll: Def.Initialize[Task[Seq[Examined]]] = Def.task {
     examine(
       (ThisBuild / baseDirectory).value,
-      hoconFormatSources.all(ScopeFilter(inAggregates(ThisProject))).value.flatten,
+      hoconInputs.all(ScopeFilter(inAggregates(ThisProject))).value.flatten,
       hoconFormatterClasspath.value,
       write = false
     )
   }
 
-  private def examine(root: File, files: Seq[File], classpath: Seq[File], write: Boolean): Seq[Examined] =
+  private def examine(
+      root: File,
+      files: Seq[(File, Map[String, String])],
+      classpath: Seq[File],
+      write: Boolean
+  ): Seq[Examined] =
     IsolatedFormatter.using(classpath) { formatter =>
-      files.map(_.getCanonicalFile).distinct.sorted.map { file =>
-        val path    = IO.relativize(root.getCanonicalFile, file).getOrElse(file.getPath)
-        val verdict = if (write) formatter.format(file.toPath) else formatter.verdictFor(IO.readBytes(file), path)
-        Examined(file, path, verdict)
-      }
+      files
+        .map { case (file, options) => file.getAbsoluteFile -> options }
+        .groupBy(_._1.getCanonicalFile)
+        .toSeq
+        .sortBy(_._1)
+        .map { case (_, inputs) =>
+          val file   = inputs.head._1
+          val path   = IO.relativize(root.getCanonicalFile, file).getOrElse(file.getPath)
+          val result = formatter.inspect(file.toPath, inputs.head._2, write)
+          Examined(file, path, result.verdict, result.warnings, result.failsOnDuplicates)
+        }
     }
+
+  private def failOnDuplicates(examined: Seq[Examined]): Unit =
+    if (examined.exists(_.failsOnDuplicates)) throw new MessageOnlyException("HOCON duplicate definitions found.")
 
   private def refusal(path: String, reason: String): String = s"Leaving $path unchanged: $reason"
 

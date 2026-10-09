@@ -49,6 +49,7 @@ val functionalTest = tasks.register<Test>("functionalTest") {
     testClassesDirs = functionalTestSourceSet.output.classesDirs
     classpath = functionalTestSourceSet.runtimeClasspath
     useJUnitPlatform()
+    systemProperty("maven.repo.local", System.getProperty("maven.repo.local", "${System.getProperty("user.home")}/.m2/repository"))
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = TestExceptionFormat.FULL
