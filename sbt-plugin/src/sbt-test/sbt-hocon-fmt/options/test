@@ -18,3 +18,10 @@ $ must-mirror src/main/resources/app.conf override.conf
 > prepareAlias
 > hoconFormat
 > assertAliasStyle
+
+# A rejected separator names the setting and the value, even when the value would break the
+# document the settings are parsed from.
+> set hoconSeparator := Some("x")
+> assertBadSeparator x
+> set hoconSeparator := Some("a\nb")
+> assertBadSeparator a\nb

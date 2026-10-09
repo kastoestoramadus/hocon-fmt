@@ -44,6 +44,40 @@ class PluginOptionsTest {
         assertTrue(readError.getMessage().contains(config.toString()), readError.getMessage());
     }
 
+    @Test void aRejectedOverrideNamesItsPropertyAndValue() throws Exception {
+        Path file = Files.writeString(dir.resolve("app.conf"), "a=1");
+        Exception badBoolean = assertThrows(IllegalArgumentException.class,
+            () -> HoconFmt.optionsFor(file, Map.of("double-indent", "maybe")));
+        assertTrue(badBoolean.getMessage().contains("double-indent"), badBoolean.getMessage());
+        assertTrue(badBoolean.getMessage().contains("maybe"), badBoolean.getMessage());
+        Exception badSeparator = assertThrows(IllegalArgumentException.class,
+            () -> HoconFmt.optionsFor(file, Map.of("separator", ";")));
+        assertTrue(badSeparator.getMessage().contains("separator"), badSeparator.getMessage());
+        assertTrue(badSeparator.getMessage().contains(";"), badSeparator.getMessage());
+    }
+
+    // A value cannot break the document the overrides are parsed from: the failure names the
+    // property and the value, not a position in the synthetic config.
+    @Test void anOverrideValueCannotBreakTheSettingsDocument() throws Exception {
+        Path file = Files.writeString(dir.resolve("app.conf"), "a=1");
+        Exception error = assertThrows(IllegalArgumentException.class,
+            () -> HoconFmt.optionsFor(file, Map.of("separator", "a\nb")));
+        assertTrue(error.getMessage().contains("separator"), error.getMessage());
+        assertTrue(error.getMessage().contains("a\\nb"), error.getMessage());
+    }
+
+    @Test void discoverConfigWalksUpToTheFirstConfigOrTheGitBoundary() throws Exception {
+        Path outer = Files.writeString(dir.resolve(".hocon-fmt.conf"), "separator = \":\"\n");
+        Path nested = Files.createDirectory(dir.resolve("nested"));
+        Path file = Files.writeString(nested.resolve("app.conf"), "a=1");
+        assertEquals(outer, HoconFmt.discoverConfig(file).orElseThrow());
+        Path inner = Files.writeString(nested.resolve(".hocon-fmt.conf"), "separator = \"=\"\n");
+        assertEquals(inner, HoconFmt.discoverConfig(file).orElseThrow());
+        Files.delete(inner);
+        Files.writeString(nested.resolve(".git"), "gitdir: somewhere\n");
+        assertTrue(HoconFmt.discoverConfig(file).isEmpty(), "a config above .git must not be found");
+    }
+
     @Test void optionsAndReportUseJdkRecords() {
         FormatOptions options = new FormatOptions(":", true, false, false);
         assertInstanceOf(Verdict.NeedsFormatting.class, HoconFmt.check("a=1", "app.conf", options));

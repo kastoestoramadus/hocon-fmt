@@ -17,3 +17,22 @@ InputKey[Unit]("assertWarnedOnce") := {
     )
   }
 }
+
+// A file whose projects set different options must fail the task, naming both projects.
+TaskKey[Unit]("assertSharedFileConflict") := {
+  val message = hoconFormatCheck.result.value match {
+    case Inc(incomplete) => failedMessage(incomplete)
+    case Value(_) =>
+      sys.error("expected hoconFormatCheck to refuse a shared file whose projects set different options")
+  }
+  Seq("projects a and b", "separator = :", "shared.conf").foreach { fragment =>
+    assert(message.contains(fragment), s"expected the conflict to name $fragment, got: $message")
+  }
+}
+
+// The message sbt recorded for a failed task, with the cause chain unwrapped.
+def failedMessage(incomplete: sbt.Incomplete): String = {
+  def from(cause: Throwable): Option[String] =
+    Option(cause.getMessage).orElse(Option(cause.getCause).flatMap(from))
+  incomplete.message.orElse(incomplete.directCause.flatMap(from)).getOrElse(incomplete.toString)
+}
