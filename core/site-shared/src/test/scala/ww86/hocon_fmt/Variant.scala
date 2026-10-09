@@ -9,11 +9,13 @@ object Variant {
   private val fork = "the fork's base renders this where released sconfig 1.12.4 breaks (unmerged, quoted keys)"
 
   val ledger: Map[String, String] = Map(
+    "showcase/03-dev-prod"                                                               -> fork,
+    "showcase/04-library-file"                                                           -> "the detached licence header is kept",
     "catalogue/detached-header-comment"                                                  -> "the banner above a blank line is kept",
     "catalogue/trailing-comment-in-object"                                               -> "the comment before the closing brace is kept",
     "commentAboveBlankLine: a header followed by a blank line"                           -> "the header is kept",
     "commentAboveBlankLine: a comment block split by a blank line"                       -> "both halves are kept",
-    "showcase/05-sconfig-defect"                                                         -> fork,
+    "catalogue/sconfig-defect"                                                           -> fork,
     "catalogue/env-override-root-not-parseable"                                          -> fork,
     "catalogue/env-override-unresolved-merge"                                            -> fork,
     "catalogue/env-variable-list-suffix"                                                 -> "the fork parses the list suffix of an optional substitution",

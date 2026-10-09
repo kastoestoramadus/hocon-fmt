@@ -18,10 +18,6 @@ object Variant {
     * `core/site-shared`.
     */
   val refusedDifferently: List[(String, List[String])] = List(
-    "showcase/05-sconfig-defect" -> List(
-      "simplify=true: refused:broken-output",
-      "simplify=false: refused:unstable-output"
-    ),
     "catalogue/env-override-root-not-parseable" -> List(
       "simplify=true: refused:broken-output",
       "simplify=false: refused:unstable-output"
@@ -29,6 +25,10 @@ object Variant {
     "catalogue/object-substitution-then-field" -> List(
       "simplify=true: refused:broken-output",
       "simplify=false: formatted"
+    ),
+    "catalogue/sconfig-defect" -> List(
+      "simplify=true: refused:broken-output",
+      "simplify=false: refused:unstable-output"
     )
   )
 }

@@ -16,6 +16,15 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     out
   }
 
+  test("the showcase records exact fork outcomes where the published core refuses") {
+    ExampleData.showcase.filter(_.siteNow.nonEmpty).foreach { e =>
+      assert(Variant.differs(e.id), e.id)
+      assertEquals(e.siteNow, Some("formatted"), e.id)
+      assertEquals(stable(e.input), e.expected("site-default"), e.id)
+      println(s"${e.id}: published=${e.now}; playground=${e.siteNow.getOrElse("")}")
+    }
+  }
+
   test("the option is on") {
     assert(HoconFormatter.parseOptions.getKeepDetachedComments)
   }
@@ -26,7 +35,7 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("the comment cases of the ledger now format") {
-    assertEquals(Variant.ledger.size, 14)
+    assertEquals(Variant.ledger.size, 16)
     List("catalogue/detached-header-comment", "catalogue/trailing-comment-in-object").foreach { id =>
       Verdict.of(example(id).input) match {
         case Verdict.Refused(refusal) => fail(s"$id: ${refusal.reason}")

@@ -2,7 +2,12 @@ package ww86.hocon_fmt.site
 
 import com.raquo.laminar.api.L.*
 
-import ww86.hocon_fmt.{ExampleData, Verdict}
+import org.ekrich.config.{ConfigFactory, ConfigRenderOptions, ConfigResolveOptions, ConfigUtil}
+
+import scala.jdk.CollectionConverters.*
+import scala.util.Try
+
+import ww86.hocon_fmt.{DuplicateReport, ExampleData, Finding, FormatOptions, IncludeMasking, Separator, Verdict}
 
 /** The page's first two parts: what the formatter is, and the playground on the core itself.
   * The third part lives in [[ContributionsView]].
@@ -10,9 +15,14 @@ import ww86.hocon_fmt.{ExampleData, Verdict}
 object Playground {
 
   def apply(): HtmlElement = {
-    val first   = ExampleData.showcase.headOption.fold("")(_.input)
-    val input   = Var(first)
-    val verdict = verdicts(input.signal, first)
+    val first    = ExampleData.showcase.headOption.fold("")(_.input)
+    val input    = Var(first)
+    val style    = Var(FormatOptions.default)
+    val resolved = Var(false)
+    val settled  = settledText(input.signal, first, 150)
+    val verdict  = settled.combineWith(style.signal).map { (text, options) =>
+      text -> Verdict.of(text, "playground", options)
+    }
 
     div(
       sectionTag(
@@ -92,6 +102,79 @@ object Playground {
             )
           }
         ),
+        p(
+          cls := "story",
+          child <-- settled.map { text =>
+            ExampleData.showcase
+              .find(_.input == text)
+              .map { example =>
+                span(
+                  example.story,
+                  example.source.url.map(url =>
+                    span(
+                      " Source: ",
+                      a(href := url, "Apache Pekko"),
+                      s" (${example.source.licence.getOrElse("")}, sha ${example.source.sha.getOrElse("")}). ",
+                      a(href := "Apache-2.0.txt", "Licence"),
+                      " · ",
+                      a(href := "NOTICE", "Attribution")
+                    )
+                  )
+                )
+              }
+              .getOrElse(span())
+          }
+        ),
+        div(
+          cls := "style-options",
+          button(
+            cls := "separator-option",
+            tpe := "button",
+            "Separator: ",
+            child.text <-- style.signal.map(o => if o.separator == Separator.Equals then "=" else ":"),
+            onClick --> { _ =>
+              style.update(o =>
+                o.copy(separator = if o.separator == Separator.Equals then Separator.Colon else Separator.Equals)
+              )
+            }
+          ),
+          button(
+            cls := "nesting-option",
+            tpe := "button",
+            child.text <-- style.signal.map(o => if o.simplifyNestedObjects then "Keep nesting" else "Flatten nesting"),
+            onClick --> { _ => style.update(o => o.copy(simplifyNestedObjects = !o.simplifyNestedObjects)) }
+          ),
+          button(
+            cls := "indent-option",
+            tpe := "button",
+            child.text <-- style.signal.map(o =>
+              if o.doubleIndent then "Use 2-space indentation" else "Use 4-space indentation"
+            ),
+            onClick --> { _ => style.update(o => o.copy(doubleIndent = !o.doubleIndent)) }
+          )
+        ),
+        div(
+          cls := "output-tabs",
+          button(
+            cls := "formatted-tab",
+            tpe := "button",
+            "Formatted",
+            aria.pressed <-- resolved.signal.map(r => (!r).toString),
+            onClick.mapTo(false) --> resolved
+          ),
+          button(
+            cls := "resolved-tab",
+            tpe := "button",
+            "Resolved",
+            aria.pressed <-- resolved.signal.map(_.toString),
+            onClick.mapTo(true) --> resolved
+          )
+        ),
+        p(
+          cls := "resolution-note",
+          hidden <-- resolved.signal.map(!_),
+          "Local preview only. Includes are not loaded; environment variables (including PORT) are unset. Required substitutions must be defined in this text."
+        ),
         div(
           cls := "panes",
           label(
@@ -107,15 +190,34 @@ object Playground {
           ),
           label(
             cls := "pane",
-            span(cls := "pane-title", "Output"),
+            span(cls := "pane-title", child.text <-- resolved.signal.map(r => if r then "Resolved" else "Formatted")),
             textArea(
               cls      := "conf",
               readOnly := true,
-              value <-- verdict.map(out)
+              value <-- verdict
+                .combineWith(resolved.signal)
+                .map { case (text, decision, resolve) =>
+                  val entry = text -> decision
+                  if resolve then resolvedOutput(entry) else out(entry)
+                }
             )
           )
         ),
         p(cls := "status", aria.live := "polite", child <-- verdict.map(statusLine)),
+        div(
+          cls       := "findings",
+          aria.live := "polite",
+          children <-- settled.map { text =>
+            DuplicateReport
+              .findings(text, "playground")
+              .fold(
+                _ => Nil,
+                _.map { case Finding.KeyDefinedAgain(path, earlier, later) =>
+                  p(s"${path.rendered}: line $earlier has no effect; replaced at line $later.")
+                }
+              )
+          }
+        ),
         // UPSTREAM-SCONFIG: delete this line, and the page runs on released sconfig again, once
         // ekrich/sconfig releases the option (#646/#647); docs/site.md, "Returning to upstream sconfig".
         p(
@@ -135,11 +237,33 @@ object Playground {
     * no file name behind it, so a refusal names the playground as the place a parse tripped.
     */
   private[site] def verdicts(input: Signal[String], first: String, debounceMs: Int = 150): Signal[(String, Verdict)] = {
-    input.distinct.changes
-      .debounce(debounceMs)
-      .startWith(first)
-      .distinct
-      .map(text => text -> Verdict.of(text, "playground"))
+    settledText(input, first, debounceMs).map(text => text -> Verdict.of(text, "playground"))
+  }
+
+  private def settledText(input: Signal[String], first: String, debounceMs: Int): Signal[String] =
+    input.distinct.changes.debounce(debounceMs).startWith(first).distinct
+
+  /** Resolve only accepted text, removing the include placeholders without reading any files.
+    * The browser has no process environment; disabling it also makes the preview reproducible.
+    */
+  private def resolvedOutput(entry: (String, Verdict)): String = entry match {
+    case (text, Verdict.Refused(_)) => text
+    case (text, _)                  =>
+      Try {
+        val masked    = IncludeMasking.mask(text)
+        val generated = masked.originals.keys
+          .flatMap(index => List(s"${IncludeMasking.PlaceholderPrefix}$index", s"${IncludeMasking.GuardPrefix}$index"))
+          .toSet
+        val config = ConfigFactory.parseString(masked.text)
+        val local  = config.entrySet.asScala
+          .map(_.getKey)
+          .filter(path => ConfigUtil.splitPath(path).asScala.lastOption.exists(generated.contains))
+          .foldLeft(config)((acc, path) => acc.withoutPath(path))
+        local
+          .resolve(ConfigResolveOptions.defaults.setUseSystemEnvironment(false))
+          .root
+          .render(ConfigRenderOptions.defaults.setJson(false).setOriginComments(false).setComments(false)) + "\n"
+      }.fold(e => s"Resolution unavailable: ${Option(e.getMessage).getOrElse(e.toString)}", identity)
   }
 
   /** The output pane shows the formatting; a refused or settled text stays exactly as typed. */

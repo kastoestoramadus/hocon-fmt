@@ -118,10 +118,15 @@ required. `ExamplesSpec` asserts `now` and output and prints gaps as
 a verdict from a local sconfig build with the author’s open PRs merged; this build
 does not compute it and the suite does not assert it. `findings: [...]` carries the report's kinds for
 the example's `input.conf`, which `ExamplesSpec` asserts — an example that declares none has none.
-reserves identifiers for a later duplicate report.
 
 `source` records `kind: synthetic | distilled | verbatim` and `pattern`; verbatim
 examples also require `url` and `licence`. A distilled entry may carry
 `source.seen-in`, the number of corpus files containing the pattern; the generator
 ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.
+
+The two showcase fork differences declare `now-site: formatted` and carry
+`expected/site-default.conf`. The published suites still assert `now`; the fork's
+`Variant.ledger` routes these inputs to `CommentCarrierSpec`, which asserts `now-site`
+and the exact fork output. `target` is always authored independently. Verbatim
+provenance may also carry `source.sha`, embedded alongside the URL and licence.

@@ -493,6 +493,9 @@ lazy val site = project
       IO.write(out / "main.js", code)
       val index = (Compile / resources).value.find(_.getName == "index.html")
       IO.copyFile(index.getOrElse(sys.error("site resources are missing index.html")), out / "index.html")
+      val repository = (LocalRootProject / baseDirectory).value
+      IO.copyFile(repository / "NOTICE", out / "NOTICE")
+      IO.copyFile(repository / "examples" / "licences" / "Apache-2.0.txt", out / "Apache-2.0.txt")
       IO.write(out / "CNAME", "hocon-fmt.ww86.eu\n")
       // A Pages branch is served through Jekyll unless it is told not to; nothing here wants a
       // preprocessor, and this keeps the three files above byte for byte.
