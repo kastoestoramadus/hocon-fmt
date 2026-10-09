@@ -52,6 +52,20 @@ class StatusSpec extends munit.FunSuite {
     assertEquals(learnMore, None)
   }
 
+  test("every explanation is one sentence the status line can carry, without saying 'no file is written' twice") {
+    // The status line reads "Left unchanged — <explanation> Your input is unchanged in both panes;
+    // no file is written.", so an explanation that promises the file is left alone says it twice.
+    RefusalKind.values.foreach { kind =>
+      val Status.LeftUnchanged(_, _, explanation, _) = statusFor(kind): @unchecked
+      assert(explanation.head.isUpper, s"$kind starts a sentence: $explanation")
+      assert(explanation.endsWith("."), s"$kind ends a sentence: $explanation")
+      assert(
+        !explanation.contains("leaves the file alone"),
+        s"$kind repeats the 'no file is written' promise the status line already makes: $explanation"
+      )
+    }
+  }
+
   private def statusFor(kind: RefusalKind): Status =
     Status.of(Verdict.Refused(refusalOf(kind)), "source")
 
