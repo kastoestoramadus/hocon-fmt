@@ -20,6 +20,8 @@ public enum RefusalKind {
     LostInclude,
     /** Formatting would carry a field across an include and change which values win. */
     MovedInclude,
+    /** Formatting would drop a definition on a path an include may write. */
+    ShadowedByInclude,
     /** The text spells the name the formatter writes include placeholders with. */
     ReservedName,
     /** A second formatting pass would change the output again, so the file would never settle. */
@@ -45,6 +47,7 @@ public enum RefusalKind {
             case "LostComment" -> LostComment;
             case "LostInclude" -> LostInclude;
             case "MovedInclude" -> MovedInclude;
+            case "ShadowedByInclude" -> ShadowedByInclude;
             case "ReservedName" -> ReservedName;
             case "UnstableOutput" -> UnstableOutput;
             default -> throw new IllegalStateException("the core grew a refusal kind the mirror"

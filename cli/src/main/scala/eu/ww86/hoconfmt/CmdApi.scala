@@ -105,7 +105,7 @@ object CmdApi extends IOApp {
     case Rewritten
     case AlreadyFormatted
     case NeedsFormatting(formatted: String)
-    case Unformattable(reason: String)
+    case Unformattable(refusal: Refusal)
     case Unreadable(reason: String)
     case Unwritable(reason: String)
   }
@@ -195,7 +195,7 @@ object CmdApi extends IOApp {
       case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, report, failed)
       case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), report, failed)
       case Verdict.Refused(refusal)           =>
-        StdinResult("", report + s"cannot format $filename: ${refusal.reason}\n", ExitCode(1))
+        StdinResult("", report + s"cannot format $filename: ${refusal.reason}\n${advice(refusal)}", ExitCode(1))
     }
   }
 
@@ -262,7 +262,7 @@ object CmdApi extends IOApp {
             Outcome(result, path, inspection.findings, options.failOnDuplicates, inspection.reportFailure)
           inspection.verdict match {
             case Verdict.AlreadyFormatted           => outcome(Result.AlreadyFormatted).pure[IO]
-            case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal.reason.take(120))).pure[IO]
+            case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal)).pure[IO]
             case Verdict.NeedsFormatting(formatted) =>
               if (checkOnly) outcome(Result.NeedsFormatting(formatted)).pure[IO]
               else
@@ -276,8 +276,8 @@ object CmdApi extends IOApp {
   private def render(outcome: Outcome): String = {
     val result = outcome.result match {
       case Result.Unreadable(_) | Result.Unwritable(_) => "" // the error line goes to stderr
-      case Result.Unformattable(reason)                =>
-        s"ERROR: cannot format, leaving unchanged: ${outcome.path} ($reason)\n"
+      case Result.Unformattable(refusal)               =>
+        s"ERROR: cannot format, leaving unchanged: ${outcome.path} (${refusal.reason.take(120)})${advice(refusal)}\n"
       case Result.NeedsFormatting(formatted) =>
         s"Found a not formatted file: ${outcome.path} .\nAfter formatting:\n$formatted\n\n"
       case Result.AlreadyFormatted => "."
@@ -291,6 +291,16 @@ object CmdApi extends IOApp {
 
   private def reportFailureLine(path: String, failure: Option[Refusal]): String =
     failure.fold("")(refusal => s"WARNING: duplicate report could not run for $path: ${refusal.reason.take(120)}\n")
+
+  /** What to do about a refusal by hand, where one sentence of reason is not enough to act on. The
+    * shadowed definition has no automatic fix — the included file cannot be read here — so the
+    * ways out are the ones the user can weigh against what they meant.
+    */
+  private def advice(refusal: Refusal): String = refusal match {
+    case Refusal.ShadowedByInclude(_, _, definitionLine) =>
+      s"\n  fix by hand: delete line $definitionLine if the included values may reach the key, move it or the include, or write the value as one definition\n"
+    case _ => ""
+  }
 
   private def findingLine(path: String, finding: Finding): String = finding match {
     case Finding.KeyDefinedAgain(keyPath, earlier, later) =>

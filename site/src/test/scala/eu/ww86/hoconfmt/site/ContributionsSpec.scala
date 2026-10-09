@@ -64,6 +64,7 @@ class ContributionsSpec extends munit.FunSuite {
         "lostComment",
         "lostInclude",
         "movedInclude",
+        "shadowedByInclude",
         "reservedName",
         "unstableOutput"
       )

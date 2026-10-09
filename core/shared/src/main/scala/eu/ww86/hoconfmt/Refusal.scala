@@ -36,6 +36,13 @@ enum Refusal derives CanEqual {
     */
   case MovedInclude(statement: String)
 
+  /** Formatting would drop a definition on a path an include may write, in the object the include
+    * stands in. The included file cannot be read at format time, so the definition may have been
+    * what kept its values out of the path, and dropping it could let them through. The fields name
+    * the path, the include's line and the definition's line, the two places to look at.
+    */
+  case ShadowedByInclude(path: String, includeLine: Int, definitionLine: Int)
+
   /** The text spells the name the include placeholders are written with, in a file that has an
     * include. Restoring the placeholders could not tell it from ours.
     */
@@ -47,14 +54,16 @@ enum Refusal derives CanEqual {
   case UnstableOutput
 
   def reason: String = this match {
-    case NotUtf8              => "not valid UTF-8"
-    case NotHocon(detail)     => s"not valid HOCON: $detail"
-    case OtherFormat(format)  => s"a $format file, and hocon-fmt formats HOCON only"
-    case BrokenOutput(detail) => s"the output would not parse again: $detail"
-    case LostComment(text)    => s"a comment would be lost: $text"
-    case LostInclude(text)    => s"an include would be lost: $text"
-    case MovedInclude(text)   => s"an include would change places with a field: $text"
-    case ReservedName         => "the text uses __INCLUDE_, which the formatter reserves for include placeholders"
-    case UnstableOutput       => "a second formatting pass would change the output again"
+    case NotUtf8                                              => "not valid UTF-8"
+    case NotHocon(detail)                                     => s"not valid HOCON: $detail"
+    case OtherFormat(format)                                  => s"a $format file, and hocon-fmt formats HOCON only"
+    case BrokenOutput(detail)                                 => s"the output would not parse again: $detail"
+    case LostComment(text)                                    => s"a comment would be lost: $text"
+    case LostInclude(text)                                    => s"an include would be lost: $text"
+    case MovedInclude(text)                                   => s"an include would change places with a field: $text"
+    case ShadowedByInclude(path, includeLine, definitionLine) =>
+      s"formatting would drop the definition on line $definitionLine, which may be what keeps the include on line $includeLine out of $path"
+    case ReservedName   => "the text uses __INCLUDE_, which the formatter reserves for include placeholders"
+    case UnstableOutput => "a second formatting pass would change the output again"
   }
 }

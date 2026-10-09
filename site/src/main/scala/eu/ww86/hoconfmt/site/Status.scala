@@ -7,36 +7,38 @@ import eu.ww86.hoconfmt.{Refusal, Verdict}
   */
 enum RefusalKind derives CanEqual {
 
-  case NotHocon, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, ReservedName, UnstableOutput,
-    NotUtf8
+  case NotHocon, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, ShadowedByInclude, ReservedName,
+    UnstableOutput, NotUtf8
 
   /** The name the `web` script publishes in its JavaScript API, which `HoconFormatterJsSpec`
     * pins there; the defect table lists refusals by it, and `ContributionsSpec` pins the set.
     */
   def name: String = this match {
-    case NotHocon       => "notHocon"
-    case OtherFormat    => "otherFormat"
-    case BrokenOutput   => "brokenOutput"
-    case LostComment    => "lostComment"
-    case LostInclude    => "lostInclude"
-    case MovedInclude   => "movedInclude"
-    case ReservedName   => "reservedName"
-    case UnstableOutput => "unstableOutput"
-    case NotUtf8        => "notUtf8"
+    case NotHocon          => "notHocon"
+    case OtherFormat       => "otherFormat"
+    case BrokenOutput      => "brokenOutput"
+    case LostComment       => "lostComment"
+    case LostInclude       => "lostInclude"
+    case MovedInclude      => "movedInclude"
+    case ShadowedByInclude => "shadowedByInclude"
+    case ReservedName      => "reservedName"
+    case UnstableOutput    => "unstableOutput"
+    case NotUtf8           => "notUtf8"
   }
 }
 
 object RefusalKind {
   def of(refusal: Refusal): RefusalKind = refusal match {
-    case Refusal.NotUtf8         => RefusalKind.NotUtf8
-    case Refusal.NotHocon(_)     => RefusalKind.NotHocon
-    case Refusal.OtherFormat(_)  => RefusalKind.OtherFormat
-    case Refusal.BrokenOutput(_) => RefusalKind.BrokenOutput
-    case Refusal.LostComment(_)  => RefusalKind.LostComment
-    case Refusal.LostInclude(_)  => RefusalKind.LostInclude
-    case Refusal.MovedInclude(_) => RefusalKind.MovedInclude
-    case Refusal.ReservedName    => RefusalKind.ReservedName
-    case Refusal.UnstableOutput  => RefusalKind.UnstableOutput
+    case Refusal.NotUtf8                    => RefusalKind.NotUtf8
+    case Refusal.NotHocon(_)                => RefusalKind.NotHocon
+    case Refusal.OtherFormat(_)             => RefusalKind.OtherFormat
+    case Refusal.BrokenOutput(_)            => RefusalKind.BrokenOutput
+    case Refusal.LostComment(_)             => RefusalKind.LostComment
+    case Refusal.LostInclude(_)             => RefusalKind.LostInclude
+    case Refusal.MovedInclude(_)            => RefusalKind.MovedInclude
+    case Refusal.ShadowedByInclude(_, _, _) => RefusalKind.ShadowedByInclude
+    case Refusal.ReservedName               => RefusalKind.ReservedName
+    case Refusal.UnstableOutput             => RefusalKind.UnstableOutput
   }
 }
 
@@ -87,6 +89,8 @@ object Status {
     case RefusalKind.LostInclude  => "Formatting would drop an include directive."
     case RefusalKind.MovedInclude =>
       "Formatting would put an include on the other side of a field, so a later definition wins."
+    case RefusalKind.ShadowedByInclude =>
+      "Formatting would drop a definition that may be what keeps the included file's values out of a key."
     case RefusalKind.ReservedName =>
       "The text uses __INCLUDE_, the name the formatter writes include placeholders with, so it cannot tell your text from its own."
     case RefusalKind.UnstableOutput => "Formatting would not settle: a second pass would change the output again."
@@ -97,7 +101,7 @@ object Status {
     case RefusalKind.NotUtf8                                                       => None
     case RefusalKind.NotHocon | RefusalKind.OtherFormat | RefusalKind.ReservedName => Some(limitationsPage)
     case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude | RefusalKind.MovedInclude |
-        RefusalKind.UnstableOutput =>
+        RefusalKind.ShadowedByInclude | RefusalKind.UnstableOutput =>
       Some(defectsSection)
   }
 }

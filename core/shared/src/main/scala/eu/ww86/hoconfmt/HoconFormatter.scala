@@ -66,13 +66,21 @@ object HoconFormatter {
       _    <- commentsKept(source, pass.text)
       _    <- secondPassAgrees(pass.text, parse, options)
       _    <- includesKeptInPlace(source, pass)
+      _    <- definitionsKept(pass)
     } yield pass.text
   }
 
-  /** What one round trip produced: the text with the includes put back, and the masked text it
-    * came from, which names the includes by the index the source gave them.
+  /** What one round trip produced: the text with the includes put back, the masked text it came
+    * from, which names the includes by the index the source gave them, and the parse of that
+    * masked text, whose origins say which lines survived the merge.
     */
-  private case class Pass(text: String, masked: String, originals: Map[Int, String])
+  private case class Pass(
+      text: String,
+      masked: String,
+      originals: Map[Int, String],
+      parsedText: String,
+      root: ConfigObject
+  )
 
   /** One parse-render round trip with the includes carried across, kept separate from [[format]]
     * so the check there can run another pass without recursing back through it. `unreadable`
@@ -109,7 +117,13 @@ object HoconFormatter {
     } yield {
       // The masked text with its carried parts back, so nothing downstream sees our placeholders.
       val restored = carried.restore(rendered)
-      Pass(IncludeMasking.unmask(restored, masked.originals), restored, masked.originals)
+      Pass(
+        IncludeMasking.unmask(restored, masked.originals),
+        restored,
+        masked.originals,
+        carried.text,
+        parsed.root
+      )
     }
   }
 
@@ -142,6 +156,13 @@ object HoconFormatter {
     */
   private def includesKeptInPlace(source: String, pass: Pass): Either[Refusal, Unit] =
     IncludeOrder.moved(source, pass.masked, pass.originals).map(Refusal.MovedInclude(_)).toLeft(())
+
+  /** Judged after the includes' places, so a file that would keep an include in place is refused
+    * for the definition it drops rather than the other way around. Both mean the same to the user:
+    * the file resolves to other values after formatting.
+    */
+  private def definitionsKept(pass: Pass): Either[Refusal, Unit] =
+    IncludeShadow.shadowed(pass.parsedText, pass.originals, pass.root).toLeft(())
 
   /** Every comment of the source, as many times as it occurs; the multiset difference names the
     * first one missing.

@@ -37,6 +37,7 @@ class StatusSpec extends munit.FunSuite {
       RefusalKind.LostComment,
       RefusalKind.LostInclude,
       RefusalKind.MovedInclude,
+      RefusalKind.ShadowedByInclude,
       RefusalKind.UnstableOutput
     )
     withSection.foreach { kind =>
@@ -81,14 +82,15 @@ class StatusSpec extends munit.FunSuite {
   }
 
   private def refusalOf(kind: RefusalKind): eu.ww86.hoconfmt.Refusal = kind match {
-    case RefusalKind.NotHocon       => eu.ww86.hoconfmt.Refusal.NotHocon("no")
-    case RefusalKind.OtherFormat    => eu.ww86.hoconfmt.Refusal.OtherFormat("JSON")
-    case RefusalKind.BrokenOutput   => eu.ww86.hoconfmt.Refusal.BrokenOutput("no")
-    case RefusalKind.LostComment    => eu.ww86.hoconfmt.Refusal.LostComment("# gone")
-    case RefusalKind.LostInclude    => eu.ww86.hoconfmt.Refusal.LostInclude("include \"x.conf\"")
-    case RefusalKind.MovedInclude   => eu.ww86.hoconfmt.Refusal.MovedInclude("include \"x.conf\"")
-    case RefusalKind.ReservedName   => eu.ww86.hoconfmt.Refusal.ReservedName
-    case RefusalKind.UnstableOutput => eu.ww86.hoconfmt.Refusal.UnstableOutput
-    case RefusalKind.NotUtf8        => eu.ww86.hoconfmt.Refusal.NotUtf8
+    case RefusalKind.NotHocon          => eu.ww86.hoconfmt.Refusal.NotHocon("no")
+    case RefusalKind.OtherFormat       => eu.ww86.hoconfmt.Refusal.OtherFormat("JSON")
+    case RefusalKind.BrokenOutput      => eu.ww86.hoconfmt.Refusal.BrokenOutput("no")
+    case RefusalKind.LostComment       => eu.ww86.hoconfmt.Refusal.LostComment("# gone")
+    case RefusalKind.LostInclude       => eu.ww86.hoconfmt.Refusal.LostInclude("include \"x.conf\"")
+    case RefusalKind.MovedInclude      => eu.ww86.hoconfmt.Refusal.MovedInclude("include \"x.conf\"")
+    case RefusalKind.ShadowedByInclude => eu.ww86.hoconfmt.Refusal.ShadowedByInclude("o", 2, 1)
+    case RefusalKind.ReservedName      => eu.ww86.hoconfmt.Refusal.ReservedName
+    case RefusalKind.UnstableOutput    => eu.ww86.hoconfmt.Refusal.UnstableOutput
+    case RefusalKind.NotUtf8           => eu.ww86.hoconfmt.Refusal.NotUtf8
   }
 }

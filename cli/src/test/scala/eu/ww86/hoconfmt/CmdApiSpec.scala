@@ -174,6 +174,23 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // The one-line reason names the two lines to look at; what to do about them needs more room, so
+  // the CLI adds the ways out the user can weigh against what they meant.
+  tmp.test("a shadowed definition reports the lines and how to rework the file") { dir =>
+    val shadowed = "include \"f.conf\"\no=3\no.c=7\n"
+    for {
+      file <- write(dir, "a.conf", shadowed)
+      run  <- rewrite(file)
+      text <- textOf(file)
+    } yield {
+      assertEquals(text, shadowed)
+      assert(run.rendered.contains("line 2"), run.rendered)
+      assert(run.rendered.contains("line 1"), run.rendered)
+      assert(run.rendered.contains("out of o"), run.rendered)
+      assert(run.rendered.contains("fix by hand: delete line 2"), run.rendered)
+    }
+  }
+
   // A missing file is not a refusal of any content: it is the run's own error, as a usage error
   // is, so a typo in a CI script's path cannot pass silently.
   tmp.test("a missing file is reported as unreadable and exits 2, without stopping the others") { dir =>

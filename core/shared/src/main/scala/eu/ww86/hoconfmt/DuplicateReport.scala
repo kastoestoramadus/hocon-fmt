@@ -100,35 +100,65 @@ object DuplicateReport {
   }
 
   /** One field of the text: where it stands, the line its key starts on, whether its value is an
-    * object (two objects merge, so neither replaces the other) and whether it holds a substitution.
+    * object (two objects merge, so neither replaces the other), whether it holds a substitution,
+    * and whether it writes nothing (an object with no value inside: the only work it does is
+    * replace a value that is not an object).
     */
-  private case class Definition(
+  private[hoconfmt] case class Definition(
       keyPath: KeyPath,
       line: Int,
       objectValued: Boolean,
       holdsSubstitution: Boolean,
+      writesNothing: Boolean,
       arrayScope: List[Int]
   )
 
-  private def defined(tree: ConfigNodeRoot): Vector[Definition] =
-    walk(tree, Nil, 1, Vector.empty, Nil)._2
+  /** One `include` directive: the line it stands on, the object it stands in, and the array scope
+    * of that object. Read from the masked text, where an include is a placeholder field, so the
+    * walk finds it by that field's key.
+    */
+  private[hoconfmt] case class Include(line: Int, scope: KeyPath, arrayScope: List[Int])
 
-  /** The definitions `node` holds, and the line the text after it starts on. The line advances by
-    * the newlines of every render in source order.
+  /** Everything the walk finds in source order: the fields and the includes. */
+  private[hoconfmt] case class Outline(definitions: Vector[Definition], includes: Vector[Include]) {
+
+    def add(definition: Definition): Outline = copy(definitions = definitions :+ definition)
+
+    def addAll(more: Vector[Definition]): Outline = copy(definitions = definitions ++ more)
+
+    def add(include: Include): Outline = copy(includes = includes :+ include)
+  }
+
+  /** Every field and every include the document parse holds: what [[IncludeShadow]] reads to see
+    * which definitions a formatting drops around an include.
+    */
+  private[hoconfmt] def outline(source: String): Either[Refusal, Outline] =
+    document(source, None).map(outlineOf)
+
+  private val emptyOutline = Outline(Vector.empty, Vector.empty)
+
+  private def outlineOf(tree: ConfigNodeRoot): Outline =
+    walk(tree, Nil, 1, emptyOutline, Nil)._2
+
+  private def defined(tree: ConfigNodeRoot): Vector[Definition] =
+    outlineOf(tree).definitions
+
+  /** The definitions and includes `node` holds, and the line the text after it starts on. The line
+    * advances by the newlines of every render in source order.
     */
   private def walk(
       node: ConfigNode,
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition],
+      found: Outline,
       arrayScope: List[Int]
-  ): (Int, Vector[Definition]) =
+  ): (Int, Outline) =
     node match {
       case field: ConfigNodeField => walkField(field, at, line, found, arrayScope)
       // The definition offset identifies each array with fields uniquely; empty arrays have no
       // descendants to compare. Nesting keeps even arrays starting at the same offset apart.
       case array: ConfigNodeArray =>
-        walkItems(array.children.asScala.toList, at, line, found, 0, arrayScope :+ found.size)
+        walkItems(array.children.asScala.toList, at, line, found, 0, arrayScope :+ found.definitions.size)
       case complex: ConfigNodeComplexValue => walkAll(complex.children.asScala.toList, at, line, found, arrayScope)
       case _                               => (line + newlines(node.render), found)
     }
@@ -137,9 +167,9 @@ object DuplicateReport {
       children: List[ConfigNode],
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition],
+      found: Outline,
       arrayScope: List[Int]
-  ): (Int, Vector[Definition]) =
+  ): (Int, Outline) =
     children.foldLeft((line, found)) { case ((current, acc), child) => walk(child, at, current, acc, arrayScope) }
 
   /** The objects in an array are reached by their position, which is part of where their fields
@@ -149,48 +179,65 @@ object DuplicateReport {
       children: List[ConfigNode],
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition],
+      found: Outline,
       index: Int,
       arrayScope: List[Int]
-  ): (Int, Vector[Definition]) =
+  ): (Int, Outline) =
     children
       .foldLeft((line, found, index)) { case ((current, acc, next), child) =>
         child match {
           case value: AbstractConfigNodeValue =>
-            val (after, definitions) = walk(value, at :+ KeyPath.Segment.Index(next), current, acc, arrayScope)
-            (after, definitions, next + 1)
+            val (after, outline) = walk(value, at :+ KeyPath.Segment.Index(next), current, acc, arrayScope)
+            (after, outline, next + 1)
           case other => (current + newlines(other.render), acc, next)
         }
       }
-      .match { case (end, definitions, _) => (end, definitions) }
+      .match { case (end, outline, _) => (end, outline) }
 
   private def walkField(
       field: ConfigNodeField,
       at: List[KeyPath.Segment],
       line: Int,
-      found: Vector[Definition],
+      found: Outline,
       arrayScope: List[Int]
-  ): (Int, Vector[Definition]) = {
+  ): (Int, Outline) = {
     val segments = pathOf(field.path)
     val path     = at ++ segments
     // `+=` is the self-referential `${?key} [ ... ]` in another spelling: it reads the earlier
     // value, which the parser only desugars in the merged tree, not in this document tree.
-    val holds = appends(field) || holdsSubstitution(field.value)
-    val own   = Definition(
-      KeyPath(path),
-      line,
-      objectValued = objectValued(field.value),
-      holdsSubstitution = holds,
-      arrayScope = arrayScope
-    )
-    val fromHere = found ++ implicitObjects(at, segments, line, holds, arrayScope) :+ own
+    val holds    = appends(field) || holdsSubstitution(field.value)
+    val contents =
+      if (placeholder(segments)) found.add(Include(line, KeyPath(at), arrayScope))
+      else {
+        val own = Definition(
+          KeyPath(path),
+          line,
+          objectValued = objectValued(field.value),
+          holdsSubstitution = holds,
+          writesNothing = writesNothing(field.value),
+          arrayScope = arrayScope
+        )
+        found.addAll(implicitObjects(at, segments, line, holds, arrayScope)).add(own)
+      }
     // The path and the separator only advance the line; the value may hold fields of its own.
-    field.children.asScala.toList.foldLeft((line, fromHere)) { case ((current, acc), child) =>
+    field.children.asScala.toList.foldLeft((line, contents)) { case ((current, acc), child) =>
       child match {
         case value: AbstractConfigNodeValue => walk(value, path, current, acc, arrayScope)
         case other                          => (current + newlines(other.render), acc)
       }
     }
+  }
+
+  /** The masked form of an include directive is a field whose key and value spell the placeholder
+    * name, so a field named like that is an include and not a definition of the user's.
+    */
+  private def placeholder(segments: List[KeyPath.Segment]): Boolean = segments match {
+    case List(KeyPath.Segment.Name(name)) =>
+      name.startsWith(IncludeMasking.PlaceholderPrefix) && {
+        val index = name.substring(IncludeMasking.PlaceholderPrefix.length)
+        index.nonEmpty && index.forall(_.isDigit)
+      }
+    case _ => false
   }
 
   /** A dotted path writes the objects on the way to its leaf too: `a.b = 2` defines `a` as an
@@ -209,6 +256,8 @@ object DuplicateReport {
         line,
         objectValued = true,
         holdsSubstitution = holdsSubstitution,
+        // A leaf stands below it, so it writes something.
+        writesNothing = false,
         arrayScope = arrayScope
       )
     }
@@ -285,6 +334,25 @@ object DuplicateReport {
     // An object written beside another merges with it rather than replacing it.
     case concat: ConfigNodeConcatenation => concat.children.asScala.exists(objectValued)
     case _                               => false
+  }
+
+  /** Whether an object value holds no value inside it. Such a value adds nothing to a merge, so
+    * replacing a value that is not an object is the only work it does.
+    */
+  private def writesNothing(value: ConfigNode): Boolean = value match {
+    case objectValue: ConfigNodeObject =>
+      objectValue.children.asScala.forall {
+        case field: ConfigNodeField => writesNothing(field.value)
+        case _                      => true
+      }
+    // An object written beside another merges with it, so a concatentation writes nothing when
+    // none of its parts does.
+    case concat: ConfigNodeConcatenation =>
+      concat.children.asScala.forall {
+        case part: AbstractConfigNodeValue => writesNothing(part)
+        case _                             => true
+      }
+    case _ => false
   }
 
   private def holdsSubstitution(node: ConfigNode): Boolean = node match {

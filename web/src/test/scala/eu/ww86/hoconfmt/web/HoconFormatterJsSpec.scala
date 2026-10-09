@@ -58,15 +58,16 @@ class HoconFormatterJsSpec extends munit.FunSuite {
 
   test("every refusal has a name a page can branch on") {
     val names = Map(
-      Refusal.NotUtf8             -> "notUtf8",
-      Refusal.NotHocon("")        -> "notHocon",
-      Refusal.OtherFormat("JSON") -> "otherFormat",
-      Refusal.BrokenOutput("")    -> "brokenOutput",
-      Refusal.LostComment("")     -> "lostComment",
-      Refusal.LostInclude("")     -> "lostInclude",
-      Refusal.MovedInclude("")    -> "movedInclude",
-      Refusal.ReservedName        -> "reservedName",
-      Refusal.UnstableOutput      -> "unstableOutput"
+      Refusal.NotUtf8                      -> "notUtf8",
+      Refusal.NotHocon("")                 -> "notHocon",
+      Refusal.OtherFormat("JSON")          -> "otherFormat",
+      Refusal.BrokenOutput("")             -> "brokenOutput",
+      Refusal.LostComment("")              -> "lostComment",
+      Refusal.LostInclude("")              -> "lostInclude",
+      Refusal.MovedInclude("")             -> "movedInclude",
+      Refusal.ShadowedByInclude("o", 2, 1) -> "shadowedByInclude",
+      Refusal.ReservedName                 -> "reservedName",
+      Refusal.UnstableOutput               -> "unstableOutput"
     )
     names.foreach((refusal, name) => assertEquals(HoconFormatterJs.nameOf(refusal), name))
   }

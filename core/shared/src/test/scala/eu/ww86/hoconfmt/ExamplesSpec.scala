@@ -7,15 +7,16 @@ class ExamplesSpec extends munit.FunSuite {
     * suite the way `MovedInclude` did.
     */
   def kindOf(refusal: Refusal): String = refusal match {
-    case Refusal.NotUtf8         => "not-utf8"
-    case Refusal.NotHocon(_)     => "not-hocon"
-    case Refusal.OtherFormat(_)  => "other-format"
-    case Refusal.BrokenOutput(_) => "broken-output"
-    case Refusal.LostComment(_)  => "lost-comment"
-    case Refusal.LostInclude(_)  => "lost-include"
-    case Refusal.MovedInclude(_) => "moved-include"
-    case Refusal.ReservedName    => "reserved-name"
-    case Refusal.UnstableOutput  => "unstable-output"
+    case Refusal.NotUtf8                    => "not-utf8"
+    case Refusal.NotHocon(_)                => "not-hocon"
+    case Refusal.OtherFormat(_)             => "other-format"
+    case Refusal.BrokenOutput(_)            => "broken-output"
+    case Refusal.LostComment(_)             => "lost-comment"
+    case Refusal.LostInclude(_)             => "lost-include"
+    case Refusal.MovedInclude(_)            => "moved-include"
+    case Refusal.ShadowedByInclude(_, _, _) => "shadowed-by-include"
+    case Refusal.ReservedName               => "reserved-name"
+    case Refusal.UnstableOutput             => "unstable-output"
   }
 
   test("richer examples retain every merged input verbatim") {
@@ -53,6 +54,7 @@ class ExamplesSpec extends munit.FunSuite {
       Refusal.LostComment("# gone"),
       Refusal.LostInclude("include \"x.conf\""),
       Refusal.MovedInclude("include \"x.conf\""),
+      Refusal.ShadowedByInclude("o", 2, 1),
       Refusal.ReservedName,
       Refusal.UnstableOutput
     )
