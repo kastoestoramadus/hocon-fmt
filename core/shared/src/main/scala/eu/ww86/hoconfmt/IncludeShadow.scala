@@ -115,15 +115,23 @@ private[hoconfmt] object IncludeShadow {
       .iterator
       .flatMap { include =>
         val inItsObject = outline.definitions.filter(definition => standsIn(definition, include))
+        // One group per line and path, built once: the fallback below asks every definition
+        // whether another one beside it on its line keeps it out of the merge, and scanning the
+        // whole object for each of them is what made a large include-bearing file quadratic.
+        val onItsLine = inItsObject.zipWithIndex.groupBy { case (definition, _) =>
+          (definition.line, definition.keyPath)
+        }
         inItsObject.zipWithIndex
           .filter { case (definition, at) =>
             definition.position > include.position &&
-            (!survives(kept, definition) || overshadowedOnItsLine(inItsObject, at, definition).nonEmpty)
+            (!survives(kept, definition) || overshadowedOnItsLine(onItsLine, at, definition).nonEmpty)
           }
           .sortBy { case (definition, _) => definition.line }
           .iterator
           .flatMap { case (definition, at) =>
-            Option.when[Refusal.ShadowedByInclude](shadowed(definition, at, include, inItsObject, root, kept))(
+            Option.when[Refusal.ShadowedByInclude](
+              shadowed(definition, at, include, inItsObject, onItsLine, root, kept)
+            )(
               Refusal.ShadowedByInclude(definition.keyPath.rendered, include.line, definition.line)
             )
           }
@@ -136,19 +144,22 @@ private[hoconfmt] object IncludeShadow {
     * with nothing inside it, which the other's object swallows whole — `p {}` beside `p { a = 1 }`
     * leaves nothing of its own to see in the rendering. The merged tree carries a path and a line
     * per value and no column, so which of the two a value at that path on that line came from
-    * cannot be read off it: [[survives]] can vouch for neither.
+    * cannot be read off it: [[survives]] can vouch for neither. The group is read off
+    * `onItsLine`, built once per include.
     */
   private def overshadowedOnItsLine(
-      inItsObject: Vector[DuplicateReport.Definition],
+      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
       at: Int,
       definition: DuplicateReport.Definition
   ): Vector[DuplicateReport.Definition] =
-    inItsObject.zipWithIndex.collect {
-      case (other, otherAt)
-          if otherAt != at && other.line == definition.line && other.keyPath == definition.keyPath &&
-            (DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued) =>
-        other
-    }
+    onItsLine
+      .getOrElse((definition.line, definition.keyPath), Vector.empty)
+      .collect {
+        case (other, otherAt)
+            if otherAt != at &&
+              (DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued) =>
+          other
+      }
 
   /** Whether a definition stands in the object an include stands in. Definitions elsewhere never
     * meet the include: the included file's fields are inlined into that object alone.
@@ -167,12 +178,13 @@ private[hoconfmt] object IncludeShadow {
       at: Int,
       include: DuplicateReport.Include,
       inItsObject: Vector[DuplicateReport.Definition],
+      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
       root: ConfigObject,
       kept: Set[(KeyPath, Int)]
   ): Boolean = {
     val later =
       inItsObject.filter(_.position > definition.position) ++
-        overshadowedOnItsLine(inItsObject, at, definition).filter(DuplicateReport.erases(_, definition))
+        overshadowedOnItsLine(onItsLine, at, definition).filter(DuplicateReport.erases(_, definition))
     val related =
       inItsObject.zipWithIndex.exists { case (other, otherAt) =>
         otherAt != at && relatedPaths(other.keyPath, definition.keyPath)
