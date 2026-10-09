@@ -92,12 +92,12 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
                 LOGGER.warn("Leaving {} unchanged: {}", file.path(), refused.reason());
             }
         }
-        if (duplicateFailure.get()) throw new GradleException("HOCON duplicate definitions found.");
         if (getParameters().getCheckOnly().get()) {
             check(examined);
         } else {
             format(examined);
         }
+        if (duplicateFailure.get()) throw new GradleException("HOCON duplicate definitions found.");
     }
 
     static void format(List<Examined> examined) {

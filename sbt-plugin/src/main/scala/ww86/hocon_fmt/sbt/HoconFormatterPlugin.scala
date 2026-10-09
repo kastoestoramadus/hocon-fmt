@@ -130,11 +130,12 @@ object HoconFormatterPlugin extends AutoPlugin {
   ): Seq[Examined] =
     IsolatedFormatter.using(classpath) { formatter =>
       files
-        .map { case (file, options) => file.getCanonicalFile -> options }
-        .groupBy(_._1)
+        .map { case (file, options) => file.getAbsoluteFile -> options }
+        .groupBy(_._1.getCanonicalFile)
         .toSeq
         .sortBy(_._1)
-        .map { case (file, inputs) =>
+        .map { case (_, inputs) =>
+          val file   = inputs.head._1
           val path   = IO.relativize(root.getCanonicalFile, file).getOrElse(file.getPath)
           val result = formatter.inspect(file.toPath, inputs.head._2, write)
           Examined(file, path, result.verdict, result.warnings, result.failsOnDuplicates)

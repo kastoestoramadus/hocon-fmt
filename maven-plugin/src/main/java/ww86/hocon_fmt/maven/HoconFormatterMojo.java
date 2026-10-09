@@ -76,8 +76,8 @@ abstract class HoconFormatterMojo extends AbstractMojo {
       }
       examined.add(new Examined(file, relativePath, outcome));
     }
-    if (duplicateFailure) throw new MojoFailureException("HOCON duplicate definitions found.");
     actOn(examined);
+    if (duplicateFailure) throw new MojoFailureException("HOCON duplicate definitions found.");
   }
 
   /** Receives every matching file; the ones the formatter refused are already reported. */
