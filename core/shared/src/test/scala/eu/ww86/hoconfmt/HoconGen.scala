@@ -340,7 +340,17 @@ object HoconGen {
     * writes something else — at one key, and under the multi-segment paths above.
     */
   val shadowBodies: List[String] =
-    List("p = 9", "p { b = 9 }", "p {}", "p.c = 9", "q = 1", "p.q = 9", "p.q { b = 9 }", "p.q.c = 9")
+    List(
+      "p = 9",
+      "p { b = 9 }",
+      "p {}",
+      "p.c = 9",
+      "q = 1",
+      "p.q = 9",
+      "p.q { b = 9 }",
+      "p.q.c = 9",
+      "p.q.r { b = 9 }"
+    )
 
   val shadowInclude: String = "include \"inc.conf\""
 
