@@ -74,12 +74,29 @@ private[hoconfmt] object IncludeOrder {
           val key  = entry.getKey
           val path = at :+ key
           entry.getValue match {
-            case inner: ConfigObject => leavesOf(inner, path, ours)
+            case inner: ConfigObject => placesOf(inner, path, ours)
             case list: ConfigList    => Leaf(path, list.origin.lineNumber, None) :: leavesInItems(list, path, ours)
             case value               => leafOf(key, path, value, ours).toList
           }
         }
     }
+
+  /** Where an object stands among the fields: the leaves its contents write, or itself when it
+    * holds none. An empty object writes a value of its own — an object with nothing inside it
+    * replaces what is not an object — so an include that ends up crossing it changes what the file
+    * resolves to, exactly as crossing a leaf would.
+    */
+  private def placesOf(obj: ConfigObject, path: List[String], ours: Set[Int]): List[Leaf] =
+    leavesOf(obj, path, ours) match {
+      case Nil if listsNoKeys(obj) => List(Leaf(path, obj.origin.lineNumber, None))
+      case places                  => places
+    }
+
+  /** Whether the object lists no keys at all, as opposed to none this walk can see because the
+    * merge behind it is unresolved.
+    */
+  private def listsNoKeys(obj: ConfigObject): Boolean =
+    Try(obj.entrySet.asScala.isEmpty).getOrElse(false)
 
   private def leavesInItems(list: ConfigList, at: List[String], ours: Set[Int]): List[Leaf] =
     list.asScala.toList.zipWithIndex.flatMap {
