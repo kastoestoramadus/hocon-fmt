@@ -191,6 +191,36 @@ class ComponentSpec extends munit.FunSuite {
     val _ = root.unmount()
   }
 
+  test("the page opens with a short TL;DR and a copyable quick start") {
+    val container = install(Github())
+    val root      = mount(container)(Page())
+    val tagline   = find(container, "tagline")
+    val tldr      = find(container, "tldr")
+    val bullets   = children(tldr).filter(_.nodeName.asInstanceOf[String] == "LI")
+    assertEquals(bullets.size, 3, "what it is and what it refuses, where it runs, and try it")
+    val prose = tagline.textContent.asInstanceOf[String] + " " +
+      bullets.map(_.textContent.asInstanceOf[String]).mkString(" ")
+    val words = prose.split("\\s+").count(_.nonEmpty)
+    println(s"TL;DR: $words words")
+    assert(words < 60, s"the TL;DR must stay short, found $words words")
+    val links = bullets.last
+      .findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
+      .asInstanceOf[js.Array[js.Dynamic]]
+      .toList
+      .map(_.getAttribute("href").asInstanceOf[String])
+    assertEquals(links, List("#playground"), "the third bullet points at the playground below")
+    val sections = children(find(container, "page")).filter(node => idOf(node) == "playground")
+    assertEquals(
+      sections.map(_.nodeName.asInstanceOf[String]),
+      List("SECTION"),
+      "and the playground is a real section to land on"
+    )
+    val quickStart = find(container, "quick-start").textContent.asInstanceOf[String]
+    assert(quickStart.contains("pipx install hocon-fmt"), quickStart)
+    assert(quickStart.contains("hocon-fmt --check"), quickStart)
+    val _ = root.unmount()
+  }
+
   // --- the playground --------------------------------------------------------------------------
 
   test("the playground formats the first example on the spot, and asks the network for nothing") {
