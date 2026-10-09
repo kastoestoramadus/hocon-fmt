@@ -104,7 +104,12 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 - **Env override**: `host = localhost` then `host = ${?HOST}` stays an unresolved merge, rendered as
   a banner that grows by one on every pass; at the file root the banner does not even parse
   (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
-  files from GitHub are refused for it. Fixed by ekrich/sconfig#600, not yet released.
+  files from GitHub are refused for it. The fixed-point fix is
+  [ekrich/sconfig#598](https://github.com/ekrich/sconfig/pull/598), merged 2026-09-30,
+  not yet released. The render-option follow-up
+  [#600](https://github.com/ekrich/sconfig/pull/600) remains open, awaiting review and merge.
+  Verified with `gh` on 2026-10-09: #598 `MERGED`, #600 `OPEN`, latest release v2.0.0
+  (2026-08-24). The playground fork includes #598; the published core does not.
 
 Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
 tree renders differently with `simplify-nested-objects = false`. Pinned over the examples in

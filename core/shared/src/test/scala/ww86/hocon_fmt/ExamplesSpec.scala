@@ -61,6 +61,16 @@ class ExamplesSpec extends munit.FunSuite {
     }
   }
 
+  test("every upstream roadmap gap has linked evidence and a waiting state") {
+    // Same-line include ordering is the formatter's own safety restriction, not an upstream port.
+    ExampleData.all.filter(e => e.now != e.target && e.now != "refused:moved-include").foreach { example =>
+      val note = example.upstream.getOrElse(fail(s"${example.id}: upstream gap without upstream metadata"))
+      assert(note.issue.startsWith("https://github.com/ekrich/sconfig/"), example.id)
+      note.fix.foreach(url => assert(url.startsWith("https://github.com/ekrich/sconfig/pull/"), example.id))
+      assert(note.state.trim.nonEmpty, example.id)
+    }
+  }
+
   ExampleData.all.filterNot(e => Variant.differs(e.id)).foreach { example =>
     example.options.foreach { option =>
       test(s"${example.id} ($option): ${example.now}") {
