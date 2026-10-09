@@ -103,9 +103,10 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   why. Catch with `NonFatal`, never `Throwable`.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
-- A PR that touches files another open PR touches is branched from that PR and lists the stack
-  at the top of its body; merge bottom first (GitHub retargets the next one); fixes in a middle
-  PR are merged upward.
+- A new PR is branched from the newest open PR (or `main` if none is open) and lists the stack at
+  the top of its body: one linear stack, so no PR conflicts with the one below it. Merge bottom
+  first (GitHub retargets the next one); fixes in a middle PR are merged upward, never rebased and
+  force-pushed.
 - Attribution names the model, its effort and the tool it ran in, never a bare tool name: the model id and
   effort as given by whoever launched the agent (effort `l`, `m`, `h`, `xh` or `max`; `?` if not given). A
   commit ends with `Co-Authored-By: <model-id>/<effort> through <tool> <noreply@anthropic.com>`. A PR body ends
@@ -114,6 +115,27 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   each review, e.g. `Reviewed by deepseek-flash/h through ZCode`; whoever relays a review adds its line.
 - Every merged improvement gets a new file in [docs/improvement-log/](docs/improvement-log/) —
   never an edit to another entry's file — with what to look at again before a release.
+
+## Working as one of several agents
+
+- Each task gets its own git worktree and its own branch; push only that branch, never force.
+  Builds share nothing: publish to a private Maven repository (`-Dmaven.repo.local=<task dir>/m2`,
+  which sbt `publishM2` and Gradle `mavenLocal` honour), since a shared `~/.m2` lets one branch's
+  snapshot break another's tests. Run `scripts/fetch-sconfig-fork.sh` before `sbt test`.
+- Until the first release, a PR is merged as soon as its CI is green; its review runs alongside,
+  and what the review finds goes into a new PR, not into the reviewed one. Code reaches `main`
+  only through a PR; a direct push is for trifles (docs, typos) and for repairing a broken `main`.
+- A review settles each claim by running it. To show a test protects something, break the code
+  it guards, run the test, see it fail, revert, and quote both runs. A reviewer comes from a
+  different model family than the author: two models that agree may share the same blind spot.
+- A prompt that sends an agent somewhere uncertain names the condition under which it must stop
+  and report instead of going on (for example: "if the released library behaves differently from
+  its main branch, change nothing").
+- A plan that must outlive the session goes into the repository (`docs/`, an issue), not only
+  into the conversation: compaction summarises, and what it drops is gone.
+- A long session ends with a handoff (what is merged, what is open, what is running and how to
+  resume it) at the first natural pause after the context is first compacted. Background jobs end
+  with the session, so a handoff lists every one still running.
 
 Where to add a test: [docs/testing.md](docs/testing.md). What is not done yet, and why it might be
 worth doing: [docs/ideas.md](docs/ideas.md).
