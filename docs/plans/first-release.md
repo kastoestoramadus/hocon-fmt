@@ -4,6 +4,15 @@ Written 2026-10-09 from `main` at `b4a441f`. Nothing is published yet. The runbo
 one-time account setup are in [releasing](../releasing.md); this file only says what stands between
 `main` and a tag, in the order to do it. Tick a box in the pull request that closes it.
 
+## Two waves (decided 2026-10-09)
+
+**Wave 1, the first publish:** the JVM artifacts sbt uploads to Maven Central with `publishRelease`:
+`hocon-fmt-core_3`, `hocon-fmt-cli_3`, `eu.ww86:hocon-fmt-java-api` and the sbt plugin.
+**Wave 2:** the Maven, Mill and Gradle plugins, PyPI wheels, npm, native binaries, the web script and
+the pre-commit hooks. So for wave 1 the PyPI, npm and Gradle accounts below, and items 1 (PyPI, npm,
+Gradle jobs) and the Gradle part of the secrets, can wait; a tag in wave 1 must not run the wave 2
+jobs. The hooks pin PyPI and npm versions, so they must not be advertised before wave 2.
+
 ## Owner's part (accounts, secrets, decisions)
 
 - [ ] Gradle Plugin Portal: sign in, check the portal verifies `eu.ww86` (else fall back to
