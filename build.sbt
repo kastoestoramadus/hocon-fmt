@@ -87,24 +87,40 @@ ThisBuild / publishTo := {
 def announceRuntime(label: String): Setting[?] =
   Test / testOptions += Tests.Cleanup(() => println(s"========== $label =========="))
 
+/** The local repositories must accept a republish at a release version. Since the version became
+  * 0.1.0 rather than -SNAPSHOT, `publishM2` fails there with "the destination file exists and
+  * overwriting is disabled" — what `sbt coreJVM/publishM2 javaApi/publishM2` hits once
+  * actions/setup-java's Maven cache has restored a ~/.m2 holding 0.1.0 — and `publishLocal` warns
+  * "You need to remove it from the cache manually" and leaves the old jar in place, while reporting
+  * success. Releases are untouched: `publish` and the `publishRelease` alias upload to the Central
+  * staging repository, which keeps refusing to overwrite.
+  */
+def republishLocally(p: Project): Project =
+  p.settings(
+    publishM2Configuration    := publishM2Configuration.value.withOverwrite(true),
+    publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(true)
+  )
+
 /** Coverage rewrites classes to call scala.runtime.coverage.Invoker, which nothing outside a
   * coverage run provides, so a jar built with it on is unusable. `coverageJvm` switches coverage
   * off when it finishes, but a run that fails midway never gets there; these guards make the
   * publication fail rather than let instrumented classes ship.
   */
 def guardPublish(p: Project): Project =
-  Seq(publish, publishLocal, publishM2, PgpKeys.publishSigned, PgpKeys.publishLocalSigned)
-    .foldLeft(p) { (proj, pub) =>
-      proj.settings(
-        pub := {
-          if (coverageEnabled.?.value.contains(true))
-            sys.error(
-              s"${pub.key.label} would publish instrumented jars: coverage is enabled. Run `coverageOff` first."
-            )
-          pub.value
-        }
-      )
-    }
+  republishLocally(
+    Seq(publish, publishLocal, publishM2, PgpKeys.publishSigned, PgpKeys.publishLocalSigned)
+      .foldLeft(p) { (proj, pub) =>
+        proj.settings(
+          pub := {
+            if (coverageEnabled.?.value.contains(true))
+              sys.error(
+                s"${pub.key.label} would publish instrumented jars: coverage is enabled. Run `coverageOff` first."
+              )
+            pub.value
+          }
+        )
+      }
+  )
 
 // UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
 // releases the option (#646/#647); see "Returning to upstream sconfig" in docs/site.md.
