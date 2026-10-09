@@ -8,8 +8,8 @@ name: Release
 #
 # How much a run ships is one switch, the repository variable RELEASE_WAVE (Settings → Secrets
 # and variables → Actions → Variables): unset or 1 ships wave 1 only — the sbt-built artifacts,
-# core, cli, the Java API and the sbt plugin, this repository's first publish — and 2 turns the
-# wave-2 jobs and uploads below back on. A repository variable, and not a workflow_dispatch
+# core, cats, cli, the Java API and the sbt plugin, this repository's first publish — and 2 turns
+# the wave-2 jobs and uploads below back on. A repository variable, and not a workflow_dispatch
 # input, because it must gate tag pushes, where no input exists; and not a single env at the
 # top, because a job-level `if` cannot read a workflow-level `env`, while it reads `vars`.
 on:
