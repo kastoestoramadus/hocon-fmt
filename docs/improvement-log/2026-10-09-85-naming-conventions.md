@@ -8,7 +8,7 @@ settled by running javac, scalac, npm's validator, PyPI's normalisation and the 
 AGENTS.md gains the rule line; architecture.md links the file.
 
 **Look at again before a release:** the package is the one mismatch a release makes expensive — it
-is `ww86.hoconfmt` while the group id and verified domain are `eu.ww86` and `ww86.eu`, so the
+is `eu.ww86.hoconfmt` while the group id and verified domain are `eu.ww86` and `ww86.eu`, so the
 convention-conformant name is `eu.ww86.hoconfmt`, and the rename is only cheap before the tag. The
 wave-2 names (the Docker image, the Homebrew tap, the coursier app, the Action, `sbt-hocon-fmt_sbt2_3`)
 are documented but unbuilt, and the Gradle Plugin Portal's fallback id changes the plugin

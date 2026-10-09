@@ -1,0 +1,130 @@
+package eu.ww86.hoconfmt
+
+import eu.ww86.hoconfmt.HoconFormatter.*
+
+/** Which occurrences of the word `include` are treated as a directive and which are ordinary text.
+  *
+  * This is the contract of the include-detection regex, isolated from rendering and from the
+  * whole-file invariants, so a change to that regex has one place to answer to.
+  */
+class IncludeDetectionSpec extends munit.FunSuite with HoconTestSupport {
+
+  // --- A directive is recognised and survives formatting -------------------------------------
+
+  val directives = Map(
+    "plain"              -> """include "f.conf"""",
+    "required"           -> """include required("f.conf")""",
+    "leading whitespace" -> """   include "f.conf""""
+  )
+
+  directives.foreach { case (name, raw) =>
+    test(s"directive is preserved: $name") {
+      val out = formatted(raw)
+      assert(out.contains("include"), s"the include directive disappeared from the output of: $raw")
+      // This is where placeholders actually get emitted, so this is where a failure to put the
+      // original statement back, or to drop the guard field, shows up.
+      assert(!out.contains("__INCLUDE"), s"placeholder leaked into the output: $out")
+    }
+  }
+
+  test("directive is preserved: several on separate lines") {
+    val out = formatted("include \"a.conf\"\ninclude \"b.conf\"")
+    assert(out.contains("include \"a.conf\""), out)
+    assert(out.contains("include \"b.conf\""), out)
+  }
+
+  // --- The bare word is NOT a directive -------------------------------------------------------
+  // Third element is text that must survive verbatim, so mangling is caught even where
+  // parse-equality alone would not notice (comments carry no meaning to compare).
+
+  val notDirectives = List(
+    ("suffix of a key", """my_include : 1""", "my_include"),
+    ("glued prefix", """reinclude : 1""", "reinclude"),
+    ("after underscore", """_include : 1""", "_include"),
+    ("no whitespace after", """include_path : "/tmp"""", "include_path"),
+    ("in a hash comment", "# include me not\na : 1", "# include me not"),
+    ("in a quoted value", """a : " include me not"""", "\" include me not\""),
+    ("in a quoted key", """"include me not" : 1""", "\"include me not\"")
+  )
+
+  notDirectives.foreach { case (name, raw, mustSurvive) =>
+    test(s"not a directive: $name") {
+      val out = formatted(raw)
+      assert(out.contains(mustSurvive), s"expected [$mustSurvive] to survive, got: $out")
+      assert(!out.contains("__INCLUDE"), s"placeholder leaked into the output: $out")
+      assertSameMeaning(out, raw, s"meaning changed for: $raw")
+    }
+  }
+
+  // --- An include may share its line with other content ----------------------------------------
+  // The preprocessing used to comment out the rest of the line, which swallowed closing braces
+  // and any entries following the include.
+
+  test("same line: include inside a one-line object") {
+    val out = formatted("""o { include "f.conf" }""")
+    assert(out.contains("""include "f.conf""""), out)
+  }
+
+  // The other way round, `o { include "f.conf", b : 1 }`, is refused: see IncludeOrderSpec.
+  test("same line: entries before an include are formatted, not passed through") {
+    val out = formatted("""o { b   :    1, include "f.conf" }""")
+    assert(out.contains("""include "f.conf""""), out)
+    assert(out.contains("b = 1"), s"entry before the include was not formatted: $out")
+  }
+
+  test("same line: closing brace survives so the result re-parses") {
+    val raw = """o { include "f.conf" }"""
+    assert(format(raw).isRight, "formatting failed outright")
+    assert(format(formatted(raw)).isRight, "output does not survive a second pass")
+  }
+
+  test("no whitespace after include is still a directive") {
+    val out = formatted("""include"f.conf"""")
+    assert(out.contains("include"), s"the include was silently dropped: [$out]")
+    assert(out.trim.nonEmpty, "output is empty - the include was lost")
+  }
+
+  test("include function forms survive sharing a line") {
+    val out = formatted("""o { b : 1, include required(file("f.conf")) }""")
+    assert(out.contains("required"), out)
+    assert(out.contains("b = 1"), out)
+  }
+
+  // --- Comments are not code ----------------------------------------------------------------------
+  // Deciding what is inside a string once counted every quote from the start of the file, those in
+  // comments included, so one stray quote in a comment hid the next include. On the JVM sconfig then
+  // resolved that include against a missing file, and the directive silently vanished.
+
+  List("#", "//").foreach { marker =>
+    test(s"a quote in a $marker comment does not hide a later include") {
+      val out = formatted(s"$marker a 5\" pipe\ninclude \"other.conf\"\na : 1")
+      assert(out.contains("include \"other.conf\""), s"the include was lost: $out")
+    }
+
+    test(s"an include in a $marker comment is not a directive") {
+      val out = formatted(s"$marker include \"x.conf\"\na : 1")
+      assert(out.contains("include \"x.conf\""), out)
+      assert(!out.contains("__INCLUDE"), s"placeholder leaked into the output: $out")
+    }
+  }
+
+  // --- A later definition of the key ---------------------------------------------------------------
+  // sconfig merges repeated keys, so a later scalar replaces an earlier object and everything written
+  // in it. Found by FormatterPropertiesSpec: the include inside went with it, and no check noticed.
+
+  test("an include in an object a later definition replaces is not silently lost") {
+    format("o {\n  include \"x.conf\"\n  a : 1\n}\no : 5") match {
+      case Right(out)                   => assert(out.contains("include \"x.conf\""), s"the include was lost: $out")
+      case Left(Refusal.LostInclude(_)) => ()
+      case Left(other)                  => fail(s"refused for the wrong reason: ${other.reason}")
+    }
+  }
+
+  // --- Layout around a leading include -------------------------------------------------------------
+
+  List("""include "x.conf"""", """include required("x.conf")""").foreach { directive =>
+    test(s"an include on the first line gains no blank line above it: $directive") {
+      assertEquals(formatted(s"$directive\na : 1"), s"$directive\na = 1\n")
+    }
+  }
+}

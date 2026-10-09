@@ -92,8 +92,8 @@ object ExampleGenerator {
           s"${list(options)}, $withSiteExpected, $upstream, $playgroundOrder)"
       }
     }
-    val output = managed / "ww86" / "hoconfmt" / "ExampleData.scala"
-    val text   = "package ww86.hoconfmt\n\n" +
+    val output = managed / "eu" / "ww86" / "hoconfmt" / "ExampleData.scala"
+    val text   = "package eu.ww86.hoconfmt\n\n" +
       """final case class ExampleSource(kind: String, pattern: String, url: Option[String], licence: Option[String], sha: Option[String])
 
 final case class ExampleUpstream(issue: String, fix: Option[String], state: String)

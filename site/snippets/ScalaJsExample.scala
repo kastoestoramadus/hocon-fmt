@@ -1,4 +1,4 @@
-import ww86.hoconfmt.{HoconFormatter, Verdict}
+import eu.ww86.hoconfmt.{HoconFormatter, Verdict}
 
 object ScalaJsExample {
   def main(args: Array[String]): Unit = {

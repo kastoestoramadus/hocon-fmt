@@ -137,8 +137,8 @@ Three builds of the same program:
 \* `--check` on one small file, averaged over 10 runs on one Linux machine.
 
 No launcher script ships with the JVM artifact; it is a jar whose manifest names
-`ww86.hoconfmt.CmdApi`, so coursier runs it (`cs launch`, above) or `java -cp <classpath>
-ww86.hoconfmt.CmdApi <args>` does, with the classpath from `cs fetch --classpath
+`eu.ww86.hoconfmt.CmdApi`, so coursier runs it (`cs launch`, above) or `java -cp <classpath>
+eu.ww86.hoconfmt.CmdApi <args>` does, with the classpath from `cs fetch --classpath
 eu.ww86:hocon-fmt-cli_3:<version>`.
 
 ## cats-effect library
@@ -152,7 +152,7 @@ Node applications also supply one `java.time` implementation, for example
 import cats.effect.IO
 import fs2.Stream
 import fs2.io.file.Path
-import ww86.hoconfmt.interop.cats.FileFormatter
+import eu.ww86.hoconfmt.interop.cats.FileFormatter
 
 val formatter = FileFormatter[IO]
 val file = Path("application.conf")
@@ -185,7 +185,7 @@ the one `FormatRefusedException`, which carries the typed `Refusal` in `.refusal
 
 ```scala
 import scala.util.{Failure, Success, Try}
-import ww86.hoconfmt.{FormatRefusedException, Verdict}
+import eu.ww86.hoconfmt.{FormatRefusedException, Verdict}
 
 val bytes: Array[Byte] = ??? // the file's content
 val formatted: Try[String] = Try(Verdict.of(bytes)).flatMap {
@@ -197,7 +197,7 @@ val formatted: Try[String] = Try(Verdict.of(bytes)).flatMap {
 
 ```scala
 import scala.concurrent.Future
-import ww86.hoconfmt.{FormatRefusedException, Verdict}
+import eu.ww86.hoconfmt.{FormatRefusedException, Verdict}
 
 val formatted: Future[String] = Future(Verdict.of(bytes)).flatMap {
   case Verdict.NeedsFormatting(text) => Future.successful(text)
@@ -213,7 +213,7 @@ Java API's `formatOrThrow` and the cats adapter raise.
 ## Java and Kotlin
 
 `eu.ww86:hocon-fmt-java-api` puts the same core behind types the JVM speaks natively: static
-methods on `ww86.hoconfmt.java.HoconFmt` return a `Verdict` that is a sealed interface of records —
+methods on `eu.ww86.hoconfmt.java.HoconFmt` return a `Verdict` that is a sealed interface of records —
 `AlreadyFormatted`, `NeedsFormatting(formatted)` and `Refused(kind, reason)` — with a `RefusalKind`
 constant per core `Refusal` case. The mirror exists because Scala 3 writes sealed-ness to TASTy and
 not to the class file, so no Java compiler can switch over the core's enum exhaustively; the mirror
@@ -221,9 +221,9 @@ can, on Java 21. Nothing accepts or returns null: the package is JSpecify `@Null
 Kotlin enforces as compile errors.
 
 ```java
-import ww86.hoconfmt.java.HoconFmt;
-import ww86.hoconfmt.java.RefusalKind;
-import ww86.hoconfmt.java.Verdict;
+import eu.ww86.hoconfmt.java.HoconFmt;
+import eu.ww86.hoconfmt.java.RefusalKind;
+import eu.ww86.hoconfmt.java.Verdict;
 
 Verdict verdict = HoconFmt.checkFile(path);
 if (verdict instanceof Verdict.NeedsFormatting needed) {
@@ -417,7 +417,7 @@ API, and the core comes with it, so naming the core alone would leave the worker
 package build
 
 import mill.*, javalib.*
-import ww86.hoconfmt.mill.HoconFormatterModule
+import eu.ww86.hoconfmt.mill.HoconFormatterModule
 
 object app extends JavaModule, HoconFormatterModule {
   object test extends JavaTests, TestModule.Junit5, HoconFormatterModule
@@ -471,8 +471,8 @@ The adapter uses ZIO 2.1.26 and has no cats or cats-effect dependency.
 ```scala
 import java.nio.file.Paths
 import zio.{IO, UIO}
-import ww86.hoconfmt.{Refusal, Verdict}
-import ww86.hoconfmt.interop.zio.{FileError, ZioFiles, ZioFormatter}
+import eu.ww86.hoconfmt.{Refusal, Verdict}
+import eu.ww86.hoconfmt.interop.zio.{FileError, ZioFiles, ZioFormatter}
 
 val formatted: IO[Refusal, String] = ZioFormatter.format("app.port=8080")
 val decision: UIO[Verdict] = ZioFormatter.verdict("app.port=8080")

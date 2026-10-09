@@ -212,12 +212,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     ),
     // SconfigDefectsSpec asserts what sconfig *should* do, so it is red while those upstream bugs
     // are open. Scoped to the `test` task only, so `testOnly` can still run it on demand.
-    Test / test / testOptions += Tests.Exclude(Seq("ww86.hoconfmt.SconfigDefectsSpec"))
+    Test / test / testOptions += Tests.Exclude(Seq("eu.ww86.hoconfmt.SconfigDefectsSpec"))
   )
   // UPSTREAM-SCONFIG: red until released sconfig has the option the page's fork carries; excluded
   // from `test` like the defects spec. Delete with the fork (docs/site.md, "Returning to upstream").
   .jvmSettings(
-    Test / test / testOptions += Tests.Exclude(Seq("ww86.hoconfmt.KeepDetachedCommentsGuardSpec"))
+    Test / test / testOptions += Tests.Exclude(Seq("eu.ww86.hoconfmt.KeepDetachedCommentsGuardSpec"))
   )
   .jvmSettings(announceRuntime("core on the JVM"))
   .jsSettings(announceRuntime("core on Scala.js"))
@@ -278,7 +278,7 @@ lazy val coreSite = project
       "org.scalameta" %%% "munit-scalacheck" % munitScalaCheck % Test
     ),
     // The upstream defect suite describes released sconfig, which core's own suites run.
-    Test / test / testOptions += Tests.Exclude(Seq("ww86.hoconfmt.SconfigDefectsSpec"))
+    Test / test / testOptions += Tests.Exclude(Seq("eu.ww86.hoconfmt.SconfigDefectsSpec"))
   )
 
 /** Effectful file operations shared by applications and the CLI. */
@@ -356,7 +356,7 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .dependsOn(cats)
   .settings(
     name             := "hocon-fmt-cli",
-    buildInfoPackage := "ww86.hoconfmt",
+    buildInfoPackage := "eu.ww86.hoconfmt",
     buildInfoKeys    := Seq[BuildInfoKey](version),
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-effect"       % catsEffect,
@@ -371,7 +371,7 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   )
   .jvmSettings(
     announceRuntime("cli on the JVM"),
-    Compile / mainClass := Some("ww86.hoconfmt.CmdApi"),
+    Compile / mainClass := Some("eu.ww86.hoconfmt.CmdApi"),
     // IOApp ends with System.exit, which must end a forked JVM and not sbt.
     run / fork := true,
     // A forked run starts in the project's directory; relative paths mean the one sbt runs in.
@@ -452,7 +452,7 @@ lazy val web = project
       "org.ekrich"    %%% "sjavatime" % sjavatime,
       "org.scalameta" %%% "munit"     % munit % Test
     ),
-    buildInfoPackage := "ww86.hoconfmt.web",
+    buildInfoPackage := "eu.ww86.hoconfmt.web",
     buildInfoKeys    := Seq[BuildInfoKey](version),
     // The tests run the optimised script a page loads, where only exported names survive.
     Test / scalaJSStage := FullOptStage,
@@ -500,12 +500,12 @@ lazy val site = project
       "org.ekrich"    %%% "sjavatime" % sjavatime,
       "org.scalameta" %%% "munit"     % munit % Test
     ),
-    buildInfoPackage := "ww86.hoconfmt.site",
+    buildInfoPackage := "eu.ww86.hoconfmt.site",
     buildInfoKeys    := Seq[BuildInfoKey](
       version,
       // What the Pages workflow deploys, passed into `sbt site/build` as environment variables
       // (.github/workflows/pages.yml); the page stamps it in its corner. A local build, told
-      // nothing, says "local build" — see ww86.hoconfmt.site.DeployStamp.
+      // nothing, says "local build" — see eu.ww86.hoconfmt.site.DeployStamp.
       BuildInfoKey("deploySha"  -> sys.env.get("HOCON_FMT_DEPLOY_SHA")),
       BuildInfoKey("deployTime" -> sys.env.get("HOCON_FMT_DEPLOY_TIME"))
     ),
@@ -576,25 +576,25 @@ Global / libraryDefects := {
   // Each run waits on its own record cleanup, so a record left by an earlier run is gone before
   // the suite can report: without it, a failure before the test run would read as a stale verdict.
   val jvmDefects = (coreJVM / Test / testOnly)
-    .toTask(" ww86.hoconfmt.SconfigDefectsSpec")
+    .toTask(" eu.ww86.hoconfmt.SconfigDefectsSpec")
     .result
-    .dependsOn(LibraryDefects.cleanRecord("jvm", "ww86.hoconfmt.SconfigDefectsSpec"))
+    .dependsOn(LibraryDefects.cleanRecord("jvm", "eu.ww86.hoconfmt.SconfigDefectsSpec"))
     .value
   val jsDefects = (coreJS / Test / testOnly)
-    .toTask(" ww86.hoconfmt.SconfigDefectsSpec")
+    .toTask(" eu.ww86.hoconfmt.SconfigDefectsSpec")
     .result
-    .dependsOn(LibraryDefects.cleanRecord("js", "ww86.hoconfmt.SconfigDefectsSpec"))
+    .dependsOn(LibraryDefects.cleanRecord("js", "eu.ww86.hoconfmt.SconfigDefectsSpec"))
     .value
   val nativeDefects = (coreNative / Test / testOnly)
-    .toTask(" ww86.hoconfmt.SconfigDefectsSpec")
+    .toTask(" eu.ww86.hoconfmt.SconfigDefectsSpec")
     .result
-    .dependsOn(LibraryDefects.cleanRecord("native", "ww86.hoconfmt.SconfigDefectsSpec"))
+    .dependsOn(LibraryDefects.cleanRecord("native", "eu.ww86.hoconfmt.SconfigDefectsSpec"))
     .value
   // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
   val guard = (coreJVM / Test / testOnly)
-    .toTask(" ww86.hoconfmt.KeepDetachedCommentsGuardSpec")
+    .toTask(" eu.ww86.hoconfmt.KeepDetachedCommentsGuardSpec")
     .result
-    .dependsOn(LibraryDefects.cleanRecord("jvm", "ww86.hoconfmt.KeepDetachedCommentsGuardSpec"))
+    .dependsOn(LibraryDefects.cleanRecord("jvm", "eu.ww86.hoconfmt.KeepDetachedCommentsGuardSpec"))
     .value
   LibraryDefects.report(
     Seq(
@@ -602,25 +602,25 @@ Global / libraryDefects := {
         "coreJVM/SconfigDefectsSpec",
         jvmDefects,
         (coreJVM / Test / target).value,
-        "ww86.hoconfmt.SconfigDefectsSpec"
+        "eu.ww86.hoconfmt.SconfigDefectsSpec"
       ),
       (
         "coreJS/SconfigDefectsSpec",
         jsDefects,
         (coreJS / Test / target).value,
-        "ww86.hoconfmt.SconfigDefectsSpec"
+        "eu.ww86.hoconfmt.SconfigDefectsSpec"
       ),
       (
         "coreNative/SconfigDefectsSpec",
         nativeDefects,
         (coreNative / Test / target).value,
-        "ww86.hoconfmt.SconfigDefectsSpec"
+        "eu.ww86.hoconfmt.SconfigDefectsSpec"
       ),
       (
         "coreJVM/KeepDetachedCommentsGuardSpec",
         guard,
         (coreJVM / Test / target).value,
-        "ww86.hoconfmt.KeepDetachedCommentsGuardSpec"
+        "eu.ww86.hoconfmt.KeepDetachedCommentsGuardSpec"
       )
     ),
     streams.value.log
@@ -702,7 +702,7 @@ lazy val sbtPlugin = guardPublish(
         "-Ywarn-value-discard"
       ),
       // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
-      buildInfoPackage := "ww86.hoconfmt.sbt",
+      buildInfoPackage := "eu.ww86.hoconfmt.sbt",
       buildInfoObject  := "FormatterArtifact",
       buildInfoKeys    := Seq[BuildInfoKey](
         "organization" -> (javaApi / organization).value,
