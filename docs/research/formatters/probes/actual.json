@@ -23121,85 +23121,81 @@
   },
   "438.conf": {
     ":": {
-      "actual_hex": "696e636c7564652022662e636f6e66220a6f2e633a20370a",
+      "actual_hex": "696e636c7564652022662e636f6e66220a6f3d330a6f2e633d37",
       "bare_sconfig_hex": "782e72657461696e65643a20390a6f2e633a20370a",
       "check": {
-        "exit": 1,
+        "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/438.conf .\nAfter formatting:\ninclude \"f.conf\"\no.c: 7\n\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       },
       "check_after": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       },
-      "issues": [
-        "meaning changed"
-      ],
+      "issues": [],
       "mode_preserved": true,
       "oracle": {
         "exit": 0,
         "stderr": "",
-        "text": "MEANING-CHANGED\nsource={x={retained=9}, o={c=7}}\noutput={x={retained=9}, o={retained=9, c=7}}"
+        "text": "meaning-equal"
       },
       "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       },
       "stdin": {
-        "exit": 0,
-        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n438.conf:2: o defined again at line 3; the earlier value never takes effect\n",
-        "stdout": "include \"f.conf\"\no.c: 7\n"
+        "exit": 1,
+        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n438.conf:2: o defined again at line 3; the earlier value never takes effect\ncannot format 438.conf: formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o\n\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n",
+        "stdout": ""
       },
-      "verdict": "BUG",
+      "verdict": "refused as designed",
       "write": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       }
     },
     "=": {
-      "actual_hex": "696e636c7564652022662e636f6e66220a6f2e63203d20370a",
+      "actual_hex": "696e636c7564652022662e636f6e66220a6f3d330a6f2e633d37",
       "bare_sconfig_hex": "782e72657461696e6564203d20390a6f2e63203d20370a",
       "check": {
-        "exit": 1,
+        "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/438.conf .\nAfter formatting:\ninclude \"f.conf\"\no.c = 7\n\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       },
       "check_after": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       },
-      "issues": [
-        "meaning changed"
-      ],
+      "issues": [],
       "mode_preserved": true,
       "oracle": {
         "exit": 0,
         "stderr": "",
-        "text": "MEANING-CHANGED\nsource={x={retained=9}, o={c=7}}\noutput={x={retained=9}, o={retained=9, c=7}}"
+        "text": "meaning-equal"
       },
       "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       },
       "stdin": {
-        "exit": 0,
-        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n438.conf:2: o defined again at line 3; the earlier value never takes effect\n",
-        "stdout": "include \"f.conf\"\no.c = 7\n"
+        "exit": 1,
+        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n438.conf:2: o defined again at line 3; the earlier value never takes effect\ncannot format 438.conf: formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o\n\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n",
+        "stdout": ""
       },
-      "verdict": "BUG",
+      "verdict": "refused as designed",
       "write": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/438.conf (formatting would drop the definition on line 2, which may be what keeps the include on line 1 out of o)\n  fix by hand: delete line 2 if the included values may reach the key, move it or the include, or write the value as one definition\n\n<work>/438.conf:2: o defined again at line 3; the earlier value never takes effect\n"
       }
     }
   },
@@ -25365,17 +25361,17 @@
   },
   "470.conf": {
     ":": {
-      "actual_hex": "782e613a20350a696e636c7564652022662e636f6e66220a",
+      "actual_hex": "782e613d350a696e636c7564652022662e636f6e66220a78207b7d",
       "bare_sconfig_hex": "6f2e72657461696e65643a20390a78207b0a202072657461696e65643a20390a2020613a20350a7d0a",
       "check": {
-        "exit": 1,
+        "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/470.conf .\nAfter formatting:\nx.a: 5\ninclude \"f.conf\"\n\n\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "check_after": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "issues": [],
       "mode_preserved": true,
@@ -25389,32 +25385,32 @@
       "second": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "stdin": {
-        "exit": 0,
-        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "x.a: 5\ninclude \"f.conf\"\n"
+        "exit": 1,
+        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot format 470.conf: formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x\n\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n",
+        "stdout": ""
       },
-      "verdict": "ok",
+      "verdict": "refused as designed",
       "write": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       }
     },
     "=": {
-      "actual_hex": "782e61203d20350a696e636c7564652022662e636f6e66220a",
+      "actual_hex": "782e613d350a696e636c7564652022662e636f6e66220a78207b7d",
       "bare_sconfig_hex": "6f2e72657461696e6564203d20390a78207b0a202072657461696e6564203d20390a202061203d20350a7d0a",
       "check": {
-        "exit": 1,
+        "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/470.conf .\nAfter formatting:\nx.a = 5\ninclude \"f.conf\"\n\n\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "check_after": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "issues": [],
       "mode_preserved": true,
@@ -25428,18 +25424,18 @@
       "second": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "stdin": {
-        "exit": 0,
-        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "x.a = 5\ninclude \"f.conf\"\n"
+        "exit": 1,
+        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot format 470.conf: formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x\n\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n",
+        "stdout": ""
       },
-      "verdict": "ok",
+      "verdict": "refused as designed",
       "write": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/470.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       }
     }
   },
@@ -34165,85 +34161,81 @@
   },
   "case-include-empty-barrier.conf": {
     ":": {
-      "actual_hex": "782e613a20350a696e636c75646520227363616c61722e636f6e66220a",
+      "actual_hex": "782e613d350a696e636c75646520227363616c61722e636f6e66220a78207b7d",
       "bare_sconfig_hex": "78207b7d0a",
       "check": {
-        "exit": 1,
+        "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/case-include-empty-barrier.conf .\nAfter formatting:\nx.a: 5\ninclude \"scalar.conf\"\n\n\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "check_after": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
-      "issues": [
-        "meaning changed"
-      ],
+      "issues": [],
       "mode_preserved": true,
       "oracle": {
         "exit": 0,
         "stderr": "",
-        "text": "MEANING-CHANGED\nsource={x={}}\noutput={x=3}"
+        "text": "meaning-equal"
       },
       "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "stdin": {
-        "exit": 0,
-        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "x.a: 5\ninclude \"scalar.conf\"\n"
+        "exit": 1,
+        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot format case-include-empty-barrier.conf: formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x\n\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n",
+        "stdout": ""
       },
-      "verdict": "BUG",
+      "verdict": "refused as designed",
       "write": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       }
     },
     "=": {
-      "actual_hex": "782e61203d20350a696e636c75646520227363616c61722e636f6e66220a",
+      "actual_hex": "782e613d350a696e636c75646520227363616c61722e636f6e66220a78207b7d",
       "bare_sconfig_hex": "78207b7d0a",
       "check": {
-        "exit": 1,
+        "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\nFound a not formatted file: <work>/case-include-empty-barrier.conf .\nAfter formatting:\nx.a = 5\ninclude \"scalar.conf\"\n\n\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "check_after": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
-      "issues": [
-        "meaning changed"
-      ],
+      "issues": [],
       "mode_preserved": true,
       "oracle": {
         "exit": 0,
         "stderr": "",
-        "text": "MEANING-CHANGED\nsource={x={}}\noutput={x=3}"
+        "text": "meaning-equal"
       },
       "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n."
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       },
       "stdin": {
-        "exit": 0,
-        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "x.a = 5\ninclude \"scalar.conf\"\n"
+        "exit": 1,
+        "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\ncannot format case-include-empty-barrier.conf: formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x\n\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n",
+        "stdout": ""
       },
-      "verdict": "BUG",
+      "verdict": "refused as designed",
       "write": {
         "exit": 0,
         "stderr": "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:<dependency>/scala-library-3.8.2.jar)\nWARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$\nWARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release\n",
-        "stdout": "Running HOCON formatter for 1 files.\n"
+        "stdout": "Running HOCON formatter for 1 files.\nERROR: cannot format, leaving unchanged: <work>/case-include-empty-barrier.conf (formatting would drop the definition on line 3, which may be what keeps the include on line 2 out of x)\n  fix by hand: delete line 3 if the included values may reach the key, move it or the include, or write the value as one definition\n\n"
       }
     }
   },
