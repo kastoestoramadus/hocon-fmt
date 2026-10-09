@@ -132,9 +132,14 @@ Three builds of the same program:
 |---|---|---|
 | native binary | `pipx install hocon-fmt`, or `hocon-fmt-<os>-<arch>` from a GitHub release | 31 ms |
 | Node | `npx hocon-fmt` | 140 ms |
-| JVM | `sbt "cliJVM/run <args>"` from a checkout | 720 ms |
+| JVM | `cs launch eu.ww86:hocon-fmt-cli_3:<version> -- <args>`; `sbt "cliJVM/run <args>"` from a checkout | 720 ms |
 
 \* `--check` on one small file, averaged over 10 runs on one Linux machine.
+
+No launcher script ships with the JVM artifact; it is a jar whose manifest names
+`ww86.hocon_fmt.CmdApi`, so coursier runs it (`cs launch`, above) or `java -cp <classpath>
+ww86.hocon_fmt.CmdApi <args>` does, with the classpath from `cs fetch --classpath
+eu.ww86:hocon-fmt-cli_3:<version>`.
 
 ## cats-effect library
 

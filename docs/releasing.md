@@ -6,8 +6,9 @@ the `Release` workflow has never run.
 
 **Wave 1 is the JVM artifacts**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
 `hocon-fmt-cli_3`, `hocon-fmt-java-api` and `sbt-hocon-fmt`. `sbt publishRelease` uploads exactly
-those, and `sbt test` fails if that set ever stops being closed under its dependencies. Everything
-else below is wave 2.
+those, and `sbt test` fails if that set ever stops being closed under what a consumer of it needs:
+the projects the POMs name, and the Java API the sbt plugin resolves at run time by the coordinates
+in its `BuildInfo`. Everything else below is wave 2.
 
 | artifact | wave | built by | published to | users get it through |
 |---|---|---|---|---|
@@ -167,18 +168,28 @@ pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --re
 
 ## Wave 1, tried before the first tag
 
-The wave-1 set was published into a private Maven repository (`sbt -Dmaven.repo.local=<dir>
-publishM2`, so nothing reached `~/.m2`) and three scratch consumer builds resolved from it alone,
-with no Maven Local or Ivy Local configured:
+The wave-1 set was published into a private Maven repository with the release version set for the
+one session (`build.sbt` stays at `0.1.0-SNAPSHOT`; nothing reached `~/.m2`):
+
+```bash
+sbt -Dmaven.repo.local=<dir>/m2 \
+  'set ThisBuild / version := "0.1.0"' \
+  "coreJVM/publishM2" "catsJVM/publishM2" "cliJVM/publishM2" "javaApi/publishM2" "sbtPlugin/publishM2"
+```
+
+Three scratch consumer builds resolved from it alone, with no Maven Local or Ivy Local configured:
 
 - a Scala 3 sbt build depending on `hocon-fmt-core_3` formats bytes from a `Verdict` and reports a
   refusal without writing;
 - an sbt build with `addSbtPlugin` fails `hoconFormatCheck` naming the file, `hoconFormat` rewrites
   it and the next check passes; the plugin resolves the Java API and its transitive core at task
   time, in a Scala 2.13 build;
-- `hocon-fmt-cli_3` resolves and runs: `--check` exits 1 then 0 after formatting, a missing path
-  exits 2 with `cannot read <path>: no such file`, and `--version` prints `hocon-fmt 0.1.0`.
-  Resolving it without `hocon-fmt-cats_3` fails, which is why the adapter is in the set.
+- `hocon-fmt-cli_3` resolves and runs. No launcher script ships, so the jar is what runs; coursier
+  does it directly (`cs launch eu.ww86:hocon-fmt-cli_3:0.1.0 -- --version` against the private
+  repository, `-r file://<dir>/m2`, prints `hocon-fmt 0.1.0`), and the manifest's
+  `Main-Class: ww86.hocon_fmt.CmdApi` serves a `java -cp` run. `--check` exits 1 then 0 after
+  formatting, a missing path exits 2 with `cannot read <path>: no such file`. Resolving it without
+  `hocon-fmt-cats_3` fails, which is why the adapter is in the set.
 
 Still to verify, and only with the real secrets: `signRelease` (it reaches `gpg` and fails without
 `PGP_PASSPHRASE`; the `central` job is where it runs) and `sonaUpload`. The Maven and Mill steps of

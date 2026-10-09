@@ -111,10 +111,10 @@ def guardPublish(p: Project): Project =
 val checkSconfigFork =
   taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
 
-/** Fails unless every project a release uploads also uploads the projects it depends on: a POM
-  * names its dependencies, so a release set that leaves one out publishes an artifact no consumer
-  * can resolve (`hocon-fmt-cli_3`'s POM names `hocon-fmt-cats_3`). The set itself is at the bottom,
-  * next to the release aliases.
+/** Fails unless every project a release uploads also uploads the projects a consumer of it needs:
+  * the ones a POM names (`hocon-fmt-cli_3`'s POM names `hocon-fmt-cats_3`), plus the ones a project
+  * resolves at run time without a `dependsOn` (the sbt plugin's Java API). The set and those extra
+  * edges are at the bottom, next to the release aliases.
   */
 val checkReleaseSet =
   taskKey[Unit]("Fails unless the release set is closed under its inter-project dependencies.")
@@ -686,13 +686,23 @@ val releaseProjectIds =
     sbtPlugin.id
   )
 
+// Edges a released project needs that `buildDependencies` does not report: the sbt plugin names
+// the Java API in its `BuildInfo` (the coordinates it resolves at task time), which is a setting
+// dependency, not `dependsOn`, so the plugin's POM and `buildDependencies` both miss it.
+val releaseRuntimeDependencies: Map[String, Seq[String]] =
+  Map(sbtPlugin.id -> Seq(javaApi.id))
+
 ThisBuild / checkReleaseSet := {
   val inSet = releaseProjectIds.toSet
   val needs = buildDependencies.value.classpathTransitive.map { case (from, to) =>
     from.project -> to.map(_.project)
   }
   val missing = releaseProjectIds.sorted
-    .flatMap(id => needs.getOrElse(id, Nil).filterNot(inSet).map(dependency => s"$dependency (needed by $id)"))
+    .flatMap { id =>
+      (needs.getOrElse(id, Nil) ++ releaseRuntimeDependencies.getOrElse(id, Nil)).distinct
+        .filterNot(inSet)
+        .map(dependency => s"$dependency (needed by $id)")
+    }
   if (missing.nonEmpty)
     sys.error(s"the release set is not closed under its dependencies: ${missing.mkString(", ")}")
 }

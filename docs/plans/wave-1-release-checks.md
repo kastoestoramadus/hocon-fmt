@@ -19,11 +19,11 @@ append-only, so a checked item is recorded here rather than ticked in its own fi
 | #73 unreviewed scan | run `scripts/changes-classifiers-test.sh` | `all classifier cases pass` |
 | #44 cats file identity, #52 rename pins | keep the JVM rename and hard-link pins green | `catsJVM/test` green (18 passed) |
 | #2 golden files, #13 include preservation, #35 lost comments, #38 env override, #48 catalogue | the defect suite is the ledger; its failures are the list to shrink | `sbt coreJVM/testOnly …SconfigDefectsSpec` is `Failed: Total 20, Failed 19, Passed 1` on the JVM, the documented 19 red by design — nothing to remove yet |
-| [first release](first-release.md) item 3 | the version is in six places and `java-api` is checked | `scripts/check-release-version.sh 0.1.0` names all six today, `java-api/build.gradle.kts` among them, so a tag before the bump stops; the sbt `hocon-fmt-java-api` follows `build.sbt` (the published POM carried 0.1.0 while the build said `-SNAPSHOT`) |
+| [first release](first-release.md) item 3 | the version is in six places and `java-api` is checked | `scripts/check-release-version.sh 0.1.0` checks all six places and today names the five that still say `-SNAPSHOT`, `java-api/build.gradle.kts` among them, so a tag before the bump stops (`.pre-commit-hooks.yaml` already carries `0.1.0`); the sbt `hocon-fmt-java-api` follows `build.sbt` (the published POM carried 0.1.0 while the build said `-SNAPSHOT`) |
 
 The wave-1 suites ran green from this worktree: `coreJVM/test` 450 passed, `catsJVM/test` 18,
 `cliJVM/test` 64, `acceptance/test` 57 (the CLI's real-process suite), `checkReleaseSet` passed, and
-`scripts/improvement-log.py` exits 0 over 69 entries.
+`scripts/improvement-log.py` exits 0 over 72 entries.
 
 ## Remains
 
@@ -43,7 +43,9 @@ The wave-1 suites ran green from this worktree: `coreJVM/test` 450 passed, `cats
 - **A decision before or after the tag**: #25 the platform contract for the CLI (Windows and
   terminal stdin are not covered by `CliAcceptanceSuite`), #52 whether a sixth published artifact
   (a shared file-identity module) is wanted, #64 adding `changes` to the ruleset's required checks
-  (the docs-only path list already covers everything the build reads, `docs/**` included), and
-  #803a770's return of merges behind review once the first release is out.
+  (the docs-only path list already covers everything the build reads, `docs/**` included), whether
+  a symlink's alias or target name should decide the `.json`/`.properties` refusal (#73; today the
+  target name does, so a `.json` alias of a `.conf` target is formatted), and the return of merges
+  behind review once the first release is out (the commit-named entry 803a770, not a PR).
 - **The site and the playground** (#16, #30, #32, #40, #42, #55, #57, #66, #67, #69, #71) are
   wave 2 or later: nothing there is on the JVM artifacts' path.

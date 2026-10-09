@@ -9,14 +9,16 @@ about a file.
 | artifact | for | how |
 |---|---|---|
 | `eu.ww86:sbt-hocon-fmt` | sbt builds | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")` |
-| `eu.ww86:hocon-fmt-cli_3` | the command line on the JVM | `hocon-fmt --check`, `--stdin`, exit codes; Java 17 or newer |
+| `eu.ww86:hocon-fmt-cli_3` | the command line on the JVM | `cs launch eu.ww86:hocon-fmt-cli_3:0.1.0 -- --check <paths>`; `--stdin`, exit codes; Java 17 or newer |
 | `eu.ww86:hocon-fmt-core_3` | Scala 3 libraries | `Verdict.of(bytes)`: a pure decision, no effects, no file access |
 | `eu.ww86:hocon-fmt-java-api` | Java and Kotlin | `HoconFmt.checkFile(path)`, JSpecify `@NullMarked` |
 | `eu.ww86:hocon-fmt-cats_3` | cats-effect applications | the file operations the CLI uses |
 
 ## What it formats
 
-A file whose name ends in `.conf` or `.hocon`. The default style is `key = value`, nested objects
+A `.conf` or `.hocon` file in a directory that is walked, or a file named on the command line —
+which is formatted whatever its extension, unless it is `.json` or `.properties`. The default
+style is `key = value`, nested objects
 flattened to path keys (`a { b = 1 }` becomes `a.b = 1`), and no extra indentation for nested
 objects. `.hocon-fmt.conf` in the file's directory or above it, up to the directory holding
 `.git`, can set `separator`, `double-indent`, `simplify-nested-objects` and `fail-on-duplicates`;
@@ -32,7 +34,9 @@ it the same way.
 A file the formatter will not format is **refused**: reported with the reason, left byte for byte
 untouched, and it does not fail the run. A `.conf` file that is not HOCON at all, a file that is
 not UTF-8, a `.json` file, a file whose formatting would lose a comment or an include, and the
-sconfig defects listed in [limitations](../limitations.md) all end that way. A file that cannot be
+sconfig defects listed in [limitations](../limitations.md) all end that way. The name is the one
+the file is known by: a symlink is followed first, so a `.json` alias of a `.conf` target is
+formatted, and a `.conf` alias of a `.json` target is refused. A file that cannot be
 *read or written* is a different thing: `cannot read <path>: <reason>` on stderr and exit code 2,
 so a typo in a CI path cannot pass silently.
 
@@ -44,15 +48,23 @@ a value, never a write, and never a failed build.
 
 - **A comment above a blank line is refused**, so most real files are: 20 of 23 `reference.conf`
   files surveyed from Akka, Pekko, Play, Kamon, Gatling and ssl-config open with a licence banner
-  and a blank line, and the comment would be dropped. It is the single limit to know about.
-- **The `x = "default"` then `x = ${?ENV}` idiom is refused**, as is any unresolved merge: 357 of
-  1,650 real files surveyed use it. An upstream sconfig fix is merged but not released.
+  and a blank line, and the comment would be dropped. It is the limit most real files hit.
+- **A substitution sconfig cannot render is refused**: the `x = "default"` then `x = ${?ENV}`
+  idiom (357 of 1,650 real files surveyed), an object, array or string concatenation with a
+  substitution (`child = ${base} { b = 2 }`), a substitution that refers to itself, and `+=` after
+  the key is defined. `${?ENV}` on the first definition of its key formats; only an override after
+  one is refused. An upstream fix for it is merged but not released.
 - **Includes**: an include that shares a line with a field, or a key defined again after one, is
   refused rather than moved across it.
+- **A root-level array, the `${MY_LIST[]}` suffix, and `a : include "x"` are refused** although the
+  specification allows them.
+- **A file with an include that spells `__INCLUDE_` is refused**, since that word writes the
+  placeholders the formatter stands for the includes with.
 - Blank lines are not kept, and duplicate definitions collapse to the later one, which the CLI and
   the plugins report as a warning (failing the run only with `fail-on-duplicates`).
 - Scala.js is not in this release; a `.json` and `.properties` file is refused under any platform,
-  because formatting it would write HOCON under the name it has.
+  because formatting it would write HOCON under the name it has. The refusal is by the name the
+  file is known by, so a symlink's target name decides (see above).
 
 ## The sbt plugin
 
