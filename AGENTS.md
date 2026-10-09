@@ -115,6 +115,8 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   each review, e.g. `Reviewed by deepseek-flash/h through ZCode`; whoever relays a review adds its line.
 - Every merged improvement gets a new file in [docs/improvement-log/](docs/improvement-log/) —
   never an edit to another entry's file — with what to look at again before a release.
+- Names follow [docs/naming.md](docs/naming.md); a new artifact, package, id or command is checked
+  against it.
 
 ## Working as one of several agents
 
