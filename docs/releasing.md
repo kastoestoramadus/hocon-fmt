@@ -4,20 +4,26 @@ Every channel ships the same core, so all of them are released together, at one 
 has been released yet: Maven Central is set up (below), the other registries are still to do, and
 the `Release` workflow has never run.
 
-| artifact | built by | published to | users get it through |
-|---|---|---|---|
-| `hocon-fmt-core_3`, `hocon-fmt-core_sjs1_3`, `hocon-fmt-core_native0.5_3` | sbt | Maven Central | the pure formatter on every platform |
-| `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | sbt | Maven Central | cats-effect file operations on every platform |
-| `hocon-fmt-zio_3`, `hocon-fmt-zio_sjs1_3`, `hocon-fmt-zio_native0.5_3` | sbt | Maven Central | the ZIO library adapter |
-| `hocon-fmt-cli_3` | sbt | Maven Central | the JVM command line |
-| `hocon-fmt-java-api` | sbt | Maven Central | a library dependency for Java and Kotlin callers |
-| `sbt-hocon-fmt` | sbt | Maven Central | `addSbtPlugin` |
-| `hocon-fmt-maven-plugin` | `maven-plugin/` | Maven Central | `<plugin>` |
-| `mill-hocon-fmt_mill1_3` | `mill-plugin/` | Maven Central | `//| mvnDeps` |
-| `eu.ww86.hocon-fmt` | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
-| native binaries, `hocon-fmt.js` | `Release` workflow | GitHub release | a download; the playground |
-| wheels carrying the native binary | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
-| npm package carrying the Node build | `Release` workflow | npm | the `-node` pre-commit hooks, `npx` |
+**Wave 1 is the JVM artifacts**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
+`hocon-fmt-cli_3`, `hocon-fmt-java-api` and `sbt-hocon-fmt`. `sbt publishRelease` uploads exactly
+those, and `sbt test` fails if that set ever stops being closed under what a consumer of it needs:
+the projects the POMs name, and the Java API the sbt plugin resolves at run time by the coordinates
+in its `BuildInfo`. Everything else below is wave 2.
+
+| artifact | wave | built by | published to | users get it through |
+|---|---|---|---|---|
+| `hocon-fmt-core_3`, `hocon-fmt-core_sjs1_3`, `hocon-fmt-core_native0.5_3` | 1 (JVM), 2 (JS, Native) | sbt | Maven Central | the pure formatter on every platform |
+| `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | 1 (JVM), 2 (JS, Native) | sbt | Maven Central | cats-effect file operations on every platform |
+| `hocon-fmt-zio_3`, `hocon-fmt-zio_sjs1_3`, `hocon-fmt-zio_native0.5_3` | 2 | sbt | Maven Central | the ZIO library adapter |
+| `hocon-fmt-cli_3` | 1 | sbt | Maven Central | the JVM command line |
+| `hocon-fmt-java-api` | 1 | sbt | Maven Central | a library dependency for Java and Kotlin callers |
+| `sbt-hocon-fmt` | 1 | sbt | Maven Central | `addSbtPlugin` |
+| `hocon-fmt-maven-plugin` | 2 | `maven-plugin/` | Maven Central | `<plugin>` |
+| `mill-hocon-fmt_mill1_3` | 2 | `mill-plugin/` | Maven Central | `//| mvnDeps` |
+| `eu.ww86.hocon-fmt` | 2 | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
+| native binaries, `hocon-fmt.js` | 2 | `Release` workflow | GitHub release | a download; the playground |
+| wheels carrying the native binary | 2 | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
+| npm package carrying the Node build | 2 | `Release` workflow | npm | the `-node` pre-commit hooks, `npx` |
 
 The names are free on every registry (checked 2026-09-26).
 
@@ -104,24 +110,24 @@ workflow" for workflows on the default branch.
    `maven-plugin/pom.xml` (the plugin's own version and the `hocon-fmt-java-api` dependency),
    `mill-plugin/build.mill` (`formatterVersion`), and the `additional_dependencies` of all four
    hooks in `.pre-commit-hooks.yaml`. The npm and wheel versions follow `build.sbt`. All core, cats
-   and zio platform artifacts and the Java API also inherit that version; `signRelease` and
-   `publishRelease` include every sbt artifact the table above lists as built by sbt.
+   and zio platform artifacts and the Java API also inherit that version. `signRelease` and
+   `publishRelease` name the wave-1 projects directly (`releaseProjectIds` in `build.sbt`), and
+   `sbt test` fails when that set stops being closed under its dependencies.
 2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds every
    artifact without releasing anything, which is how to find out the matrix works. Its `central`
    job also signs with the real key and passphrase, uploading nothing: the passphrase is checked
-   there, because a typo cannot be seen from outside. `signRelease` checks every sbt artifact,
-   including the cross-built core and cats libraries, without uploading anything.
+   there, because a typo cannot be seen from outside. `signRelease` checks the wave-1 artifacts on
+   the machine that runs it, without uploading anything, and needs `PGP_PASSPHRASE` to sign.
 3. Push a tag `v<version>`. `scripts/check-release-version.sh <version>` runs first and stops the
    job if any place that carries the version disagrees with the tag. The workflow links native binaries for Linux (x86_64, aarch64) and
    macOS (aarch64), smoke-tests them, wraps each in a wheel, packs the npm package, builds the web
    script, and attaches all of it to a GitHub release.
 4. Publish, in dependency order:
    - Maven Central, first: the Gradle and Maven plugins resolve the Java API, and the core through
-     it, from there, while the Mill and sbt plugins resolve the core. The tag leaves three
-     deployments in the portal (sbt, Maven, Mill). Look each
-     over in Publish → Deployments, then publish the sbt one, which carries core, cats and zio on
-     all three platforms (zio is text only on Scala.js) and the Java API, first. A release cannot
-     be undone.
+     it, from there, while the Mill and sbt plugins resolve the core. Look the deployments over in
+     Publish → Deployments, then publish the sbt one first: it carries the wave-1 JVM artifacts
+     (core, cats, cli, the Java API and the sbt plugin). A release cannot be undone. The Maven and
+     Mill deployments the tag stages belong to wave 2; until then, leave them unpublished.
    - The Gradle Plugin Portal.
    - PyPI and npm, before announcing the tag: the hooks at that tag pin those exact versions.
 5. Try every channel as a user would (below).
@@ -160,7 +166,39 @@ To check a release, in any repository with a `.conf` file:
 pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --ref v<version> --all-files
 ```
 
+## Wave 1, tried before the first tag
+
+The wave-1 set was published into a private Maven repository with the release version set for the
+one session (`build.sbt` stays at `0.1.0-SNAPSHOT`; nothing reached `~/.m2`):
+
+```bash
+sbt -Dmaven.repo.local=<dir>/m2 \
+  'set ThisBuild / version := "0.1.0"' \
+  "coreJVM/publishM2" "catsJVM/publishM2" "cliJVM/publishM2" "javaApi/publishM2" "sbtPlugin/publishM2"
+```
+
+Three scratch consumer builds resolved from it alone, with no Maven Local or Ivy Local configured:
+
+- a Scala 3 sbt build depending on `hocon-fmt-core_3` formats bytes from a `Verdict` and reports a
+  refusal without writing;
+- an sbt build with `addSbtPlugin` fails `hoconFormatCheck` naming the file, `hoconFormat` rewrites
+  it and the next check passes; the plugin resolves the Java API and its transitive core at task
+  time, in a Scala 2.13 build;
+- `hocon-fmt-cli_3` resolves and runs. No launcher script ships, so the jar is what runs; coursier
+  does it directly (`cs launch eu.ww86:hocon-fmt-cli_3:0.1.0 -- --version` against the private
+  repository, `-r file://<dir>/m2`, prints `hocon-fmt 0.1.0`), and the manifest's
+  `Main-Class: ww86.hocon_fmt.CmdApi` serves a `java -cp` run. `--check` exits 1 then 0 after
+  formatting, a missing path exits 2 with `cannot read <path>: no such file`. Resolving it without
+  `hocon-fmt-cats_3` fails, which is why the adapter is in the set.
+
+Still to verify, and only with the real secrets: `signRelease` (it reaches `gpg` and fails without
+`PGP_PASSPHRASE`; the `central` job is where it runs) and `sonaUpload`. The Maven and Mill steps of
+the workflow are wave 2 and are left unpublished until then. The user-facing text of the release is
+[plans/release-notes-0.1.0.md](plans/release-notes-0.1.0.md).
+
 ## Trying a release
+
+Wave 2's channels; wave 1's are in the section above.
 
 ```bash
 pipx run hocon-fmt --check application.conf          # the wheel, native
