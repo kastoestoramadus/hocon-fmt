@@ -94,6 +94,32 @@ has no public accessor in sconfig 1.12.4: `DuplicateReport` matches the document
 
 ## Distribution
 
+### Install options for the CLI
+
+Where the command line can come from, one or two lines each; the entries below cover what is
+still to build. The first four ship in wave 2, with PyPI, npm and the release binaries.
+
+- **pipx** — `pipx install hocon-fmt`, the PyPI wheel carrying the native binary. Needs Python;
+  no wheel for Windows, Intel Macs or Linux older than glibc 2.34.
+- **npx** — `npx hocon-fmt`, the npm package running the Node build; needs Node only.
+- **pre-commit** — the hooks from this repository at a tag; needs Python and pre-commit only, and
+  installs the wheel or the npm package itself.
+- **GitHub release binary** — the native binary attached to a release, downloaded by hand.
+- **Homebrew tap** — `brew install kastoestoramadus/tap/hocon-fmt` on macOS and Linux; entry below.
+- **coursier** — `cs install hocon-fmt` for the Scala crowd; the same channel serves pre-commit
+  through `language: coursier`, which pre-commit 4.6.2 supports and which needs `cs` on PATH and
+  the JVM CLI on Maven Central, and starts slower than the native binary; entry below.
+- **Docker** — `docker run ghcr.io/kastoestoramadus/hocon-fmt ...` for CI that runs containers;
+  entry below.
+- **GitHub Action** — `uses: kastoestoramadus/hocon-fmt-action@v1`, checking with an annotation
+  per unformatted file; entry below.
+- **Scoop / Windows wheel** — both want the Windows native build first: Scoop installs the
+  binary from a bucket, the wheel gives pip and pipx a Windows build.
+- **Nix** — `nix run github:kastoestoramadus/hocon-fmt` from a flake, then a nixpkgs package;
+  entry below.
+
+After wave 2, build the Homebrew tap and coursier first, then Docker and the Action.
+
 ### Homebrew tap (S)
 
 `brew install kastoestoramadus/tap/hocon-fmt` on macOS and Linux, installing the release
