@@ -18,6 +18,15 @@ import ww86.hocon_fmt.{ExampleData, Verdict}
   */
 class ComponentSpec extends munit.FunSuite {
 
+  val storyTitles = List(
+    "Three people edited this file",
+    "Set twice, only one counts",
+    "Dev defaults, prod overrides",
+    "A real library file",
+    "A typo",
+    "The safety net"
+  )
+
   /** A GitHub that answers only when the test says so, and counts what was asked. */
   final class Github {
     val searched = scala.collection.mutable.ListBuffer.empty[String]
@@ -193,6 +202,69 @@ class ComponentSpec extends munit.FunSuite {
       .map { _ =>
         assertEquals(input.value.asInstanceOf[String], example)
         assertEquals(output.value.asInstanceOf[String], formatted(example))
+        val _ = root.unmount()
+        ()
+      }
+  }
+
+  test("the six stories show their formatted output, findings, and permanent refusals") {
+    val container = install(Github())
+    val root      = mount(container)(Playground())
+    val buttons   = findAll(container, "example")
+    assertEquals(buttons.map(_.textContent.asInstanceOf[String]), storyTitles)
+    val (input, output) = panes(container)
+    buttons.zipWithIndex
+      .foldLeft(Future.successful(())) { case (done, (button, index)) =>
+        done.flatMap { _ =>
+          val _ = button.fire("click")
+          settle(250).map { _ =>
+            val example = ExampleData.showcase(index)
+            assertEquals(input.value.asInstanceOf[String], example.input)
+            assertEquals(output.value.asInstanceOf[String], formatted(example.input))
+            val status = find(container, "status").textContent.asInstanceOf[String]
+            assert(status.contains(if index < 4 then "Formatted" else "Left unchanged"), status)
+            if index == 1 then {
+              val finding = find(container, "findings").textContent.asInstanceOf[String]
+              assert(finding.contains("service.port"), finding)
+              assert(finding.contains("line 1") && finding.contains("line 3"), finding)
+            }
+            if index == 4 then assert(status.contains("playground: 4"), status)
+            if index == 5 then assert(status.contains("Keep this operational note"), status)
+            println(s"Story ${index + 1}: ${example.title}: $status")
+          }
+        }
+      }
+      .map { _ =>
+        val _ = root.unmount(); ()
+      }
+  }
+
+  test("style choices shrink the first story's diff and resolution shows local production values") {
+    val container   = install(Github())
+    val root        = mount(container)(Playground())
+    val (_, output) = panes(container)
+    val before      = output.value.asInstanceOf[String]
+    val _           = find(container, "nesting-option").fire("click")
+    settle(250)
+      .flatMap { _ =>
+        val after  = output.value.asInstanceOf[String]
+        val source = ExampleData.showcase.head.input
+        assert(Status.changedLines(source, after) < Status.changedLines(source, before))
+        val _ = findAll(container, "example")(2).fire("click")
+        settle(250)
+      }
+      .map { _ =>
+        assert(output.value.asInstanceOf[String].contains("include"))
+        assert(output.value.asInstanceOf[String].contains("${?PORT}"))
+        val _        = find(container, "resolved-tab").fire("click")
+        val resolved = output.value.asInstanceOf[String]
+        assert(resolved.contains("9000"), resolved)
+        assert(resolved.contains("production"), resolved)
+        assert(!resolved.contains("${?PORT}"), resolved)
+        assert(!resolved.contains("__INCLUDE_"), resolved)
+        assert(find(container, "resolution-note").textContent.asInstanceOf[String].contains("Includes are not loaded"))
+        val _ = find(container, "formatted-tab").fire("click")
+        assert(output.value.asInstanceOf[String].contains("include"))
         val _ = root.unmount()
         ()
       }
