@@ -12,3 +12,9 @@ $ copy-file input.conf src/main/resources/app.conf
 > set hoconSimplifyNestedObjects := Some(false)
 > hoconFormat
 $ must-mirror src/main/resources/app.conf override.conf
+> set hoconSeparator := None
+> set hoconDoubleIndent := None
+> set hoconSimplifyNestedObjects := None
+> prepareAlias
+> hoconFormat
+> assertAliasStyle
