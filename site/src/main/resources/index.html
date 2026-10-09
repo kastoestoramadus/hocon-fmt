@@ -150,7 +150,10 @@
         font-size: 0.85rem;
         line-height: 1.45;
         width: 100%;
-        min-height: 14rem;
+        /* About 24 lines of monospace on a desktop; a short window keeps the pane proportionate
+           instead of pushing the rest of the page out of sight. The playground only writes an
+           inline height once the reader drags a pane. */
+        min-height: min(70vh, 32rem);
         padding: 0.6rem;
         border: 1px solid var(--line);
         border-radius: 6px;
