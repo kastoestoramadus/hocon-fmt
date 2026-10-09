@@ -20,23 +20,61 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
   test("every include-between-definitions case is refused or keeps resolving the same") {
     val root = Files.createTempDirectory("include-shadow")
     HoconGen.shadowCases.zipWithIndex.foreach { case (shadowCase, index) =>
-      val input  = beside(root.resolve(s"in-$index"), shadowCase)
-      val output = beside(root.resolve(s"out-$index"), shadowCase)
-      Verdict.of(Files.readAllBytes(input), "main.conf") match {
-        // Leaving the file alone is what the user does by hand, and always allowed.
+      refusedOrUnchanged(root, index, shadowCase)
+    }
+  }
+
+  test("a definition dropped under a multi-segment path is refused") {
+    val root  = Files.createTempDirectory("include-shadow-paths")
+    val cases = List(
+      "dotted value then object"        -> ("a.o = 3\na.o.c = 7\n", "a.o { retained = 9 }"),
+      "nested value then object"        -> ("a { o = 3 }\na.o.c = 7\n", "a.o { retained = 9 }"),
+      "three-segment value then object" -> ("a.o.b = 3\na.o.b.c = 7\n", "a.o.b { retained = 9 }"),
+      "nested path, dotted leaf"        -> ("a.o { b = 3 }\na.o.b.c = 7\n", "a.o.b { retained = 9 }")
+    )
+    cases.zipWithIndex.foreach { case ((name, (definitions, body)), index) =>
+      val text    = s"${HoconGen.shadowInclude}\n$definitions"
+      val verdict = refusedOrUnchanged(root, index, HoconGen.ShadowCase(text, body))
+      verdict match {
         case Verdict.Refused(_) => ()
-        case verdict            =>
-          val formatted = verdict match {
-            case Verdict.NeedsFormatting(text) => text
-            case _                             => shadowCase.text
-          }
-          write(output, formatted)
-          assertEquals(
-            resolved(output),
-            resolved(input),
-            s"formatting changed what the text resolves to:\n${shadowCase.text}"
-          )
+        case other              => fail(s"$name: expected a refusal, got $other")
       }
+    }
+  }
+
+  test("the include's place decides: after the definitions it still formats") {
+    val root = Files.createTempDirectory("include-shadow-places")
+    // The dropped dotted definition is the include's own line, so the shadow check has nothing to
+    // refuse; the moved-include check refuses this one on its own, which keeping the values allows.
+    val between = "a.o = 3\ninclude \"inc.conf\"\na.o.c = 7\n"
+    val _       = refusedOrUnchanged(root, 0, HoconGen.ShadowCase(between, "a.o { retained = 9 }"))
+    val after   = "a.o = 3\na.o.c = 7\ninclude \"inc.conf\"\n"
+    refusedOrUnchanged(root, 1, HoconGen.ShadowCase(after, "a.o { retained = 9 }")) match {
+      case Verdict.Refused(refusal) => fail(s"the include after the definitions: refused: ${refusal.reason}")
+      case _                        => ()
+    }
+  }
+
+  /** The case's text beside the file its include names, formatted and resolved against the input:
+    * a refusal passes, any other verdict must keep the values.
+    */
+  private def refusedOrUnchanged(root: Path, index: Int, shadowCase: HoconGen.ShadowCase): Verdict = {
+    val input  = beside(root.resolve(s"in-$index"), shadowCase)
+    val output = beside(root.resolve(s"out-$index"), shadowCase)
+    Verdict.of(Files.readAllBytes(input), "main.conf") match {
+      case verdict @ Verdict.Refused(_) => verdict
+      case verdict                      =>
+        val formatted = verdict match {
+          case Verdict.NeedsFormatting(text) => text
+          case _                             => shadowCase.text
+        }
+        write(output, formatted)
+        assertEquals(
+          resolved(output),
+          resolved(input),
+          s"formatting changed what the text resolves to:\n${shadowCase.text}"
+        )
+        verdict
     }
   }
 

@@ -313,15 +313,34 @@ object HoconGen {
   // ---- the include-shadow family ---------------------------------------------------------------
 
   /** The shapes a definition around an include takes: a value that erases what came before, an
-    * object that merges, an empty object, a path below the key, an array.
+    * object that merges, an empty object, a path below the key, an array — at one key, and under a
+    * multi-segment path spelled dotted, nested, or one of each. The path matters as much as the
+    * shape: `p.q = 3` writes the object `p` and the value `p.q` on one line, so whether the merge
+    * kept something on that line says nothing about which of the two it kept.
     */
   val shadowDefinitions: List[String] =
-    List("p = 3", "p { a = 1 }", "p {}", "p.c = 7", "p = null", "p = [1]")
+    List(
+      "p = 3",
+      "p { a = 1 }",
+      "p {}",
+      "p.c = 7",
+      "p = null",
+      "p = [1]",
+      "p.q = 3",
+      "p.q { a = 1 }",
+      "p.q {}",
+      "p.q.c = 7",
+      "p.q = null",
+      "p { q = 3 }",
+      "p.q.r = 3",
+      "p.q.r.c = 7"
+    )
 
   /** What the file the include names holds when it writes the same path, and what it holds when it
-    * writes something else.
+    * writes something else — at one key, and under the multi-segment paths above.
     */
-  val shadowBodies: List[String] = List("p = 9", "p { b = 9 }", "p {}", "p.c = 9", "q = 1")
+  val shadowBodies: List[String] =
+    List("p = 9", "p { b = 9 }", "p {}", "p.c = 9", "q = 1", "p.q = 9", "p.q { b = 9 }", "p.q.c = 9")
 
   val shadowInclude: String = "include \"inc.conf\""
 
