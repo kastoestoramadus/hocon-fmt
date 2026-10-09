@@ -12,7 +12,7 @@ failed=0
 
 tree=
 
-sbt_v= api_v= gradle_v= mill_v= maven_v= hooks_v=
+sbt_v="" api_v="" gradle_v="" mill_v="" maven_v="" hooks_v="" drop=""
 fresh() { sbt_v=$1 api_v=$1 gradle_v=$1 mill_v=$1 maven_v=$1 hooks_v=$1; }
 
 put() { printf '%b\n' "$2" > "$tree/$1"; }
@@ -28,6 +28,8 @@ write_tree() {
   put mill-plugin/build.mill         "  def formatterVersion = \"$mill_v\""
   put maven-plugin/pom.xml           "<version>$maven_v</version>\n<version>$maven_v</version>"
   put .pre-commit-hooks.yaml         "additional_dependencies: [\"hocon-fmt==$hooks_v\"]\nadditional_dependencies: [\"hocon-fmt==$hooks_v\"]\nadditional_dependencies: [\"hocon-fmt@$hooks_v\"]\nadditional_dependencies: [\"hocon-fmt@$hooks_v\"]"
+  # A place the wave checks can be missing; the check must fail, not read "not there" as "fine".
+  if [ -n "$drop" ]; then rm -f "$tree/$drop"; fi
 }
 
 expect_run() { # name, expected exit status, pattern the output must carry ('-' = none), command
@@ -63,8 +65,16 @@ fresh "$good"; sbt_v=$stale; write_tree
 expect_run 'wave 1 fails on a build.sbt mismatch' 1 '^build\.sbt:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
+fresh "$good"; drop=java-api/build.gradle.kts; write_tree; drop=""
+expect_run 'wave 1 fails when a place it checks is missing' 1 '^java-api/build\.gradle\.kts:' \
+  "$tree/scripts/check-release-version.sh" "$good"
+
 fresh "$good"; write_tree
 expect_run 'wave 2 passes when all six places agree' 0 '-' \
+  env RELEASE_WAVE=2 "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; drop=mill-plugin/build.mill; write_tree; drop=""
+expect_run 'wave 2 fails when a place it checks is missing' 1 '^mill-plugin/build\.mill:' \
   env RELEASE_WAVE=2 "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; hooks_v=$stale; write_tree
