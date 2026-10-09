@@ -94,6 +94,16 @@ class UseItSpec extends munit.FunSuite {
     assert(!container.textContent.asInstanceOf[String].contains("Dependencies are fixed"))
     val _ = root.unmount()
   }
+  test("the pre-commit tab carries the wave-2 note, in the docs' words") {
+    val container = installed("#use-it-pre-commit")
+    val root      = render(container.asInstanceOf[dom.Element], UseIt())
+    val note      = "The hooks ship in wave 2: they pin PyPI and npm versions published only then."
+    assert(container.textContent.asInstanceOf[String].contains(note))
+    val usage = js.Dynamic.global.require("fs").readFileSync("docs/usage.md", "utf8").asInstanceOf[String]
+    assert(usage.contains(note))
+    val _ = root.unmount()
+  }
+
   test("displayed install commands are verbatim usage documentation") {
     val fs    = js.Dynamic.global.require("fs")
     val usage = fs.readFileSync("docs/usage.md", "utf8").asInstanceOf[String]
