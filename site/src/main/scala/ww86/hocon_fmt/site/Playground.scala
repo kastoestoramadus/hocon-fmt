@@ -9,8 +9,8 @@ import scala.util.Try
 
 import ww86.hocon_fmt.{DuplicateReport, ExampleData, Finding, FormatOptions, IncludeMasking, Separator, Verdict}
 
-/** The page's first two parts: what the formatter is, and the playground on the core itself.
-  * The third part lives in [[ContributionsView]].
+/** The page's playground, on the core itself, with one privacy line and one short upstream line
+  * per example. The page's other parts live in [[UseIt]], [[KnownLimits]] and [[ContributionsView]].
   */
 object Playground {
 
@@ -24,226 +24,173 @@ object Playground {
       text -> Verdict.of(text, "playground", options)
     }
 
-    div(
-      sectionTag(
-        idAttr := "formatter",
-        h2("What it is"),
-        p(
-          "HOCON is the configuration format of lightbend/config and its Scala port sconfig: JSON ",
-          "with a friendlier face — comments, ",
-          code("include"),
-          " directives, substitutions, and fields written without quotes or braces. ",
-          "Real files drift: indentation wanders, ",
-          code("="),
-          " and ",
-          code(":"),
-          " mix, nested ",
-          "objects grow inconsistent. hocon-fmt tidies a file by parsing it with sconfig and ",
-          "rendering it back with fixed options: ",
-          code("//"),
-          " comments become ",
-          code("#"),
-          ", ",
-          code(":"),
-          " becomes ",
-          code("="),
-          ", nested objects flatten to dotted paths. The meaning stays; the spelling does not."
-        ),
-        p("Two things it does that a plain parse-render round trip does not:"),
-        ul(
-          li(
-            strong("Includes survive."),
-            " Parsing resolves an ",
-            code("include"),
-            " directive and keeps nothing to render, so a plain round trip deletes it. The ",
-            "formatter carries each whole statement across the round trip and puts it back."
-          ),
-          li(
-            strong("It refuses rather than corrupts."),
-            " Before handing text back it checks that ",
-            "the output parses again, that a second pass would not change it, and that no comment ",
-            "or include went missing. A file that fails any of this is left byte for byte as it ",
-            "was, reported with the reason, without failing the run."
-          )
-        ),
-        p(
-          "One Scala 3 core serves a command line tool (a native binary, Node.js and the JVM), ",
-          "pre-commit hooks, and plugins for sbt, Gradle, Maven and Mill."
-        ),
-        p(
-          cls := "privacy",
-          "The playground below runs this page's own copy of that core, in your browser: nothing ",
-          "you type or paste here ever leaves the page. The only network requests the page makes ",
-          "are the read-only lookups of the contribution list on api.github.com, further down."
-        ),
-        p(
-          "Nothing is published yet, so there are no installation commands to show; they will ",
-          "appear here with the first release. Until then, the source is on GitHub: ",
-          a(href := Repo.url, "kastoestoramadus/hocon-fmt"),
-          "."
-        )
+    sectionTag(
+      idAttr := "playground",
+      h2("Try it"),
+      p(
+        cls := "privacy",
+        "The playground runs this page's own copy of the formatter core, in your browser: nothing ",
+        "you type or paste here ever leaves the page. The only network requests are the read-only ",
+        "lookups of the collapsed upstream section at the bottom."
       ),
-      sectionTag(
-        idAttr := "playground",
-        h2("Try it"),
-        p(
-          cls := "muted",
-          "Formatting happens as you type, here in the page. Pick an example or paste your own."
-        ),
-        div(cls := "examples", ExampleData.showcase.map(exampleButton(_, input))),
-        div(
-          cls := "more-examples",
-          h3("More examples"),
-          div(cls := "examples", ExampleData.more.map(exampleButton(_, input)))
-        ),
-        p(
-          cls := "story",
-          child <-- settled.map { text =>
-            (ExampleData.showcase ++ ExampleData.more)
-              .find(_.input == text)
-              .map { example =>
-                span(
-                  example.story,
-                  example.source.url.map(url =>
-                    span(
-                      " Source: ",
-                      a(href := url, "Apache Pekko"),
-                      s" (${example.source.licence.getOrElse("")}, sha ${example.source.sha.getOrElse("")}). ",
-                      a(href := "Apache-2.0.txt", "Licence"),
-                      " · ",
-                      a(href := "NOTICE", "Attribution")
-                    )
+      p(
+        cls := "muted",
+        "Formatting happens as you type, here in the page. Pick an example or paste your own."
+      ),
+      div(cls := "examples", ExampleData.showcase.map(exampleButton(_, input))),
+      div(
+        cls := "more-examples",
+        h3("More examples"),
+        div(cls := "examples", ExampleData.more.map(exampleButton(_, input)))
+      ),
+      p(
+        cls := "story",
+        child <-- settled.map { text =>
+          (ExampleData.showcase ++ ExampleData.more)
+            .find(_.input == text)
+            .map { example =>
+              span(
+                example.story,
+                example.source.url.map(url =>
+                  span(
+                    " Source: ",
+                    a(href := url, "Apache Pekko"),
+                    s" (${example.source.licence.getOrElse("")}, sha ${example.source.sha.getOrElse("")}). ",
+                    a(href := "Apache-2.0.txt", "Licence"),
+                    " · ",
+                    a(href := "NOTICE", "Attribution")
                   )
                 )
-              }
-              .getOrElse(span())
-          }
-        ),
-        div(
-          cls := "upstream-note",
-          child <-- settled.map { text =>
-            (ExampleData.showcase ++ ExampleData.more)
-              .find(_.input == text)
-              .flatMap { example =>
-                example.upstream.map { note =>
-                  p(
-                    strong("Published core: "),
-                    example.now.replace("refused:", "refuses: ").replace("-", " ") + ". ",
-                    "Upstream report ",
-                    a(href := note.issue, "#" + note.issue.split("/").last),
-                    ". ",
-                    note.fix.map(url => span("Our fix ", a(href := url, "#" + url.split("/").last), ". ")),
-                    note.state
-                  )
-                }
-              }
-              .getOrElse(span())
-          }
-        ),
-        div(
-          cls := "style-options",
-          button(
-            cls := "separator-option",
-            tpe := "button",
-            "Separator: ",
-            child.text <-- style.signal.map(o => if o.separator == Separator.Equals then "=" else ":"),
-            onClick --> { _ =>
-              style.update(o =>
-                o.copy(separator = if o.separator == Separator.Equals then Separator.Colon else Separator.Equals)
               )
             }
-          ),
-          button(
-            cls := "nesting-option",
-            tpe := "button",
-            child.text <-- style.signal.map(o => if o.simplifyNestedObjects then "Keep nesting" else "Flatten nesting"),
-            onClick --> { _ => style.update(o => o.copy(simplifyNestedObjects = !o.simplifyNestedObjects)) }
-          ),
-          button(
-            cls := "indent-option",
-            tpe := "button",
-            child.text <-- style.signal.map(o =>
-              if o.doubleIndent then "Use 2-space indentation" else "Use 4-space indentation"
-            ),
-            onClick --> { _ => style.update(o => o.copy(doubleIndent = !o.doubleIndent)) }
-          )
-        ),
-        div(
-          cls := "output-tabs",
-          button(
-            cls := "formatted-tab",
-            tpe := "button",
-            "Formatted",
-            aria.pressed <-- resolved.signal.map(r => (!r).toString),
-            onClick.mapTo(false) --> resolved
-          ),
-          button(
-            cls := "resolved-tab",
-            tpe := "button",
-            "Resolved",
-            aria.pressed <-- resolved.signal.map(_.toString),
-            onClick.mapTo(true) --> resolved
-          )
-        ),
-        p(
-          cls := "resolution-note",
-          hidden <-- resolved.signal.map(!_),
-          "Local preview only. Includes are not loaded; environment variables (including PORT) are unset. Required substitutions must be defined in this text."
-        ),
-        div(
-          cls := "panes",
-          label(
-            cls := "pane",
-            span(cls := "pane-title", "Input"),
-            textArea(
-              cls         := "conf",
-              spellCheck  := false,
-              placeholder := "paste HOCON here",
-              value <-- input.signal,
-              onInput.mapToValue --> input
+            .getOrElse(span())
+        }
+      ),
+      div(
+        cls := "upstream-note",
+        child <-- settled.map { text =>
+          (ExampleData.showcase ++ ExampleData.more)
+            .find(_.input == text)
+            .flatMap { example =>
+              example.upstream.map { note =>
+                // One short line: what the published core does, the report, our fix, and where it stands.
+                p(
+                  strong("Published core: "),
+                  example.now.replace("refused:", "refuses: ").replace("-", " ") + ". ",
+                  "Upstream ",
+                  a(href := note.issue, "#" + note.issue.split("/").last),
+                  note.fix.map(url => span(", fix ", a(href := url, "#" + url.split("/").last))),
+                  ". ",
+                  note.state
+                )
+              }
+            }
+            .getOrElse(span())
+        }
+      ),
+      div(
+        cls := "style-options",
+        button(
+          cls := "separator-option",
+          tpe := "button",
+          "Separator: ",
+          child.text <-- style.signal.map(o => if o.separator == Separator.Equals then "=" else ":"),
+          onClick --> { _ =>
+            style.update(o =>
+              o.copy(separator = if o.separator == Separator.Equals then Separator.Colon else Separator.Equals)
             )
-          ),
-          label(
-            cls := "pane",
-            span(cls := "pane-title", child.text <-- resolved.signal.map(r => if r then "Resolved" else "Formatted")),
-            textArea(
-              cls      := "conf",
-              readOnly := true,
-              value <-- verdict
-                .combineWith(resolved.signal)
-                .map { case (text, decision, resolve) =>
-                  val entry = text -> decision
-                  if resolve then resolvedOutput(entry) else out(entry)
-                }
-            )
-          )
-        ),
-        p(cls := "status", aria.live := "polite", child <-- verdict.map(statusLine)),
-        div(
-          cls       := "findings",
-          aria.live := "polite",
-          children <-- settled.map { text =>
-            DuplicateReport
-              .findings(text, "playground")
-              .fold(
-                _ => Nil,
-                _.map { case Finding.KeyDefinedAgain(path, earlier, later) =>
-                  p(s"${path.rendered}: line $earlier has no effect; replaced at line $later.")
-                }
-              )
           }
         ),
-        // UPSTREAM-SCONFIG: delete this line, and the page runs on released sconfig again, once
-        // ekrich/sconfig releases the option (#646/#647); docs/site.md, "Returning to upstream sconfig".
-        p(
-          cls := "muted",
-          "The playground runs a development build of sconfig — the detached-comment fix (",
-          a(href := "https://github.com/ekrich/sconfig/issues/646", "#646"),
-          ", draft ",
-          a(href := "https://github.com/ekrich/sconfig/pull/647", "#647"),
-          ") and the other fixes merged since its last release — so it keeps comments, and renders ",
-          "merges, that the released CLI still refuses; everything published uses released sconfig unchanged."
+        button(
+          cls := "nesting-option",
+          tpe := "button",
+          child.text <-- style.signal.map(o => if o.simplifyNestedObjects then "Keep nesting" else "Flatten nesting"),
+          onClick --> { _ => style.update(o => o.copy(simplifyNestedObjects = !o.simplifyNestedObjects)) }
+        ),
+        button(
+          cls := "indent-option",
+          tpe := "button",
+          child.text <-- style.signal.map(o =>
+            if o.doubleIndent then "Use 2-space indentation" else "Use 4-space indentation"
+          ),
+          onClick --> { _ => style.update(o => o.copy(doubleIndent = !o.doubleIndent)) }
         )
+      ),
+      div(
+        cls := "output-tabs",
+        button(
+          cls := "formatted-tab",
+          tpe := "button",
+          "Formatted",
+          aria.pressed <-- resolved.signal.map(r => (!r).toString),
+          onClick.mapTo(false) --> resolved
+        ),
+        button(
+          cls := "resolved-tab",
+          tpe := "button",
+          "Resolved",
+          aria.pressed <-- resolved.signal.map(_.toString),
+          onClick.mapTo(true) --> resolved
+        )
+      ),
+      p(
+        cls := "resolution-note",
+        hidden <-- resolved.signal.map(!_),
+        "Local preview only. Includes are not loaded; environment variables (including PORT) are unset. Required substitutions must be defined in this text."
+      ),
+      div(
+        cls := "panes",
+        label(
+          cls := "pane",
+          span(cls := "pane-title", "Input"),
+          textArea(
+            cls         := "conf",
+            spellCheck  := false,
+            placeholder := "paste HOCON here",
+            value <-- input.signal,
+            onInput.mapToValue --> input
+          )
+        ),
+        label(
+          cls := "pane",
+          span(cls := "pane-title", child.text <-- resolved.signal.map(r => if r then "Resolved" else "Formatted")),
+          textArea(
+            cls      := "conf",
+            readOnly := true,
+            value <-- verdict
+              .combineWith(resolved.signal)
+              .map { case (text, decision, resolve) =>
+                val entry = text -> decision
+                if resolve then resolvedOutput(entry) else out(entry)
+              }
+          )
+        )
+      ),
+      p(cls := "status", aria.live := "polite", child <-- verdict.map(statusLine)),
+      div(
+        cls       := "findings",
+        aria.live := "polite",
+        children <-- settled.map { text =>
+          DuplicateReport
+            .findings(text, "playground")
+            .fold(
+              _ => Nil,
+              _.map { case Finding.KeyDefinedAgain(path, earlier, later) =>
+                p(s"${path.rendered}: line $earlier has no effect; replaced at line $later.")
+              }
+            )
+        }
+      ),
+      // UPSTREAM-SCONFIG: delete this line, and the page runs on released sconfig again, once
+      // ekrich/sconfig releases the option (#646/#647); docs/site.md, "Returning to upstream sconfig".
+      p(
+        cls := "muted",
+        "The playground runs a development build of sconfig (",
+        a(href := "https://github.com/ekrich/sconfig/issues/646", "#646"),
+        ", draft ",
+        a(href := "https://github.com/ekrich/sconfig/pull/647", "#647"),
+        "), so it keeps some comments and renders some merges the released CLI still refuses; ",
+        "everything published uses released sconfig unchanged."
       )
     )
   }

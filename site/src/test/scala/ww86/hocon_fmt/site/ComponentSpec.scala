@@ -135,6 +135,44 @@ class ComponentSpec extends munit.FunSuite {
     case _                               => text
   }
 
+  /** The page is supposed to lead with what works and how to use it; Laminar sets `id` as a
+    * property, so that is where the section order is read from.
+    */
+  def idOf(node: js.Dynamic): String = {
+    val id = node.id
+    if (js.isUndefined(id) || id == null) "" else id.asInstanceOf[String]
+  }
+
+  // --- the page --------------------------------------------------------------------------------
+
+  test("the page's sections come in the owner's order: playground, use it, limits, upstream") {
+    val github    = Github()
+    val container = install(github)
+    val root      = mount(container)(Page())
+    val sections  = children(find(container, "page")).map(idOf).filter(_.nonEmpty)
+    assertEquals(sections, List("playground", "use-it", "limits", "contributions"))
+    val _ = root.unmount()
+  }
+
+  test("the upstream section ships collapsed by default") {
+    val github    = Github()
+    val container = install(github)
+    val root      = mount(container)(Page())
+    val upstream  = find(container, "upstream")
+    assertEquals(upstream.nodeName.asInstanceOf[String], "DETAILS")
+    assert(
+      !upstream.hasAttribute("open").asInstanceOf[Boolean],
+      "the upstream work stays closed until the reader opens it"
+    )
+    val summary = children(upstream).head
+    assertEquals(summary.nodeName.asInstanceOf[String], "SUMMARY")
+    assert(
+      upstream.textContent.asInstanceOf[String].contains("What the formatter refuses"),
+      "the lists and the table are all there, only hidden"
+    )
+    val _ = root.unmount()
+  }
+
   // --- the playground --------------------------------------------------------------------------
 
   test("the playground formats the first example on the spot, and asks the network for nothing") {
@@ -279,13 +317,13 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
-  test("upstream gaps show linked issue, our fix, and verified waiting state") {
+  test("upstream gaps show one short linked line: issue, fix, and where it stands") {
     val container = install(Github())
     val root      = mount(container)(Playground())
     val cases     = List(
-      (2, "600", "waiting for maintainer review and merge"),
-      (3, "647", "draft; waiting for the maintainer"),
-      (10, "598", "merged upstream; waiting for a release")
+      (2, "600", "awaiting a release; #600 open"),
+      (3, "647", "Open draft, awaiting the maintainer"),
+      (10, "598", "merged upstream, awaiting a release")
     )
     cases
       .foldLeft(Future.successful(())) { case (done, (index, fix, state)) =>
