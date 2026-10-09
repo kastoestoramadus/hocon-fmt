@@ -213,7 +213,9 @@ class ComponentSpec extends munit.FunSuite {
     val buttons   = findAll(container, "example")
     assertEquals(buttons.take(6).map(_.textContent.asInstanceOf[String]), storyTitles)
     val (input, output) = panes(container)
-    buttons.take(6).zipWithIndex
+    buttons
+      .take(6)
+      .zipWithIndex
       .foldLeft(Future.successful(())) { case (done, (button, index)) =>
         done.flatMap { _ =>
           val _ = button.fire("click")
@@ -243,56 +245,69 @@ class ComponentSpec extends munit.FunSuite {
 
   test("the five original examples follow the stories and every refusal explains preserved input") {
     val container = install(Github())
-    val root = mount(container)(Playground())
+    val root      = mount(container)(Playground())
     val originals = moreIds.map(id => ExampleData.all.find(_.id == s"catalogue/$id").get)
-    val buttons = findAll(container, "example")
+    val buttons   = findAll(container, "example")
     assertEquals(buttons.drop(6).map(_.textContent.asInstanceOf[String]), originals.map(_.title))
     assert(find(container, "more-examples").textContent.asInstanceOf[String].contains("More examples"))
     val (input, output) = panes(container)
-    buttons.zip(ExampleData.showcase ++ originals).foldLeft(Future.successful(())) {
-      case (done, (button, example)) => done.flatMap { _ =>
-        val _ = button.fire("click")
-        settle(250).map { _ =>
-          assertEquals(input.value.asInstanceOf[String], example.input)
-          assertEquals(output.value.asInstanceOf[String], formatted(example.input))
-          Verdict.of(example.input) match {
-            case Verdict.Refused(_) =>
-              val status = find(container, "status").textContent.asInstanceOf[String]
-              assert(status.contains("Left unchanged"), status)
-              assert(status.contains("Your input is unchanged"), status)
-              assert(find(container, "refusal-detail").textContent.asInstanceOf[String].nonEmpty)
-              val _ = find(container, "resolved-tab").fire("click")
-              assertEquals(output.value.asInstanceOf[String], example.input)
-              val _ = find(container, "formatted-tab").fire("click")
-              println(s"Refusal ${example.id}: $status")
-            case _ => ()
+    buttons
+      .zip(ExampleData.showcase ++ originals)
+      .foldLeft(Future.successful(())) { case (done, (button, example)) =>
+        done.flatMap { _ =>
+          val _ = button.fire("click")
+          settle(250).map { _ =>
+            assertEquals(input.value.asInstanceOf[String], example.input)
+            assertEquals(output.value.asInstanceOf[String], formatted(example.input))
+            Verdict.of(example.input) match {
+              case Verdict.Refused(_) =>
+                val status = find(container, "status").textContent.asInstanceOf[String]
+                assert(status.contains("Left unchanged"), status)
+                assert(status.contains("Your input is unchanged"), status)
+                assert(find(container, "refusal-detail").textContent.asInstanceOf[String].nonEmpty)
+                val _ = find(container, "resolved-tab").fire("click")
+                assertEquals(output.value.asInstanceOf[String], example.input)
+                val _ = find(container, "formatted-tab").fire("click")
+                println(s"Refusal ${example.id}: $status")
+              case _ => ()
+            }
           }
         }
       }
-    }.map { _ => val _ = root.unmount(); () }
+      .map { _ =>
+        val _ = root.unmount(); ()
+      }
   }
 
   test("upstream gaps show linked issue, our fix, and verified waiting state") {
     val container = install(Github())
-    val root = mount(container)(Playground())
-    val cases = List((2, "600", "waiting for maintainer review and merge"),
+    val root      = mount(container)(Playground())
+    val cases     = List(
+      (2, "600", "waiting for maintainer review and merge"),
       (3, "647", "draft; waiting for the maintainer"),
-      (10, "598", "merged upstream; waiting for a release"))
-    cases.foldLeft(Future.successful(())) { case (done, (index, fix, state)) =>
-      done.flatMap { _ =>
-        val _ = findAll(container, "example")(index).fire("click")
-        settle(250).map { _ =>
-          val note = find(container, "upstream-note")
-          val text = note.textContent.asInstanceOf[String]
-          assert(text.contains("Published core"), text)
-          assert(text.contains(s"#$fix") && text.contains(state), text)
-          val links = note.findAll((n: js.Dynamic) => n.nodeName.asInstanceOf[String] == "A")
-            .asInstanceOf[js.Array[js.Dynamic]].toList
-          assert(links.size >= 2, "issue and fix must both be links")
-          println(s"Upstream example $index: $text")
+      (10, "598", "merged upstream; waiting for a release")
+    )
+    cases
+      .foldLeft(Future.successful(())) { case (done, (index, fix, state)) =>
+        done.flatMap { _ =>
+          val _ = findAll(container, "example")(index).fire("click")
+          settle(250).map { _ =>
+            val note = find(container, "upstream-note")
+            val text = note.textContent.asInstanceOf[String]
+            assert(text.contains("Published core"), text)
+            assert(text.contains(s"#$fix") && text.contains(state), text)
+            val links = note
+              .findAll((n: js.Dynamic) => n.nodeName.asInstanceOf[String] == "A")
+              .asInstanceOf[js.Array[js.Dynamic]]
+              .toList
+            assert(links.size >= 2, "issue and fix must both be links")
+            println(s"Upstream example $index: $text")
+          }
         }
       }
-    }.map { _ => val _ = root.unmount(); () }
+      .map { _ =>
+        val _ = root.unmount(); ()
+      }
   }
 
   test("style choices shrink the first story's diff and resolution shows local production values") {

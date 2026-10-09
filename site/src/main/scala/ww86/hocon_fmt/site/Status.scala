@@ -77,20 +77,20 @@ object Status {
   }
 
   private def explanation(kind: RefusalKind): String = kind match {
-    case RefusalKind.NotHocon    => "sconfig cannot read this text as HOCON, so there is nothing to format."
+    case RefusalKind.NotHocon    => "The parser cannot read this text as HOCON. Check the syntax at the location below."
     case RefusalKind.OtherFormat =>
-      "the file is named as a format of its own, which the loader reads too, and this formatter writes HOCON only, so it leaves the file alone."
+      "The file name specifies another format. This formatter writes HOCON only."
     case RefusalKind.BrokenOutput =>
-      "the configuration library renders this as text it cannot read back, so the formatter leaves it alone rather than hand it on."
+      "Formatting would produce text that the parser cannot read back."
     case RefusalKind.LostComment =>
-      "the configuration library would drop a comment, so the formatter leaves the file alone."
+      "Formatting would lose the comment shown below. This can happen when a later definition replaces a commented field, or when the library drops a detached comment."
     case RefusalKind.LostInclude =>
       "the configuration library would drop an include directive, so the formatter leaves the file alone."
     case RefusalKind.MovedInclude =>
       "formatting would put an include on the other side of a field, and a later definition wins, so the formatter leaves the file alone."
     case RefusalKind.ReservedName =>
       "the text uses __INCLUDE_, a name the formatter writes include placeholders with, so it cannot tell your text from its own."
-    case RefusalKind.UnstableOutput => "the output would not settle: formatting it again would change it again."
+    case RefusalKind.UnstableOutput => "Formatting would not settle: a second pass would change the output again."
     case RefusalKind.NotUtf8        => "the bytes are not valid UTF-8."
   }
 

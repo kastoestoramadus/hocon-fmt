@@ -95,7 +95,8 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 ## Shared examples
 
 `examples/showcase/NN-slug/` holds the playground examples in directory order.
-`examples/catalogue/slug/` holds examples for tests only. Both contain `input.conf`,
+`examples/catalogue/slug/` holds tested fixtures; optional positive `playground-order`
+shows one in the page’s second group, ordered by that key. Both contain `input.conf`,
 `example.conf`, and, for successful examples, `expected/default.conf`. Refused showcase
 examples need no expected file: their verdict is pinned. Refused catalogue examples carry
 `expected/refused.txt` containing the `refused:<kind>` verdict. Input and expected
@@ -130,3 +131,12 @@ The two showcase fork differences declare `now-site: formatted` and carry
 `Variant.ledger` routes these inputs to `CommentCarrierSpec`, which asserts `now-site`
 and the exact fork output. `target` is always authored independently. Verbatim
 provenance may also carry `source.sha`, embedded alongside the URL and licence.
+
+An upstream gap (`now != target`, except the formatter’s own same-line include
+restriction) requires `upstream: { issue: "https://github.com/ekrich/sconfig/…",
+fix: "https://github.com/ekrich/sconfig/pull/…", state: "…" }`. `ExamplesSpec` fails
+without a note. `fix` is optional only when no upstream fix exists; the state must
+say so rather than imply a fix is pending. A PR may serve as the upstream report
+when there is no separate issue. States are snapshots verified with `gh`, not build-time
+network requests. `ComponentSpec` clicks all eleven buttons, checks each refusal in
+both output tabs, and checks the selected upstream links and waiting states.

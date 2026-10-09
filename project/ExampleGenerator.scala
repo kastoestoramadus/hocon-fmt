@@ -51,6 +51,15 @@ object ExampleGenerator {
         }
         def optional(key: String): String =
           if (config.hasPath(key)) "Some(" + quoted(str(key)) + ")" else "None"
+        val upstream =
+          if (config.hasPath("upstream"))
+            s"Some(ExampleUpstream(${quoted(str("upstream.issue"))}, ${optional("upstream.fix")}, ${quoted(str("upstream.state"))}))"
+          else "None"
+        val playgroundOrder = if (config.hasPath("playground-order")) {
+          val order = config.getInt("playground-order")
+          require(section == "catalogue" && order > 0, s"$id: playground-order needs a positive catalogue order")
+          s"Some($order)"
+        } else "None"
         val target = verdict(str("target"), target = true)
         val now    = verdict(str("now"))
         if (config.hasPath("pending")) verdict(str("pending"))
@@ -80,7 +89,7 @@ object ExampleGenerator {
           s"${quoted(IO.read(input))}, ${quoted(target)}, ${quoted(now)}, ${optional("pending")}, " +
           s"${optional("reason-if-different")}, ${optional("now-site")}, ${list(findings)}, " +
           s"ExampleSource(${quoted(sourceKind)}, ${quoted(pattern)}, ${optional("source.url")}, ${optional("source.licence")}, ${optional("source.sha")}), " +
-          s"${list(options)}, $withSiteExpected)"
+          s"${list(options)}, $withSiteExpected, $upstream, $playgroundOrder)"
       }
     }
     val output = managed / "ww86" / "hocon_fmt" / "ExampleData.scala"
@@ -105,11 +114,13 @@ final case class Example(
     source: ExampleSource,
     options: List[String],
     expected: Map[String, String],
-    upstream: Option[ExampleUpstream] = None
+    upstream: Option[ExampleUpstream] = None,
+    playgroundOrder: Option[Int] = None
 )
 """ + "\nobject ExampleData {\n" +
       entries.mkString("  val all: List[Example] = List(\n    ", ",\n    ", "\n  )\n") +
       "  val kinds: Set[String] = Set(" + kinds.toSeq.sorted.map(quoted).mkString(", ") + ")\n" +
+      "  val more: List[Example] = all.filter(e => e.id.startsWith(\"catalogue/\") && e.playgroundOrder.nonEmpty).sortBy(_.playgroundOrder)\n" +
       "  val showcase: List[Example] = all.filter(_.id.startsWith(\"showcase/\"))\n}\n"
     if (!output.exists || IO.read(output) != text) IO.write(output, text)
     Seq(output)

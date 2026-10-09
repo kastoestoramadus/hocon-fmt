@@ -36,11 +36,16 @@ One page, three parts, all rendered by Laminar into `#root`.
    kind, and a link into [limitations](limitations.md). Example buttons come from
    `examples/showcase/NN-slug/` in directory order, using `title` and `shows` from
    `example.conf`. The sbt generator embeds the same data that core’s `ExamplesSpec`
-   pins on JVM, Scala.js and Native. `examples/catalogue/` is reserved for tests and
-   never appears on the page. See [shared examples](testing.md#shared-examples) for the schema.
+   pins on JVM, Scala.js and Native. `examples/catalogue/` also supplies tested fixtures and
+   appears in a second “More examples” group when `playground-order` is set. See [shared examples](testing.md#shared-examples) for the schema.
    The six buttons tell stories about mixed styles, a dead duplicate, development
    defaults and production overrides, a verbatim Pekko excerpt, a typo, and the comment
-   safety net. Style controls select separator, nesting and indentation. The duplicate
+   safety net. The original messy, includes, comments, not-HOCON and sconfig-defect
+   buttons follow them, with no duplicate fixture files. A selected example’s `upstream`
+   note links its report and our fix and records the verified merge/release status; it
+   explicitly names the published core’s result even when the fork formats the input.
+   Refusals show a plain explanation and an unchanged-input promise, followed by the
+   diagnostic on a separate, wrapping line. Style controls select separator, nesting and indentation. The duplicate
    report names the dead path and both lines below the status, even on refused text.
    Formatted preserves includes and optional substitutions; Resolved previews only
    local values, with includes unloaded and environment variables unset. Resolution

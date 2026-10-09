@@ -90,22 +90,16 @@ object Playground {
           cls := "muted",
           "Formatting happens as you type, here in the page. Pick an example or paste your own."
         ),
+        div(cls := "examples", ExampleData.showcase.map(exampleButton(_, input))),
         div(
-          cls := "examples",
-          ExampleData.showcase.map { example =>
-            button(
-              cls   := "example",
-              tpe   := "button",
-              title := example.shows,
-              example.title,
-              onClick.mapTo(example.input) --> input
-            )
-          }
+          cls := "more-examples",
+          h3("More examples"),
+          div(cls := "examples", ExampleData.more.map(exampleButton(_, input)))
         ),
         p(
           cls := "story",
           child <-- settled.map { text =>
-            ExampleData.showcase
+            (ExampleData.showcase ++ ExampleData.more)
               .find(_.input == text)
               .map { example =>
                 span(
@@ -121,6 +115,27 @@ object Playground {
                     )
                   )
                 )
+              }
+              .getOrElse(span())
+          }
+        ),
+        div(
+          cls := "upstream-note",
+          child <-- settled.map { text =>
+            (ExampleData.showcase ++ ExampleData.more)
+              .find(_.input == text)
+              .flatMap { example =>
+                example.upstream.map { note =>
+                  p(
+                    strong("Published core: "),
+                    example.now.replace("refused:", "refuses: ").replace("-", " ") + ". ",
+                    "Upstream report ",
+                    a(href := note.issue, "#" + note.issue.split("/").last),
+                    ". ",
+                    note.fix.map(url => span("Our fix ", a(href := url, "#" + url.split("/").last), ". ")),
+                    note.state
+                  )
+                }
               }
               .getOrElse(span())
           }
@@ -233,6 +248,15 @@ object Playground {
     )
   }
 
+  private def exampleButton(example: ww86.hocon_fmt.Example, input: Var[String]): HtmlElement =
+    button(
+      cls   := "example",
+      tpe   := "button",
+      title := example.shows,
+      example.title,
+      onClick.mapTo(example.input) --> input
+    )
+
   /** One verdict per settled input; kept separate from the DOM for reactive tests. Typed text has
     * no file name behind it, so a refusal names the playground as the place a parse tripped.
     */
@@ -272,7 +296,7 @@ object Playground {
     case (text, _)                               => text
   }
 
-  private def statusLine(entry: (String, Verdict)): HtmlElement = {
+  private[site] def statusLine(entry: (String, Verdict)): HtmlElement = {
     val (text, verdict) = entry
     Status.of(verdict, text) match {
       case Status.Formatted(changed) =>
@@ -285,8 +309,8 @@ object Playground {
       case Status.LeftUnchanged(_, reason, explanation, learnMore) =>
         span(
           strong("Left unchanged"),
-          s" — $reason. ",
-          explanation + " ",
+          " — " + explanation + " Your input is unchanged in both panes; no file is written.",
+          span(cls := "refusal-detail", "Details: " + reason),
           learnMore.map(url =>
             a(href := url, target := "_blank", rel := "noopener noreferrer", "Why the formatter refuses this")
           )
