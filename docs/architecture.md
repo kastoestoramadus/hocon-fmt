@@ -32,6 +32,11 @@ around it in `HoconFormatter`.
 their hosts. File effects live in `cats`, on cats-effect and fs2; the CLI delegates to it. The independent
 `zio` library adapter offers text and file formatting on ZIO.
 
+## Naming
+
+Artifact ids, packages, plugin ids, hook ids and command names — each with the registry rule it
+follows and the mismatches left open: [naming](naming.md).
+
 ## The pipeline
 
 1. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
