@@ -9,7 +9,10 @@ def owner(result):
             'check changed bytes or mtime', 'file identity changed', 'refusal changed bytes', 'unchanged file mtime changed']):
         return 'ours'
     if 'meaning changed' in result['issues']:
-        return 'shared'
+        # A formatted file can only change meaning through our masked-include path: sconfig
+        # dropping a definition a later one overrides is its expected merge behaviour, and the
+        # guard that must notice the include it stopped overriding is ours (AGENTS.md).
+        return 'ours'
     if result['issues']:
         return 'sconfig'
     text = result['write']['stdout'] + result['write']['stderr']

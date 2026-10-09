@@ -78,6 +78,10 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
   `core/site-shared/src/test` with a reason each, and `CommentCarrierSpec` pins the outcome there
   instead. `KeepDetachedCommentsGuardSpec` (JVM, `sbt libraryDefects`) is red until released
   sconfig has the option: the signal to return to upstream.
+- **Ownership.** [Test ownership](test-ownership.md) classifies every suite — and the groups of the
+  big ones — as ours, sconfig's or mixed, with the counts and the evidence; it lists the red ledger,
+  the upstream candidates to port and every patch this repository carries for sconfig. A new case
+  goes to the suite that owns its subject, and a sconfig-owned case is ported upstream, not copied.
 - **Order.** `sbt test` runs core, cats, cli and the ZIO adapter on the JVM, Scala.js and Scala Native, one project at a
   time under a `==========` banner. Aggregated projects would run concurrently and print unlabelled,
   interleaved summaries. The cost: the run stops at the first failing project.
