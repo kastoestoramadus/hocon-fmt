@@ -191,6 +191,9 @@ pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --re
 
 ## Wave 1, tried before the first tag
 
+The JVM and Scala.js package is `ww86.hoconfmt`; Java consumers use
+`import ww86.hoconfmt.java.HoconFmt;`. Distribution and artifact names remain `hocon-fmt`.
+
 The wave-1 set was published into a private Maven repository with the release version set for the
 one session (`build.sbt` stays at `0.1.0-SNAPSHOT`; nothing reached `~/.m2`):
 
