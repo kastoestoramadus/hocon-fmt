@@ -243,6 +243,16 @@ class HoconFormatterPluginFunctionalTest {
         assertEquals("a = 1\n", read(projectDir.resolve("src/main/resources/app.conf")));
     }
 
+    @Test
+    void duplicateFailureStillNamesEveryUnformattedFile() throws IOException {
+        write(".hocon-fmt.conf", "fail-on-duplicates = true\n");
+        write("src/main/resources/duplicate.conf", "a=1\na=2\n");
+        write("src/main/resources/other.conf", "b=3\n");
+        String output = buildAndFail("hoconFormatCheck").getOutput();
+        assertTrue(output.contains("defined again"), output);
+        assertTrue(output.contains("other.conf"), output);
+    }
+
     void writeBuild(String extraPlugins, String configuration) throws IOException {
         write(
                 "build.gradle.kts",
