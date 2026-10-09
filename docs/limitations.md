@@ -89,13 +89,30 @@ Moved across a field (`Refusal.MovedInclude`):
   include: a key defined twice is merged when parsing. For the same reason sorting fields would
   move includes across them, and is never offered.
 
-  **Not detected:** sconfig drops a definition that a later one of the same key overrides, and
-  after an include that definition may have been what overrode the included file. Neither the parse
-  of the source nor that of the output shows it, so the comparison above cannot — the duplicate
-  report can, since it reads a parse that keeps every definition:
-  `include "f.conf"` then `o = 3` then `o.c = 7` renders without `o = 3`, and `x.a = 5`, the
-  include, `x {}` renders without `x {}`. In both the included file's values for `o` and `x` now
-  survive. Such a file is formatted today.
+Dropped in the include's object (`Refusal.ShadowedByInclude`):
+
+- **A definition a later one replaces, with the include before it**: `include "f.conf"` (which
+  defines `o.retained`), `o = 3`, `o.c = 7`. The scalar erased the included `o`, and `o.c = 7`
+  replaced the scalar, so the file resolves `o` to `{c = 7}`; `o = 3` leaves no trace in the
+  rendered tree and is dropped, after which the included `o.retained` merges into `o.c = 7`.
+- **An empty object, with the include before it**: `x.a = 5`, `include "scalar.conf"` (which
+  defines `x = 3`), `x {}`. The empty object replaced the included scalar, so the file resolves
+  `x` to `{}`; nothing of it survives the merge, it is dropped, and the include's scalar is what
+  `x` resolves to.
+
+  The included file cannot be read at format time — a web page has no filesystem, and the target
+  may be a URL — so the formatter cannot check whether the dropped definition mattered. It refuses,
+  naming the include's line and the definition's line, and leaves the file for the user to rework by
+  hand. Deleting the dropped line, moving the include below the definitions, or writing the value
+  the file resolves to as one definition all format; which one is right depends on what the file was
+  meant to say. `o = null` is not a way out: the null is dropped like any other replaced definition,
+  and the include then writes the key again.
+
+  This refuses a little too much. `x.a = 5`, the include, `x {}` is refused even when the included
+  file says nothing about `x` (as one research probe's `f.conf` does): the check sees the text, not
+  the included file, and a file whose included contents are unknown is not one to resolve on a guess.
+  Of the 524 files in `examples/`, the golden files and the research probes, exactly the three that
+  reproduce the two cases above are refused that were not before.
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
