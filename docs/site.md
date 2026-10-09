@@ -127,6 +127,30 @@ no CSS. Rendering is still verified by running the page: served
 (`python3 -m http.server -d site/target/site 4001`) with the live search answering, and from
 `file://` in a fetch-less browser where the snapshot must stand.
 
+The UI coverage audit adds behavioural checks for each style switch in the formatted view,
+including switching back and leaving the other controls alone; tab `aria-pressed`, the output
+pane title, the hidden resolution note and read-only output; refusal details/help links and their
+removal after valid input; and partial/all GitHub failures with snapshot badges and links to
+other recent work. The fake GitHub can answer each repository independently. `UseIt` currently
+has plain snippets, with no copy buttons to exercise. Build-stamp formatting is covered by
+`DeployStampSpec`, and the local stamp in the page header by `ComponentSpec`.
+
+On Scala 3.8.2 / Scala.js 1.22.0, `sbt coverage site/test site/coverageReport` compiles the
+instrumented sources but fails linking: `There were linking errors`, including missing
+`java.security.SecureRandom` and concurrent collection internals. No Scala.js coverage
+percentage is reported; the audit ranks source/suite gaps instead. Run ordinary tests with
+coverage off and a private Maven repository (`-Dmaven.repo.local=<task dir>/m2`), after
+`scripts/fetch-sconfig-fork.sh`.
+
+The seven new component tests were checked against deliberate production mutations: frozen
+separator/nesting/indent handlers, inverted formatted-tab `aria-pressed`, a refusal link opening
+in the current tab, and partial/all failure labels claiming a refresh. Every new test failed at
+its corresponding assertion: `Failed: Total 26, Failed 9, Errors 0, Passed 17` (seven new tests
+and two existing style tests). Both production files were restored byte for byte; the unchanged
+components pass `Passed: Total 26, Failed 0, Errors 0, Passed 26`. No production change or
+browser dependency was needed. CSS, native keyboard/focus behaviour and bootstrap remain
+manual browser checks, outside FakeDom's model.
+
 ## Laminar practices
 
 Reviewed against [Laminar 17.2.1's tagged docs (including the Modifiers FAQ)](https://github.com/raquo/Laminar/blob/v17.2.1/website/docs/documentation.md),
