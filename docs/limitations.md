@@ -91,11 +91,13 @@ Moved across a field (`Refusal.MovedInclude`):
 
   **Not detected:** sconfig drops a definition that a later one of the same key overrides, and
   after an include that definition may have been what overrode the included file. Neither the parse
-  of the source nor that of the output shows it, so the comparison above cannot — the duplicate
-  report can, since it reads a parse that keeps every definition:
-  `include "f.conf"` then `o = 3` then `o.c = 7` renders without `o = 3`, and `x.a = 5`, the
-  include, `x {}` renders without `x {}`. In both the included file's values for `o` and `x` now
-  survive. Such a file is formatted today.
+  of the source nor that of the output shows it, so the comparison above cannot. The duplicate
+  report reads a parse that keeps every definition, and it catches one of the two shapes but not
+  the other: `include "f.conf"` then `o = 3` then `o.c = 7` is reported, because the dotted path
+  replaces the scalar, while `x.a = 5`, the include, `x {}` is not, because a repeated object
+  merges instead of replacing (see "What the duplicate report does not claim"). The report is a
+  warning even with `--fail-on-duplicates`, and that run still writes: the file is formatted today,
+  and in the formatted text the included file's values for `o` and `x` now survive.
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
@@ -246,7 +248,9 @@ limitations. Several fixes are merged upstream but not released; the ledger abov
 re-check them when upgrading rather than silently enable formatting because a newer version compiles.
 
 There is one known safety gap: an overridden definition beside an include can disappear while its
-include remains, allowing an included value to survive. The duplicate warning is useful evidence,
-but does not repair the meaning. The [research probes](research/formatters/REPORT.md#probe-results)
-reproduce this with a real include fixture. Tell us if this blocks you, including the smallest input
-and the formatter version. No upstream issue is posted by the research task.
+include remains, so the formatter **writes a file whose meaning silently changed** — the included
+value survives although the source overrode it. The duplicate warning is useful evidence, but it
+does not repair the meaning, and `--fail-on-duplicates` fails the run only after that write. The
+[research probes](research/formatters/REPORT.md#probe-results) reproduce this with a real include
+fixture. Tell us if this blocks you, including the smallest input and the formatter version. No
+upstream issue is posted by the research task.
