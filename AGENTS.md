@@ -101,6 +101,12 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   `.head`, `.get` on `Option` or `Try`, `null`, `throw`, `return`, `var`, `while`, casts. A place
   that needs one takes a `@SuppressWarnings` on the narrowest definition, with a comment saying
   why. Catch with `NonFatal`, never `Throwable`.
+- **Test only our domain**: include masking, the comment carrier, verdicts and refusals, the
+  duplicate report, options, file writes, the CLI, the plugins and the page. A case that passes or
+  fails on bare sconfig is sconfig's — port it to `ekrich/sconfig` as a tests-only PR — and a case
+  that exposes an upstream defect joins `SconfigDefectsSpec` and is reported, never worked around
+  here. [docs/test-ownership.md](docs/test-ownership.md) classifies every suite, the red ledger and
+  what a release retires.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
 - A new PR is branched from the newest open PR (or `main` if none is open) and lists the stack at
