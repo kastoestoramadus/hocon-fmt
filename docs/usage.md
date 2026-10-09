@@ -302,8 +302,9 @@ its environment is 29 MB against 233 MB, mostly the Node that pre-commit downloa
 Every plugin discovers `.hocon-fmt.conf` from each formatted file's directory upwards,
 including the first directory holding `.git` (a directory or a worktree's file), and stops there.
 The nearest config wins. Invalid UTF-8, unknown keys and invalid values fail the task with the
-config's name. Only explicit plugin settings override it; an unset setting preserves the
-repository value, then the formatter default.
+config's name; an explicit setting with an unusable value fails it naming the setting and the
+value. Only explicit plugin settings override it; an unset setting preserves the repository value,
+then the formatter default.
 
 | CLI/config name | sbt key (`Option`) | Gradle property | Maven parameter / system property |
 |---|---|---|---|
@@ -349,9 +350,10 @@ hoconFormatter {
 mvn hocon-fmt:check -Dhocon-fmt.fail-on-duplicates=true
 ```
 
-Gradle tracks ancestor config files as check inputs, including absent files, so adding, deleting
-or editing a config invalidates an up-to-date check. `scripts/plugin-parity.sh` runs the shared
-fixture through the CLI and scripted, TestKit, invoker and both supported Mill test hosts.
+Gradle tracks ancestor config files as check inputs, including absent files, up to the directory
+holding `.git` where the lookup stops, so adding, deleting or editing a config the formatter reads
+invalidates an up-to-date check. `scripts/plugin-parity.sh` runs the shared fixture through the CLI
+and scripted, TestKit, invoker and both supported Mill test hosts.
 
 ## sbt
 
@@ -367,8 +369,10 @@ addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")
 | `hoconFormatSources` | the files; default `*.conf` and `*.hocon` in the Compile and Test resource directories |
 
 Run in a project, a task covers that project and the projects it aggregates, so running it at the
-root covers the build, and a resource directory two projects share is examined once. Neither task
-is wired into `test` or `compile`, as with sbt-scalafmt; add `hoconFormatCheck` to CI explicitly.
+root covers the build, and a resource directory two projects share is examined once. The projects
+sharing a file must agree on their explicit HOCON settings: when they differ, the task fails naming
+the projects rather than silently formatting with one project's. Neither task is wired into `test`
+or `compile`, as with sbt-scalafmt; add `hoconFormatCheck` to CI explicitly.
 
 ```scala
 hoconFormatSources := (baseDirectory.value / "conf" ** "*.conf").get

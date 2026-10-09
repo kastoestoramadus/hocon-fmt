@@ -14,3 +14,9 @@ $ copy-file original/shared.conf shared/shared.conf
 $ must-mirror b/src/main/resources/b.conf expected/b.conf
 $ must-mirror shared/shared.conf expected/shared.conf
 > hoconFormatCheck
+
+# Projects that share a file but set different options must not silently take the first
+# project's: the task fails, naming both projects.
+> set a / hoconSeparator := Some(":")
+> assertSharedFileConflict
+> set a / hoconSeparator := None

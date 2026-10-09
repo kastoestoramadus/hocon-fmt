@@ -65,7 +65,7 @@ class FormatOptionsSpec extends munit.FunSuite {
     )
     assertEquals(
       FormatOptions.parse("fail-on-duplicates = maybe", "team.conf"),
-      Left("team.conf: fail-on-duplicates: expected true or false")
+      Left("team.conf: fail-on-duplicates: expected true or false, got: maybe")
     )
   }
 
@@ -87,18 +87,22 @@ class FormatOptionsSpec extends munit.FunSuite {
     )
   }
 
-  test("a bad value is an error naming the file and the key") {
+  test("a bad value is an error naming the file, the key and the value") {
     assertEquals(
       FormatOptions.parse("separator = equals", "team.conf"),
       Left("team.conf: separator: expected \"=\" or \":\", got: equals")
     )
     assertEquals(
       FormatOptions.parse("separator = [1]", "team.conf"),
-      Left("team.conf: separator: expected \"=\" or \":\"")
+      Left("team.conf: separator: expected \"=\" or \":\", got: [1]")
     )
     assertEquals(
       FormatOptions.parse("double-indent = maybe", "team.conf"),
-      Left("team.conf: double-indent: expected true or false")
+      Left("team.conf: double-indent: expected true or false, got: maybe")
+    )
+    assertEquals(
+      FormatOptions.parse("""separator = "a\nb"""", "team.conf"),
+      Left("""team.conf: separator: expected "=" or ":", got: a\nb""")
     )
   }
 

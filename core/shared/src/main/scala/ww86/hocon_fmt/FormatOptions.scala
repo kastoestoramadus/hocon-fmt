@@ -69,8 +69,9 @@ object FormatOptions {
       Try(config.getString("separator")).toEither match {
         case Right("=")   => Right(Separator.Equals)
         case Right(":")   => Right(Separator.Colon)
-        case Right(other) => Left(s"""$file: separator: expected "=" or ":", got: $other""")
-        case Left(_)      => Left(s"""$file: separator: expected "=" or ":"""")
+        case Right(other) => Left(s"""$file: separator: expected "=" or ":", got: ${oneLine(other)}""")
+        case Left(_)      =>
+          Left(s"""$file: separator: expected "=" or ":", got: ${oneLine(rawValue(config, "separator"))}""")
       }
     }
 
@@ -78,6 +79,16 @@ object FormatOptions {
     if (!isSet(config, key)) { Right(fallback) }
     else {
       Try(config.getBoolean(key)).toEither.left
-        .map(_ => s"$file: $key: expected true or false")
+        .map(_ => s"$file: $key: expected true or false, got: ${oneLine(rawValue(config, key))}")
     }
+
+  /** What a rejected key holds, read loosely: the message must name what was found even when the
+    * value is of the wrong type, or a substitution sconfig cannot resolve on its own.
+    */
+  private def rawValue(config: Config, key: String): Any =
+    Try(config.getValue(key)).toOption.flatMap(value => Try(value.unwrapped).toOption).getOrElse("?")
+
+  /** A value on one line: a newline or tab in a config must not break up the diagnostic. */
+  private def oneLine(value: Any): String =
+    String.valueOf(value).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 }

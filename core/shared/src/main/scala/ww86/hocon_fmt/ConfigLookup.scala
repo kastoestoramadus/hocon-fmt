@@ -4,6 +4,14 @@ package ww86.hocon_fmt
 object ConfigLookup {
   enum Decision derives CanEqual {
     case Found, Stop, Parent
+
+    /** Whether the walk found the config it was looking for. The Java API cannot name the cases
+      * of a Scala enum across the JVM boundary, so it asks the decision instead of matching.
+      */
+    def found: Boolean = this == Decision.Found
+
+    /** Whether the walk ends here, at a config boundary, instead of looking further up. */
+    def stops: Boolean = this == Decision.Stop
   }
 
   /** A config in the boundary directory still belongs to that repository. `.git` may be a file. */

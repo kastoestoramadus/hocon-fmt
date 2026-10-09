@@ -33,8 +33,7 @@ class HoconFormatterPluginFunctionalTest {
 
     @BeforeEach
     void writeConsumerBuild() throws IOException {
-        write("settings.gradle.kts", "rootProject.name = \"consumer\"\n");
-        writeBuild("", "");
+        writeConsumerBuild(projectDir);
     }
 
     @Test
@@ -229,6 +228,24 @@ class HoconFormatterPluginFunctionalTest {
     }
 
     @Test
+    void aConfigAboveTheGitBoundaryDoesNotInvalidateTheCheck() throws IOException {
+        Path repo = Files.createDirectories(projectDir.resolve("repo"));
+        writeConsumerBuild(repo);
+        Files.createDirectory(repo.resolve(".git"));
+        write(repo, ".hocon-fmt.conf", "separator = \":\"\n");
+        write(repo, "src/main/resources/app.conf", "a: 1\n");
+        // The lookup reads no further up than the repository root, so a config above it is not an
+        // input: editing it must leave the check up to date.
+        write(".hocon-fmt.conf", "separator = \"=\"\n");
+
+        assertEquals(SUCCESS, buildIn(repo, "hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        assertEquals(UP_TO_DATE, buildIn(repo, "hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+
+        write(".hocon-fmt.conf", "separator = \":\"\n");
+        assertEquals(UP_TO_DATE, buildIn(repo, "hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+    }
+
+    @Test
     void configChangesInvalidateAnUpToDateCheck() throws IOException {
         write("src/main/resources/app.conf", "a = 1\n");
         build("hoconFormatCheck");
@@ -253,8 +270,18 @@ class HoconFormatterPluginFunctionalTest {
         assertTrue(output.contains("other.conf"), output);
     }
 
+    void writeConsumerBuild(Path dir) throws IOException {
+        write(dir, "settings.gradle.kts", "rootProject.name = \"consumer\"\n");
+        writeBuild(dir, "", "");
+    }
+
     void writeBuild(String extraPlugins, String configuration) throws IOException {
+        writeBuild(projectDir, extraPlugins, configuration);
+    }
+
+    void writeBuild(Path dir, String extraPlugins, String configuration) throws IOException {
         write(
+                dir,
                 "build.gradle.kts",
                 "plugins {\n"
                         + "    id(\"eu.ww86.hocon-fmt\")\n"
@@ -272,27 +299,42 @@ class HoconFormatterPluginFunctionalTest {
         return runner(arguments).build();
     }
 
+    BuildResult buildIn(Path dir, String... arguments) {
+        return runner(dir, arguments).build();
+    }
+
     BuildResult buildAndFail(String... arguments) {
         return runner(arguments).buildAndFail();
     }
 
     GradleRunner runner(String... arguments) {
+        return runner(projectDir, arguments);
+    }
+
+    GradleRunner runner(Path dir, String... arguments) {
         List<String> all = new ArrayList<>(List.of(arguments));
         // A deprecation in the plugin should fail here, not in a user's build after the next upgrade.
         all.add("--warning-mode=fail");
         all.add("-Dmaven.repo.local=" + System.getProperty("maven.repo.local"));
         return GradleRunner.create()
-                .withProjectDir(projectDir.toFile())
+                .withProjectDir(dir.toFile())
                 .withPluginClasspath()
                 .withArguments(all);
     }
 
     Path write(String relativePath, String content) throws IOException {
-        return write(relativePath, content.getBytes(UTF_8));
+        return write(projectDir.resolve(relativePath), content.getBytes(UTF_8));
+    }
+
+    Path write(Path dir, String relativePath, String content) throws IOException {
+        return write(dir.resolve(relativePath), content.getBytes(UTF_8));
     }
 
     Path write(String relativePath, byte[] content) throws IOException {
-        Path file = projectDir.resolve(relativePath);
+        return write(projectDir.resolve(relativePath), content);
+    }
+
+    Path write(Path file, byte[] content) throws IOException {
         Files.createDirectories(file.getParent());
         return Files.write(file, content);
     }
