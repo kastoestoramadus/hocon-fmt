@@ -3,18 +3,14 @@
 
   scripts/verify-research-urls.py [--json] [--cache DIR] [--jobs N] FILE.md [FILE.md ...]
 
-Every `[text](https://…)` link and every bare URL in the given files is checked:
+Links in fenced blocks and inline code are skipped and counted. GitHub issues, pull requests
+and commits are resolved through authenticated `gh api`, or the public API with a warning.
+Title claims are explicit quoted phrases or labels equal to the real title after normalisation;
+prose labels are checked for existence only. Other URLs get HEAD (GET after 403/405/501).
 
-  * a github.com issue, pull or commit URL is resolved through `gh api` (unauthenticated
-    api.github.com when gh is not installed) and its title is compared with the link's text, or
-    with a double-quoted title right after the link — `[#149](…) "Preserve comments across
-    newlines?"`; a backticked word there is code, the research files quote titles with `"`;
-  * any other URL gets a HEAD status check (GET after a 403/405/501).
-
-Exit status 1 when a citation is DEAD (404/410) or its title MISMATCHes; 0 otherwise, including a
-run that could check nothing: a rate limit is RETRY, an unreachable URL is unverifiable, and the
-summary counts both as "unverifiable (text only)". Answers are cached under --cache, so a rerun
-that only edits the prose costs nothing.
+Exit 1 for DEAD or MISMATCH, 3 on the first confirmed rate limit, 2 for invalid inputs, otherwise
+0. Retry-After and X-RateLimit-Reset are reported so the caller can resume when allowed; no more
+requests are made after a limit. Only definitive answers (ok/dead) are cached under --cache.
 
 The network is replaced by canned JSON when VERIFY_RESEARCH_URLS_STUB names a directory holding
 a manifest.json ({url: file name}); scripts/verify-research-urls-test.sh uses it. Python 3
@@ -32,14 +28,15 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 STUB_VARIABLE = "VERIFY_RESEARCH_URLS_STUB"
 USER_AGENT = "hocon-fmt-verify-research-urls"
 GITHUB_API = "https://api.github.com"
-MAX_ATTEMPTS = 3
 CACHE_TTL = 86400
+CACHE_VERSION = 2
 
 # `issues/7#issuecomment-1` and `?plain=1` are the same API resource as the URL without them.
 GH_LINK = re.compile(
@@ -56,20 +53,15 @@ SHA = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
 # Between a link and its quoted title there is punctuation at most: `[#149](…) "Title"`,
 # `[b6989a2](…) — "skip errors while formatting"`.
 QUOTE_SKIP = " \t\r\n—–−-:;,.*|"
-# A link text that names the reference rather than a title; it is not a title claim.
-LABELS = {
-    "commit", "commits", "diff", "here", "issue", "issues", "link", "patch",
-    "pr", "prs", "pull request", "source", "the commit", "the issue", "the pr",
-    "this commit", "this issue", "this pr",
-}
 
 
 class Link:
     """One citation in one file: its URL, the markdown text and the position of each."""
 
-    __slots__ = ("url", "text", "line", "end")
+    __slots__ = ("url", "text", "line", "end", "in_code")
 
-    def __init__(self, url, text, line, end):
+    def __init__(self, url, text, line, end, in_code=False):
+        self.in_code = in_code
         self.url = url
         self.text = text
         self.line = line
@@ -110,33 +102,78 @@ def line_of(text, offset):
     return text.count("\n", 0, offset) + 1
 
 
-def clean_bare(url):
+def clean_bare(url, prefix=""):
     """A bare URL without the sentence punctuation that followed it."""
     url = url.rstrip(".,;:!?")
+    wrapper = re.search(r"([*_]+)$", prefix)
+    if wrapper and url.endswith(wrapper[1]):
+        url = url[:-len(wrapper[1])].rstrip(".,;:!?")
     while url.endswith(")") and url.count("(") < url.count(")"):
         url = url[:-1]
     return url
 
 
-def collect_links(path):
-    """Every markdown link and bare URL in the file, in order."""
-    text = Path(path).read_text(encoding="utf-8")
+def code_spans(text):
+    """Offsets of fenced blocks and matching backtick spans, preserving source positions."""
     spans = []
+    fence = None
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        match = re.match(r" {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
+        if fence is None:
+            if match and not (match[1][0] == "`" and "`" in match[2]):
+                fence = (match[1][0], len(match[1]), offset)
+        elif match and match[1][0] == fence[0] and len(match[1]) >= fence[1] and not match[2].strip():
+            spans.append((fence[2], offset + len(line)))
+            fence = None
+        offset += len(line)
+    if fence:
+        spans.append((fence[2], len(text)))
+    runs = list(re.finditer(r"`+", text))
+    index = 0
+    while index < len(runs):
+        run = runs[index]
+        if any(start <= run.start() < end for start, end in spans):
+            index += 1
+            continue
+        closing = next((j for j in range(index + 1, len(runs))
+                        if len(runs[j][0]) == len(run[0])
+                        and not any(start <= runs[j].start() < end for start, end in spans)), None)
+        if closing is None:
+            index += 1
+        else:
+            # A code span cannot cross a fenced block.
+            if not any(run.start() < start < runs[closing].end() for start, _ in spans):
+                spans.append((run.start(), runs[closing].end()))
+            index = closing + 1
+    return spans
+
+
+def collect_links(path):
+    """Every citation in source order, marking examples in code for the summary."""
+    text = Path(path).read_text(encoding="utf-8")
+    code = code_spans(text)
+    spans = []
+    links = []
     for match in MARKDOWN_LINK.finditer(text):
         spans.append(match.span())
-        yield Link(match.group("url"), match.group("text"), line_of(text, match.start()), match.end())
+        links.append((match.start(), Link(match.group("url"), match.group("text"),
+                     line_of(text, match.start()), match.end())))
     for match in URL.finditer(text):
-        # A URL inside a markdown link is that link's target or text, not a citation of its own.
         if any(start <= match.start() < end for start, end in spans):
             continue
-        url = clean_bare(match.group(0))
+        url = clean_bare(match.group(0), text[max(0, match.start() - 3):match.start()])
         if url:
-            yield Link(url, "", line_of(text, match.start()), match.end())
+            links.append((match.start(), Link(url, "", line_of(text, match.start()), match.end())))
+    for offset, link in sorted(links, key=lambda pair: pair[0]):
+        link.in_code = any(start <= offset < end for start, end in code)
+        yield link
 
 
 def fetch_url(url):
-    """The URL without the fragment and query the API resource does not need."""
-    return url.split("#", 1)[0].split("?", 1)[0]
+    """Drop fragments; only GitHub API citations can also discard their query."""
+    url = url.split("#", 1)[0]
+    return url.split("?", 1)[0] if GH_LINK.match(url) else url
 
 
 def github_parts(url):
@@ -176,9 +213,8 @@ def quoted_after(text, offset):
     if index >= len(text):
         return None
     opening = text[index]
-    # Only a double quote marks a title: a backticked word after a link is code, and reading it
-    # as the claim flags ``[#798](…) — `setShowEnvVariableValues` hides secrets`` as a mismatch.
-    closing = {'"': '"', "“": "”"}.get(opening)
+    # A lone backticked identifier is code; a phrase can be a quoted title.
+    closing = {'"': '"', "“": "”", "`": "`"}.get(opening)
     if closing is None:
         return None
     index += 1
@@ -191,7 +227,7 @@ def quoted_after(text, offset):
             continue
         if char == closing:
             claim = "".join(out).strip()
-            return claim if 0 < len(claim) <= 400 else None
+            return claim if 0 < len(claim) <= 400 and (opening != "`" or " " in claim) else None
         out.append(char)
         index += 1
     return None
@@ -241,14 +277,34 @@ def gh_success(kind, data):
     return Fetched("ok", title=data.get("title"), state=data.get("state"), http_status=200)
 
 
-def status_result(code, body="", api=False):
-    """Map an HTTP status onto a fetch outcome."""
-    if code in (404, 410):
+def status_result(code, body="", api=False, headers=None):
+    """Map definitive HTTP errors separately from confirmed rate limits."""
+    headers = {key.lower(): str(value) for key, value in (headers or {}).items()}
+    if code in (404, 410) or (api and code == 422 and "no commit found" in body.lower()):
         return Fetched("dead", http_status=code, reason=f"HTTP {code}")
     if 200 <= code < 400:
         return Fetched("ok", http_status=code)
-    if code == 429 or (api and code == 403 and "rate limit" in body.lower()):
-        return Fetched("retry", http_status=code, reason=f"rate limited (HTTP {code})")
+    if code == 429 or (code == 403 and (
+        "rate limit" in body.lower() or headers.get("x-ratelimit-remaining") == "0"
+    )):
+        advice = ""
+        if "retry-after" in headers:
+            value = headers["retry-after"]
+            try:
+                delay = max(0, int(value))
+                advice = f"; retry after {delay} seconds"
+            except ValueError:
+                try:
+                    advice = f"; retry at {parsedate_to_datetime(value).isoformat()}"
+                except (ValueError, TypeError, OverflowError):
+                    pass
+        elif "x-ratelimit-reset" in headers:
+            try:
+                reset = datetime.fromtimestamp(int(headers["x-ratelimit-reset"]), timezone.utc)
+                advice = f"; retry at {reset.isoformat()}"
+            except (ValueError, OverflowError, OSError):
+                pass
+        return Fetched("retry", http_status=code, reason=f"rate limited (HTTP {code}){advice}")
     return Fetched("unverifiable", http_status=code, reason=f"HTTP {code}")
 
 
@@ -268,32 +324,43 @@ def api_request(url, timeout):
 
 def github_fetch(owner, repo, kind, ref, args):
     """The title of one GitHub resource, through gh when it is there, else api.github.com."""
-    endpoint = {"pull": "pulls", "commit": "commits"}.get(kind, "issues")
+    endpoint = "commits" if kind == "commit" else "issues"
     path = f"repos/{owner}/{repo}/{endpoint}/{ref}"
-    if shutil.which("gh"):
+    if args.gh_authenticated:
         try:
             done = subprocess.run(
-                ["gh", "api", path], capture_output=True, text=True, timeout=args.timeout
+                ["gh", "api", "--include", path], capture_output=True, text=True, timeout=args.timeout
             )
         except (subprocess.SubprocessError, OSError):
             done = None
-        if done is not None and done.returncode == 0:
-            try:
-                return gh_success(kind, json.loads(done.stdout))
-            except (ValueError, AttributeError):
-                return Fetched("unverifiable", reason="gh printed no JSON")
         if done is not None:
+            # --include retains retry headers even when gh exits with an HTTP error.
+            raw = done.stdout.replace("\r\n", "\n")
+            head, separator, body = raw.partition("\n\n")
+            status = re.match(r"HTTP/\S+ (\d+)", head)
+            if status and separator:
+                headers = dict(line.split(":", 1) for line in head.splitlines()[1:] if ":" in line)
+                headers = {key: value.strip() for key, value in headers.items()}
+                code = int(status[1])
+                if code >= 400:
+                    return status_result(code, body, api=True, headers=headers)
+                raw = body
+            if done.returncode == 0:
+                try:
+                    return gh_success(kind, json.loads(raw))
+                except (ValueError, AttributeError):
+                    return Fetched("unverifiable", reason="gh printed no JSON")
             message = (done.stderr or done.stdout).strip()
-            if "rate limit" in message.lower() or "HTTP 403" in message or "HTTP 429" in message:
-                return Fetched("retry", reason=message.splitlines()[0] if message else "rate limited")
-            if "HTTP 404" in message or "HTTP 410" in message:
-                return Fetched("dead", reason=f"HTTP {message.rsplit('HTTP ', 1)[-1].rstrip(')')}")
+            code = re.search(r"HTTP (\d+)", message)
+            if code:
+                return status_result(int(code[1]), message, api=True)
+            return Fetched("unverifiable", reason=message or "gh request failed")
     data, error = api_request(f"{GITHUB_API}/{path}", args.timeout)
     if data is not None:
         return gh_success(kind, data)
     if isinstance(error, urllib.error.HTTPError):
         body = error.read(4096).decode(errors="replace")
-        return status_result(error.code, body, api=True)
+        return status_result(error.code, body, api=True, headers=error.headers)
     return Fetched("unverifiable", reason=f"request failed: {error}")
 
 
@@ -304,6 +371,10 @@ def plain_fetch(url, args):
         with urllib.request.urlopen(request, timeout=args.timeout) as response:
             return status_result(response.status)
     except urllib.error.HTTPError as error:
+        body = error.read(2048).decode(errors="replace")
+        result = status_result(error.code, body, headers=error.headers)
+        if result.status == "retry":
+            return result
         if error.code in (403, 405, 501):
             # Some servers refuse HEAD but answer GET; a range keeps the body tiny.
             get = urllib.request.Request(
@@ -314,10 +385,10 @@ def plain_fetch(url, args):
                     return status_result(response.status)
             except urllib.error.HTTPError as get_error:
                 body = get_error.read(2048).decode(errors="replace")
-                return status_result(get_error.code, body)
+                return status_result(get_error.code, body, headers=get_error.headers)
             except (urllib.error.URLError, OSError, ValueError) as get_error:
                 return Fetched("unverifiable", reason=f"request failed: {get_error}")
-        return status_result(error.code)
+        return result
     except (urllib.error.URLError, OSError, ValueError) as error:
         return Fetched("unverifiable", reason=f"request failed: {error}")
 
@@ -346,7 +417,9 @@ def stub_fetch(url, manifest, directory):
     if data.get("rate_limit"):
         return Fetched("retry", reason="rate limited (canned)")
     if "status" in data:
-        return status_result(int(data["status"]))
+        return status_result(int(data["status"]), data.get("message", ""),
+                             api=url.startswith((GITHUB_API, "https://github.com/")),
+                             headers=data.get("headers"))
     if "commit" in data:
         message = data["commit"].get("message", "")
         return Fetched("ok", title=message.splitlines()[0] if message else None)
@@ -362,17 +435,17 @@ def cache_path(directory, url):
 
 
 def fetch(url, args, stub_manifest):
-    """The answer for one URL: the stub, the cache, or the network, retrying a rate limit."""
+    """Fetch once; cache only definitive existence answers."""
     kind = github_parts(url)
     if stub_manifest is not None:
-        # A canned rate limit answers the same way every time; the retries a real run makes are
-        # what the status records, so the answer is read once and reported as RETRY.
         return stub_fetch(url, stub_manifest, os.environ[STUB_VARIABLE])
     if args.cache:
         path = cache_path(args.cache, url)
         try:
             cached = json.loads(path.read_text(encoding="utf-8"))
-            if time.time() - cached["fetched_at"] <= args.cache_ttl:
+            if (cached.get("version") == CACHE_VERSION
+                    and cached["status"] in ("ok", "dead")
+                    and time.time() - cached["fetched_at"] <= args.cache_ttl):
                 return Fetched(
                     cached["status"],
                     title=cached.get("title"),
@@ -383,18 +456,14 @@ def fetch(url, args, stub_manifest):
                 )
         except (OSError, ValueError, KeyError):
             pass
-    result = Fetched("unverifiable")
-    for attempt in range(MAX_ATTEMPTS):
-        result = github_fetch(*kind, args=args) if kind else plain_fetch(url, args)
-        if result.status != "retry" or attempt == MAX_ATTEMPTS - 1:
-            break
-        time.sleep(args.sleep)
-    if args.cache:
+    result = github_fetch(*kind, args=args) if kind else plain_fetch(url, args)
+    if args.cache and result.status in ("ok", "dead"):
         args.cache.mkdir(parents=True, exist_ok=True)
         try:
             cache_path(args.cache, url).write_text(
                 json.dumps(
                     {
+                        "version": CACHE_VERSION,
                         "url": fetch_url(url),
                         "status": result.status,
                         "title": result.title,
@@ -427,23 +496,30 @@ def evaluate(link, file, text, fetched):
             ref.lower().startswith(sha.lower()) or sha.lower().startswith(ref.lower())
         ):
             return Checked(link, file, "mismatch", sha, ref, fetched)
-    claim = link.text.strip()
-    if claim.strip("`").strip().lower() in LABELS or reference_number(claim) is not None:
-        claim = ""
-    if kind == "commit" and sha_text(claim):
-        claim = ""
+    label = link.text.strip()
+    claim = quoted_after(text, link.end) or ""
+    if not claim and fetched.title and normalise(label) == normalise(fetched.title):
+        claim = label
     if not claim:
-        claim = quoted_after(text, link.end) or ""
+        # Reference-prefixed labels also quote titles: [repo#7 “Title”](url).
+        quote = re.search(r'["“`]', label)
+        claim = quoted_after(label, quote.start()) if quote else ""
+        claim = claim or ""
     if claim and fetched.title is not None and not title_matches(claim, fetched.title):
         return Checked(link, file, "mismatch", claim, fetched.title, fetched)
-    return Checked(link, file, "ok", fetched=fetched)
+    return Checked(link, file, "ok", claimed=claim, fetched=fetched)
 
 
-def report(checked, args, files):
+def report(checked, args, files, skipped=0):
     """Print the run: the problems, then the summary, or the whole run as one JSON document."""
+    no_title = sum(1 for row in checked if row.status == "ok"
+                   and github_parts(row.link.url) and not row.claimed)
     if args.json:
         document = {
             "checked": len(checked),
+            "skipped_in_code": skipped,
+            "ok_no_title_claimed": no_title,
+            "stopped_on_rate_limit": any(row.status == "retry" for row in checked),
             "ok": sum(1 for row in checked if row.status == "ok"),
             "mismatch": sum(1 for row in checked if row.status == "mismatch"),
             "dead": sum(1 for row in checked if row.status == "dead"),
@@ -470,11 +546,12 @@ def report(checked, args, files):
             ],
         }
         print(json.dumps(document, indent=2, sort_keys=False))
-        return 1 if document["mismatch"] or document["dead"] else 0
+        return 3 if document["retry"] else (1 if document["mismatch"] or document["dead"] else 0)
     for row in checked:
         if row.status == "ok":
             if args.verbose:
-                print(f"ok           {row.file}:{row.link.line} {row.link.url}")
+                label = "ok (no title claimed)" if github_parts(row.link.url) and not row.claimed else "ok"
+                print(f"{label:12} {row.file}:{row.link.line} {row.link.url}")
             continue
         else:
             print(f"{row.status.upper():12} {row.file}:{row.link.line} {row.link.url}")
@@ -489,9 +566,10 @@ def report(checked, args, files):
     unverifiable = sum(1 for row in checked if row.status in ("unverifiable", "retry"))
     print(
         f"checked {len(checked)} urls: {ok} ok, {mismatch} mismatch, {dead} dead, "
-        f"{unverifiable} unverifiable (text only)"
+        f"{unverifiable} unverifiable (text only); skipped {skipped} in code; "
+        f"{no_title} ok (no title claimed)"
     )
-    return 1 if mismatch or dead else 0
+    return 3 if any(row.status == "retry" for row in checked) else (1 if mismatch or dead else 0)
 
 
 def main():
@@ -506,13 +584,13 @@ def main():
         f"(default {CACHE_TTL})"
     )
     parser.add_argument(
-        "--sleep", type=float, default=5.0, help="seconds to wait after a rate limit (default 5)"
+        "--sleep", type=float, default=5.0, help="deprecated compatibility option; rate limits stop immediately"
     )
     parser.add_argument(
         "--timeout", type=float, default=20.0, help="seconds one request may take (default 20)"
     )
     parser.add_argument(
-        "--jobs", type=int, default=1, help="URLs fetched at once (default 1; ignored with a stub)"
+        "--jobs", type=int, default=1, help="compatibility option; requests are serial to stop at the first rate limit"
     )
     parser.add_argument("--verbose", action="store_true", help="print every URL, not only problems")
     args = parser.parse_args()
@@ -524,23 +602,36 @@ def main():
     stub = os.environ.get(STUB_VARIABLE)
     manifest = load_stub(stub) if stub else None
 
+    args.gh_authenticated = False
+    if manifest is None:
+        if shutil.which("gh"):
+            try:
+                args.gh_authenticated = subprocess.run(
+                    ["gh", "auth", "status"], capture_output=True, timeout=args.timeout
+                ).returncode == 0
+            except (subprocess.SubprocessError, OSError):
+                pass
+        if not args.gh_authenticated:
+            print("warning: running without gh authentication; GitHub API limits are lower", file=sys.stderr)
+
     texts = {file: Path(file).read_text(encoding="utf-8") for file in args.files}
-    occurrences = [
-        (file, link) for file in args.files for link in collect_links(file)
-    ]
-    # One answer per distinct URL: drafting the same citation in several files is one fetch.
+    all_links = [(file, link) for file in args.files for link in collect_links(file)]
+    skipped = sum(link.in_code for _, link in all_links)
+    occurrences = [(file, link) for file, link in all_links if not link.in_code]
     urls = list(dict.fromkeys(fetch_url(link.url) for _, link in occurrences))
-    if args.jobs > 1 and manifest is None:
-        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            answers = list(pool.map(lambda url: fetch(url, args, manifest), urls))
-    else:
-        answers = [fetch(url, args, manifest) for url in urls]
-    fetched = dict(zip(urls, answers))
+    fetched = {}
+    # Serial requests ensure even --jobs cannot launch more work after a confirmed limit.
+    for url in urls:
+        result = fetch(url, args, manifest)
+        fetched[url] = result
+        if result.status == "retry":
+            print(f"stopped: rate limit at {url}: {result.reason}; rerun when allowed (exit 3)", file=sys.stderr)
+            break
     checked = [
         evaluate(link, file, texts[file], fetched[fetch_url(link.url)])
-        for file, link in occurrences
+        for file, link in occurrences if fetch_url(link.url) in fetched
     ]
-    return report(checked, args, args.files)
+    return report(checked, args, args.files, skipped)
 
 
 if __name__ == "__main__":
