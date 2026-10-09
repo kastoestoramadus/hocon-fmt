@@ -491,6 +491,41 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
+  test("the style switches shape the resolved view too: its text goes through our renderer") {
+    val container   = install(Github())
+    val root        = mount(container)(Playground())
+    val (_, output) = panes(container)
+    val _           = find(container, "resolved-tab").fire("click")
+    val plain       = output.value.asInstanceOf[String]
+    // What sconfig renders resolved is raw text again, so each switch must reach it through our
+    // renderer: the defaults here are the formatter's (spaced `=`, single-key object flattened).
+    assert(plain.contains("name = orders"), plain)
+    assert(plain.contains("database.host = localhost"), plain)
+    val _ = find(container, "separator-option").fire("click")
+    settle(250)
+      .flatMap { _ =>
+        val colons = output.value.asInstanceOf[String]
+        assert(colons != plain, s"the separator switch must reach the resolved view:\n$plain\nvs\n$colons")
+        assert(colons.contains("name: orders"), colons)
+        val _ = find(container, "nesting-option").fire("click")
+        settle(250)
+      }
+      .flatMap { _ =>
+        val nested = output.value.asInstanceOf[String]
+        assert(nested.contains("database {"), nested)
+        assert(nested.contains("\n    host:"), nested)
+        val _ = find(container, "indent-option").fire("click")
+        settle(250)
+      }
+      .map { _ =>
+        val wide = output.value.asInstanceOf[String]
+        assert(wide.contains("\n    name:"), wide)
+        assert(wide.contains("\n        host:"), wide)
+        val _ = root.unmount()
+        ()
+      }
+  }
+
   // --- the contributions section ---------------------------------------------------------------
 
   test("building the contributions section asks GitHub nothing; mounting it asks once per repository") {
