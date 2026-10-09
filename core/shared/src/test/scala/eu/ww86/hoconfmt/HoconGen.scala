@@ -310,7 +310,56 @@ object HoconGen {
     Document(doc.nodes :+ Node.Field(key, " = ", Value.Scalar(value)))
   }
 
-  /** Renames fields so no two at one level share the first segment of their path. */
+  // ---- the include-shadow family ---------------------------------------------------------------
+
+  /** The shapes a definition around an include takes: a value that erases what came before, an
+    * object that merges, an empty object, a path below the key, an array.
+    */
+  val shadowDefinitions: List[String] =
+    List("p = 3", "p { a = 1 }", "p {}", "p.c = 7", "p = null", "p = [1]")
+
+  /** What the file the include names holds when it writes the same path, and what it holds when it
+    * writes something else.
+    */
+  val shadowBodies: List[String] = List("p = 9", "p { b = 9 }", "p {}", "p.c = 9", "q = 1")
+
+  val shadowInclude: String = "include \"inc.conf\""
+
+  /** One case: the text, and what the file it includes holds. */
+  final case class ShadowCase(text: String, includeBody: String)
+
+  /** Every way one or two of the shapes stand around an include, with every body beside it, at the
+    * file root and inside an object. The included file cannot be read at format time — a web page
+    * has no filesystem and the target may be a URL — so a definition there may be what kept its
+    * values out, and the formatter must either refuse the case or hand back text that still
+    * resolves the same way. The suites that can resolve write the file named by `shadowInclude`
+    * beside the text and check exactly that.
+    */
+  lazy val shadowCases: List[ShadowCase] = {
+    def around(definitions: List[String], at: Int): String =
+      ((definitions.take(at) :+ shadowInclude) ++ definitions.drop(at)).mkString("\n") + "\n"
+
+    def insideAnObject(text: String): String =
+      "a {\n" + text.stripSuffix("\n").linesIterator.map("  " + _).mkString("\n") + "\n}\n"
+
+    val oneStatement = for {
+      definition <- shadowDefinitions
+      at         <- 0 to 1
+    } yield List(definition) -> at
+    val twoStatements = for {
+      first  <- shadowDefinitions
+      second <- shadowDefinitions
+      at     <- 0 to 2
+    } yield List(first, second) -> at
+    for {
+      (definitions, at) <- oneStatement ++ twoStatements
+      nested            <- List(false, true)
+      body              <- shadowBodies
+    } yield {
+      val text = around(definitions, at)
+      ShadowCase(if (nested) insideAnObject(text) else text, body)
+    }
+  }
   def withDistinctKeys(nodes: List[Node]): List[Node] =
     nodes.zipWithIndex.map {
       case (Node.Field(key, separator, value, joined), i) =>
