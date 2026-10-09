@@ -111,7 +111,7 @@ tree renders differently with `simplify-nested-objects = false`. Pinned over the
 `ExamplesSpec`; a file that is refused under one style is not thereby shown to format wrongly under
 another, but nothing here promises the options agree:
 
-- `showcase/05-sconfig-defect` and `catalogue/env-override-root-not-parseable` are
+- `catalogue/sconfig-defect` and `catalogue/env-override-root-not-parseable` are
   `Refusal.BrokenOutput` with the default nesting and `Refusal.UnstableOutput` without it.
 - `catalogue/object-substitution-then-field` (`x = ${t} { b = 2 }`) is `Refusal.BrokenOutput` with
   the default nesting and formats without it.

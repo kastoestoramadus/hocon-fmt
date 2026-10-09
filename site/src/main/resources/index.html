@@ -251,6 +251,23 @@
         font-size: 0.9rem;
       }
 
+      .style-options, .output-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0.75rem 0;
+      }
+      .style-options button, .output-tabs button {
+        padding: 0.4rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 0.3rem;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      .output-tabs button[aria-pressed="true"] { font-weight: bold; }
+      .resolution-note, .story, .findings { overflow-wrap: anywhere; }
+
       @media (max-width: 46rem) {
         .page {
           padding: 1.5rem 1rem 2rem;

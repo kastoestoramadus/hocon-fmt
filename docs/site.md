@@ -14,11 +14,12 @@ plan in [playground](playground.md); the `web` module and its script are unchang
 17.2.1, the latest stable for `_sjs1_3`, renders it; sjavatime supplies the `java.time` sconfig
 needs, the way `web` does.
 
-`sbt site/build` links the app with fullOpt and writes four files:
+`sbt site/build` links the app with fullOpt and writes six files:
 
 - `index.html` — the markup and every style; no web fonts, no CDNs, no analytics.
 - `main.js` — one classic script, not an ES module, so a `<script>` tag loads it from `file://`.
 - `CNAME` — `hocon-fmt.ww86.eu`, for Pages.
+- `NOTICE` and `Apache-2.0.txt` — attribution and licence for the embedded Pekko excerpt.
 - `.nojekyll` — so a Pages branch serves the files as they are, without Jekyll in between.
 
 ## The page
@@ -37,6 +38,13 @@ One page, three parts, all rendered by Laminar into `#root`.
    `example.conf`. The sbt generator embeds the same data that core’s `ExamplesSpec`
    pins on JVM, Scala.js and Native. `examples/catalogue/` is reserved for tests and
    never appears on the page. See [shared examples](testing.md#shared-examples) for the schema.
+   The six buttons tell stories about mixed styles, a dead duplicate, development
+   defaults and production overrides, a verbatim Pekko excerpt, a typo, and the comment
+   safety net. Style controls select separator, nesting and indentation. The duplicate
+   report names the dead path and both lines below the status, even on refused text.
+   Formatted preserves includes and optional substitutions; Resolved previews only
+   local values, with includes unloaded and environment variables unset. Resolution
+   errors are shown in the output pane; refused inputs stay untouched in both tabs.
 3. **The work upstream**: the author's pull requests on sconfig and lightbend/config, grouped by
    library and theme, each with its state, and the defect table tying every refusal of
    [limitations](limitations.md) to the pull requests that aim to fix it.
@@ -169,7 +177,8 @@ it is red until released sconfig has `setKeepDetachedComments`, and green once t
    `HoconFormatter`, and `Variant` in the tests with its ledger. Then the four pinned refusals
    (`detached-header-comment`, `trailing-comment-in-object`, the two `commentAboveBlankLine`
    cases) flip for the command line as well.
-4. Delete the muted line under the playground (`Playground.scala`), reword showcase 05, and drop the
+4. Delete the muted line under the playground (`Playground.scala`), update the showcase fork
+   metadata and expected files, and drop the
    fork-only text where the marker sits: the "Comment carrier" section and the `coreSite` row in
    [architecture](architecture.md), the paragraph in [limitations](limitations.md), the `coreSite`
    bullet in [testing](testing.md), the script line in [README](../README.md), and the rule and
