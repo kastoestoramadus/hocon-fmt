@@ -13,7 +13,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Decides whether anything the build reads changed, in a few seconds, so a docs-only pull
+  # request does not spend runners on it. Docs-only means only docs/** and root *.md: the
+  # build, tests, site and scripts never read those (every reference in code is a comment or
+  # a link; the only markdown anything reads is python/README.md, and that is the Release
+  # workflow's wheel build). The jobs below are skipped by their `if`, and a job skipped
+  # because a needed job failed may not block a merge, so the branch ruleset should require
+  # `changes` beside the jobs it already lists; no job below is renamed.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Enough history to diff against the base; the whole repository is ~1 MiB of pack.
+          fetch-depth: 0
+      - name: Did anything but the documentation change?
+        id: diff
+        env:
+          # The pull request base for a pull_request, the previous main commit for a push;
+          # empty on workflow_dispatch, which runs everything.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          code=false
+          # An unresolvable base (a new branch, a rewritten history) runs everything rather
+          # than skipping.
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            # The diff is captured before the loop reads it: piped straight in, a failed
+            # `git diff` would feed the loop nothing and read as a docs-only change, so it
+            # answers code=true instead — the same fail-open as an unresolvable base, and
+            # any other error fails the step loudly. `--no-renames` lists a pure rename as
+            # both of its paths: plain --name-only shows only the destination, so a code
+            # file renamed into docs/ would read as docs-only and skip CI.
+            if files=$(git diff --name-only --no-renames "$BASE" HEAD); then
+              if [ -n "$files" ]; then
+                while IFS= read -r file; do
+                  case "$file" in
+                    docs/*) ;;        # the documentation directory
+                    */*) code=true; break ;;  # any other path with a directory part is code
+                    *.md) ;;          # a root-level *.md (README.md, AGENTS.md, CLAUDE.md, ...)
+                    *) code=true; break ;;
+                  esac
+                done <<< "$files"
+              fi
+            else
+              code=true
+            fi
+          else
+            code=true
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +111,8 @@ jobs:
         run: sbt scalafmtCheckAll scalafmtSbtCheck
 
   sbt-plugin:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +126,8 @@ jobs:
         run: sbt sbtPluginTest
 
   gradle-plugin:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -88,6 +147,8 @@ jobs:
         run: ./gradlew check
 
   java-api:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,6 +170,8 @@ jobs:
         run: ./gradlew check
 
   maven-plugin:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -127,6 +190,8 @@ jobs:
         run: ./mvnw -B verify
 
   mill-plugin:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,6 +209,8 @@ jobs:
         run: ./mill --ticker false __.testForked
 
   pre-commit:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -163,6 +230,8 @@ jobs:
   # The command line contract on a real process, on every runtime. CmdApiSpec runs in the test JVM
   # and cannot see locale, streams or exit codes.
   cli-acceptance:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -179,6 +248,8 @@ jobs:
   # Report-only: shared runners are too noisy to fail a build on. main keeps the history in
   # refs/notes/benchmarks; a pull request is compared against it in the job summary.
   benchmarks:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -219,6 +290,8 @@ jobs:
   # fails it. JVM only: dotty's coverage runtime needs java.util.UUID over java.security.SecureRandom,
   # which the Scala.js and Scala Native javalibs do not carry, so those links fail instrumented.
   coverage:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

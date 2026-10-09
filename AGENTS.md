@@ -103,14 +103,17 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   why. Catch with `NonFatal`, never `Throwable`.
 - Comments explain why, never restate the code. No `private` in test code.
 - Commits, PRs and review replies in English; a PR carries only what it delivers.
+- A PR that touches files another open PR touches is branched from that PR and lists the stack
+  at the top of its body; merge bottom first (GitHub retargets the next one); fixes in a middle
+  PR are merged upward.
 - Attribution names the model, its effort and the tool it ran in, never a bare tool name: the model id and
   effort as given by whoever launched the agent (effort `l`, `m`, `h`, `xh` or `max`; `?` if not given). A
   commit ends with `Co-Authored-By: <model-id>/<effort> through <tool> <noreply@anthropic.com>`. A PR body ends
   with an attribution block: `Generated with <model-id>/<effort> through <tool>` (the tool may be a link), then
   one line per later pass in the same form, `Revised by …` for whoever changed the PR and `Reviewed by …` for
   each review, e.g. `Reviewed by deepseek-flash/h through ZCode`; whoever relays a review adds its line.
-- Every merged improvement gets a line in [docs/improvement-log.md](docs/improvement-log.md), with
-  what to look at again before a release.
+- Every merged improvement gets a new file in [docs/improvement-log/](docs/improvement-log/) —
+  never an edit to another entry's file — with what to look at again before a release.
 
 Where to add a test: [docs/testing.md](docs/testing.md). What is not done yet, and why it might be
 worth doing: [docs/ideas.md](docs/ideas.md).
