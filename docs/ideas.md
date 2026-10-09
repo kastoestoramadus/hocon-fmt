@@ -8,15 +8,16 @@ is in [releasing](releasing.md), not here.
 
 ## Found while trying the channels
 
-### A file that cannot be read fails the run (S)
+### A file that cannot be read fails the run (S) — implemented
 
-`hocon-fmt --check missing.conf` prints
-`ERROR: cannot format, leaving unchanged: .../missing.conf (missing.conf)` and exits 0. A typo in
-a CI script's path therefore passes silently, and the reason in brackets is the exception's
-message, which for a missing file is only its name. A missing or unreadable file is not a refusal
-of its content: it should say `cannot read <path>: no such file` and exit 2, as a usage error
-does, leaving 1 to mean "unformatted". **Code:** a new `Outcome` for unreadable files, tests in
-`CmdApiSpec` first, on all three platforms.
+`hocon-fmt --check missing.conf` used to print
+`ERROR: cannot format, leaving unchanged: .../missing.conf (missing.conf)` and exit 0, so a typo in
+a CI script's path passed silently. A missing or unreadable file is not a refusal of its content:
+the run now says `cannot read <path>: no such file` on stderr and exits 2, as a usage error does,
+leaving 1 to mean "unformatted". **Code:** `Result.Unreadable` in `CmdApi`, `ReadFailure` turning
+the JVM's typed exceptions and Node's errno strings into words, and `Walk.Unreadable` for a
+directory argument that does not exist; tests in `CmdApiSpec` and `CliAcceptanceSuite`, on all
+three platforms.
 
 ### One report format for every channel (S)
 
@@ -55,11 +56,17 @@ surprises in `CmdApiSpec`.
 
 Standard input to standard output and `--version` are implemented; see [usage](usage.md).
 
-### Directories and ignores (S)
+### Directories and ignores (S) — implemented
 
-`hocon-fmt src/` walking for `*.conf` and `*.hocon`, skipping what `.gitignore` excludes, as
-ruff and prettier do; today the caller expands globs. Maybe
-`--strict`, turning a refusal into a failure, for teams that want every `.conf` to be HOCON.
+`hocon-fmt src/` walks for `*.conf` and `*.hocon`, skipping what `.gitignore` excludes, as ruff
+and prettier do; the caller no longer has to expand globs. Hidden entries are skipped and a
+symlinked directory is not followed; a file named on the command line is examined even when
+ignored, since the user typed that path. The ignores are the `.gitignore` files from the
+checkout root (where the walk up stops, as the style lookup does) down and below, a deeper
+file's match beating a shallower one's; like prettier and ruff, the walk reads those files and
+not `core.excludesFile` or `.git/info/exclude`. The `--strict` the entry floated — a refusal
+failing the run — was not taken, so a refused file still never fails a run. **Code:** `Walk` and
+`GitIgnore` in `cli`, tests in `CmdApiSpec`, `GitIgnoreSpec` and `CliAcceptanceSuite`.
 
 ### Report dead duplicate keys (M) — implemented
 

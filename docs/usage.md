@@ -8,6 +8,10 @@ Every channel runs the same formatter and follows the same rules:
   [known sconfig defect](limitations.md)) is reported with the reason and left byte-for-byte
   untouched. A refusal never fails the run: a `.conf` file that is not HOCON at all, such as an
   nginx config, is common enough that failing on it would make the tool unusable.
+- A file that cannot be **read** — missing, or refused by the filesystem — is a different thing
+  from a refusal of its content: the run reports `cannot read <path>: <reason>` on stderr and
+  exits 2, as a usage error does, so a typo in a CI script's path cannot pass silently. The
+  files it could read are still examined.
 - Where a key is defined more than once, the later definition wins and the earlier one never takes
   effect; the CLI and every plugin say so as a warning. It changes nothing that is written and no exit code, unless
   `--fail-on-duplicates` asks for it — [the duplicate report](#the-duplicate-report).
@@ -21,16 +25,25 @@ All JVM channels need Java 17 or newer, as Scala 3.8 does.
 ## Command line
 
 ```
-hocon-fmt [--check] [--separator =|:] [--config <file>] [--fail-on-duplicates] <file>...
+hocon-fmt [--check] [--separator =|:] [--config <file>] [--fail-on-duplicates] <path>...
 hocon-fmt --stdin [--stdin-filename <name>] [--fail-on-duplicates]
 hocon-fmt --version
 ```
+
+A directory argument is walked for `*.conf` and `*.hocon`, as prettier and ruff walk: hidden
+entries and what `.gitignore` excludes are skipped, and a symlinked directory is not followed. The
+ignores are the `.gitignore` files from the checkout root — the directory holding `.git`, where
+the walk up stops, as the style lookup does — down to the argument and below, with a deeper
+file's match beating a shallower one's; like prettier and ruff, the walk reads those files and
+not `core.excludesFile` or `.git/info/exclude`. A file named outright is examined even when
+ignored: the user typed that path, so it is not walked. So a repository needs no `git ls-files`
+pipeline; `hocon-fmt --check src/` is enough.
 
 | exit code | meaning |
 |---|---|
 | 0 | done; with `--check`, every file is formatted or refused, and no finding failed the run |
 | 1 | `--check` found an unformatted file, stdin was refused, or a finding met `--fail-on-duplicates` |
-| 2 | the arguments could not be parsed, a config file could not be read or trusted, or stdin could not be read |
+| 2 | the arguments could not be parsed, a file could not be read, a config file could not be read or trusted, or stdin could not be read |
 
 `--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
 summary. Already formatted input is returned unchanged. A refusal writes nothing to stdout,
