@@ -1,5 +1,6 @@
 > hoconFormat
 $ must-mirror src/main/resources/app.conf expected.conf
+> assertFixtureBytes
 > assertWarning
 $ copy-file input.conf src/main/resources/app.conf
 > set hoconFailOnDuplicates := Some(true)

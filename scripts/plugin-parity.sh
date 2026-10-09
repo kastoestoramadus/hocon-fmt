@@ -14,6 +14,9 @@ for consumer in sbt-plugin/src/sbt-test/sbt-hocon-fmt/options maven-plugin/src/i
     cmp "$fixture/$name" "$consumer/$name"
   done
 done
+cmp "$fixture/input.conf" sbt-plugin/src/sbt-test/sbt-hocon-fmt/options/src/main/resources/app.conf
+cmp "$fixture/input.conf" maven-plugin/src/it/options/src/main/resources/app.conf
+cmp "$fixture/input.conf" mill-plugin/integration/resources/options-project/app/resources/app.conf
 cp "$fixture/.hocon-fmt.conf" "$scratch/.hocon-fmt.conf"
 cp "$fixture/input.conf" "$scratch/app.conf"
 scripts/fetch-sconfig-fork.sh
