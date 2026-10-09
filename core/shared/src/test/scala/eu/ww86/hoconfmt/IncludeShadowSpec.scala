@@ -110,6 +110,48 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The same shapes as an ordinary config writes them: an array concatenation whose second piece
+  // holds an empty section beside its leaf. The definition stands at the element its own piece
+  // counts, which the merged list numbers after the piece before it, so the refusal stands.
+  val ordinaryArrayConcatenations = List(
+    (
+      "an empty object before its leaf",
+      "servers=[{host=\"one\"}] [{\ninclude \"f.conf\"\npool {}\npool.size=8\n}]\n",
+      "servers[0].pool"
+    ),
+    (
+      "an empty object before a dotted leaf",
+      "servers=[{host=\"one\"}] [{\ninclude \"f.conf\"\nheaders {}\nheaders.Accept=\"application/json\"\n}]\n",
+      "servers[0].headers"
+    )
+  )
+
+  test("an ordinary array concatenation: refused by the position the piece counts") {
+    ordinaryArrayConcatenations.foreach { case (name, text, path) =>
+      val reason = refusalOf(text).reason
+      assert(reason.contains(s"out of $path"), s"$name: $reason")
+      assert(reason.contains("line 3"), s"$name: $reason")
+      assert(reason.contains("line 2"), s"$name: $reason")
+    }
+  }
+
+  // An object concatenation is not an array concatenation: two objects merging under one name
+  // count no element, so a definition beside the include stands where the merged tree says it
+  // does, and refusing it costs the formatter a file it must format. These are the shapes an
+  // ordinary config writes — an empty section beside its leaf, before or after it.
+  val objectConcatenations = List(
+    "an empty object before its leaf"     -> "app={servers=[\"one\"]} {\ninclude \"f.conf\"\npool {}\npool.size=8\n}\n",
+    "an empty section beside another key" -> "app={servers=[\"one\"]} {\ninclude \"f.conf\"\nmetrics {}\npool.size=8\n}\n",
+    "an empty object after its leaf"      -> "app={servers=[\"one\"]} {\ninclude \"f.conf\"\npool {size=8}\npool {}\n}\n"
+  )
+
+  test("an object concatenation names no position: the ordinary shapes still format") {
+    objectConcatenations.foreach { case (name, text) =>
+      val formatted = HoconFormatter.format(text).fold(refusal => fail(s"$name: ${refusal.reason}"), identity)
+      assertEquals(HoconFormatter.format(formatted), Right(formatted), name)
+    }
+  }
+
   test("the shapes the refusal protects, without a dropped definition, still format") {
     // A definition before the include is folded into one value before the include reads it, and a
     // later definition wins over it; only a definition the formatting drops can let values
