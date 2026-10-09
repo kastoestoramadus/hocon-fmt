@@ -50,9 +50,9 @@ class CmdApiSpec extends munit.CatsEffectSuite {
 
   tmp.test("plugin parity fixture uses repository style and the original duplicate report") { dir =>
     for {
-      _ <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
-      file <- write(dir, "app.conf", "a=1\na=2\nb {c=3}\n")
-      run <- rewrite(file)
+      _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      file   <- write(dir, "app.conf", "a=1\na=2\nb {c=3}\n")
+      run    <- rewrite(file)
       output <- textOf(file)
     } yield {
       assertEquals(output, "a: 2\nb.c: 3\n")

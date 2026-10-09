@@ -15,7 +15,7 @@ around it in `HoconFormatter`.
 | `core` | `HoconFormatter.format: (String, FormatOptions) => Either[Refusal, String]`, `Verdict`, include masking | JVM, Scala.js, Scala Native | sconfig only |
 | `cats` | `FileFormatter[F]`: file verdicts, identity-preserving formatting, streaming checks, opt-in refusal errors | JVM, Scala.js (Node), Scala Native | core, cats-effect, fs2-io |
 | `zio` | `ZioFormatter`, blocking `ZioFiles`, identity-preserving formatting, per-file streamed outcomes | JVM, Scala Native; text on Scala.js | core, ZIO, zio-streams |
-| `cli` | `CmdApi`, an `IOApp`: arguments, the `.hocon-fmt.conf` lookup, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
+| `cli` | `CmdApi`, an `IOApp`: arguments, `.hocon-fmt.conf` filesystem access, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `java-api` | `HoconFmt` and the mirrored `Verdict` records and `RefusalKind` for Java and Kotlin callers; published as `eu.ww86:hocon-fmt-java-api` from sbt, tested by the standalone Gradle build in `java-api/` | JVM, Java 17 | core, jspecify |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `coreSite` | the core's sources against a sconfig fork that keeps detached comments, with the real `CommentCarrier`; not published | Scala.js | the fork |
@@ -103,8 +103,17 @@ The CLI prints a finding as a warning beside the file it examined, and only `--f
 (or its key in `.hocon-fmt.conf`) makes one fail a run; `cats`' `FileFormatter.inspect` hands the
 verdict, findings and any report failure of one read to the CLI, and its `write` replaces the file
 as `format` does. A failed document parse or an unsupported document tree produces a warning that the
-duplicate report could not run, rather than an empty successful report. The plugins do not report
-yet: they call the core through `JvmFacade`, which has no report.
+duplicate report could not run, rather than an empty successful report. The Java API mirrors options, findings and report failures in JDK records. Its `inspectFile`
+reads original bytes once, reports duplicates from those bytes and writes only a `NeedsFormatting`
+verdict. sbt reads these records reflectively; Gradle and Maven call them directly. Mill stays on
+core and reads and writes at its own edge. All four apply the file's effective duplicate policy.
+
+`ConfigLookup` contains the pure lookup decision: a config wins even in a directory holding `.git`,
+otherwise `.git` stops the walk, otherwise the parent is next. Filesystem existence probes, parent
+paths, strict UTF-8 reads and error effects stay in CLI, Java API and Mill. `StyleOverrides` and
+`FormatOptions.parse` are pure core values shared by these integrations; core still depends only
+on sconfig. Gradle includes ancestor configs in task inputs and defers discovery of their paths
+through a provider to preserve configuration-cache reuse.
 
 ## Include masking
 
