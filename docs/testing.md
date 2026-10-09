@@ -135,11 +135,11 @@ examples also require `url` and `licence`. A distilled entry may carry
 ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.
 
-The two showcase fork differences declare `now-site: formatted` and carry
+Fork differences with pinned page output declare `now-site: formatted` and carry
 `expected/site-default.conf`. The published suites still assert `now`; the fork's
 `Variant.ledger` routes these inputs to `CommentCarrierSpec`, which asserts `now-site`
-and the exact fork output. `target` is always authored independently. Verbatim
-provenance may also carry `source.sha`, embedded alongside the URL and licence.
+and the exact fork output for showcase and catalogue fixtures. `target` is always authored
+independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
 
 An upstream gap (`now != target`, except the formatter’s own same-line include
 restriction) requires `upstream: { issue: "https://github.com/ekrich/sconfig/…",

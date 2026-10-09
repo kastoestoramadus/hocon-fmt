@@ -28,3 +28,7 @@ slash-comment and triple-quoted-string inputs; `messy` retains the optional subs
 and lone append; `showcase/02-set-twice` retains the duplicate logging filter. Refused
 fixtures stay separate because each file pins one refusal. The original five buttons
 keep their `playground-order` values.
+
+The catalogue also adapts owner-authored sconfig tests: `commented-nested-paths`
+shows why comments keep nested object boundaries; `detached-array-comment` and
+`unresolved-merge-in-array` pin separate refusals and the page fork's exact output.
