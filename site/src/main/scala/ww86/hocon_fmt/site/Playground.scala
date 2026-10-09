@@ -8,7 +8,16 @@ import org.scalajs.dom
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-import ww86.hocon_fmt.{DuplicateReport, ExampleData, Finding, FormatOptions, IncludeMasking, Separator, Verdict}
+import ww86.hocon_fmt.{
+  DuplicateReport,
+  ExampleData,
+  Finding,
+  FormatOptions,
+  HoconFormatter,
+  IncludeMasking,
+  Separator,
+  Verdict
+}
 
 /** The page's playground, on the core itself, with one privacy line and one short upstream line
   * per example. The page's other parts live in [[UseIt]], [[KnownLimits]] and [[ContributionsView]].
@@ -163,10 +172,11 @@ object Playground {
             cls      := "conf",
             readOnly := true,
             value <-- verdict
+              .combineWith(options.signal)
               .combineWith(resolved.signal)
-              .map { case (text, decision, resolve) =>
+              .map { (text: String, decision: Verdict, chosen: FormatOptions, resolve: Boolean) =>
                 val entry = text -> decision
-                if resolve then resolvedOutput(entry) else out(entry)
+                if resolve then resolvedOutput(entry, chosen) else out(entry)
               },
             height <-- paneHeights,
             syncedPane(paneHeight)
@@ -263,8 +273,10 @@ object Playground {
 
   /** Resolve only accepted text, removing the include placeholders without reading any files.
     * The browser has no process environment; disabling it also makes the preview reproducible.
+    * What sconfig renders resolved is raw text again, so the style choices reach the resolved
+    * view only through our renderer, the one the formatted pane shows.
     */
-  private def resolvedOutput(entry: (String, Verdict)): String = entry match {
+  private def resolvedOutput(entry: (String, Verdict), chosen: FormatOptions): String = entry match {
     case (text, Verdict.Refused(_)) => text
     case (text, _)                  =>
       Try {
@@ -277,10 +289,14 @@ object Playground {
           .map(_.getKey)
           .filter(path => ConfigUtil.splitPath(path).asScala.lastOption.exists(generated.contains))
           .foldLeft(config)((acc, path) => acc.withoutPath(path))
-        local
+        val rendered = local
           .resolve(ConfigResolveOptions.defaults.setUseSystemEnvironment(false))
           .root
           .render(ConfigRenderOptions.defaults.setJson(false).setOriginComments(false).setComments(false)) + "\n"
+        // Every value here survived the verdict's collision probe on the input, so our renderer
+        // refusing its own accepted render is not a case to dress up: the untouched render stays
+        // the truth about the values, and a refusal line would hide them behind one message.
+        HoconFormatter.format(rendered, chosen).getOrElse(rendered)
       }.fold(e => s"Resolution unavailable: ${Option(e.getMessage).getOrElse(e.toString)}", identity)
   }
 
