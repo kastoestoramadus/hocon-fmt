@@ -1,4 +1,4 @@
-# 2026-10-09 — citation checker review fixes
+# 2026-10-09 — [#100](https://github.com/kastoestoramadus/hocon-fmt/pull/100) — citation checker review fixes
 
 **Change:** GitHub pull URLs resolve through the issues endpoint, which also serves PRs. The
 checker skips and counts URLs in fenced blocks and inline code, treats prose labels as existence
