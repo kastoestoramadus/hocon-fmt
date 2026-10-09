@@ -1,6 +1,6 @@
 import cats.effect.{IO, IOApp}
 import fs2.io.file.Path
-import ww86.hoconfmt.interop.cats.FileFormatter
+import eu.ww86.hoconfmt.interop.cats.FileFormatter
 
 object CatsExample extends IOApp.Simple {
   val run: IO[Unit] = {

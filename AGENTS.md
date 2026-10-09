@@ -31,8 +31,8 @@ sbt cliJS/npmPackage      # cli/.js/target/npm-package
 sbt web/bundle            # web/target/bundle/hocon-fmt.js, the script for web pages
 sbt site/build            # site/target/site: the project page (index.html, main.js, CNAME)
 sbt "cliJVM/run --check path/to/file.conf"
-sbt "coreJVM/testOnly ww86.hoconfmt.HoconFormatterInvariantsSpec -- *idempotent*"
-UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hoconfmt.GoldenFileSpec"
+sbt "coreJVM/testOnly eu.ww86.hoconfmt.HoconFormatterInvariantsSpec -- *idempotent*"
+UPDATE_GOLDEN=1 sbt "coreJVM/testOnly eu.ww86.hoconfmt.GoldenFileSpec"
 scripts/refresh-contributions.py  # diff the site's contribution snapshot against GitHub, needs gh
 ```
 

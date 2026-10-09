@@ -1,5 +1,5 @@
-import ww86.hoconfmt.java.HoconFmt;
-import ww86.hoconfmt.java.Verdict;
+import eu.ww86.hoconfmt.java.HoconFmt;
+import eu.ww86.hoconfmt.java.Verdict;
 
 public final class JavaExample {
     public static void main(String[] args) {

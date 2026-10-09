@@ -34,7 +34,7 @@ RELEASES = {
     "lightbend/config": ("v1.4.9", "2026-06-03"),
 }
 
-SNAPSHOT_FILE = Path(__file__).resolve().parent.parent / "site/src/main/scala/ww86/hoconfmt/site/Contributions.scala"
+SNAPSHOT_FILE = Path(__file__).resolve().parent.parent / "site/src/main/scala/eu/ww86/hoconfmt/site/Contributions.scala"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 LIBRARY = {"Sconfig": "ekrich/sconfig", "LightbendConfig": "lightbend/config"}

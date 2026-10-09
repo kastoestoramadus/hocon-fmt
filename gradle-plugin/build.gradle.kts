@@ -25,7 +25,7 @@ gradlePlugin {
     plugins {
         create("hoconFormatter") {
             id = "eu.ww86.hocon-fmt"
-            implementationClass = "ww86.hoconfmt.gradle.HoconFormatterPlugin"
+            implementationClass = "eu.ww86.hoconfmt.gradle.HoconFormatterPlugin"
             displayName = "HOCON formatter"
             description = "Formats HOCON configuration files, or checks that they are formatted."
         }
