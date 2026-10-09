@@ -131,8 +131,8 @@ The UI coverage audit adds behavioural checks for each style switch in the forma
 including switching back and leaving the other controls alone; tab `aria-pressed`, the output
 pane title, the hidden resolution note and read-only output; refusal details/help links and their
 removal after valid input; and partial/all GitHub failures with snapshot badges and links to
-other recent work. The fake GitHub can answer each repository independently. `UseIt` currently
-has plain snippets, with no copy buttons to exercise. Build-stamp formatting is covered by
+other recent work. The fake GitHub can answer each repository independently. `UseIt`'s snippets
+have no copy buttons to exercise. Build-stamp formatting is covered by
 `DeployStampSpec`, and the local stamp in the page header by `ComponentSpec`.
 
 On Scala 3.8.2 / Scala.js 1.22.0, `sbt coverage site/test site/coverageReport` compiles the

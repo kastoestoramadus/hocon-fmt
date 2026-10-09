@@ -230,8 +230,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     libraryDependencies += "org.ekrich" %%% "sjavatime" % sjavatime % Provided
   )
 
-lazy val coreJVM    = guardPublish(core.jvm)
-lazy val coreJS     = guardPublish(core.js)
+lazy val coreJVM = guardPublish(core.jvm).settings(
+  Test / unmanagedSources += (ThisBuild / baseDirectory).value / "site" / "snippets" / "CoreExample.scala"
+)
+lazy val coreJS = guardPublish(core.js).settings(
+  Test / unmanagedSources += (ThisBuild / baseDirectory).value / "site" / "snippets" / "ScalaJsExample.scala"
+)
 lazy val coreNative = guardPublish(core.native)
 
 /** UPSTREAM-SCONFIG: the core as the project page runs it, against the sconfig fork that keeps
@@ -301,7 +305,9 @@ lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     Test / nativeConfig ~= { _.withMode(Mode.debug).withLTO(LTO.none) }
   )
 
-lazy val catsJVM    = guardPublish(cats.jvm)
+lazy val catsJVM = guardPublish(cats.jvm).settings(
+  Test / unmanagedSources += (ThisBuild / baseDirectory).value / "site" / "snippets" / "CatsExample.scala"
+)
 lazy val catsJS     = guardPublish(cats.js)
 lazy val catsNative = guardPublish(cats.native)
 
@@ -331,7 +337,9 @@ lazy val zio = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .jsSettings(announceRuntime("ZIO text adapter on Scala.js"))
   .nativeSettings(announceRuntime("ZIO adapter on Scala Native"))
 
-lazy val zioJVM    = guardPublish(zio.jvm)
+lazy val zioJVM = guardPublish(zio.jvm).settings(
+  Test / unmanagedSources += (ThisBuild / baseDirectory).value / "site" / "snippets" / "ZioExample.scala"
+)
 lazy val zioJS     = guardPublish(zio.js)
 lazy val zioNative = guardPublish(zio.native)
 
@@ -470,6 +478,10 @@ lazy val site = project
   .dependsOn(coreSite)
   .settings(
     name := "hocon-fmt-site",
+    Compile / sourceGenerators += Def.task {
+      UseItGenerator.generate((ThisBuild / baseDirectory).value, (Compile / sourceManaged).value)
+    }.taskValue,
+
     Compile / sourceGenerators += Def.task {
       ExampleGenerator.generate(
         (ThisBuild / baseDirectory).value / "examples",
@@ -666,8 +678,9 @@ lazy val javaApi = guardPublish(
       // javac-only flag; javadoc's own doclint stays on at its default and the sources must pass it.
       Compile / doc / javacOptions := Seq("--release", "17"),
       // The JUnit and Kotlin tests belong to the Gradle build, which is what runs them; sbt
-      // compiles and publishes the main sources only.
+      // compiles the site's Java showcase too, without publishing test classes.
       Test / unmanagedSourceDirectories := Seq(),
+      Test / unmanagedSources += (ThisBuild / baseDirectory).value / "site" / "snippets" / "JavaExample.java",
       // @NullMarked sits on the package, so consumers read it from their classpath too.
       libraryDependencies += "org.jspecify" % "jspecify" % "1.0.0"
     )
