@@ -42,6 +42,25 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
     }
   }
 
+  test("a definition dropped on a line another definition shares is refused") {
+    val root  = Files.createTempDirectory("include-shadow-one-line")
+    val body  = "a.o { retained = 9 }"
+    val cases = List(
+      "dotted value then object"      -> s"${HoconGen.shadowInclude}\na.o = 3, a.o.c = 7\n",
+      "nested value then object"      -> s"${HoconGen.shadowInclude}\na { o = 3 }, a.o.c = 7\n",
+      "the same path written twice"   -> s"${HoconGen.shadowInclude}\na.o = 3, a.o = { c = 7 }\n",
+      "an empty object after a value" -> s"${HoconGen.shadowInclude}\na.o = 3, a.o {}\n",
+      "on the include's own line"     -> s"${HoconGen.shadowInclude}, a.o = 3, a.o.c = 7",
+      "inside an object"              -> "a {\n  include \"inc.conf\"\n  o = 3, o.c = 7\n}\n"
+    )
+    cases.zipWithIndex.foreach { case ((name, text), index) =>
+      refusedOrUnchanged(root, index, HoconGen.ShadowCase(text, body)) match {
+        case Verdict.Refused(_) => ()
+        case other              => fail(s"$name: expected a refusal, got $other")
+      }
+    }
+  }
+
   test("the include's place decides: after the definitions it still formats") {
     val root = Files.createTempDirectory("include-shadow-places")
     // The dropped dotted definition is the include's own line, so the shadow check has nothing to

@@ -357,16 +357,51 @@ object HoconGen {
   /** One case: the text, and what the file it includes holds. */
   final case class ShadowCase(text: String, includeBody: String)
 
-  /** Every way one or two of the shapes stand around an include, with every body beside it, at the
-    * file root and inside an object. The included file cannot be read at format time — a web page
-    * has no filesystem and the target may be a URL — so a definition there may be what kept its
-    * values out, and the formatter must either refuse the case or hand back text that still
-    * resolves the same way. The suites that can resolve write the file named by `shadowInclude`
-    * beside the text and check exactly that.
+  /** How a case's statements stand: each on a line of its own, the definitions sharing one line,
+    * or every statement on one line with the file's closing newline left out. A comma is what puts
+    * two statements on one line. Two definitions on one line carry one origin line between them,
+    * which the shadow check has to tell apart; a file with no newline at all is where an include
+    * shares a line with the fields around it.
+    */
+  enum Layout derives CanEqual {
+    case OwnLines
+    case DefinitionsJoined
+    case OneLine
+  }
+
+  /** The lines of a case, each a group of statements joined with a comma where the layout puts
+    * them on one line.
+    */
+  def shadowLines(definitions: List[String], at: Int, layout: Layout): List[List[String]] = {
+    val (before, after) = (definitions.take(at), definitions.drop(at))
+    layout match {
+      case Layout.OwnLines          => before.map(List(_)) ++ List(List(shadowInclude)) ++ after.map(List(_))
+      case Layout.DefinitionsJoined =>
+        List(before).filter(_.nonEmpty) ++ List(List(shadowInclude)) ++ List(after).filter(_.nonEmpty)
+      case Layout.OneLine => List(before ++ List(shadowInclude) ++ after)
+    }
+  }
+
+  /** The layouts worth generating for a placement: sharing a line only says something new where
+    * there are two definitions to put on it, and the joined layout repeats the plain one when the
+    * include splits them.
+    */
+  def shadowLayouts(definitions: List[String], at: Int): List[Layout] =
+    if (definitions.size < 2 || at == 1) List(Layout.OwnLines, Layout.OneLine)
+    else List(Layout.OwnLines, Layout.DefinitionsJoined, Layout.OneLine)
+
+  /** Every way one or two of the shapes stand around an include, in every layout, with every body
+    * beside it, at the file root and inside an object. The included file cannot be read at format
+    * time — a web page has no filesystem and the target may be a URL — so a definition there may
+    * be what kept its values out, and the formatter must either refuse the case or hand back text
+    * that still resolves the same way. The suites that can resolve write the file named by
+    * `shadowInclude` beside the text and check exactly that.
     */
   lazy val shadowCases: List[ShadowCase] = {
-    def around(definitions: List[String], at: Int): String =
-      ((definitions.take(at) :+ shadowInclude) ++ definitions.drop(at)).mkString("\n") + "\n"
+    def around(definitions: List[String], at: Int, layout: Layout): String = {
+      val lines = shadowLines(definitions, at, layout).map(_.mkString(", "))
+      lines.mkString("\n") + (if (layout == Layout.OneLine) "" else "\n")
+    }
 
     def insideAnObject(text: String): String =
       "a {\n" + text.stripSuffix("\n").linesIterator.map("  " + _).mkString("\n") + "\n}\n"
@@ -382,10 +417,11 @@ object HoconGen {
     } yield List(first, second) -> at
     for {
       (definitions, at) <- oneStatement ++ twoStatements
+      layout            <- shadowLayouts(definitions, at)
       nested            <- List(false, true)
       body              <- shadowBodies
     } yield {
-      val text = around(definitions, at)
+      val text = around(definitions, at, layout)
       ShadowCase(if (nested) insideAnObject(text) else text, body)
     }
   }

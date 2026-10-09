@@ -66,6 +66,29 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
     assert(refusalOf(nested).reason.contains("a.o"), refusalOf(nested).reason)
   }
 
+  // Two definitions written on one line carry one origin line between them, and a value of the
+  // merged tree carries a path and a line, never a column: the kept definition's own line is what
+  // the dropped one's test reads. A file written this way must be refused like the two-line
+  // spellings above, including where the definitions share the include's line, whose order the
+  // rendering does not keep.
+  val b1OnOneLine = List(
+    ("at one key", "include \"f.conf\"\no = 3, o.c = 7\n", "o", 1, 2),
+    ("with a dotted path", "include \"g.conf\"\na.o = 3, a.o.c = 7\n", "a.o", 1, 2),
+    ("with a nested definition", "include \"g.conf\"\na { o = 3 }, a.o.c = 7\n", "a.o", 1, 2),
+    ("with the path written twice", "include \"g.conf\"\na.o = 3, a.o = { c = 7 }\n", "a.o", 1, 2),
+    ("inside an object", "a {\n  include \"g.conf\"\n  o = 3, o.c = 7\n}\n", "a.o", 2, 3),
+    ("in a file with no newline", "include \"g.conf\", o = 3, o.c = 7", "o", 1, 1)
+  )
+
+  test("B1 with both definitions on one line: refused however the path is spelled") {
+    b1OnOneLine.foreach { case (name, text, path, includeLine, definitionLine) =>
+      val reason = refusalOf(text).reason
+      assert(reason.contains(s"out of $path"), s"$name: $reason")
+      assert(reason.contains(s"line $definitionLine"), s"$name: $reason")
+      assert(reason.contains(s"line $includeLine"), s"$name: $reason")
+    }
+  }
+
   test("the shapes the refusal protects, without a dropped definition, still format") {
     // A definition before the include is folded into one value before the include reads it, and a
     // later definition wins over it; only a definition the formatting drops can let values
