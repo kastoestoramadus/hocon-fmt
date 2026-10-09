@@ -156,7 +156,7 @@ manual browser checks, outside FakeDom's model.
 Reviewed against [Laminar 17.2.1's tagged docs (including the Modifiers FAQ)](https://github.com/raquo/Laminar/blob/v17.2.1/website/docs/documentation.md),
 [the official documentation](https://laminar.dev/documentation), and
 [Airstream 17.2.1's README](https://github.com/raquo/Airstream/blob/v17.2.1/README.md).
-Locations below are in `site/src/main/scala/ww86/hocon_fmt/site/` at the reviewed base
+Locations below are in `site/src/main/scala/ww86/hoconfmt/site/` at the reviewed base
 `08b38f5`; use the named methods after edits.
 
 | Practice and source | Audit location | Decision and reason |

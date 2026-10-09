@@ -5,8 +5,8 @@ today, and whether the two agree. A name is judged against its registry's or lan
 not against taste, so each row carries its source. The `here` column is what `git grep` finds in the
 sources, `build.sbt`, the manifests, `.pre-commit-hooks.yaml`, the workflows and `docs/`.
 
-One mismatch becomes expensive at the first release: the JVM package. It is the first
-[finding](#findings); the rest either match, or differ in ways that cost nothing to leave alone.
+The owner chose `ww86.hoconfmt` before the first release, retaining the `ww86` prefix.
+The first [finding](#findings) records that decision and its difference from the domain convention.
 
 ## Contexts
 
@@ -19,8 +19,8 @@ One mismatch becomes expensive at the first release: the JVM package. It is the 
 | sbt plugin artifact id | "Use the `sbt-$projectname` scheme to name your library and artifact" ([Plugins Best Practices](https://www.scala-sbt.org/1.x/docs/Plugins-Best-Practices.html)); an sbt 1 plugin "append[s] the sbt-cross version `_2.12_1.0` to the module artifactId" ([IvySbt](https://www.scala-sbt.org/1.9.8/api/sbt/internal/librarymanagement/IvySbt.html)), an sbt 2 plugin carries `_sbt2_3` ([sbt 2 plugins](https://www.scala-sbt.org/2.x/docs/en/reference/plugin.html)) | `sbt-hocon-fmt` on Scala 2.12.21; [the sbt 2 plan](plans/sbt2-plugin.md) publishes `sbt-hocon-fmt_sbt2_3` separately | matches |
 | Mill plugin artifact id | the published id is the module name plus `platformSuffix` plus the Scala binary version; Mill's own example sets `platformSuffix = s"_mill1"` and publishes `myplugin_mill1_3` ([writing plugins](https://mill-build.org/mill/extending/writing-plugins.html)) | `artifactName = "mill-hocon-fmt"` with `platformSuffix = "_mill1"`, resolved as `eu.ww86::mill-hocon-fmt` ([mill-plugin/build.mill](../mill-plugin/build.mill)) | matches |
 | Version string | semantic versioning: "It should start with the major version, followed by the minor version and the patch version" ([naming guide](https://maven.apache.org/guides/mini/guide-naming-conventions.html)); a released version "cannot end in `-SNAPSHOT`" ([Central requirements](https://central.sonatype.org/publish/requirements/)) | `0.1.0-SNAPSHOT` while unreleased; the first release sets `0.1.0` in six places ([releasing](releasing.md)) | matches |
-| JVM package | "You form a unique package name by first having (or belonging to an organization that has) an Internet domain name, such as oracle.com. You then reverse this name, component by component, to obtain, in this example, com.oracle, and use this as a prefix for your package names" ([JLS §6.1](https://docs.oracle.com/javase/specs/jls/se21/html/jls-6.html#jls-6.1); §7.7 in the older JLS, now [Module Declarations](https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.7)); "Scala packages should follow the Java package naming conventions" ([Scala style](https://docs.scala-lang.org/style/naming-conventions.html)) | `ww86.hocon_fmt` in all 120 Scala sources and the Java sources, with subpackages `.java`, `.sbt`, `.gradle`, `.maven`, `.mill`, `.interop.cats`, `.interop.zio`, `.web`, `.bench`, `.site` | **differs** — see [Findings](#findings) |
-| Kotlin-facing package | "Names of packages are always lowercase and do not use underscores (`org.example.project`)" ([Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html#naming-rules)) | Kotlin callers import `ww86.hocon_fmt.java.HoconFmt`; the underscore is part of the API they type | differs, with the package row |
+| JVM package | "You form a unique package name by first having (or belonging to an organization that has) an Internet domain name, such as oracle.com. You then reverse this name, component by component, to obtain, in this example, com.oracle, and use this as a prefix for your package names" ([JLS §6.1](https://docs.oracle.com/javase/specs/jls/se21/html/jls-6.html#jls-6.1); §7.7 in the older JLS, now [Module Declarations](https://docs.oracle.com/javase/specs/jls/se25/html/jls-7.html#jls-7.7)); "Scala packages should follow the Java package naming conventions" ([Scala style](https://docs.scala-lang.org/style/naming-conventions.html)) | `ww86.hoconfmt` in all 120 Scala sources and the Java sources, with subpackages `.java`, `.sbt`, `.gradle`, `.maven`, `.mill`, `.interop.cats`, `.interop.zio`, `.web`, `.bench`, `.site` | **differs** — see [Findings](#findings) |
+| Kotlin-facing package | "Names of packages are always lowercase and do not use underscores (`org.example.project`)" ([Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html#naming-rules)) | Kotlin callers import `ww86.hoconfmt.java.HoconFmt`; every package segment is lowercase with no underscore | matches |
 | Class, object and file names | "Classes should be named in upper camel case"; objects like classes ([Scala style](https://docs.scala-lang.org/style/naming-conventions.html)); "Class names should be nouns, in mixed case with the first letter of each internal word capitalized" ([Oracle](https://www.oracle.com/java/technologies/javase/codeconventions-namingconventions.html)) | `HoconFormatter`, `HoconFmt`, `HoconFormatterPlugin`, `HoconFormatterModule`, `HoconFormat` / `HoconFormatCheck`, `HoconText`, `CmdApi` | matches |
 | Java API names | the same class rule; names are read by Java and Kotlin callers | `HoconFmt`, `Verdict`, `Inspection`, `RefusalKind`, `FormatOptions`, `DuplicateReport`, `AtomicFile`, under `@NullMarked` | matches |
 | Gradle plugin id | "Plugin IDs are meant to be globally unique, similar to Java package names (i.e., a reverse domain name)"; "May contain any alphanumeric character, '.', and '-'", "Must contain at least one '.'", "Conventionally use only lowercase characters", no leading or trailing '.' and no '..' ([plugin ids](https://docs.gradle.org/current/userguide/implementing_gradle_plugins_binary.html#sec:creating_a_plugin_id)); the Portal wants the id to trace back to its author, `io.github.<user>.<name>` when the domain cannot be proved ([publish](https://plugins.gradle.org/docs/publish-plugin)) | `eu.ww86.hocon-fmt`, with `io.github.kastoestoramadus.hocon-fmt` as the documented fallback ([releasing](releasing.md)) | matches |
@@ -51,23 +51,14 @@ One mismatch becomes expensive at the first release: the JVM package. It is the 
 
 Ranked by what a change costs now against what it costs once the artifacts are published.
 
-1. **The package root does not reverse the domain the project owns, and the segment is not the one
-   the owner chose.** Everything under `ww86.hocon_fmt` — 120 Scala sources, the Java API, the
-   plugins' implementation classes, the CLI's `Main-Class`, the sbt plugin's `buildInfoPackage` —
-   should be `eu.ww86.hoconfmt`. The JLS convention is a name formed from a domain the
-   organization holds: `ww86.eu` reverses to `eu.ww86`, which is also the group id verified at
-   Central, while `ww86` alone reverses nothing and is not a top-level domain. And the owner chose
-   `hoconfmt` as the project segment, which is the form Kotlin's conventions want; `hocon_fmt` is
-   legal Java but an underscore in the Kotlin-facing API a Kotlin caller types
-   ([Gradle's Portal guide](https://plugins.gradle.org/docs/publish-plugin) is the one source that
-   argues for the underscore — "while the plugin ID and group ID should use dashes, the package name
-   should contain underscores instead" — but it argues about plugin ids, not about a group id that is
-   already dot-separated). **Before the first release this is a mechanical rename the compiler
-   checks** — the imports, the plugin descriptors, `buildInfoPackage`, the CLI's `Main-Class`, the
-   site's snippets and the docs, with no consumer to break. **After it, it breaks every Java, Kotlin
-   and Scala caller's imports and every plugin class name** — a major version, and a
-   [limitations](limitations.md)-style note rather than a fix. This is the one row worth acting on
-   before the tag.
+1. **The owner chose `ww86.hoconfmt` before the first release, keeping the prefix `ww86`.**
+   The Scala, Java and Kotlin sources, plugin implementation classes, CLI's `Main-Class`,
+   `buildInfoPackage`, site snippets and documentation use that name. The segment `hoconfmt`
+   follows Kotlin's lowercase, underscore-free package convention. The domain `ww86.eu` would
+   conventionally reverse to `eu.ww86`, which remains the Maven group id; the owner explicitly
+   retained the shorter package prefix. The package and Maven group id are separate identifiers.
+   This rename happens before any publication and changes no formatter behaviour. After a release,
+   changing a package affects consumer imports, reflection and plugin implementation class names.
 
 2. **The command name against POSIX Guideline 2 differs, and should stay as it is.** `hocon-fmt`
    uses a hyphen, which Guideline 2's "lowercase letters and digits only" excludes, and it is at the
@@ -79,7 +70,7 @@ Ranked by what a change costs now against what it costs once the artifacts are p
 3. **`UPDATE_GOLDEN` has no project prefix.** The environment variables the code owns are
    `HOCON_FMT_*`; the golden-file switch is named for what it does and collides with nothing here,
    but it is the one variable a reader could take for someone else's. It is test-only and read in
-   one file ([GoldenFileSpec](../core/jvm-native/src/test/scala/ww86/hocon_fmt/GoldenFileSpec.scala)).
+   one file ([GoldenFileSpec](../core/jvm-native/src/test/scala/ww86/hoconfmt/GoldenFileSpec.scala)).
 
 4. **Three contexts have no rule to be measured against, and a fourth has only a loose one.** Gradle
    states no convention for task names, pre-commit none for hook ids, Scala Native none for the
@@ -106,7 +97,7 @@ package eu.ww86.hocon-fmt;
                      ^
 1 error
 
-$ javac -d out pkg/Under.java         # package ww86.hocon_fmt;
+$ javac -d out pkg/Under.java         # package example.under_score;
 $ echo $?
 0
 ```

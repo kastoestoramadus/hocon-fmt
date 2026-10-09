@@ -148,7 +148,7 @@ a build with `app/resources/application.conf`, and run `./mill __.hoconFormatChe
 //| - eu.ww86::mill-hocon-fmt::0.1.0
 package build
 import mill.*, javalib.*
-import ww86.hocon_fmt.mill.HoconFormatterModule
+import ww86.hoconfmt.mill.HoconFormatterModule
 
 object app extends JavaModule, HoconFormatterModule
 ```
