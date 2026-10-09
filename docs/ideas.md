@@ -345,3 +345,35 @@ standard runners being free for them. **Your part:** deciding the cadence, and w
 may commit the refreshed snapshot to `main` or only publish it. **Code:** a `schedule` trigger in
 the Pages workflow, a refresh script run by hand today, and a check that a changed snapshot is the
 only difference before it deploys.
+
+## From the formatter research
+
+The [synthesis](research/formatters/REPORT.md#recommendations) ranks these; nothing here promises
+implementation. Existing report/diff, cache, corpus-comment support, CST, editor/LSP, distribution,
+benchmark and file-identity entries above remain the canonical entries, not duplicates.
+
+| new idea | source (research + original URL) | why not now / trigger to revisit | cost |
+|---|---|---|---|
+| Second pass on every approved golden/example | [test architecture](research/formatters/REPORT.md#test-architecture), [Cue harness](https://github.com/cue-lang/cue/blob/master/cue/format/format_test.go) | research only; next golden/test change, promote with mutation proof | S |
+| Exact comment multiset including duplicates and explicit attachment slots | [property plan](research/formatters/REPORT.md#property-testing-plan), [rustfmt #5913](https://github.com/rust-lang/rustfmt/pull/5913) | loss-only guard already exists; next core safety change should add the converse and slot model | S/M |
+| Independent value oracle with include/override and environment fixtures | [property plan](research/formatters/REPORT.md#property-testing-plan), [Black safety code](https://github.com/psf/black/blob/main/src/black/parsing.py) | avoid runtime dependency changes; next safety PR adds pinned Lightbend Config in JVM test scope | M |
+| Budgeted licensed corpus with per-refusal ceilings | [test architecture](research/formatters/REPORT.md#test-architecture), [gofmt corpus](https://github.com/golang/go/blob/master/src/cmd/gofmt/long_test.go) | corpus inputs need pins/licences; before release, sample within a stated file/byte/time budget | M |
+| Nightly seeded properties and failure minimization | [property plan](research/formatters/REPORT.md#property-testing-plan), [Black fuzz](https://github.com/psf/black/blob/main/scripts/fuzz.py) | CI cost unmeasured; after measuring the PR tier, schedule a capped exploration run | S |
+| Source-level re-lex/delimiter/literal checks | [test architecture](research/formatters/REPORT.md#test-architecture), [taplo #456](https://github.com/tamasfe/taplo/pull/456) | value-tree equality misses text corruption; next masking/comment transform supplies permitted-normalization rules | M |
+| Improvement-detecting known-bad ledger automation | [test architecture](research/formatters/REPORT.md#test-architecture), [Prettier exclusions](https://github.com/prettier/prettier/blob/main/tests/config/failed-format-tests.js) | `SconfigDefectsSpec` already gives the signal; next parser upgrade routes its improvements to triage, never silent skips | S |
+| All-verdict process contract and visible refusal totals | [product](research/formatters/REPORT.md#product), [gofmt #46289](https://github.com/golang/go/issues/46289) | existing CLI/acceptance tests cover much; next reporting change extends them instead of creating a parallel suite | S |
+| Structured `--json` per-file verdicts/diagnostics | [product](research/formatters/REPORT.md#product), [Ruff CLI](https://github.com/astral-sh/ruff/blob/main/crates/ruff/src/args.rs) | schema would become an API; revisit for CI/editor consumption with a versioned schema | M |
+| `path:line:col` diagnostics and Unicode offset discipline | [product](research/formatters/REPORT.md#product), [rustfmt #7029](https://github.com/rust-lang/rustfmt/pull/7029) | paths/lines already exist; revisit when precise spans are available, not guessed from rendering | M |
+| `# hocon-fmt: off/on` scope and unmatched-marker policy | [product](research/formatters/REPORT.md#product), [Black #4033](https://github.com/psf/black/issues/4033), [dprint ignore fix](https://github.com/dprint/dprint-plugin-json/pull/69) | value tree cannot preserve arbitrary regions; revisit only with a source-preserving strategy, whole-file off first | L |
+| Style-stability policy and repo-side required version | [process/docs](research/formatters/REPORT.md#process-and-docs), [Black stability](https://github.com/psf/black/blob/main/docs/the_black_code_style/index.md) | artifact pins exist; before first release publish policy, then consider a runtime version guard | S |
+| Refusals explained as protection, counted visibly | [process/docs](research/formatters/REPORT.md#process-and-docs), [rustfmt warning fixtures](https://github.com/rust-lang/rustfmt/tree/main/tests/warning) | documentation added to limitations now; next report-format change aligns channel wording | S |
+| Property tiers and admission rule with ten initial targets | [test budget](research/formatters/REPORT.md#how-not-to-overdo-tests), [dprint tests](https://github.com/dprint/dprint-plugin-json/blob/main/tests/test.rs) | no regression tests added by research; require a demonstrated failure and cost tier for each promoted probe | S |
+| Cross-platform corpus bytes and no-panic arbitrary-byte core property | [property plan](research/formatters/REPORT.md#property-testing-plan), [hclwrite fuzz](https://github.com/hashicorp/hcl/tree/main/hclwrite/fuzz) | JVM probes establish no JS/Native claim; next property change extends existing ZIO byte coverage to core | M |
+| BOM-tolerant style config policy | [safety/API study](research/formatters/safety-and-ux-history-tests-api.md#5-ideas-to-migrate-with-cost-and-value), [Prettier config history](https://github.com/prettier/prettier/commit/1a36a7de) | input BOM normalization does not specify config BOM policy; revisit with a Windows-authored config reproduction | S |
+| Range formatting, extension plugin API, more style switches, sorting or comment reflow | [we will not do](research/formatters/REPORT.md#we-will-not-do), [Black range caveat](https://github.com/psf/black/issues/4033), [Prettier options](https://github.com/prettier/prettier/blob/main/docs/option-philosophy.md) | deliberately declined: nonlocal merge/include semantics and option interactions; revisit only with concrete demand and a safety design | L |
+
+Existing "One report format" owns `--diff`; existing cache idea should include content **and every
+option**, parser version and a no-cache escape hatch ([Black discovery](https://github.com/psf/black/blob/main/docs/usage_and_configuration/file_collection_and_discovery.md)).
+Existing CST entry owns lossless parsing; existing benchmark entry owns performance gates. Editor snippets,
+VS Code/LSP, GitHub Action, Docker and ecosystem builds retain their earlier costs and revisit triggers;
+this research supplies evidence, not a reason to add another implementation before release.

@@ -232,3 +232,21 @@ sconfig's parser is about 27 times slower on Scala Native than on the JVM, and i
 slow part on Scala.js. A service's `application.conf` formats in about 1 ms on Native, well under
 the process start-up; a generated 330 KB file takes about 2 s there against 0.1 s on the JVM.
 Current numbers: `scripts/bench.py report`.
+
+## What depending on sconfig means for your files
+
+The published formatter uses sconfig to read values and print them again. That value tree loses
+some source details: licence banners above blank lines, comments at the end of objects/files,
+and definitions hidden by later definitions. The formatter checks for lost comments, broken output
+and unstable output and leaves those files unchanged. This protects your file; a refusal is not a
+claim that your valid HOCON is wrong. The playground temporarily keeps more comments than the CLI.
+
+Default-plus-environment overrides and some substitution/object/array combinations also hit renderer
+limitations. Several fixes are merged upstream but not released; the ledger above names them. We will
+re-check them when upgrading rather than silently enable formatting because a newer version compiles.
+
+There is one known safety gap: an overridden definition beside an include can disappear while its
+include remains, allowing an included value to survive. The duplicate warning is useful evidence,
+but does not repair the meaning. The [research probes](research/formatters/REPORT.md#probe-results)
+reproduce this with a real include fixture. Tell us if this blocks you, including the smallest input
+and the formatter version. No upstream issue is posted by the research task.

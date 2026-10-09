@@ -1,0 +1,4 @@
+# Source: https://github.com/rust-lang/rustfmt
+# Licence: MIT OR Apache-2.0
+# Research: safety-and-ux-history-tests-api.md:311
+# Input is a newly written HOCON analogue, not formatter code.

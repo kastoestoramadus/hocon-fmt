@@ -1,0 +1,4 @@
+# Source: https://github.com/lightbend/config
+# Licence: Apache-2.0
+# Research: synthesis matrix:long-120
+# Input is a newly written HOCON analogue, not formatter code.

@@ -1,0 +1,4 @@
+# Source: https://github.com/llvm/llvm-project
+# Licence: Apache-2.0 WITH LLVM-exception
+# Research: language-classics-history-tests-api.md:316
+# Input is a newly written HOCON analogue, not formatter code.

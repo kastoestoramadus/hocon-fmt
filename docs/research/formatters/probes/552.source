@@ -1,0 +1,4 @@
+# Source: https://github.com/apache/pekko/blob/1dd51690af2fdb317fec4241cd476c83aac4e768/actor/src/main/resources/reference.conf
+# Licence: Apache-2.0
+# Research: examples/showcase/04-library-file/input.conf
+# Verbatim/derived Pekko fixture already carried by examples; data only.

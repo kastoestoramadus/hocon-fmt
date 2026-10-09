@@ -1,0 +1,210 @@
+[
+  {
+    "tag": "semantic-change",
+    "counts": [
+      21,
+      4,
+      4,
+      10
+    ],
+    "frequency": 89,
+    "severity": 5,
+    "relevance": 3,
+    "score": 1335
+  },
+  {
+    "tag": "comment-loss",
+    "counts": [
+      5,
+      9,
+      2,
+      10
+    ],
+    "frequency": 47,
+    "severity": 4,
+    "relevance": 3,
+    "score": 564
+  },
+  {
+    "tag": "crash",
+    "counts": [
+      2,
+      8,
+      3,
+      12
+    ],
+    "frequency": 40,
+    "severity": 4,
+    "relevance": 3,
+    "score": 480
+  },
+  {
+    "tag": "check-exit-codes",
+    "counts": [
+      6,
+      3,
+      3,
+      9
+    ],
+    "frequency": 39,
+    "severity": 4,
+    "relevance": 3,
+    "score": 468
+  },
+  {
+    "tag": "idempotence",
+    "counts": [
+      7,
+      6,
+      4,
+      10
+    ],
+    "frequency": 51,
+    "severity": 3,
+    "relevance": 3,
+    "score": 459
+  },
+  {
+    "tag": "comment-movement",
+    "counts": [
+      11,
+      5,
+      4,
+      11
+    ],
+    "frequency": 62,
+    "severity": 3,
+    "relevance": 2,
+    "score": 372
+  },
+  {
+    "tag": "include-import-analog",
+    "counts": [
+      3,
+      3,
+      1,
+      6
+    ],
+    "frequency": 23,
+    "severity": 5,
+    "relevance": 3,
+    "score": 345
+  },
+  {
+    "tag": "parse-error-handling",
+    "counts": [
+      3,
+      3,
+      2,
+      9
+    ],
+    "frequency": 28,
+    "severity": 4,
+    "relevance": 3,
+    "score": 336
+  },
+  {
+    "tag": "whitespace-eol-encoding",
+    "counts": [
+      3,
+      7,
+      2,
+      8
+    ],
+    "frequency": 35,
+    "severity": 3,
+    "relevance": 3,
+    "score": 315
+  },
+  {
+    "tag": "config-ignore",
+    "counts": [
+      6,
+      6,
+      4,
+      10
+    ],
+    "frequency": 48,
+    "severity": 2,
+    "relevance": 2,
+    "score": 192
+  },
+  {
+    "tag": "ordering",
+    "counts": [
+      4,
+      4,
+      1,
+      5
+    ],
+    "frequency": 27,
+    "severity": 3,
+    "relevance": 2,
+    "score": 162
+  },
+  {
+    "tag": "performance",
+    "counts": [
+      3,
+      1,
+      3,
+      4
+    ],
+    "frequency": 21,
+    "severity": 2,
+    "relevance": 2,
+    "score": 84
+  },
+  {
+    "tag": "other",
+    "counts": [
+      7,
+      2,
+      3,
+      4
+    ],
+    "frequency": 35,
+    "severity": 2,
+    "relevance": 1,
+    "score": 70
+  },
+  {
+    "tag": "embedded-language",
+    "counts": [
+      4,
+      2,
+      2,
+      6
+    ],
+    "frequency": 26,
+    "severity": 2,
+    "relevance": 1,
+    "score": 52
+  },
+  {
+    "tag": "line-width-layout",
+    "counts": [
+      9,
+      4,
+      2,
+      10
+    ],
+    "frequency": 49,
+    "severity": 1,
+    "relevance": 1,
+    "score": 49
+  },
+  {
+    "tag": "partial-range",
+    "counts": [
+      0,
+      1,
+      3,
+      6
+    ],
+    "frequency": 14,
+    "severity": 1,
+    "relevance": 0,
+    "score": 0
+  }
+]

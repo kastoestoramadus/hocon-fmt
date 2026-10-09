@@ -1,0 +1,4 @@
+# Source: https://github.com/kastoestoramadus/hocon-fmt
+# Licence: GPL-3.0-only (new HOCON analogue)
+# Research: examples/catalogue/unresolved-merge-in-array/expected/site-default.conf
+# Input is a newly written HOCON analogue, not formatter code.

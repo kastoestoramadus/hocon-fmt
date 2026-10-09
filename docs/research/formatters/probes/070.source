@@ -1,0 +1,4 @@
+# Source: https://github.com/google/go-jsonnet
+# Licence: Apache-2.0
+# Research: config-siblings-history-tests-api.md:420
+# Input is a newly written HOCON analogue, not formatter code.

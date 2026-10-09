@@ -1,0 +1,4598 @@
+[
+  {
+    "research": "safety-and-ux.md:59",
+    "input": "x = 1",
+    "expectation": "- idempotence: `x = 1` then `x = ${?ENV}` at the root — expected `Refusal.BrokenOutput` (their class is \"the second pass differs\"; ours is the resolved banner growing).",
+    "files": [
+      "case-env-root-y.conf",
+      "case-env-root.conf",
+      "case-object-substitution-comments.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:59",
+    "input": "x = ${?ENV}",
+    "expectation": "- idempotence: `x = 1` then `x = ${?ENV}` at the root — expected `Refusal.BrokenOutput` (their class is \"the second pass differs\"; ours is the resolved banner growing).",
+    "files": [
+      "case-env-root.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:60",
+    "input": "a = 1",
+    "expectation": "- comment-loss: a one-line licence header, a blank line, then `a = 1` — expected refusal today (the 20-of-23 reference.conf shape); the playground keeps the comment, the CLI stays refused until sconfig releases the option.",
+    "files": [
+      "case-leading-no-final.conf",
+      "case-bare-cr-comment.conf",
+      "case-detached-between.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:61",
+    "input": "e = ${g} { name = \"east\" }",
+    "expectation": "- semantic-change: `e = ${g} { name = \"east\" }` — expected `Refusal.BrokenOutput`, and the same answer with `--separator :`.",
+    "files": [
+      "case-object-merge.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:121",
+    "input": "a = [1, 2]",
+    "expectation": "- idempotence: `a = [1, 2]` with a comment before the closing `]` (sconfig drops it — expect refusal, not silent loss); if a future sconfig keeps it, a second pass must be a fixed point.",
+    "files": [
+      "case-nested-inline-array.conf",
+      "111.conf",
+      "155.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:121",
+    "input": "]",
+    "expectation": "- idempotence: `a = [1, 2]` with a comment before the closing `]` (sconfig drops it — expect refusal, not silent loss); if a future sconfig keeps it, a second pass must be a fixed point.",
+    "files": [
+      "case-array-tail.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux.md:122",
+    "input": "include \"x.conf\", a = 1",
+    "expectation": "- comment-movement: `include \"x.conf\", a = 1` — expected `Refusal.MovedInclude`, never a silent swap.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "safety-and-ux.md:125",
+    "input": "path = ${path}\":d\"",
+    "expectation": "- semantic-change: `path = ${path}\":d\"` — expected `Refusal.BrokenOutput`.",
+    "files": [
+      "case-string-substitution.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux.md:185",
+    "input": "a = 1 # note",
+    "expectation": "- comment-loss: `a = 1 # note` inside an object where the comment would end up before the closing brace — expected refusal; if kept in future, a second pass must keep it in place.",
+    "files": [
+      "381.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:186",
+    "input": "x = 1",
+    "expectation": "- semantic-change: `x = 1` then `x = ${?Y}` (their shape: valid output, different program) — expected `Refusal.UnstableOutput` at the root and a banner-free refusal elsewhere.",
+    "files": [
+      "case-env-root-y.conf",
+      "case-env-root.conf",
+      "case-object-substitution-comments.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:186",
+    "input": "x = ${?Y}",
+    "expectation": "- semantic-change: `x = 1` then `x = ${?Y}` (their shape: valid output, different program) — expected `Refusal.UnstableOutput` at the root and a banner-free refusal elsewhere.",
+    "files": [
+      "case-env-root-y.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:249",
+    "input": "o { include \"x.conf\" }",
+    "expectation": "- semantic-change: `o { include \"x.conf\" }` then `o : 5` — expected `Refusal.LostInclude` (their macro class: the include must not vanish with the replaced object).",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "safety-and-ux.md:249",
+    "input": "o : 5",
+    "expectation": "- semantic-change: `o { include \"x.conf\" }` then `o : 5` — expected `Refusal.LostInclude` (their macro class: the include must not vanish with the replaced object).",
+    "files": [
+      "case-include-empty-barrier.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux.md:251",
+    "input": "include \"b.conf\"",
+    "expectation": "- include-import-analog: `include \"b.conf\"` after `a = 1` and before `a.c = 2` — expected `Refusal.MovedInclude`.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "safety-and-ux.md:251",
+    "input": "a = 1",
+    "expectation": "- include-import-analog: `include \"b.conf\"` after `a = 1` and before `a.c = 2` — expected `Refusal.MovedInclude`.",
+    "files": [
+      "case-leading-no-final.conf",
+      "case-bare-cr-comment.conf",
+      "case-detached-between.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux.md:251",
+    "input": "a.c = 2",
+    "expectation": "- include-import-analog: `include \"b.conf\"` after `a = 1` and before `a.c = 2` — expected `Refusal.MovedInclude`.",
+    "files": [
+      "case-include-precedence.conf",
+      "437.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:313",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`# banner\\n\\nkey = 1\\n`",
+    "expectation": "refuses (`LostComment`) — upstream drops it",
+    "files": [
+      "017.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:314",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`key = 1\\n# c\\n`",
+    "expectation": "refuses (`LostComment`)",
+    "files": [
+      "018.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:315",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`key = 1 # c\\n` / `key = # c\\n1\\n`",
+    "expectation": "formats",
+    "files": [
+      "019.conf",
+      "020.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:316",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`key # c\\n= 1\\n`",
+    "expectation": "formats",
+    "files": [
+      "021.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:317",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`# pre\\n{}\\n# post\\n`",
+    "expectation": "refuses (both attach to nothing)",
+    "files": [
+      "022.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:318",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`a = [\\n# pre\\n1 # post\\n]\\n`",
+    "expectation": "refuses (nothing can hold them)",
+    "files": [
+      "023.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:319",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`a = 1\\n, # c\\n`",
+    "expectation": "formats; `# c` is not attached upstream",
+    "files": [
+      "024.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:320",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`a =\\n# c\\n[]\\n`",
+    "expectation": "formats (comment attaches to `a`)",
+    "files": [
+      "025.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:321",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`\\uFEFFkey = 1\\n`, `key = \"\\uFEFFx\"\\n`",
+    "expectation": "formats; leading BOM dropped, inner kept",
+    "files": [
+      "026.conf",
+      "027.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:322",
+    "section": "### lightbend/config and ekrich/sconfig (shared design)",
+    "input": "`{ a = 1\\ninclude \"x.conf\"\\n# c\\nb = 2 }\\n`",
+    "expectation": "include masked and kept; `# c` above `b` formats, `# c` last refuses",
+    "files": [
+      "028.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:333",
+    "section": "### pyhocon",
+    "input": "`a = {\\n# c4\\nb = 1, # c5\\n}\\n`",
+    "expectation": "refuses (`# c5`)",
+    "files": [
+      "029.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:334",
+    "section": "### pyhocon",
+    "input": "`// a\\n# b\\nk = v # c\\n`",
+    "expectation": "formats (both become `#`)",
+    "files": [
+      "030.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:335",
+    "section": "### pyhocon",
+    "input": "`t = [1, # c\\n2, # d\\n3]\\n`",
+    "expectation": "refuses",
+    "files": [
+      "031.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:336",
+    "section": "### pyhocon",
+    "input": "`a = 1\\n# the end\\n`",
+    "expectation": "refuses (`LostComment`)",
+    "files": [
+      "032.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:337",
+    "section": "### pyhocon",
+    "input": "`foo = \"a\" \"b\" // c\\n`",
+    "expectation": "formats",
+    "files": [
+      "033.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:338",
+    "section": "### pyhocon",
+    "input": "`a =\\n  1\\n`",
+    "expectation": "formats",
+    "files": [
+      "034.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:339",
+    "section": "### pyhocon",
+    "input": "`animals {\\ninclude \"animals.d/cat.conf\"\\n}\\n`",
+    "expectation": "formats; include masked, its comments not read",
+    "files": [
+      "035.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:340",
+    "section": "### pyhocon",
+    "input": "`dc = { size = 6 }\\ndc-east = ${dc} { name = \"east\" }\\n`",
+    "expectation": "refuses (sconfig renders `${dc}name = east`)",
+    "files": [
+      "036.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:341",
+    "section": "### pyhocon",
+    "input": "`timeout = 10 seconds\\n`",
+    "expectation": "formats",
+    "files": [
+      "037.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:342",
+    "section": "### pyhocon",
+    "input": "`a = 1\\na = 2\\n`",
+    "expectation": "formats; duplicate report names `a`",
+    "files": [
+      "038.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:352",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`# not bound\\n\\n# bound\\nkey.more = value\\n`",
+    "expectation": "refuses (first comment)",
+    "files": [
+      "039.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:353",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`#doc\\n#more doc\\nkey = value\\n`",
+    "expectation": "formats",
+    "files": [
+      "040.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:354",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`a: 1\\nb = 2\\nc { d = 3 }\\n`",
+    "expectation": "formats (`:` → `=`)",
+    "files": [
+      "041.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:355",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`key =\\n  value\\n`",
+    "expectation": "formats",
+    "files": [
+      "042.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:356",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`include \"a.conf\",\\nb = 1\\n`",
+    "expectation": "refuses (include shares a line)",
+    "files": [
+      "043.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:357",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`a = 1,\\n`",
+    "expectation": "formats",
+    "files": [
+      "044.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:358",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`a = \"\"\"x\\n`",
+    "expectation": "refuses (`NotHocon`)",
+    "files": [
+      "045.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:359",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`a = ${?b}\\nc = ${d.e}\\n`",
+    "expectation": "formats; `${a[]}` refuses",
+    "files": [
+      "046.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:360",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`obj {\\n# c1\\n// c2\\n}\\n`",
+    "expectation": "refuses (nothing follows the comments)",
+    "files": [
+      "047.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:361",
+    "section": "### AVSystem/intellij-hocon",
+    "input": "`a = ${ ?b }\\n`",
+    "expectation": "refuses (`NotHocon`)",
+    "files": [
+      "048.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:373",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "``, `foo = 1\\n`, `\\nfoo = 1\\nbar = 1\\n`",
+    "expectation": "formats",
+    "files": [
+      "049.conf",
+      "050.conf",
+      "051.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:374",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`# c\\n\\nfoo = 1\\nbar = 1\\nb {\\na = 1\\n}\\n`",
+    "expectation": "refuses (`# c` above a blank line)",
+    "files": [
+      "052.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:375",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a = 1\\n# c\\nb = 2\\n`",
+    "expectation": "formats",
+    "files": [
+      "053.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:376",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a { } # after\\n`",
+    "expectation": "formats (comment moves above)",
+    "files": [
+      "054.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:377",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a = \"${ x }\"\\n`",
+    "expectation": "refuses (`NotHocon`: no spaces in a substitution)",
+    "files": [
+      "055.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:378",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a = [[\\n  [\\n    1\\n  ]\\n]]\\n`",
+    "expectation": "formats",
+    "files": [
+      "056.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:379",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a = 1\\nlong = 2\\n`",
+    "expectation": "formats, no alignment",
+    "files": [
+      "057.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:380",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "random bytes",
+    "expectation": "refuses (`NotHocon`), never panics",
+    "files": [
+      "case-random-bytes.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:381",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a = 1\\n\\n\\n`",
+    "expectation": "formats; output ends with one `\\n`",
+    "files": [
+      "058.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:382",
+    "section": "### hashicorp/hcl (hclwrite)",
+    "input": "`a = \"\"\"x\\ny\"\"\"\\n`",
+    "expectation": "formats; triple quotes become `\\n` escapes",
+    "files": [
+      "059.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:395",
+    "section": "### tamasfe/taplo",
+    "input": "`o {\\n# at zero\\n  a = 1\\n}\\n`",
+    "expectation": "formats",
+    "files": [
+      "060.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:396",
+    "section": "### tamasfe/taplo",
+    "input": "`a = 1 # c\\n`",
+    "expectation": "formats (moves above)",
+    "files": [
+      "061.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:397",
+    "section": "### tamasfe/taplo",
+    "input": "`# c\\na = 1\\n`",
+    "expectation": "formats",
+    "files": [
+      "062.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:398",
+    "section": "### tamasfe/taplo",
+    "input": "`a = [\\n# c\\n  1\\n]\\n`",
+    "expectation": "refuses (`LostComment`)",
+    "files": [
+      "063.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:399",
+    "section": "### tamasfe/taplo",
+    "input": "`a = [1, # x\\n2 # y\\n]\\n`",
+    "expectation": "refuses",
+    "files": [
+      "064.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:400",
+    "section": "### tamasfe/taplo",
+    "input": "`a = 1 # one\\nbb = 2 # two\\n`",
+    "expectation": "formats; alignment not offered",
+    "files": [
+      "065.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:401",
+    "section": "### tamasfe/taplo",
+    "input": "`a = [[1, 2], [3]]\\n`",
+    "expectation": "formats",
+    "files": [
+      "066.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:402",
+    "section": "### tamasfe/taplo",
+    "input": "`o {\\n  # c\\n  a = 1\\n}\\n`",
+    "expectation": "formats",
+    "files": [
+      "067.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:403",
+    "section": "### tamasfe/taplo",
+    "input": "a 200-line application.conf",
+    "expectation": "formats; a corpus gate in CI is the analogue",
+    "files": [
+      "478.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:404",
+    "section": "### tamasfe/taplo",
+    "input": "n/a (we never rename keys)",
+    "expectation": "—",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:416",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "`#\\na = 1\\n`",
+    "expectation": "formats",
+    "files": [
+      "068.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:417",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "n/a",
+    "expectation": "—",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:418",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "`a = ${b} { c = 1 }\\n`",
+    "expectation": "refused (sconfig renders `${b}c = 1`)",
+    "files": [
+      "069.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:419",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "n/a",
+    "expectation": "—",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:420",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "`# c\\n# d\\nk = v\\n`",
+    "expectation": "formats (all become `#`)",
+    "files": [
+      "070.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:421",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "`a = \"x\\\\\"y\"\\n`",
+    "expectation": "formats",
+    "files": [
+      "071.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:422",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "any",
+    "expectation": "layout is one system, not one pass",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:423",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "a reference.conf corpus",
+    "expectation": "corpus gate in CI (nixfmt runs one)",
+    "files": [
+      "499.conf",
+      "500.conf",
+      "501.conf",
+      "502.conf",
+      "503.conf",
+      "504.conf",
+      "505.conf",
+      "506.conf",
+      "507.conf",
+      "508.conf",
+      "509.conf",
+      "510.conf",
+      "511.conf",
+      "512.conf",
+      "513.conf",
+      "514.conf",
+      "515.conf",
+      "516.conf",
+      "517.conf",
+      "518.conf",
+      "519.conf",
+      "520.conf",
+      "521.conf",
+      "522.conf",
+      "523.conf",
+      "524.conf",
+      "525.conf",
+      "526.conf",
+      "527.conf",
+      "528.conf",
+      "529.conf",
+      "530.conf",
+      "531.conf",
+      "532.conf",
+      "533.conf",
+      "534.conf",
+      "535.conf",
+      "536.conf",
+      "537.conf",
+      "538.conf",
+      "539.conf",
+      "540.conf",
+      "541.conf",
+      "542.conf",
+      "543.conf",
+      "544.conf",
+      "545.conf",
+      "546.conf",
+      "547.conf",
+      "548.conf",
+      "549.conf",
+      "550.conf",
+      "551.conf",
+      "552.conf",
+      "553.conf",
+      "554.conf",
+      "555.conf",
+      "556.conf"
+    ],
+    "disposition": "All local examples/goldens; historic external corpus not available."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:424",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "an invalid file",
+    "expectation": "our refusal kinds are pinned the same way",
+    "files": [
+      "case-missing-value.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:425",
+    "section": "### google/go-jsonnet (jsonnetfmt)",
+    "input": "n/a",
+    "expectation": "`--check` + exit codes",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:439",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`o { # opener\\n# before\\na = 1 # after\\n}\\n`",
+    "expectation": "refuses (`# after`)",
+    "files": [
+      "072.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:440",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`o {\\n# c\\n}\\n`",
+    "expectation": "refuses (`LostComment`)",
+    "files": [
+      "073.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:441",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`a = [1, 2, 3]\\n`",
+    "expectation": "formats; `[1 2 3]` refuses",
+    "files": [
+      "074.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:442",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`a = 1+2\\nb = -1\\n`",
+    "expectation": "formats (`1+2` stays as written)",
+    "files": [
+      "075.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:443",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`a = 1\\n\\nb = 2\\n`",
+    "expectation": "formats; blank line dropped",
+    "files": [
+      "076.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:444",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`include \"x.conf\"\\n# c\\n`",
+    "expectation": "formats; same-line `include \"x.conf\" # c` refuses",
+    "files": [
+      "077.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:445",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`a = \"\"\"x\\n# not a comment\\n\"\"\"\\n`",
+    "expectation": "formats (comment text kept verbatim)",
+    "files": [
+      "078.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:446",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "n/a",
+    "expectation": "no version notion; one rendering",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:447",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "n/a",
+    "expectation": "—",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:448",
+    "section": "### cue-lang/cue (cue fmt)",
+    "input": "`a = -1\\n`",
+    "expectation": "formats",
+    "files": [
+      "079.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:460",
+    "section": "### NixOS/nixfmt",
+    "input": "a well-formatted app config",
+    "expectation": "already formatted",
+    "files": [
+      "149.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:461",
+    "section": "### NixOS/nixfmt",
+    "input": "`a = 1 # c\\n+ 2\\n`",
+    "expectation": "formats; comment moves above",
+    "files": [
+      "080.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:462",
+    "section": "### NixOS/nixfmt",
+    "input": "`a = 1\\n/* x\\n\\n   y */\\n`",
+    "expectation": "formats; comment text kept verbatim",
+    "files": [
+      "081.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:463",
+    "section": "### NixOS/nixfmt",
+    "input": "`a = [\\n# c\\n]\\n`",
+    "expectation": "refuses (`LostComment`)",
+    "files": [
+      "082.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:464",
+    "section": "### NixOS/nixfmt",
+    "input": "`o {\\nx = 1\\n# c\\n}\\n`",
+    "expectation": "refuses",
+    "files": [
+      "083.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:465",
+    "section": "### NixOS/nixfmt",
+    "input": "`a = 1 # c\\n`",
+    "expectation": "formats",
+    "files": [
+      "061.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:466",
+    "section": "### NixOS/nixfmt",
+    "input": "`\\n\\na = 1\\n`",
+    "expectation": "formats; leading blank lines dropped",
+    "files": [
+      "085.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:467",
+    "section": "### NixOS/nixfmt",
+    "input": "`a = 1 .b\\n`",
+    "expectation": "refuses (`NotHocon`)",
+    "files": [
+      "086.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:468",
+    "section": "### NixOS/nixfmt",
+    "input": "`o {\\na = 1\\n}\\n`",
+    "expectation": "formats (no option; style is fixed)",
+    "files": [
+      "087.conf"
+    ]
+  },
+  {
+    "research": "config-siblings-history-tests-api.md:469",
+    "section": "### NixOS/nixfmt",
+    "input": "`a = = 1\\n`",
+    "expectation": "refuses (`NotHocon`)",
+    "files": [
+      "088.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:30",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`# only a comment`",
+    "expectation": "refused `LostComment` (page fork formats it)",
+    "files": [
+      "089.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:31",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`# header` + blank + `foo = 1`",
+    "expectation": "refused (`LostComment`, blank line detaches)",
+    "files": [
+      "090.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:32",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`cache {\\n  x = 1\\n  # tail\\n}`",
+    "expectation": "refused `LostComment`",
+    "files": [
+      "091.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:33",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`a # c\\n= 1`",
+    "expectation": "pin the verdict (no attachment in sconfig's tree)",
+    "files": [
+      "092.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:34",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`s = \"\"\"a  \\n\"\"\"`",
+    "expectation": "formats, whitespace inside the string kept",
+    "files": [
+      "093.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:35",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`s = \"\"\"a\\nb\"\"\"\\n\\nx = 1`",
+    "expectation": "formats (blank line dropped)",
+    "files": [
+      "094.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:36",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`x = 1\\nx = 2`",
+    "expectation": "formats + duplicate finding",
+    "files": [
+      "095.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:37",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`a =\\t1`",
+    "expectation": "formats",
+    "files": [
+      "096.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:38",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`a = one\\n  two`",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "097.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:39",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "500-deep `a { a { … } }`",
+    "expectation": "JVM/Native: formats or refuses; Scala.js: refused ≥32 levels",
+    "files": [
+      "098.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:40",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "a 2000-char quoted value",
+    "expectation": "formats; no width option exists",
+    "files": [
+      "476.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:41",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`---\\na = 1\\n---`",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "099.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:42",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`` / `\"  \\n\\n\"`",
+    "expectation": "empty → empty (`OptionsSpec`); whitespace-only unverified",
+    "files": [
+      "049.conf",
+      "101.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:43",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`{foo}`, root array `[1,2]`",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "102.conf",
+      "103.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:44",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`a: 1` (no `\\n`)",
+    "expectation": "formats, adds the final newline",
+    "files": [
+      "104.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:45",
+    "section": "### Candidate cases (HOCON renderings are ours; source paths exist in the clone)",
+    "input": "`u = \"a\\\\b(c)\"`",
+    "expectation": "formats; escape text untouched",
+    "files": [
+      "106.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:73",
+    "section": "### Candidate cases",
+    "input": "`# c\\na = 1`",
+    "expectation": "formats",
+    "files": [
+      "107.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:74",
+    "section": "### Candidate cases",
+    "input": "`` (0 bytes)",
+    "expectation": "formats/unchanged",
+    "files": [
+      "049.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:75",
+    "section": "### Candidate cases",
+    "input": "`a = 1.5e3`",
+    "expectation": "formats → `a = 1500` (documented)",
+    "files": [
+      "109.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:76",
+    "section": "### Candidate cases",
+    "input": "`a = {b=1}`; `a = [1,2]`",
+    "expectation": "formats",
+    "files": [
+      "110.conf",
+      "111.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:77",
+    "section": "### Candidate cases",
+    "input": "`a = [1,2,]`",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "112.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:78",
+    "section": "### Candidate cases",
+    "input": "`a = 1` (no `\\n`)",
+    "expectation": "formats, adds the newline",
+    "files": [
+      "024.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:79",
+    "section": "### Candidate cases",
+    "input": "`a = { b = 1 }`",
+    "expectation": "formats (style options exist in hocon-fmt's `.hocon-fmt.conf`)",
+    "files": [
+      "115.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:80",
+    "section": "### Candidate cases",
+    "input": "`# biome-ignore format: x\\na = 1 # keep`",
+    "expectation": "no pragma exists in hocon-fmt — a missing feature, not a bug",
+    "files": [
+      "116.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:81",
+    "section": "### Candidate cases",
+    "input": "`a = undefined`?",
+    "expectation": "refused or formats; pin it",
+    "files": [
+      "117.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:82",
+    "section": "### Candidate cases",
+    "input": "`a { b { c = 1 } }` nested objects",
+    "expectation": "formats, idempotent",
+    "files": [
+      "118.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:83",
+    "section": "### Candidate cases",
+    "input": "`a = [1,\\n\\n2]`; `s = \"\"\"x\\n\"\"\" # c`",
+    "expectation": "formats; blank line dropped",
+    "files": [
+      "119.conf",
+      "120.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:113",
+    "section": "### Candidate cases",
+    "input": "`a = 1\\n\\n# last`",
+    "expectation": "refused `LostComment` (no field follows the comment)",
+    "files": [
+      "121.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:114",
+    "section": "### Candidate cases",
+    "input": "`a # c\\n= 1`",
+    "expectation": "pin the verdict (attachment gap)",
+    "files": [
+      "092.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:115",
+    "section": "### Candidate cases",
+    "input": "`# dprint-ignore\\na = [1, 2]`",
+    "expectation": "no pragma in hocon-fmt",
+    "files": [
+      "123.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:116",
+    "section": "### Candidate cases",
+    "input": "`# about b\\nb = 2`",
+    "expectation": "formats (no sorting)",
+    "files": [
+      "124.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:117",
+    "section": "### Candidate cases",
+    "input": "`a = 1.5e3`; `a = \"\\\\u0041\"`",
+    "expectation": "formats → `1500`, `A` (documented)",
+    "files": [
+      "109.conf",
+      "126.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:118",
+    "section": "### Candidate cases",
+    "input": "`a = 'x'`",
+    "expectation": "refused `NotHocon` (single quotes are not HOCON)",
+    "files": [
+      "127.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:119",
+    "section": "### Candidate cases",
+    "input": "n/a",
+    "expectation": "hocon-fmt has no range mode — recorded as missing",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:120",
+    "section": "### Candidate cases",
+    "input": "`a { b {} }`; `a = []`",
+    "expectation": "formats",
+    "files": [
+      "128.conf",
+      "129.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:121",
+    "section": "### Candidate cases",
+    "input": "`s = \"\"\"a\\nb\"\"\"`; `---\\na = 1\\n---`",
+    "expectation": "formats (escaped single line); refused `NotHocon`",
+    "files": [
+      "130.conf",
+      "099.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:122",
+    "section": "### Candidate cases",
+    "input": "analogue: an include on its own line",
+    "expectation": "formats/unchanged; include kept",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:123",
+    "section": "### Candidate cases",
+    "input": "the 1,650-file `.conf` corpus",
+    "expectation": "the harness itself is the candidate: run it and fix what it reports",
+    "files": [
+      "499.conf",
+      "500.conf",
+      "501.conf",
+      "502.conf",
+      "503.conf",
+      "504.conf",
+      "505.conf",
+      "506.conf",
+      "507.conf",
+      "508.conf",
+      "509.conf",
+      "510.conf",
+      "511.conf",
+      "512.conf",
+      "513.conf",
+      "514.conf",
+      "515.conf",
+      "516.conf",
+      "517.conf",
+      "518.conf",
+      "519.conf",
+      "520.conf",
+      "521.conf",
+      "522.conf",
+      "523.conf",
+      "524.conf",
+      "525.conf",
+      "526.conf",
+      "527.conf",
+      "528.conf",
+      "529.conf",
+      "530.conf",
+      "531.conf",
+      "532.conf",
+      "533.conf",
+      "534.conf",
+      "535.conf",
+      "536.conf",
+      "537.conf",
+      "538.conf",
+      "539.conf",
+      "540.conf",
+      "541.conf",
+      "542.conf",
+      "543.conf",
+      "544.conf",
+      "545.conf",
+      "546.conf",
+      "547.conf",
+      "548.conf",
+      "549.conf",
+      "550.conf",
+      "551.conf",
+      "552.conf",
+      "553.conf",
+      "554.conf",
+      "555.conf",
+      "556.conf"
+    ],
+    "disposition": "All local examples/goldens; historic external corpus not available."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:124",
+    "section": "### Candidate cases",
+    "input": "63-deep object; CRLF file",
+    "expectation": "JVM/Native formats (Scala.js refuses ≥32 — pin per platform); CRLF → LF",
+    "files": [
+      "480.conf",
+      "481.conf",
+      "482.conf",
+      "484.conf",
+      "485.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:148",
+    "section": "### Candidate cases",
+    "input": "`# head\\na = 1  # line\\n# tail`",
+    "expectation": "formats; the trailing comment moves above (documented)",
+    "files": [
+      "133.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:149",
+    "section": "### Candidate cases",
+    "input": "`# c\\na = 1`",
+    "expectation": "formats",
+    "files": [
+      "107.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:150",
+    "section": "### Candidate cases",
+    "input": "`---\\na = 1\\n---`",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "099.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:151",
+    "section": "### Candidate cases",
+    "input": "`s = \"\"\"a\\n\\nb\"\"\"`",
+    "expectation": "formats",
+    "files": [
+      "136.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:152",
+    "section": "### Candidate cases",
+    "input": "`a = ${b}` (closest analogue)",
+    "expectation": "formats",
+    "files": [
+      "137.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:153",
+    "section": "### Candidate cases",
+    "input": "`include \"defaults.conf\"` (merge analogue)",
+    "expectation": "formats (include masked and restored)",
+    "files": [
+      "138.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:154",
+    "section": "### Candidate cases",
+    "input": "`a = [\\n1,\\n2\\n]`",
+    "expectation": "formats",
+    "files": [
+      "139.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:155",
+    "section": "### Candidate cases",
+    "input": "100 KB single-line value",
+    "expectation": "formats (performance case for `scripts/bench.py`)",
+    "files": [
+      "477.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:156",
+    "section": "### Candidate cases",
+    "input": "`# only a comment`",
+    "expectation": "refused `LostComment`",
+    "files": [
+      "089.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:157",
+    "section": "### Candidate cases",
+    "input": "`s = \"\"\"a\\nb\"\"\"`",
+    "expectation": "formats to an escaped single line (documented)",
+    "files": [
+      "130.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:158",
+    "section": "### Candidate cases",
+    "input": "`s = \"\"\"a  \\n\"\"\"`",
+    "expectation": "formats",
+    "files": [
+      "093.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:159",
+    "section": "### Candidate cases",
+    "input": "`a = [1, 2, ]`",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "143.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:184",
+    "section": "### Candidate cases",
+    "input": "`# header\\n\\na = 1`",
+    "expectation": "refused `LostComment` on released sconfig (blank line detaches)",
+    "files": [
+      "144.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:185",
+    "section": "### Candidate cases",
+    "input": "`a = 1`; `a = [1, 2]`",
+    "expectation": "formats",
+    "files": [
+      "024.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:186",
+    "section": "### Candidate cases",
+    "input": "a syntax sconfig does not know",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "case-missing-value.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:187",
+    "section": "### Candidate cases",
+    "input": "`a =` (no value)",
+    "expectation": "refused `NotHocon`",
+    "files": [
+      "147.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:188",
+    "section": "### Candidate cases",
+    "input": "`a = [1, # c\\n2]`",
+    "expectation": "formats or refuses; pin the verdict",
+    "files": [
+      "148.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:189",
+    "section": "### Candidate cases",
+    "input": "blank lines before the first key",
+    "expectation": "formats (blank lines dropped)",
+    "files": [
+      "case-leading-no-final.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:190",
+    "section": "### Candidate cases",
+    "input": "`a = 1\\n`",
+    "expectation": "unchanged, not rewritten (verdict)",
+    "files": [
+      "149.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:191",
+    "section": "### Candidate cases",
+    "input": "`--stdin-filepath` (hocon-fmt: missing)",
+    "expectation": "feature gap recorded",
+    "files": [],
+    "disposition": "Not a runnable HOCON input: filesystem setup stdin-filename-no-lookup confirms diagnostic-only name."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:219",
+    "section": "### Candidate cases",
+    "input": "`a=1`, `a :1`",
+    "expectation": "formats (`:`→`=`, spacing)",
+    "files": [
+      "151.conf",
+      "152.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:220",
+    "section": "### Candidate cases",
+    "input": "`a {\\nb = 1\\n}`",
+    "expectation": "formats (sconfig decides indent)",
+    "files": [
+      "153.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:221",
+    "section": "### Candidate cases",
+    "input": "`a = [1\\n, 2]`",
+    "expectation": "formats; arrays re-rendered",
+    "files": [
+      "154.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:222",
+    "section": "### Candidate cases",
+    "input": "a 300-char value line",
+    "expectation": "formats; sconfig does not wrap",
+    "files": [
+      "case-long-300.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:223",
+    "section": "### Candidate cases",
+    "input": "`a = [1,\\n2]`",
+    "expectation": "formats; second pass stable (`UnstableOutput` guard)",
+    "files": [
+      "155.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:224",
+    "section": "### Candidate cases",
+    "input": "`a = 1` (no `\\n`); `a { x = 1\\n\\n\\n}`",
+    "expectation": "formats, adds newline; blank lines dropped",
+    "files": [
+      "158.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:225",
+    "section": "### Candidate cases",
+    "input": "(none in hocon-fmt)",
+    "expectation": "formats; pragma support is a possible later feature",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:226",
+    "section": "### Candidate cases",
+    "input": "n/a: one policy, unstable output refused",
+    "expectation": "—",
+    "files": [],
+    "disposition": "Not a runnable HOCON case: unsupported API/range/edit operation. See REPORT recommendations."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:227",
+    "section": "### Candidate cases",
+    "input": "`a = ${b} ${c}`",
+    "expectation": "formats; env-override files refused (documented)",
+    "files": [
+      "159.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:228",
+    "section": "### Candidate cases",
+    "input": "the `.conf` corpus from docs/limitations.md",
+    "expectation": "run the corpus; record refusals per kind",
+    "files": [
+      "499.conf",
+      "500.conf",
+      "501.conf",
+      "502.conf",
+      "503.conf",
+      "504.conf",
+      "505.conf",
+      "506.conf",
+      "507.conf",
+      "508.conf",
+      "509.conf",
+      "510.conf",
+      "511.conf",
+      "512.conf",
+      "513.conf",
+      "514.conf",
+      "515.conf",
+      "516.conf",
+      "517.conf",
+      "518.conf",
+      "519.conf",
+      "520.conf",
+      "521.conf",
+      "522.conf",
+      "523.conf",
+      "524.conf",
+      "525.conf",
+      "526.conf",
+      "527.conf",
+      "528.conf",
+      "529.conf",
+      "530.conf",
+      "531.conf",
+      "532.conf",
+      "533.conf",
+      "534.conf",
+      "535.conf",
+      "536.conf",
+      "537.conf",
+      "538.conf",
+      "539.conf",
+      "540.conf",
+      "541.conf",
+      "542.conf",
+      "543.conf",
+      "544.conf",
+      "545.conf",
+      "546.conf",
+      "547.conf",
+      "548.conf",
+      "549.conf",
+      "550.conf",
+      "551.conf",
+      "552.conf",
+      "553.conf",
+      "554.conf",
+      "555.conf",
+      "556.conf"
+    ],
+    "disposition": "All local examples/goldens; historic external corpus not available."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:229",
+    "section": "### Candidate cases",
+    "input": "`x = 1  //c`; an include beside a field",
+    "expectation": "comment multiset check; `MovedInclude` refusal",
+    "files": [
+      "161.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:258",
+    "section": "### Candidate cases",
+    "input": "`# top` / `a = 1` / `# end`",
+    "expectation": "refused `LostComment` (trailing comment)",
+    "files": [
+      "162.conf",
+      "164.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:259",
+    "section": "### Candidate cases",
+    "input": "`a { x = 1 # c\\n y = 2 }`",
+    "expectation": "formats",
+    "files": [
+      "165.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:260",
+    "section": "### Candidate cases",
+    "input": "a multi-line `#` comment",
+    "expectation": "formats; text verbatim",
+    "files": [
+      "166.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:261",
+    "section": "### Candidate cases",
+    "input": "`# a --> b`",
+    "expectation": "formats",
+    "files": [
+      "167.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:262",
+    "section": "### Candidate cases",
+    "input": "`a = 1\\n\\n\\nb = 2`",
+    "expectation": "formats; blank lines dropped",
+    "files": [
+      "168.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:263",
+    "section": "### Candidate cases",
+    "input": "CRLF file with trailing spaces",
+    "expectation": "formats; endings normalised",
+    "files": [
+      "463.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:264",
+    "section": "### Candidate cases",
+    "input": "BOM-prefixed CRLF file with unicode keys",
+    "expectation": "formats; BOM dropped",
+    "files": [
+      "case-bom-unicode-crlf.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:265",
+    "section": "### Candidate cases",
+    "input": "`s = \"\"`; `s = \"\"\"a\"\"\"\"\"\"b\"\"\"`",
+    "expectation": "formats; adjacent blobs refused or formats — pin it",
+    "files": [
+      "169.conf",
+      "170.conf"
+    ]
+  },
+  {
+    "research": "data-markup-history-tests-api.md:266",
+    "section": "### Candidate cases",
+    "input": "long quoted value with escapes",
+    "expectation": "formats; escape text untouched",
+    "files": [
+      "case-long-escapes.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:267",
+    "section": "### Candidate cases",
+    "input": "Latin-1 bytes in a `.conf`",
+    "expectation": "refused `NotUtf8`",
+    "files": [
+      "case-latin1.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup-history-tests-api.md:268",
+    "section": "### Candidate cases",
+    "input": "`a = {}`",
+    "expectation": "formats",
+    "files": [
+      "172.conf"
+    ]
+  },
+  {
+    "research": "data-markup.md:47",
+    "input": "a = 1 # trailing",
+    "expectation": "- comment-loss: `a = 1 # trailing`, and a file holding only `# c`. Expected: comment kept, or `LostComment` — never a silent drop.",
+    "files": [
+      "425.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:47",
+    "input": "# c",
+    "expectation": "- comment-loss: `a = 1 # trailing`, and a file holding only `# c`. Expected: comment kept, or `LostComment` — never a silent drop.",
+    "files": [
+      "case-unknown-comment-only.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:48",
+    "input": "# why",
+    "expectation": "- comment-movement: `# why` above `b = 2`, and a comment after the last field. Expected: comment stays above `b`, or refusal (the known blank-line gap).",
+    "files": [
+      "case-nested-comment.conf",
+      "293.conf",
+      "382.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:48",
+    "input": "b = 2",
+    "expectation": "- comment-movement: `# why` above `b = 2`, and a comment after the last field. Expected: comment stays above `b`, or refusal (the known blank-line gap).",
+    "files": [
+      "case-detached-between.conf",
+      "case-style-four.conf",
+      "case-comments-tabs-crlf.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:51",
+    "input": "{ \"a\": 1 } // note",
+    "expectation": "- parse-error-handling: `{ \"a\": 1 } // note` named `x.conf`. Expected: `NotHocon` refusal, file untouched, run exits 0.",
+    "files": [
+      "case-json-conf.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:99",
+    "input": "# only a comment",
+    "expectation": "- comment-loss: `# only a comment` in a file, and `o { # nothing }`. Expected: `LostComment` refusal, file untouched.",
+    "files": [
+      "089.conf"
+    ]
+  },
+  {
+    "research": "data-markup.md:99",
+    "input": "o { # nothing }",
+    "expectation": "- comment-loss: `# only a comment` in a file, and `o { # nothing }`. Expected: `LostComment` refusal, file untouched.",
+    "files": [
+      "case-comment-only-unclosed-object.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:100",
+    "input": "o { include \"x.conf\" }",
+    "expectation": "- include-import-analog: `o { include \"x.conf\" }` as the object's only content, then `o : 5`. Expected: `LostInclude` — already a suite entry; re-run as a release gate.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup.md:100",
+    "input": "o : 5",
+    "expectation": "- include-import-analog: `o { include \"x.conf\" }` as the object's only content, then `o : 5`. Expected: `LostInclude` — already a suite entry; re-run as a release gate.",
+    "files": [
+      "case-include-empty-barrier.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:102",
+    "input": "a = [1, 2] # c",
+    "expectation": "- idempotence: `a = [1, 2] # c` before the closing brace, twice. Expected: fixed point.",
+    "files": [
+      "case-nested-inline-array.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:140",
+    "input": "o { include \"x.conf\" }",
+    "expectation": "- include-import-analog: `o { include \"x.conf\" }` then `o : 5` (already `LostInclude`); confirm exit code stays 0.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup.md:140",
+    "input": "o : 5",
+    "expectation": "- include-import-analog: `o { include \"x.conf\" }` then `o : 5` (already `LostInclude`); confirm exit code stays 0.",
+    "files": [
+      "case-include-empty-barrier.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:141",
+    "input": "{ \"a\": 1 } // c",
+    "expectation": "- comment-loss analog: `{ \"a\": 1 } // c` as `x.json` and as `x.conf`. Expected: `OtherFormat` and `NotHocon` respectively, no writes.",
+    "files": [
+      "case-json-end-comment.conf"
+    ],
+    "disposition": "JSON-named variants are separately recorded; this is the conf-named variant."
+  },
+  {
+    "research": "data-markup.md:185",
+    "input": "simplify-nested-objects = false",
+    "expectation": "- idempotence: a comment above a field inside an object under `simplify-nested-objects = false`, twice. Expected: fixed point.",
+    "files": [
+      "case-nested-kept.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:271",
+    "input": "include \"a.conf\"",
+    "expectation": "- include-import-analog: `include \"a.conf\"` where a sibling field defines the same key, so the include loses silently. Expected: the documented refusal list stays as documented.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "data-markup.md:324",
+    "input": "a = 1",
+    "expectation": "- comment-loss: `a = 1`, blank line, `# c`, `b = 2` (the #4620 pattern). Expected: `LostComment` today; the test documents the gap.",
+    "files": [
+      "case-leading-no-final.conf",
+      "case-bare-cr-comment.conf",
+      "case-detached-between.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:324",
+    "input": "# c",
+    "expectation": "- comment-loss: `a = 1`, blank line, `# c`, `b = 2` (the #4620 pattern). Expected: `LostComment` today; the test documents the gap.",
+    "files": [
+      "case-unknown-comment-only.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:324",
+    "input": "b = 2",
+    "expectation": "- comment-loss: `a = 1`, blank line, `# c`, `b = 2` (the #4620 pattern). Expected: `LostComment` today; the test documents the gap.",
+    "files": [
+      "case-detached-between.conf",
+      "case-style-four.conf",
+      "case-comments-tabs-crlf.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:325",
+    "input": "o = { a = 1 # c\\n }",
+    "expectation": "- idempotence: `o = { a = 1 # c\\n }`, twice. Expected: identical.",
+    "files": [
+      "case-nested-inline-array.conf"
+    ],
+    "disposition": "Nested inline array comment variant; simple nested inline comment also in 191.conf."
+  },
+  {
+    "research": "data-markup.md:376",
+    "input": "a = [ 1 # c\\n ]",
+    "expectation": "- comment-movement: `a = [ 1 # c\\n ]` and a comment before a closing brace. Expected: no displacement, or refusal.",
+    "files": [
+      "case-array-position.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:377",
+    "input": "a.b.c = 1",
+    "expectation": "- idempotence: `a.b.c = 1` with comments before and after, a `+=` append and a nested object; twice. Expected: pass two equals pass one.",
+    "files": [
+      "case-append-comment-path.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "data-markup.md:377",
+    "input": "+=",
+    "expectation": "- idempotence: `a.b.c = 1` with comments before and after, a `+=` append and a nested object; twice. Expected: pass two equals pass one.",
+    "files": [
+      "case-append-comment-path.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "data-markup.md:378",
+    "input": "a = \"unterminated",
+    "expectation": "- parse-error-handling: `a = \"unterminated` — expected `NotHocon`, run exits 0. Note that the \"unparsable section\" concept has no HOCON analog: we refuse the file instead.",
+    "files": [
+      "195.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics-history-tests-api.md:63",
+    "section": "## gofmt",
+    "input": "`# banner` + blank + `foo = 1` + blank + `# tail`",
+    "expectation": "refuses: the trailing comment attaches to no field (`LostComment`)",
+    "files": [
+      "196.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:64",
+    "section": "## gofmt",
+    "input": "`a = 1 # t` / `obj { x = 1 # in` / `  // lone` / `}`",
+    "expectation": "refuses: in-object lone comment and EOF comment; otherwise formats",
+    "files": [
+      "197.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:65",
+    "section": "## gofmt",
+    "input": "`list = [` / `  # one` / `  1` / `  # two` / `  2` / `]`",
+    "expectation": "refuses: a comment before `]` has no field",
+    "files": [
+      "198.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:66",
+    "section": "## gofmt",
+    "input": "`# - one` / `# - two` / `key = 1`",
+    "expectation": "unchanged: never rewrite comment bytes, even list layout",
+    "files": [
+      "199.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:67",
+    "section": "## gofmt",
+    "input": "`include \"base.conf\"` / `zone = \"us\"`",
+    "expectation": "formats when the include keeps position; `MovedInclude` if a later key would cross it",
+    "files": [
+      "200.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:68",
+    "section": "## gofmt",
+    "input": "`list = [1, 2, 3,]`",
+    "expectation": "formats (trailing comma is HOCON-legal); must be a fixed point",
+    "files": [
+      "201.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:69",
+    "section": "## gofmt",
+    "input": "`shortKey = 1` / `muchLongerKey = 2` / `third = 3`",
+    "expectation": "formats without alignment; any alignment must be idempotent and opt-in",
+    "files": [
+      "202.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:70",
+    "section": "## gofmt",
+    "input": "`a = 1\\r\\nb = 2\\r\\n`; `\\uFEFFa = 1`; no final `\\n`",
+    "expectation": "formats to LF + one final newline; BOM at start stripped, elsewhere refused",
+    "files": [
+      "203.conf",
+      "204.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:71",
+    "section": "## gofmt",
+    "input": "`s = \"\"\"` / `  line1` / blank / `  line3\"\"\"`",
+    "expectation": "formats outside the string; `\"\"\"` interior byte-identical",
+    "files": [
+      "206.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:72",
+    "section": "## gofmt",
+    "input": "`a = ${b}` / `b = ${a}` (cycle)",
+    "expectation": "refuses: sconfig renders an unstable banner (`UnstableOutput`) — do not copy the skip habit",
+    "files": [
+      "207.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:73",
+    "section": "## gofmt",
+    "input": "read-only `a = 1`; `link.conf -> a.conf`",
+    "expectation": "refuses the write untouched; formats the target through a symlink; tested end-to-end",
+    "files": [],
+    "disposition": "Not a runnable standalone text input: filesystem-actual.json read-only and symlink cases exercise this setup."
+  },
+  {
+    "research": "language-classics-history-tests-api.md:100",
+    "section": "## rustfmt",
+    "input": "`# before` / `a {  // after brace` / `  b = 1  # trailing` / `  /* between fields */` / `  c = 2` / `}` / `// after close`",
+    "expectation": "formats; every comment kept verbatim, only indentation may change; one pass",
+    "files": [
+      "210.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:101",
+    "section": "## rustfmt",
+    "input": "`# note\\r\\na = 1\\r\\n`",
+    "expectation": "formats; EOL policy honoured; second pass byte-identical",
+    "files": [
+      "211.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:102",
+    "section": "## rustfmt",
+    "input": "empty; whitespace-only",
+    "expectation": "unchanged; `--check` exit 0; no newline invented",
+    "files": [
+      "101.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics-history-tests-api.md:103",
+    "section": "## rustfmt",
+    "input": "`/* note` / `*/` / `a = 1`",
+    "expectation": "one-pass fixed point; explicit `format(format(x)) == format(x)`",
+    "files": [
+      "212.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:104",
+    "section": "## rustfmt",
+    "input": "`ключ = 1        # значение` / `鍵 = \"値\"   // комментарий`",
+    "expectation": "formats; never slices mid-codepoint; comment bytes unchanged",
+    "files": [
+      "213.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:105",
+    "section": "## rustfmt",
+    "input": "`s = \"a\\u{00A0}b\\u{2028}c\"`",
+    "expectation": "byte-identical inside the string; no unicode folding",
+    "files": [
+      "214.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:106",
+    "section": "## rustfmt",
+    "input": "`a = 1 // note,` / `b = 2 // note =>`",
+    "expectation": "comment text verbatim; separators never inserted into a comment",
+    "files": [
+      "215.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:107",
+    "section": "## rustfmt",
+    "input": "`include /* why */ \"x.conf\"` / `a   =   1`",
+    "expectation": "formats; masking never assumes adjacency",
+    "files": [
+      "216.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:108",
+    "section": "## rustfmt",
+    "input": "`a.b = 1` then `a.b = 2`; the same `include \"x.conf\"` twice",
+    "expectation": "both definitions/includes kept (or refused); never one dropped per pass",
+    "files": [
+      "217.conf",
+      "218.conf",
+      "219.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:109",
+    "section": "## rustfmt",
+    "input": "keys `Z`, `a`, `_A`, `a1` with \"order keys\"",
+    "expectation": "sorts only under a total order; falls back to input order, never panics",
+    "files": [
+      "220.conf",
+      "221.conf",
+      "222.conf",
+      "223.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:110",
+    "section": "## rustfmt",
+    "input": "`b = 1` / `# note` / `include \"z.conf\"` / `a = 2`",
+    "expectation": "unchanged unless reordering is asked for; comments stay with their include",
+    "files": [
+      "224.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:111",
+    "section": "## rustfmt",
+    "input": "`a = 1 /* c */ + 2` (comment inside a concatenation)",
+    "expectation": "refuses that construct, returns the original text, warns, and does not fail the run by default",
+    "files": [
+      "225.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:138",
+    "section": "## Black",
+    "input": "`# Licence, many lines` / `# …` / blank / `app.name = \"svc\"  # trailing note`",
+    "expectation": "refuses: the blank line detaches the banner (`LostComment`); without the blank line, formats",
+    "files": [
+      "226.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:139",
+    "section": "## Black",
+    "input": "`db { # opening` / `  url = \"jdbc:…\"` / `}`",
+    "expectation": "formats: a comment after `{` belongs to the field that follows and survives verbatim",
+    "files": [
+      "227.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:140",
+    "section": "## Black",
+    "input": "`#\\u00a0indent is a NBSP` / `port = 8080`",
+    "expectation": "formats: comment text carried as bytes, no whitespace rewriting inside it",
+    "files": [
+      "228.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:141",
+    "section": "## Black",
+    "input": "`zone = [` / `  \"a\"` / `  # last inner` / `]  # trailing`",
+    "expectation": "refuses: a comment before the closing `]` belongs to no field",
+    "files": [
+      "229.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:142",
+    "section": "## Black",
+    "input": "`app {` / `  name = \"svc\"` / blank / `  # about the port` / `  port = 8080` / `}`",
+    "expectation": "formats, and the blank line is lost (sconfig keeps none — the known normalisation); also the blank-line-detaches-comment defect",
+    "files": [
+      "230.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:143",
+    "section": "## Black",
+    "input": "spaces/tabs/newlines only",
+    "expectation": "formats to empty text; empty input is a fixed point",
+    "files": [
+      "101.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics-history-tests-api.md:144",
+    "section": "## Black",
+    "input": "`port = 8080` with no trailing newline",
+    "expectation": "formats; the final newline is a pinned render option; a comment with no field after it is `LostComment`",
+    "files": [
+      "231.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:145",
+    "section": "## Black",
+    "input": "`# comment<FF>` / `port = 8080`",
+    "expectation": "formats: the FF is inside the comment and carried; an FF after the last field goes with the comment block and is refused",
+    "files": [
+      "232.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:146",
+    "section": "## Black",
+    "input": "`na\\u00efve = 1` / `ключ = \"caf\\\\u00e9\"`",
+    "expectation": "formats; `\\u00e9` keeps its value — worth a golden",
+    "files": [
+      "233.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:147",
+    "section": "## Black",
+    "input": "`# hocon-fmt: off` / `  port=  8080` / `# hocon-fmt: on`",
+    "expectation": "refuses today (nothing carried verbatim); each pragma form is a case the feature must answer for",
+    "files": [
+      "234.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:148",
+    "section": "## Black",
+    "input": "`zone = \"us\", zone = \"eu\"` on one line",
+    "expectation": "formats **with a duplicate warning**; `--fail-on-duplicates` exits 1; a layout moving one across an include is `MovedInclude`",
+    "files": [
+      "235.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:149",
+    "section": "## Black",
+    "input": "same file with only `port` reformatted",
+    "expectation": "no analogue today (whole-file); records what a partial option must preserve outside the range",
+    "files": [
+      "236.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:176",
+    "section": "## ruff format",
+    "input": "`# fmt: off` / `a  =  1   # keep` / `# fmt: on` / `b   =   2`",
+    "expectation": "with the pragma feature: bytes inside identical, `b = 2` reformatted",
+    "files": [
+      "237.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:177",
+    "section": "## ruff format",
+    "input": "`# fmt: off` / `a  =  1`",
+    "expectation": "unchanged after the pragma",
+    "files": [
+      "238.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:178",
+    "section": "## ruff format",
+    "input": "`a=1,b=2  # fmt: skip`",
+    "expectation": "unchanged including spacing; other lines formatted",
+    "files": [
+      "239.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:179",
+    "section": "## ruff format",
+    "input": "`a =  1  # fmt: skip because generated`",
+    "expectation": "first unchanged; the unsupported form decided and documented, not guessed",
+    "files": [
+      "240.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:180",
+    "section": "## ruff format",
+    "input": "`#\\| table: x` / `#!env` / `k=1`",
+    "expectation": "formats `k = 1`; comment bodies byte-identical",
+    "files": [
+      "241.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:181",
+    "section": "## ruff format",
+    "input": "`#\\tTabbed` / `a = 1\\t#\\tTabbed`",
+    "expectation": "comment bodies byte-identical (no tab→space)",
+    "files": [
+      "242.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:182",
+    "section": "## ruff format",
+    "input": "`{  # open` / ` key# k` / ` : # c` / ` value# v` / `} # close`",
+    "expectation": "formats the layout, keeps all five comments on the same tokens",
+    "files": [
+      "243.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:183",
+    "section": "## ruff format",
+    "input": "`# c\\r\\n` / `a = \"\"\"l1\\r\\n` / `l2\"\"\"\\r\\n`",
+    "expectation": "formats; EOL policy honoured; string interior byte-preserved",
+    "files": [
+      "244.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:184",
+    "section": "## ruff format",
+    "input": "empty file; spaces with no newline; `\\n`; `\\n\\n\\n`",
+    "expectation": "empty → empty; whitespace-only → unchanged; never silently delete the only bytes",
+    "files": [
+      "246.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:185",
+    "section": "## ruff format",
+    "input": "`# only a comment` (no `\\n`)",
+    "expectation": "formats (adds the final newline); the comment survives",
+    "files": [
+      "089.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:186",
+    "section": "## ruff format",
+    "input": "`a = 1` + 4 blank lines + `b = 2`",
+    "expectation": "formats; collapse to the pinned count",
+    "files": [
+      "249.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:187",
+    "section": "## ruff format",
+    "input": "`a = \"x<0x0B>y\"`",
+    "expectation": "formats key/spacing; quoted-value bytes untouched",
+    "files": [
+      "250.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:188",
+    "section": "## ruff format",
+    "input": "`a { # only` / `}` and `a {} # only`",
+    "expectation": "formats; the two forms must not oscillate",
+    "files": [
+      "251.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:189",
+    "section": "## ruff format",
+    "input": "`a = 1` / `<0x0C>` / `b = 2`",
+    "expectation": "formatted; the form feed preserved or refused, never dropped",
+    "files": [
+      "252.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:190",
+    "section": "## ruff format",
+    "input": "`a = \"x\"  # c` / `    \"y\"`",
+    "expectation": "refuses: with no safe place for the comment, refusal beats moving it",
+    "files": [
+      "253.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:191",
+    "section": "## ruff format",
+    "input": "`a = 'x'`",
+    "expectation": "formats spacing per config; the default must be preserve",
+    "files": [
+      "127.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:218",
+    "section": "## scalafmt",
+    "input": "`a {` / `  # lead` / `  b = 1 # trail` / `  c = [1, # one` / `       2]` / `}`",
+    "expectation": "formats; every comment in place and verbatim",
+    "files": [
+      "255.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:219",
+    "section": "## scalafmt",
+    "input": "`a {` / `  # format: off` / `  b=1     # keep   this` / `  # format: on` / `  c=2` / `}`",
+    "expectation": "with the feature, the region is byte-identical; refuse if that cannot be guaranteed",
+    "files": [
+      "256.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:220",
+    "section": "## scalafmt",
+    "input": "`# block of #` / `#` / `# markdown-ish text` / `a = 1`",
+    "expectation": "comment text and `#` layout unchanged",
+    "files": [
+      "257.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:221",
+    "section": "## scalafmt",
+    "input": "`s = \"\"\"` / `  \\| line two` / `  \"\"\"`",
+    "expectation": "never touch string interior bytes; unchanged",
+    "files": [
+      "258.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:222",
+    "section": "## scalafmt",
+    "input": "`a { b { c = 1 } # inner` / `}` / `outer = 1`",
+    "expectation": "no delimiter deleted; the comment stays with the inner object",
+    "files": [
+      "259.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:223",
+    "section": "## scalafmt",
+    "input": "`b = 1 # first` / `# note` / `a = 2` / `b = 3 # last wins`",
+    "expectation": "order preserved (duplicate keys carry meaning); comments stay with their line",
+    "files": [
+      "260.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:224",
+    "section": "## scalafmt",
+    "input": "`s = \"\"\"short line` / long line `…\"\"\"`",
+    "expectation": "unchanged; no rewrap of literal content",
+    "files": [
+      "261.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:225",
+    "section": "## scalafmt",
+    "input": "`s = \"\\u00e9\"` / `# é and \\u000A inside a comment`",
+    "expectation": "unchanged; refuse if a comment escape would change tokenization",
+    "files": [
+      "262.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:226",
+    "section": "## scalafmt",
+    "input": "`a = {` / `b = 1` / blank / `c = 2 }`",
+    "expectation": "formats without losing the blank-line structure",
+    "files": [
+      "263.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:227",
+    "section": "## scalafmt",
+    "input": "`l = [1, 2, 3,]`",
+    "expectation": "if sconfig rejects the trailing comma: refuse; never add or remove silently",
+    "files": [
+      "264.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:228",
+    "section": "## scalafmt",
+    "input": "`a = 1E3` / `b = 0x10`",
+    "expectation": "number spelling untouched (HOCON number text is meaning)",
+    "files": [
+      "265.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:229",
+    "section": "## scalafmt",
+    "input": "`a=1` / `b={c=2}`",
+    "expectation": "`format(format(x)) == format(x)`",
+    "files": [
+      "266.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:230",
+    "section": "## scalafmt",
+    "input": "`\"\"`, `\"  \\n  \\n\"`; a whole CRLF file",
+    "expectation": "no crash; one pinned policy; CRLF preserved under `keep`, never mixed EOLs",
+    "files": [
+      "049.conf",
+      "268.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:231",
+    "section": "## scalafmt",
+    "input": "`a = 1` vs `a=1`",
+    "expectation": "masked parse of output == input; includes unchanged",
+    "files": [
+      "151.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:258",
+    "section": "## google-java-format",
+    "input": "`a = 1 // one` / `//  two` / `//  three` / `b = 2`",
+    "expectation": "formats; comment prefixes kept, continuation re-indented consistently",
+    "files": [
+      "271.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:259",
+    "section": "## google-java-format",
+    "input": "`x {` / `  // first` / `  a = 1` / `  b = 2  // after` / `}`",
+    "expectation": "formats; each comment stays attached to the member it precedes/follows",
+    "files": [
+      "272.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:260",
+    "section": "## google-java-format",
+    "input": "`x {` / `  // note` / `  a = 1` / `}` / `// trailing`",
+    "expectation": "formats; comment lines between members preserved",
+    "files": [
+      "273.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:261",
+    "section": "## google-java-format",
+    "input": "`x {` / `  a = 1` / `  // doc` / `  b = 1` / blank / `}`",
+    "expectation": "formats; blank-line-before-comment is policy and must be pinned by goldens",
+    "files": [
+      "274.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:262",
+    "section": "## google-java-format",
+    "input": "`f(/* a= */ 1)` / `list = [1, /* b= */ 2]`",
+    "expectation": "formats; comment text verbatim (no canonical spacing) or refuse; never drop tokens",
+    "files": [
+      "275.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:263",
+    "section": "## google-java-format",
+    "input": "`s = \"\"\"` / `  hello` / `  \"\"\"`",
+    "expectation": "formats; a comment never merges into a multi-line string; break between comment and `\"\"\"`",
+    "files": [
+      "276.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:264",
+    "section": "## google-java-format",
+    "input": "`s = \"\"\"` / `    kept` / `  \"\"\"`",
+    "expectation": "unchanged inside the string; only the whole value's position may move",
+    "files": [
+      "277.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:265",
+    "section": "## google-java-format",
+    "input": "`s = \"\"\"` / `  foo\\` / `  bar \"\"\"`",
+    "expectation": "unchanged or refused; the trailing space before the delimiter is value data",
+    "files": [
+      "278.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:266",
+    "section": "## google-java-format",
+    "input": "`bar = \"\"\"` / `    bar\\` / `     bar\"\"\"`",
+    "expectation": "unchanged; refuse if byte equality of the value cannot be proven",
+    "files": [
+      "279.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:267",
+    "section": "## google-java-format",
+    "input": "`s = \"a very long … value\"`",
+    "expectation": "unchanged (HOCON has no concatenation) or refuse to split; never introduce escapes silently",
+    "files": [
+      "280.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:268",
+    "section": "## google-java-format",
+    "input": "`a = [1, 2, ]` / `b = 1`",
+    "expectation": "formats; trailing separator policy is a documented normalisation",
+    "files": [
+      "281.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:269",
+    "section": "## google-java-format",
+    "input": "duplicate keys `a = 1`, `a = 2`",
+    "expectation": "unchanged order; no sorting pass; duplicates reported, never reordered",
+    "files": [
+      "283.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:270",
+    "section": "## google-java-format",
+    "input": "`# doc block` / `// line comment`",
+    "expectation": "formats with a declared margin policy; interior text preserved",
+    "files": [
+      "284.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:271",
+    "section": "## google-java-format",
+    "input": "`a = 1` with no `\\n`",
+    "expectation": "formats; final-newline policy explicit and nothing else changes",
+    "files": [
+      "024.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics-history-tests-api.md:272",
+    "section": "## google-java-format",
+    "input": "`a = 1 // x\\u2009`",
+    "expectation": "formats; unicode whitespace in comments handled deliberately, not by `trim()`",
+    "files": [
+      "287.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:273",
+    "section": "## google-java-format",
+    "input": "empty file; `{}`",
+    "expectation": "unchanged (empty for empty); no synthetic newline",
+    "files": [
+      "288.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:301",
+    "section": "## clang-format",
+    "input": "`a = 1 b { c = 2 }` scrambled from `a = 1` / `b { c = 2 }`",
+    "expectation": "formats to the same bytes as the sound input; if unparsable, refuses",
+    "files": [
+      "289.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:302",
+    "section": "## clang-format",
+    "input": "`a=1 # x`",
+    "expectation": "idempotent; second run a no-op",
+    "files": [
+      "290.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:303",
+    "section": "## clang-format",
+    "input": "`a=1` + 5 blank lines + `# c` + `b=2`",
+    "expectation": "blank-line collapse is a documented normalisation; the comment survives",
+    "files": [
+      "291.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:304",
+    "section": "## clang-format",
+    "input": "`a=1` / blank / `b=2`",
+    "expectation": "collapse, but never merge an `include` or a section boundary a blank line separated",
+    "files": [
+      "292.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:305",
+    "section": "## clang-format",
+    "input": "`a=1` / blank / `# why` / blank / `b=2`",
+    "expectation": "formats; comment order and attachment unchanged, blank lines clamped not removed around it",
+    "files": [
+      "293.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:306",
+    "section": "## clang-format",
+    "input": "`s = \"abc\\` / `def\"`",
+    "expectation": "unchanged: the splice is inside the string's lexical content; nothing reflows it",
+    "files": [
+      "294.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:307",
+    "section": "## clang-format",
+    "input": "`s = \"\"\"line 1` / `   line 2\"\"\"`",
+    "expectation": "interior unchanged; only the whole value's placement, else refuse",
+    "files": [
+      "295.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:308",
+    "section": "## clang-format",
+    "input": "`s = \"\"\"` / blank / `  text` / `  \"\"\"`",
+    "expectation": "unchanged: leading blank lines are data, not layout",
+    "files": [
+      "296.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:309",
+    "section": "## clang-format",
+    "input": "`a {` / `  b=1` / `  # end note` / `}`",
+    "expectation": "formats; the comment stays before `}`, never re-attached to `b`",
+    "files": [
+      "297.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:310",
+    "section": "## clang-format",
+    "input": "`a=1` / blank / `# last` (no final newline)",
+    "expectation": "decides the final-newline policy explicitly; comment and EOF state preserved",
+    "files": [
+      "298.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:311",
+    "section": "## clang-format",
+    "input": "`a { }` / `b=1`",
+    "expectation": "refuses to delete anything that could hold meaning; an empty object is still a value",
+    "files": [
+      "299.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:312",
+    "section": "## clang-format",
+    "input": "`include \"b.conf\"` / `include \"a.conf\"`",
+    "expectation": "unchanged or refused: in HOCON include order and duplicates are semantic",
+    "files": [
+      "300.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:313",
+    "section": "## clang-format",
+    "input": "`a=1` / `b=2` with `--lines 2:2`",
+    "expectation": "if ever offered: refuse when the range cuts a rule or string; text outside byte-identical",
+    "files": [
+      "301.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:314",
+    "section": "## clang-format",
+    "input": "`.hocon-fmt.conf` with an unknown key",
+    "expectation": "fail loudly with a path/line, no silent fallback — a config typo must not silently change formatting",
+    "files": [
+      "302.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:315",
+    "section": "## clang-format",
+    "input": "`a { }`",
+    "expectation": "the mirror failure: never invent comment text",
+    "files": [
+      "303.conf"
+    ]
+  },
+  {
+    "research": "language-classics-history-tests-api.md:316",
+    "section": "## clang-format",
+    "input": "`n=1000000` vs `1_000_000`",
+    "expectation": "refuse rather than guess; any accepted spelling normalisation documented",
+    "files": [
+      "304.conf",
+      "305.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:48",
+    "input": "a { b = 1 # note\\n}\\nc = 2 # after object",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}\\nc = 2 # after object`: both comments byte-identical and still on their lines after two passes. `a = 1  # one   # two` and `# - item\\n#   cont`: `f(f(x)) == f(x)`. CRLF file: bytes preserved or refused, never converted. `include \"base.conf\" # note` under a licence banner: include, banner and note all survive in order. `--check` on `a: 1`: exit 1, zero bytes written.",
+    "files": [
+      "case-root-inline.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:48",
+    "input": "a = 1  # one   # two",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}\\nc = 2 # after object`: both comments byte-identical and still on their lines after two passes. `a = 1  # one   # two` and `# - item\\n#   cont`: `f(f(x)) == f(x)`. CRLF file: bytes preserved or refused, never converted. `include \"base.conf\" # note` under a licence banner: include, banner and note all survive in order. `--check` on `a: 1`: exit 1, zero bytes written.",
+    "files": [
+      "case-compound-comment.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:48",
+    "input": "# - item\\n#   cont",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}\\nc = 2 # after object`: both comments byte-identical and still on their lines after two passes. `a = 1  # one   # two` and `# - item\\n#   cont`: `f(f(x)) == f(x)`. CRLF file: bytes preserved or refused, never converted. `include \"base.conf\" # note` under a licence banner: include, banner and note all survive in order. `--check` on `a: 1`: exit 1, zero bytes written.",
+    "files": [
+      "case-markdown-comment.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:48",
+    "input": "f(f(x)) == f(x)",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}\\nc = 2 # after object`: both comments byte-identical and still on their lines after two passes. `a = 1  # one   # two` and `# - item\\n#   cont`: `f(f(x)) == f(x)`. CRLF file: bytes preserved or refused, never converted. `include \"base.conf\" # note` under a licence banner: include, banner and note all survive in order. `--check` on `a: 1`: exit 1, zero bytes written.",
+    "files": [
+      "017.conf",
+      "018.conf",
+      "019.conf",
+      "020.conf",
+      "021.conf",
+      "022.conf",
+      "023.conf",
+      "024.conf",
+      "025.conf",
+      "026.conf",
+      "027.conf",
+      "028.conf",
+      "029.conf",
+      "030.conf",
+      "031.conf",
+      "032.conf",
+      "033.conf",
+      "034.conf",
+      "035.conf",
+      "036.conf",
+      "037.conf",
+      "038.conf",
+      "039.conf",
+      "040.conf",
+      "041.conf",
+      "042.conf",
+      "043.conf",
+      "044.conf",
+      "045.conf",
+      "046.conf",
+      "047.conf",
+      "048.conf",
+      "049.conf",
+      "050.conf",
+      "051.conf",
+      "052.conf",
+      "053.conf",
+      "054.conf",
+      "055.conf",
+      "056.conf",
+      "057.conf",
+      "058.conf",
+      "059.conf",
+      "060.conf",
+      "061.conf",
+      "062.conf",
+      "063.conf",
+      "064.conf",
+      "065.conf",
+      "066.conf",
+      "067.conf",
+      "068.conf",
+      "069.conf",
+      "070.conf",
+      "071.conf",
+      "072.conf",
+      "073.conf",
+      "074.conf",
+      "075.conf",
+      "076.conf",
+      "077.conf",
+      "078.conf",
+      "079.conf",
+      "080.conf",
+      "081.conf",
+      "082.conf",
+      "083.conf",
+      "085.conf",
+      "086.conf",
+      "087.conf",
+      "088.conf",
+      "089.conf",
+      "090.conf",
+      "091.conf",
+      "092.conf",
+      "093.conf",
+      "094.conf",
+      "095.conf",
+      "096.conf",
+      "097.conf",
+      "098.conf",
+      "099.conf",
+      "101.conf",
+      "102.conf",
+      "103.conf",
+      "104.conf",
+      "106.conf",
+      "107.conf",
+      "109.conf",
+      "110.conf",
+      "111.conf",
+      "112.conf",
+      "115.conf",
+      "116.conf",
+      "117.conf",
+      "118.conf",
+      "119.conf",
+      "120.conf",
+      "121.conf",
+      "123.conf",
+      "124.conf",
+      "126.conf",
+      "127.conf",
+      "128.conf",
+      "129.conf",
+      "130.conf",
+      "133.conf",
+      "136.conf",
+      "137.conf",
+      "138.conf",
+      "139.conf",
+      "143.conf",
+      "144.conf",
+      "147.conf",
+      "148.conf",
+      "149.conf",
+      "151.conf",
+      "152.conf",
+      "153.conf",
+      "154.conf",
+      "155.conf",
+      "158.conf",
+      "159.conf",
+      "161.conf",
+      "162.conf",
+      "164.conf",
+      "165.conf",
+      "166.conf",
+      "167.conf",
+      "168.conf",
+      "169.conf",
+      "170.conf",
+      "172.conf",
+      "196.conf",
+      "197.conf",
+      "198.conf",
+      "199.conf",
+      "200.conf",
+      "201.conf",
+      "202.conf",
+      "203.conf",
+      "204.conf",
+      "206.conf",
+      "207.conf",
+      "210.conf",
+      "211.conf",
+      "212.conf",
+      "213.conf",
+      "214.conf",
+      "215.conf",
+      "216.conf",
+      "217.conf",
+      "218.conf",
+      "219.conf",
+      "220.conf",
+      "221.conf",
+      "222.conf",
+      "223.conf",
+      "224.conf",
+      "225.conf",
+      "226.conf",
+      "227.conf",
+      "228.conf",
+      "229.conf",
+      "230.conf",
+      "231.conf",
+      "232.conf",
+      "233.conf",
+      "234.conf",
+      "235.conf",
+      "236.conf",
+      "237.conf",
+      "238.conf",
+      "239.conf",
+      "240.conf",
+      "241.conf",
+      "242.conf",
+      "243.conf",
+      "244.conf",
+      "246.conf",
+      "249.conf",
+      "250.conf",
+      "251.conf",
+      "252.conf",
+      "253.conf",
+      "255.conf",
+      "256.conf",
+      "257.conf",
+      "258.conf",
+      "259.conf",
+      "260.conf",
+      "261.conf",
+      "262.conf",
+      "263.conf",
+      "264.conf",
+      "265.conf",
+      "266.conf",
+      "268.conf",
+      "271.conf",
+      "272.conf",
+      "273.conf",
+      "274.conf",
+      "275.conf",
+      "276.conf",
+      "277.conf",
+      "278.conf",
+      "279.conf",
+      "280.conf",
+      "281.conf",
+      "283.conf",
+      "284.conf",
+      "287.conf",
+      "288.conf",
+      "289.conf",
+      "290.conf",
+      "291.conf",
+      "292.conf",
+      "293.conf",
+      "294.conf",
+      "295.conf",
+      "296.conf",
+      "297.conf",
+      "298.conf",
+      "299.conf",
+      "300.conf",
+      "301.conf",
+      "302.conf",
+      "303.conf",
+      "304.conf",
+      "305.conf",
+      "365.conf",
+      "366.conf",
+      "367.conf",
+      "368.conf",
+      "369.conf",
+      "370.conf",
+      "371.conf",
+      "372.conf",
+      "373.conf",
+      "374.conf",
+      "378.conf",
+      "379.conf",
+      "380.conf",
+      "381.conf",
+      "382.conf",
+      "384.conf",
+      "385.conf",
+      "386.conf",
+      "387.conf",
+      "388.conf",
+      "389.conf",
+      "390.conf",
+      "391.conf",
+      "392.conf",
+      "393.conf",
+      "394.conf",
+      "395.conf",
+      "398.conf",
+      "399.conf",
+      "401.conf",
+      "402.conf",
+      "403.conf",
+      "404.conf",
+      "405.conf",
+      "406.conf",
+      "409.conf",
+      "410.conf",
+      "411.conf",
+      "412.conf",
+      "414.conf",
+      "415.conf",
+      "417.conf",
+      "419.conf",
+      "420.conf",
+      "421.conf",
+      "422.conf",
+      "424.conf",
+      "425.conf",
+      "426.conf",
+      "427.conf",
+      "429.conf",
+      "430.conf",
+      "431.conf",
+      "432.conf",
+      "433.conf",
+      "434.conf",
+      "435.conf",
+      "436.conf",
+      "437.conf",
+      "438.conf",
+      "439.conf",
+      "440.conf",
+      "441.conf",
+      "442.conf",
+      "444.conf",
+      "445.conf",
+      "447.conf",
+      "448.conf",
+      "449.conf",
+      "450.conf",
+      "451.conf",
+      "452.conf",
+      "453.conf",
+      "454.conf",
+      "455.conf",
+      "456.conf",
+      "457.conf",
+      "458.conf",
+      "459.conf",
+      "460.conf",
+      "463.conf",
+      "464.conf",
+      "465.conf",
+      "466.conf",
+      "467.conf",
+      "468.conf",
+      "469.conf",
+      "470.conf",
+      "471.conf",
+      "472.conf",
+      "473.conf",
+      "474.conf",
+      "475.conf",
+      "476.conf",
+      "477.conf",
+      "478.conf",
+      "479.conf",
+      "480.conf",
+      "481.conf",
+      "482.conf",
+      "483.conf",
+      "484.conf",
+      "485.conf",
+      "486.conf",
+      "487.conf",
+      "488.conf",
+      "489.conf",
+      "490.conf",
+      "491.conf",
+      "492.conf",
+      "493.conf",
+      "494.conf",
+      "495.conf",
+      "496.conf",
+      "499.conf",
+      "500.conf",
+      "501.conf",
+      "502.conf",
+      "503.conf",
+      "504.conf",
+      "505.conf",
+      "506.conf",
+      "507.conf",
+      "508.conf",
+      "509.conf",
+      "510.conf",
+      "511.conf",
+      "512.conf",
+      "513.conf",
+      "514.conf",
+      "515.conf",
+      "516.conf",
+      "517.conf",
+      "518.conf",
+      "519.conf",
+      "520.conf",
+      "521.conf",
+      "522.conf",
+      "523.conf",
+      "524.conf",
+      "525.conf",
+      "526.conf",
+      "527.conf",
+      "528.conf",
+      "529.conf",
+      "530.conf",
+      "531.conf",
+      "532.conf",
+      "533.conf",
+      "534.conf",
+      "535.conf",
+      "536.conf",
+      "537.conf",
+      "538.conf",
+      "539.conf",
+      "540.conf",
+      "541.conf",
+      "542.conf",
+      "543.conf",
+      "544.conf",
+      "545.conf",
+      "546.conf",
+      "547.conf",
+      "548.conf",
+      "549.conf",
+      "550.conf",
+      "551.conf",
+      "552.conf",
+      "553.conf",
+      "554.conf",
+      "555.conf",
+      "556.conf",
+      "case-env-root.conf",
+      "case-env-root-y.conf",
+      "case-array-tail.conf",
+      "case-object-merge.conf",
+      "case-object-substitution-comments.conf",
+      "case-include-precedence.conf",
+      "case-header-include-inline.conf",
+      "case-note-include-pair.conf",
+      "case-include-inline-after.conf",
+      "case-include-alone.conf",
+      "case-include-file.conf",
+      "case-include-required.conf",
+      "case-include-classpath.conf",
+      "case-include-unclosed.conf",
+      "case-include-nested.conf",
+      "case-json-conf.conf",
+      "case-placeholder-collision.conf",
+      "case-placeholder-collision-no-include.conf",
+      "case-raw-whitespace.conf",
+      "case-raw-whitespace-surround.conf",
+      "case-raw-comments.conf",
+      "case-nested-comment.conf",
+      "case-root-inline.conf",
+      "case-compound-comment.conf",
+      "case-markdown-comment.conf",
+      "case-pragma-object.conf",
+      "case-unclosed-object.conf",
+      "case-no-unquoting.conf",
+      "case-concatenation.conf",
+      "case-substitution-malformed.conf",
+      "case-missing-value.conf",
+      "case-substitution-open.conf",
+      "case-stray-close.conf",
+      "case-long-comment.conf",
+      "case-raw-trailing.conf",
+      "case-include-comment-between.conf",
+      "case-comment-trim.conf",
+      "case-raw-bom-env.conf",
+      "case-comments-tabs-crlf.conf",
+      "case-append-comment-path.conf",
+      "case-nested-inline-array.conf",
+      "case-detached-between.conf",
+      "case-array-position.conf",
+      "case-nested-sibling-comments.conf",
+      "case-overridden-comments.conf",
+      "case-numeric-huge.conf",
+      "case-bare-cr-comment.conf",
+      "case-random-bytes.conf",
+      "case-long-300.conf",
+      "case-long-escapes.conf",
+      "case-bom-unicode-crlf.conf",
+      "case-leading-no-final.conf",
+      "case-style-four.conf",
+      "case-include-empty-barrier.conf",
+      "case-string-substitution.conf",
+      "case-array-element-inline.conf",
+      "case-unknown-comment-only.conf",
+      "case-comment-only-unclosed-object.conf",
+      "case-json-end-comment.conf",
+      "case-array-concat.conf",
+      "case-duration.conf",
+      "case-inline-keep-me.conf",
+      "case-substitution-x-open.conf",
+      "case-include-section.conf",
+      "case-block-comment.conf",
+      "case-nginx-body.conf",
+      "case-latin1.conf",
+      "case-numeric-separators.conf",
+      "case-field-order.conf",
+      "case-string-quote-escape.conf",
+      "case-unicode-escape.conf",
+      "case-comment-head-tail.conf",
+      "case-bom-lower.conf",
+      "case-crlf-string-escaped.conf",
+      "case-nested-kept.conf",
+      "case-nested-double.conf",
+      "case-raw-no-simplify.conf"
+    ],
+    "disposition": "Every case is written twice and checked; this is the harness invariant."
+  },
+  {
+    "research": "language-classics.md:48",
+    "input": "include \"base.conf\" # note",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}\\nc = 2 # after object`: both comments byte-identical and still on their lines after two passes. `a = 1  # one   # two` and `# - item\\n#   cont`: `f(f(x)) == f(x)`. CRLF file: bytes preserved or refused, never converted. `include \"base.conf\" # note` under a licence banner: include, banner and note all survive in order. `--check` on `a: 1`: exit 1, zero bytes written.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:48",
+    "input": "a: 1",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}\\nc = 2 # after object`: both comments byte-identical and still on their lines after two passes. `a = 1  # one   # two` and `# - item\\n#   cont`: `f(f(x)) == f(x)`. CRLF file: bytes preserved or refused, never converted. `include \"base.conf\" # note` under a licence banner: include, banner and note all survive in order. `--check` on `a: 1`: exit 1, zero bytes written.",
+    "files": [
+      "104.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "a { b = 1 # note\\n}",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "case-root-inline.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "x = [1, # one\\n 2]",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "case-array-element-inline.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "a = \"x // y\"",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "469.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "b = \"\"\"line # not comment\"\"\"",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "469.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "c = ${?ENV}",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "469.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "# hocon-fmt: off",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "case-pragma-object.conf",
+      "473.conf",
+      "234.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:86",
+    "input": "a { b = 1\\n# trailing",
+    "expectation": "**Probe** — `a { b = 1 # note\\n}` and `x = [1, # one\\n 2]`: every comment present exactly once in the *text*, not just the parse. `a = \"x // y\"`, `b = \"\"\"line # not comment\"\"\"`, `c = ${?ENV}`: bytes unchanged after masking round-trip. `# hocon-fmt: off` is not implemented — assert an unknown directive is either honoured or preserved verbatim, never half-applied. Unclosed `a { b = 1\\n# trailing`: refusal, file untouched, comment still there. `--check` on a refused file: reported as refused, not as unformatted, and no write.",
+    "files": [
+      "case-unclosed-object.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "a { # keep\\n  b = 1  # inline\\n}",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "case-nested-comment.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "a = \"1\"",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "case-no-unquoting.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "a = ${?X}",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "441.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "a = [1] [2]",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "case-array-concat.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "a = 3s",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "case-duration.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:124",
+    "input": "a = {",
+    "expectation": "**Probe** — `a { # keep\\n  b = 1  # inline\\n}`: both comments byte-identical and `--check` clean after formatting. `# rationale\\ninclude \"x.conf\"\\ninclude \"y.conf\"  # note`: no comment crosses an include boundary. Nested objects with substitutions and comments, formatted twice: second output byte-identical. `a = \"1\"`, `a = ${?X}`, `a = [1] [2]`, `a = 3s`: no unquoting, no concatenation folding. `a = {` and an unterminated string: refusal, distinct non-zero code, no write. Empty file, BOM, CRLF-only, 1000-level nesting: clean exit, no write.",
+    "files": [
+      "172.conf",
+      "110.conf",
+      "115.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "[1, # one\\n 2]",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "255.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "include \"x.conf\"  # why",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "a = \"1\"",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "case-no-unquoting.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "a = ${?X}",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "441.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "x = ${a}${b}",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "case-concatenation.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "a = \"unterminated",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "195.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:162",
+    "input": "include required(classpath(\"x\"))",
+    "expectation": "**Probe** — `[1, # one\\n 2]`: inline comment and its line association survive; `include \"x.conf\"  # why`: no migration across the include; formatted fixture twice: byte-identical; `a = \"1\"`, `a = ${?X}`, `x = ${a}${b}`: quoting and concatenation preserved; unparseable `a = \"unterminated`: exit distinct from \"would reformat\", no write, no crash; `include required(classpath(\"x\"))` with no file on disk: include kept, nothing resolved.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:200",
+    "input": "a = 1 # keep me",
+    "expectation": "**Probe** — `a = 1 # keep me` where the path gets flattened: still attached, or the file is refused. `include \"base.conf\" # reason` with a standalone note above `foo = 1`: byte-identical order after formatting. A file mixing `//`, `\"\"\"` and deep nesting, formatted twice: identical, `--check` exit 0. `a = ${undefined` and `a =`: no write, clear message, no crash. `include required(file(\"x.conf\"))` among objects: kept in place, never reordered. A batch of one formatted and one unparseable file under `--check`: exit 1, both results reported, the unparseable one refused.",
+    "files": [
+      "case-inline-keep-me.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:200",
+    "input": "include \"base.conf\" # reason",
+    "expectation": "**Probe** — `a = 1 # keep me` where the path gets flattened: still attached, or the file is refused. `include \"base.conf\" # reason` with a standalone note above `foo = 1`: byte-identical order after formatting. A file mixing `//`, `\"\"\"` and deep nesting, formatted twice: identical, `--check` exit 0. `a = ${undefined` and `a =`: no write, clear message, no crash. `include required(file(\"x.conf\"))` among objects: kept in place, never reordered. A batch of one formatted and one unparseable file under `--check`: exit 1, both results reported, the unparseable one refused.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:200",
+    "input": "foo = 1",
+    "expectation": "**Probe** — `a = 1 # keep me` where the path gets flattened: still attached, or the file is refused. `include \"base.conf\" # reason` with a standalone note above `foo = 1`: byte-identical order after formatting. A file mixing `//`, `\"\"\"` and deep nesting, formatted twice: identical, `--check` exit 0. `a = ${undefined` and `a =`: no write, clear message, no crash. `include required(file(\"x.conf\"))` among objects: kept in place, never reordered. A batch of one formatted and one unparseable file under `--check`: exit 1, both results reported, the unparseable one refused.",
+    "files": [
+      "case-include-inline-after.conf",
+      "050.conf",
+      "051.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:200",
+    "input": "a = ${undefined",
+    "expectation": "**Probe** — `a = 1 # keep me` where the path gets flattened: still attached, or the file is refused. `include \"base.conf\" # reason` with a standalone note above `foo = 1`: byte-identical order after formatting. A file mixing `//`, `\"\"\"` and deep nesting, formatted twice: identical, `--check` exit 0. `a = ${undefined` and `a =`: no write, clear message, no crash. `include required(file(\"x.conf\"))` among objects: kept in place, never reordered. A batch of one formatted and one unparseable file under `--check`: exit 1, both results reported, the unparseable one refused.",
+    "files": [
+      "case-substitution-malformed.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:200",
+    "input": "a =",
+    "expectation": "**Probe** — `a = 1 # keep me` where the path gets flattened: still attached, or the file is refused. `include \"base.conf\" # reason` with a standalone note above `foo = 1`: byte-identical order after formatting. A file mixing `//`, `\"\"\"` and deep nesting, formatted twice: identical, `--check` exit 0. `a = ${undefined` and `a =`: no write, clear message, no crash. `include required(file(\"x.conf\"))` among objects: kept in place, never reordered. A batch of one formatted and one unparseable file under `--check`: exit 1, both results reported, the unparseable one refused.",
+    "files": [
+      "147.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:200",
+    "input": "include required(file(\"x.conf\"))",
+    "expectation": "**Probe** — `a = 1 # keep me` where the path gets flattened: still attached, or the file is refused. `include \"base.conf\" # reason` with a standalone note above `foo = 1`: byte-identical order after formatting. A file mixing `//`, `\"\"\"` and deep nesting, formatted twice: identical, `--check` exit 0. `a = ${undefined` and `a =`: no write, clear message, no crash. `include required(file(\"x.conf\"))` among objects: kept in place, never reordered. A batch of one formatted and one unparseable file under `--check`: exit 1, both results reported, the unparseable one refused.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:233",
+    "input": "#",
+    "expectation": "**Probe** — a 200-char `#` comment on its own line before `k=v`: format twice, byte-identical (`--check` exit 0 both times). `s = \"\"\"line1\\n  line2  \"\"\"`: inner bytes unchanged. `include required(file(\"base.conf\"))  # keep`: include and comment verbatim. `--check` on a trailing-whitespace-only diff: non-zero, file untouched. `a = ${` and `include \"missing.conf\"`: refuse, no write, exit code distinct from \"would reformat\".",
+    "files": [
+      "166.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:233",
+    "input": "k=v",
+    "expectation": "**Probe** — a 200-char `#` comment on its own line before `k=v`: format twice, byte-identical (`--check` exit 0 both times). `s = \"\"\"line1\\n  line2  \"\"\"`: inner bytes unchanged. `include required(file(\"base.conf\"))  # keep`: include and comment verbatim. `--check` on a trailing-whitespace-only diff: non-zero, file untouched. `a = ${` and `include \"missing.conf\"`: refuse, no write, exit code distinct from \"would reformat\".",
+    "files": [
+      "case-long-comment.conf",
+      "070.conf",
+      "030.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:233",
+    "input": "s = \"\"\"line1\\n  line2  \"\"\"",
+    "expectation": "**Probe** — a 200-char `#` comment on its own line before `k=v`: format twice, byte-identical (`--check` exit 0 both times). `s = \"\"\"line1\\n  line2  \"\"\"`: inner bytes unchanged. `include required(file(\"base.conf\"))  # keep`: include and comment verbatim. `--check` on a trailing-whitespace-only diff: non-zero, file untouched. `a = ${` and `include \"missing.conf\"`: refuse, no write, exit code distinct from \"would reformat\".",
+    "files": [
+      "case-raw-trailing.conf",
+      "465.conf",
+      "295.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:233",
+    "input": "include required(file(\"base.conf\"))  # keep",
+    "expectation": "**Probe** — a 200-char `#` comment on its own line before `k=v`: format twice, byte-identical (`--check` exit 0 both times). `s = \"\"\"line1\\n  line2  \"\"\"`: inner bytes unchanged. `include required(file(\"base.conf\"))  # keep`: include and comment verbatim. `--check` on a trailing-whitespace-only diff: non-zero, file untouched. `a = ${` and `include \"missing.conf\"`: refuse, no write, exit code distinct from \"would reformat\".",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:233",
+    "input": "a = ${",
+    "expectation": "**Probe** — a 200-char `#` comment on its own line before `k=v`: format twice, byte-identical (`--check` exit 0 both times). `s = \"\"\"line1\\n  line2  \"\"\"`: inner bytes unchanged. `include required(file(\"base.conf\"))  # keep`: include and comment verbatim. `--check` on a trailing-whitespace-only diff: non-zero, file untouched. `a = ${` and `include \"missing.conf\"`: refuse, no write, exit code distinct from \"would reformat\".",
+    "files": [
+      "case-substitution-open.conf",
+      "case-substitution-malformed.conf",
+      "case-raw-bom-env.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:233",
+    "input": "include \"missing.conf\"",
+    "expectation": "**Probe** — a 200-char `#` comment on its own line before `k=v`: format twice, byte-identical (`--check` exit 0 both times). `s = \"\"\"line1\\n  line2  \"\"\"`: inner bytes unchanged. `include required(file(\"base.conf\"))  # keep`: include and comment verbatim. `--check` on a trailing-whitespace-only diff: non-zero, file untouched. `a = ${` and `include \"missing.conf\"`: refuse, no write, exit code distinct from \"would reformat\".",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:266",
+    "input": "include \"a.conf\"\\n// c\\nb=1",
+    "expectation": "**Probe** — `include \"a.conf\"\\n// c\\nb=1`: the comment survives between include and key, byte-identical on the second run. `include file(\"base.conf\")` in a file whose keys are \"unused\": the include is retained; no cleanup pass. `a = [1, ` and `a = ${x`: refusal with non-zero exit, no write. Unformatted stdin on the second `--stdin` run: still writes the text and exits 0 (not #267's empty output).",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:266",
+    "input": "include file(\"base.conf\")",
+    "expectation": "**Probe** — `include \"a.conf\"\\n// c\\nb=1`: the comment survives between include and key, byte-identical on the second run. `include file(\"base.conf\")` in a file whose keys are \"unused\": the include is retained; no cleanup pass. `a = [1, ` and `a = ${x`: refusal with non-zero exit, no write. Unformatted stdin on the second `--stdin` run: still writes the text and exits 0 (not #267's empty output).",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:266",
+    "input": "a = [1, ",
+    "expectation": "**Probe** — `include \"a.conf\"\\n// c\\nb=1`: the comment survives between include and key, byte-identical on the second run. `include file(\"base.conf\")` in a file whose keys are \"unused\": the include is retained; no cleanup pass. `a = [1, ` and `a = ${x`: refusal with non-zero exit, no write. Unformatted stdin on the second `--stdin` run: still writes the text and exits 0 (not #267's empty output).",
+    "files": [
+      "case-array-tail.conf",
+      "case-nested-inline-array.conf",
+      "111.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:266",
+    "input": "a = ${x",
+    "expectation": "**Probe** — `include \"a.conf\"\\n// c\\nb=1`: the comment survives between include and key, byte-identical on the second run. `include file(\"base.conf\")` in a file whose keys are \"unused\": the include is retained; no cleanup pass. `a = [1, ` and `a = ${x`: refusal with non-zero exit, no write. Unformatted stdin on the second `--stdin` run: still writes the text and exits 0 (not #267's empty output).",
+    "files": [
+      "case-substitution-x-open.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:300",
+    "input": "a = { b = 1 }",
+    "expectation": "**Probe** — `a = { b = 1 }` versus `a.b = 1`: same resolved config after formatting (our masked-output parse check). `a = 1\\n# c\\nb = 2`: no blank line inserted, comment stays. `# # #   trailing spaces  `: bytes preserved within the documented normalisations, `--check` sees a diff rather than silently fixing. `include \"base.conf\"` with no reference to its keys: never removed, never flagged. `--check` from a subdirectory with `.hocon-fmt.conf` above: found, or a documented default, never a silent miss. CRLF file: preserved or refused.",
+    "files": [
+      "115.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:300",
+    "input": "a.b = 1",
+    "expectation": "**Probe** — `a = { b = 1 }` versus `a.b = 1`: same resolved config after formatting (our masked-output parse check). `a = 1\\n# c\\nb = 2`: no blank line inserted, comment stays. `# # #   trailing spaces  `: bytes preserved within the documented normalisations, `--check` sees a diff rather than silently fixing. `include \"base.conf\"` with no reference to its keys: never removed, never flagged. `--check` from a subdirectory with `.hocon-fmt.conf` above: found, or a documented default, never a silent miss. CRLF file: preserved or refused.",
+    "files": [
+      "217.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:300",
+    "input": "a = 1\\n# c\\nb = 2",
+    "expectation": "**Probe** — `a = { b = 1 }` versus `a.b = 1`: same resolved config after formatting (our masked-output parse check). `a = 1\\n# c\\nb = 2`: no blank line inserted, comment stays. `# # #   trailing spaces  `: bytes preserved within the documented normalisations, `--check` sees a diff rather than silently fixing. `include \"base.conf\"` with no reference to its keys: never removed, never flagged. `--check` from a subdirectory with `.hocon-fmt.conf` above: found, or a documented default, never a silent miss. CRLF file: preserved or refused.",
+    "files": [
+      "case-detached-between.conf",
+      "291.conf",
+      "053.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:300",
+    "input": "# # #   trailing spaces  ",
+    "expectation": "**Probe** — `a = { b = 1 }` versus `a.b = 1`: same resolved config after formatting (our masked-output parse check). `a = 1\\n# c\\nb = 2`: no blank line inserted, comment stays. `# # #   trailing spaces  `: bytes preserved within the documented normalisations, `--check` sees a diff rather than silently fixing. `include \"base.conf\"` with no reference to its keys: never removed, never flagged. `--check` from a subdirectory with `.hocon-fmt.conf` above: found, or a documented default, never a silent miss. CRLF file: preserved or refused.",
+    "files": [
+      "case-comment-trim.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:300",
+    "input": "include \"base.conf\"",
+    "expectation": "**Probe** — `a = { b = 1 }` versus `a.b = 1`: same resolved config after formatting (our masked-output parse check). `a = 1\\n# c\\nb = 2`: no blank line inserted, comment stays. `# # #   trailing spaces  `: bytes preserved within the documented normalisations, `--check` sees a diff rather than silently fixing. `include \"base.conf\"` with no reference to its keys: never removed, never flagged. `--check` from a subdirectory with `.hocon-fmt.conf` above: found, or a documented default, never a silent miss. CRLF file: preserved or refused.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:338",
+    "input": "include \"base.conf\"",
+    "expectation": "**Probe** — `include \"base.conf\"` between two keys, and `include \"x.conf\" # why`: no reordering, no comment loss, `--check` clean after formatting. `//` and `#` comments, tabs, CRLF in one file: format twice, byte-identical second pass, CRLF preserved or refused. `s = \"\"\"line # not comment\\n// literal\"\"\"`: inner bytes untouched. `a = ${`, stray `}`, unterminated `\"\"\"`: refusal, no stack trace, no write, distinct code. BOM + CRLF + no final newline: preserved bytes outside reformatted spans.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:338",
+    "input": "include \"x.conf\" # why",
+    "expectation": "**Probe** — `include \"base.conf\"` between two keys, and `include \"x.conf\" # why`: no reordering, no comment loss, `--check` clean after formatting. `//` and `#` comments, tabs, CRLF in one file: format twice, byte-identical second pass, CRLF preserved or refused. `s = \"\"\"line # not comment\\n// literal\"\"\"`: inner bytes untouched. `a = ${`, stray `}`, unterminated `\"\"\"`: refusal, no stack trace, no write, distinct code. BOM + CRLF + no final newline: preserved bytes outside reformatted spans.",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:338",
+    "input": "#",
+    "expectation": "**Probe** — `include \"base.conf\"` between two keys, and `include \"x.conf\" # why`: no reordering, no comment loss, `--check` clean after formatting. `//` and `#` comments, tabs, CRLF in one file: format twice, byte-identical second pass, CRLF preserved or refused. `s = \"\"\"line # not comment\\n// literal\"\"\"`: inner bytes untouched. `a = ${`, stray `}`, unterminated `\"\"\"`: refusal, no stack trace, no write, distinct code. BOM + CRLF + no final newline: preserved bytes outside reformatted spans.",
+    "files": [
+      "166.conf"
+    ]
+  },
+  {
+    "research": "language-classics.md:338",
+    "input": "s = \"\"\"line # not comment\\n// literal\"\"\"",
+    "expectation": "**Probe** — `include \"base.conf\"` between two keys, and `include \"x.conf\" # why`: no reordering, no comment loss, `--check` clean after formatting. `//` and `#` comments, tabs, CRLF in one file: format twice, byte-identical second pass, CRLF preserved or refused. `s = \"\"\"line # not comment\\n// literal\"\"\"`: inner bytes untouched. `a = ${`, stray `}`, unterminated `\"\"\"`: refusal, no stack trace, no write, distinct code. BOM + CRLF + no final newline: preserved bytes outside reformatted spans.",
+    "files": [
+      "case-raw-comments.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:338",
+    "input": "a = ${",
+    "expectation": "**Probe** — `include \"base.conf\"` between two keys, and `include \"x.conf\" # why`: no reordering, no comment loss, `--check` clean after formatting. `//` and `#` comments, tabs, CRLF in one file: format twice, byte-identical second pass, CRLF preserved or refused. `s = \"\"\"line # not comment\\n// literal\"\"\"`: inner bytes untouched. `a = ${`, stray `}`, unterminated `\"\"\"`: refusal, no stack trace, no write, distinct code. BOM + CRLF + no final newline: preserved bytes outside reformatted spans.",
+    "files": [
+      "case-substitution-open.conf",
+      "case-substitution-malformed.conf",
+      "case-raw-bom-env.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:338",
+    "input": "}",
+    "expectation": "**Probe** — `include \"base.conf\"` between two keys, and `include \"x.conf\" # why`: no reordering, no comment loss, `--check` clean after formatting. `//` and `#` comments, tabs, CRLF in one file: format twice, byte-identical second pass, CRLF preserved or refused. `s = \"\"\"line # not comment\\n// literal\"\"\"`: inner bytes untouched. `a = ${`, stray `}`, unterminated `\"\"\"`: refusal, no stack trace, no write, distinct code. BOM + CRLF + no final newline: preserved bytes outside reformatted spans.",
+    "files": [
+      "case-stray-close.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:374",
+    "input": "include \"base.conf\"",
+    "expectation": "**Probe** — a licence banner above `include \"base.conf\"` and a `# section` below: order and attachment unchanged (lessons #772/#1080). Empty file, file with comments only, unterminated `include`: clean refusal code, no stack trace (lessons #1155/#1301). `--check` on formatted / unformatted / refused input: 0, non-zero, distinct non-zero; second format byte-identical (lessons #327/#1242). `# hocon-fmt: off` before a key and inside a nested object: honoured or loudly rejected, never a silent half-apply (lessons #771/#816). BOM+CRLF file with `s = \"\"\"# not a comment\"\"\"` and `${?ENV}`: byte-preservation outside reformatted spans (lessons #1226/#1097).",
+    "files": [
+      "case-include-alone.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "language-classics.md:374",
+    "input": "# section",
+    "expectation": "**Probe** — a licence banner above `include \"base.conf\"` and a `# section` below: order and attachment unchanged (lessons #772/#1080). Empty file, file with comments only, unterminated `include`: clean refusal code, no stack trace (lessons #1155/#1301). `--check` on formatted / unformatted / refused input: 0, non-zero, distinct non-zero; second format byte-identical (lessons #327/#1242). `# hocon-fmt: off` before a key and inside a nested object: honoured or loudly rejected, never a silent half-apply (lessons #771/#816). BOM+CRLF file with `s = \"\"\"# not a comment\"\"\"` and `${?ENV}`: byte-preservation outside reformatted spans (lessons #1226/#1097).",
+    "files": [
+      "case-include-section.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "language-classics.md:374",
+    "input": "# hocon-fmt: off",
+    "expectation": "**Probe** — a licence banner above `include \"base.conf\"` and a `# section` below: order and attachment unchanged (lessons #772/#1080). Empty file, file with comments only, unterminated `include`: clean refusal code, no stack trace (lessons #1155/#1301). `--check` on formatted / unformatted / refused input: 0, non-zero, distinct non-zero; second format byte-identical (lessons #327/#1242). `# hocon-fmt: off` before a key and inside a nested object: honoured or loudly rejected, never a silent half-apply (lessons #771/#816). BOM+CRLF file with `s = \"\"\"# not a comment\"\"\"` and `${?ENV}`: byte-preservation outside reformatted spans (lessons #1226/#1097).",
+    "files": [
+      "case-pragma-object.conf",
+      "473.conf",
+      "234.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:374",
+    "input": "s = \"\"\"# not a comment\"\"\"",
+    "expectation": "**Probe** — a licence banner above `include \"base.conf\"` and a `# section` below: order and attachment unchanged (lessons #772/#1080). Empty file, file with comments only, unterminated `include`: clean refusal code, no stack trace (lessons #1155/#1301). `--check` on formatted / unformatted / refused input: 0, non-zero, distinct non-zero; second format byte-identical (lessons #327/#1242). `# hocon-fmt: off` before a key and inside a nested object: honoured or loudly rejected, never a silent half-apply (lessons #771/#816). BOM+CRLF file with `s = \"\"\"# not a comment\"\"\"` and `${?ENV}`: byte-preservation outside reformatted spans (lessons #1226/#1097).",
+    "files": [
+      "case-raw-bom-env.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "language-classics.md:374",
+    "input": "${?ENV}",
+    "expectation": "**Probe** — a licence banner above `include \"base.conf\"` and a `# section` below: order and attachment unchanged (lessons #772/#1080). Empty file, file with comments only, unterminated `include`: clean refusal code, no stack trace (lessons #1155/#1301). `--check` on formatted / unformatted / refused input: 0, non-zero, distinct non-zero; second format byte-identical (lessons #327/#1242). `# hocon-fmt: off` before a key and inside a nested object: honoured or loudly rejected, never a silent half-apply (lessons #771/#816). BOM+CRLF file with `s = \"\"\"# not a comment\"\"\"` and `${?ENV}`: byte-preservation outside reformatted spans (lessons #1226/#1097).",
+    "files": [
+      "case-env-root.conf",
+      "case-raw-bom-env.conf",
+      "469.conf"
+    ],
+    "disposition": "Full input carrying the proposed snippet; see original expectation and matrix."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:270",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`# first\\n\\n# second`",
+    "expectation": "refuses:lost-comment (a comment with no field after it, and a blank line detaching the first)",
+    "files": [
+      "365.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:271",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`name = \"💖\"\\n# This comment\\n# should not get collapsed`",
+    "expectation": "refuses:lost-comment (comment after the last field)",
+    "files": [
+      "366.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:272",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`# This comment\\nname = \"💖\"`",
+    "expectation": "formats (comment kept; emoji is text)",
+    "files": [
+      "367.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:273",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`# trailing space ->   \\nkey = 1`",
+    "expectation": "formats (comment text preserved byte-for-byte)",
+    "files": [
+      "368.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:274",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`a {\\n  # dangling\\n}`",
+    "expectation": "refuses:lost-comment (comment no field follows)",
+    "files": [
+      "369.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:275",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "(empty file)",
+    "expectation": "unchanged (empty text is a pinned option, `OptionsSpec`) **(probe)**",
+    "files": [
+      "049.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:276",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`\\ufeffkey = 1`",
+    "expectation": "formats — hocon-fmt documents the opposite: \"a UTF-8 byte-order mark is dropped\" (`docs/limitations.md:190`)",
+    "files": [
+      "370.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:277",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`a = 1\\r\\nb = 2`",
+    "expectation": "formats (`\\n` only; no `endOfLine` option to honour)",
+    "files": [
+      "371.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:278",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`# hocon-fmt-ignore\\nkey   =   1`",
+    "expectation": "formats (no pragma exists; the comment is ordinary and survives, the field is normalised)",
+    "files": [
+      "372.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:279",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`s = \"\"\"line one\\n  line two\"\"\"`, whole-file",
+    "expectation": "formats (no range flags; the whole file is in scope, so the \"range only\" safety net does not exist)",
+    "files": [
+      "373.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:280",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "`a {\\n  # first field comment\\n  b = 1\\n}`",
+    "expectation": "formats (a comment above a field is kept; this is the shape the ledger protects)",
+    "files": [
+      "374.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:281",
+    "section": "### 3.1 prettier (`c3d36525`, MIT)",
+    "input": "the same `.conf` name with an nginx-style body",
+    "expectation": "refuses:not-hocon",
+    "files": [
+      "case-nginx-body.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:287",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`# header\\n\\na = 1`",
+    "expectation": "refuses:lost-comment (blank line ends the attachment; the commonest refusal in real files)",
+    "files": [
+      "144.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:288",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = 1\\n\\n\\nb = 2`",
+    "expectation": "formats (blank lines are dropped entirely, `docs/limitations.md:63-65`)",
+    "files": [
+      "168.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:289",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`# %% setup\\n\\na = 1`",
+    "expectation": "refuses:lost-comment",
+    "files": [
+      "378.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:290",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`# Copyright …\\n# …\\n\\na = 1`",
+    "expectation": "refuses:lost-comment (matches the Akka `reference.conf` corpus finding)",
+    "files": [
+      "379.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:291",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = [1, 2 # inner\\n]`",
+    "expectation": "refuses:lost-comment (comment before the closing `]`)",
+    "files": [
+      "380.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:292",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = 1  # note\\u00a0x`",
+    "expectation": "formats (comment text kept; trailing comment moves to its own line) **(probe)**",
+    "files": [
+      "381.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:293",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = 1 \\\\\\n# why\\nb = 2`",
+    "expectation": "refuses:not-hocon (no line continuation in HOCON) **(probe)**",
+    "files": [
+      "382.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:294",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`# only a comment` (no newline)",
+    "expectation": "refuses:lost-comment",
+    "files": [
+      "089.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:295",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = \"\\u0041\"`",
+    "expectation": "formats (`A`; unicode escapes are resolved)",
+    "files": [
+      "384.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:296",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = \"he said \\\\\"hi\\\\\"\"`",
+    "expectation": "formats (quoting normalised, meaning kept)",
+    "files": [
+      "385.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:297",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = \"\"\"line1\\nline2\"\"\"`",
+    "expectation": "formats (escape resolution; multiline content preserved)",
+    "files": [
+      "386.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:298",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = [1, 2, 3,]`",
+    "expectation": "formats (probe what sconfig does with the last comma)",
+    "files": [
+      "387.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:299",
+    "section": "### 3.2 black (`c9b1148`, MIT)",
+    "input": "`a = 1\\n\\\\\\nb = 2`",
+    "expectation": "refuses:not-hocon",
+    "files": [
+      "388.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:305",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`# hocon-fmt: skip\\na=1`",
+    "expectation": "formats (no skip pragma; the comment must survive and the field is normalised)",
+    "files": [
+      "389.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:306",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`# hocon-fmt::skip\\na   =   1`",
+    "expectation": "formats (a near-miss marker must not be honoured)",
+    "files": [
+      "390.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:307",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "(empty file)",
+    "expectation": "unchanged **(probe)**",
+    "files": [
+      "049.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:308",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`a = 1\\r\\n# c\\r\\n`",
+    "expectation": "formats (`\\n`, final newline added)",
+    "files": [
+      "391.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:309",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "the same CRLF file with no config available",
+    "expectation": "formats (no newline-style option exists)",
+    "files": [
+      "463.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:310",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "file with leading blank lines and no final newline",
+    "expectation": "formats (no range mode: the whole file is in scope)",
+    "files": [
+      "case-leading-no-final.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:311",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`a = 1\\n\\n# after the blank`",
+    "expectation": "refuses:lost-comment (the exact analogue of the pinned rustfmt error)",
+    "files": [
+      "392.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:312",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`# café ✓ — naïve\\na = 1`",
+    "expectation": "formats (comment text preserved)",
+    "files": [
+      "393.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:313",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`a = \"\\u0041\"\\nb = \"日本語\"`",
+    "expectation": "formats (escape resolved; non-ASCII text kept)",
+    "files": [
+      "394.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:314",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`a = \"\"\"line1\\n  line2\"\"\"`",
+    "expectation": "formats (triple-quoted becomes an escaped one-line string; content preserved)",
+    "files": [
+      "395.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:315",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`a = [1, 2, 3,]`",
+    "expectation": "formats **(probe)**",
+    "files": [
+      "387.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:316",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "`a = 1\\n\\n\\nb = 2`",
+    "expectation": "formats (blank lines dropped)",
+    "files": [
+      "168.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:317",
+    "section": "### 3.3 rustfmt (`9f96727`, MIT OR Apache-2.0)",
+    "input": "31 and 32 nested objects",
+    "expectation": "formats at 31; refuses:broken-output at 32 (Scala.js only)",
+    "files": [
+      "480.conf",
+      "481.conf",
+      "482.conf",
+      "484.conf",
+      "485.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:323",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`o {\\n  a = 1\\n  # lone\\n}`",
+    "expectation": "refuses:lost-comment",
+    "files": [
+      "398.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:324",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`# head\\n# tail`",
+    "expectation": "refuses:lost-comment (documented: every comment of a file that holds nothing else)",
+    "files": [
+      "399.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:325",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`a = 1\\r\\nb = 2\\r\\n`",
+    "expectation": "formats",
+    "files": [
+      "203.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:326",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`v1 = { F1 = \"hello\", f2 = 1 }` (no trailing newline)",
+    "expectation": "formats (output gains the final newline)",
+    "files": [
+      "401.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:327",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`i  =5 # c` (no trailing newline)",
+    "expectation": "refuses:lost-comment",
+    "files": [
+      "402.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:328",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`s = \"a\\u00e9b\"\\nt = \"é\"`",
+    "expectation": "formats (escapes resolved; value unchanged)",
+    "files": [
+      "403.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:329",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`s = \"\"\"\\nline 1\\n  line 2\\n\"\"\"`",
+    "expectation": "formats (one-line escaped form; both newlines and the two spaces must survive)",
+    "files": [
+      "404.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:330",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`a { b = 1 }`",
+    "expectation": "formats (default flattening writes `a.b = 1`; `--no-simplify-nested-objects` leaves it unchanged)",
+    "files": [
+      "405.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:331",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`a = 1\\na = 2`",
+    "expectation": "formats plus the duplicate warning (the later definition wins, the earlier text is dropped)",
+    "files": [
+      "406.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:332",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "`a = 1.5e3`",
+    "expectation": "formats (`1500`; number literals are canonicalised)",
+    "files": [
+      "109.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:333",
+    "section": "### 3.4 gofmt (`72edc307c`, BSD-3-Clause)",
+    "input": "a 33-level nested object",
+    "expectation": "refuses:broken-output (Scala.js: 32+ levels render as text that does not re-parse; 31 formats on every platform)",
+    "files": [
+      "482.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:339",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`a = 1 # note`",
+    "expectation": "formats (the comment moves to its own line above)",
+    "files": [
+      "381.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:340",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`# banner\\n\\na = 1`",
+    "expectation": "refuses:lost-comment",
+    "files": [
+      "409.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:341",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`# one\\n# two\\na = 1`",
+    "expectation": "formats",
+    "files": [
+      "410.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:342",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`#a = 1\\nb = 2\\n#a = 3`",
+    "expectation": "formats (comment text kept verbatim)",
+    "files": [
+      "411.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:343",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`a = [1, 2 # note\\n]`",
+    "expectation": "refuses:lost-comment (no field can stand before `]`)",
+    "files": [
+      "412.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:344",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "a block comment with an empty line, then `a = 1`",
+    "expectation": "refuses:lost-comment (the part above the blank line goes with it)",
+    "files": [
+      "case-block-comment.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:345",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`# format: off\\na={b=1}\\n# format: on`",
+    "expectation": "formats (no pragma; comments kept, body normalised)",
+    "files": [
+      "414.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:346",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`a = \"\\u00A0\"`",
+    "expectation": "formats (escape resolved; the value keeps the NBSP)",
+    "files": [
+      "415.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:347",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`a = \"\"\"line1\\n  line2\"\"\"`",
+    "expectation": "formats (triple-quoted becomes a one-line escaped string; the two spaces stay)",
+    "files": [
+      "395.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:348",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`b = 1\\na = 2`",
+    "expectation": "formats (field order preserved — sorting is never offered)",
+    "files": [
+      "417.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:349",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "zero-byte file",
+    "expectation": "unchanged **(probe)**",
+    "files": [
+      "049.conf"
+    ],
+    "disposition": "Full-context/matrix input implementing the abstract proposal; original expectation retained."
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:350",
+    "section": "### 3.5 scalafmt (`91694e7d`, Apache-2.0)",
+    "input": "`a = 1\\r\\nb = 2\\r\\n`",
+    "expectation": "formats (line endings become `\\n`)",
+    "files": [
+      "203.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:356",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "(empty), then `\"   \\n\\n\"`",
+    "expectation": "unchanged **(probe)** (whitespace-only is a valid empty config)",
+    "files": [
+      "419.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:357",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`server.port = 8080` (no newline)",
+    "expectation": "formats (final newline added)",
+    "files": [
+      "420.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:358",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`a = \"line1\\r\\nline2\"`",
+    "expectation": "unchanged (bytes inside the value are the value; only line endings outside are the formatter's)",
+    "files": [
+      "421.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:359",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`# \\u0015` only",
+    "expectation": "refuses:lost-comment (comment-only file); with a field after it, formats",
+    "files": [
+      "422.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:360",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`a = 1\\n\\n\\nb = 2`",
+    "expectation": "formats (blank lines are not kept)",
+    "files": [
+      "168.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:361",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`#!/usr/bin/env hocon-fmt\\nserver.port = 8080`",
+    "expectation": "formats (the shebang text must survive byte-for-byte)",
+    "files": [
+      "424.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:362",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`a = 1\\n# trailing note`",
+    "expectation": "refuses:lost-comment",
+    "files": [
+      "425.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:363",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`# leading comment\\n\\nserver.port = 8080`",
+    "expectation": "refuses:lost-comment (blank line ends attachment; there is no `--range` to test)",
+    "files": [
+      "426.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:364",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`a = [1,2,3] # fmt: skip`",
+    "expectation": "formats (no pragma support; the comment is ordinary)",
+    "files": [
+      "427.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:365",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`a = [1, 2, 3,]`",
+    "expectation": "formats **(probe)**",
+    "files": [
+      "387.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:366",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "`ключ = \"значение\"\\nemotion = \"🚀\"`",
+    "expectation": "unchanged",
+    "files": [
+      "429.conf"
+    ]
+  },
+  {
+    "research": "safety-and-ux-history-tests-api.md:367",
+    "section": "### 3.6 ruff (`5b27c1ccf`, MIT)",
+    "input": "a 120-character single-line value",
+    "expectation": "unchanged (no reflow; long values are left alone)",
+    "files": [
+      "475.conf"
+    ],
+    "disposition": "Concrete matrix analogue; original proposal in input column."
+  }
+]

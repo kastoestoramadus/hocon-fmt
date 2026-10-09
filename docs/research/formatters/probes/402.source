@@ -1,0 +1,4 @@
+# Source: https://github.com/golang/go
+# Licence: BSD-3-Clause
+# Research: safety-and-ux-history-tests-api.md:327
+# Input is a newly written HOCON analogue, not formatter code.

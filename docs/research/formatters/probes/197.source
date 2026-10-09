@@ -1,0 +1,4 @@
+# Source: https://github.com/golang/go
+# Licence: BSD-3-Clause
+# Research: language-classics-history-tests-api.md:64
+# Input is a newly written HOCON analogue, not formatter code.
