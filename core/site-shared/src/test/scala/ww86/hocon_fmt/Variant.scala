@@ -11,6 +11,8 @@ object Variant {
   val ledger: Map[String, String] = Map(
     "showcase/03-dev-prod"                                                               -> fork,
     "showcase/04-library-file"                                                           -> "the detached licence header is kept",
+    "catalogue/detached-array-comment"                                                   -> "the detached array-element comment is kept",
+    "catalogue/unresolved-merge-in-array"                                                -> fork,
     "catalogue/detached-header-comment"                                                  -> "the banner above a blank line is kept",
     "catalogue/trailing-comment-in-object"                                               -> "the comment before the closing brace is kept",
     "commentAboveBlankLine: a header followed by a blank line"                           -> "the header is kept",
