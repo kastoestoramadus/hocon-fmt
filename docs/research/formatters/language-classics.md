@@ -346,7 +346,7 @@ issues/PRs mention `cmd/gofmt` in the title, only a handful mention idempotence.
 **Design choices that matter to us**
 - Configurable through a JSON `.swift-format`; rules can be enabled/disabled and defaults dumped with `dump-configuration` (https://github.com/swiftlang/swift-format/blob/main/Documentation/Configuration.md).
 - Ignore pragmas: `// swift-format-ignore[: rules]` and its `-file` variant suppress "the next node … all children", only on declarations and statements (https://github.com/swiftlang/swift-format/blob/main/Documentation/IgnoringSource.md).
-- Comments are generally not rewrapped — "Column limits don't seem to apply to comments" (https://github.com/swiftlang/swift-format/issues/469, open 2023-01-09) — though inline spacing is normalised (https://github.com/swiftlang/swift-format/issues/868, closed 2024-10-22).
+- Comments are generally not rewrapped — "Column limits don't seem to apply to comments" (https://github.com/swiftlang/swift-format/issues/469, open 2023-01-09) — though inline spacing is normalised (https://github.com/swiftlang/swift-format/issues/868, closed 2024-10-30).
 - Blank lines: `maximumBlankLines` defaults to 1, `indentBlankLines` to false (https://github.com/swiftlang/swift-format/blob/main/Documentation/Configuration.md).
 - `OrderedImports` sorts imports; sectioning is configurable and access-level grouping missing (https://github.com/swiftlang/swift-format/issues/1128, closed 2025-12-18; https://github.com/swiftlang/swift-format/issues/703, open 2024-03-15).
 - Line width: `lineLength` defaults to 100 (https://github.com/swiftlang/swift-format/blob/main/Documentation/Configuration.md).
