@@ -23140,7 +23140,7 @@
         "stderr": "",
         "text": "meaning-equal"
       },
-      "owner": "ours",
+      "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
@@ -23179,7 +23179,7 @@
         "stderr": "",
         "text": "meaning-equal"
       },
-      "owner": "ours",
+      "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
@@ -34180,7 +34180,7 @@
         "stderr": "",
         "text": "meaning-equal"
       },
-      "owner": "ours",
+      "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
@@ -34219,7 +34219,7 @@
         "stderr": "",
         "text": "meaning-equal"
       },
-      "owner": "ours",
+      "owner": "shared",
       "owner_preserved": true,
       "second": {
         "exit": 0,
