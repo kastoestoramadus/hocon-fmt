@@ -240,6 +240,27 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  List("", "unrelated.txt\n", "!keep.conf\n").foreach { local =>
+    tmp.test(s"an unmatched nested .gitignore preserves inherited exclusions: $local") { dir =>
+      val sub = dir / "sub"
+      for {
+        _      <- write(dir, ".gitignore", "ignored.conf\n")
+        _      <- Files[IO].createDirectory(sub)
+        _      <- write(sub, ".gitignore", local)
+        hidden <- write(sub, "ignored.conf", unformatted)
+        kept   <- write(sub, "keep.conf", unformatted)
+        run    <-
+          CmdApi.examineAll(CmdApi.Arguments(List(dir), checkOnly = false, config = None, style = StyleOverrides.none))
+        bytes  <- Files[IO].readAll(hidden).through(fs2.text.utf8.decode).compile.string
+        wanted <- Files[IO].realPath(kept)
+      } yield {
+        val outcomes = run.toOption.toList.flatMap(_.outcomes)
+        assertEquals(outcomes.map(_.path), List(wanted.toString))
+        assertEquals(bytes, unformatted)
+      }
+    }
+  }
+
   tmp.test("a file named on the command line is examined even when .gitignore excludes it") { dir =>
     for {
       _    <- write(dir, ".gitignore", "a.conf\n")
