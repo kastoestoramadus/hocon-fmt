@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercises scripts/verify-research-urls.py without a network: the checker reads every answer
+# Exercises scripts/verify-research-urls.py without an external network: the checker reads every answer
 # from canned JSON when VERIFY_RESEARCH_URLS_STUB names a directory with a manifest.json
 # ({url: file name}), so a fixture can pin what GitHub and a plain web server would have said.
 # Each case is a small markdown file and the summary line it must produce; the run is
@@ -219,6 +219,7 @@ if status >= 400:
     sys.exit(1)
 PYGH
 chmod +x "$work/bin/gh"
+expect_run 'summary counts existence-only GitHub citations' 0 '1 ok (no title claimed)' "$md/prose.md"
 expect_run 'prose labels claim no title' 0 'ok (no title claimed)' --verbose "$md/prose.md"
 expect_run 'a quoted wrong link label still mismatches' 1 'WRONG title' "$md/quoted-label.md"
 expect_run 'a backticked wrong title still mismatches' 1 'WRONG title' "$md/backtick-title.md"
