@@ -1,4 +1,4 @@
-# 2026-10-09 — — — Six playground stories
+# 2026-10-09 — [#66](https://github.com/kastoestoramadus/hocon-fmt/pull/66) — Six playground stories
 
 **Change:** Replaced the five playground buttons with six shared stories: mixed styles, a dead duplicate with a visible report, development defaults and production overrides, a verbatim Apache Pekko excerpt with attribution, a missing brace, and the comment safety net. Added site style controls and Formatted/Resolved tabs. Preserved all previous fixtures in the catalogue and pinned exact fork outputs separately from the published core's refusals.
 
