@@ -156,6 +156,8 @@ fixtures = {
     "prose": '[fixed in #83](https://github.com/acme/widgets/pull/83)',
     "quoted-label": '["WRONG title"](https://github.com/acme/widgets/issues/5)',
     "backtick-title": '[#5](https://github.com/acme/widgets/issues/5) `WRONG title`',
+    "literal-underscore": 'https://example.com/name_',
+    "unclosed-code": '~~~md\nhttps://example.com/gone',
     "real-title": '[The real title](https://github.com/acme/widgets/issues/5)',
     "code": '```md\n[link](https://example.com/gone)\n```\n~~~\nhttps://example.com/gone\n~~~\n`https://example.com/gone`\n``[x](https://example.com/gone)``\n[docs](https://example.com/docs)',
     "queries": 'https://example.com/search?q=live\nhttps://example.com/search?q=dead',
@@ -173,6 +175,7 @@ manifest = json.loads((stub / 'manifest.json').read_text())
 responses = {
     'https://github.com/acme/widgets/commit/deadbee': {'status': 422, 'message': 'No commit found for SHA: deadbee'},
     'https://github.com/acme/widgets/pull/83': {'title': 'An ordinary issue'},
+    'https://example.com/name_': {'status': 200},
     'https://example.com/search?q=live': {'status': 200},
     'https://example.com/search?q=dead': {'status': 404},
     'https://api.github.com/repos/acme/widgets/pulls/83': {'status': 404},
@@ -255,7 +258,8 @@ else
   echo 'ok   rate limit is not cached'
 fi
 transport_run 'reset header is reported' 3 'retry at 2100-01-01' --sleep 0 "$md/reset.md"
-TEST_NO_AUTH=1 transport_run 'unauthenticated runs warn' 0 'warning: running without gh authentication' "$md/issue-pr.md"
+printf '`https://example.com/gone`\n' > "$md/auth-only.md"
+TEST_NO_AUTH=1 transport_run 'unauthenticated runs warn' 0 'warning: running without gh authentication' "$md/auth-only.md"
 # Definitive responses remain cacheable; an old RETRY cache entry must be ignored.
 transport_run 'definitive response is cached' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
 : > "$work/requests"
@@ -269,6 +273,52 @@ for path in Path(sys.argv[1]).glob('*.json'):
     path.write_text(json.dumps(data))
 PYCACHE
 transport_run 'legacy retry cache is ignored' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
+
+expect_run 'an unclosed fence skips the rest of the file' 0 'skipped 1 in code' "$md/unclosed-code.md"
+expect_run 'a literal trailing underscore is kept' 0 '1 ok' "$md/literal-underscore.md"
+
+# A loopback HTTP transport reads canned statuses and records requests, including queries.
+cat > "$work/http-stub.py" <<'PYHTTP'
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+work = Path(sys.argv[1])
+class Handler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        with (work / 'http-requests').open('a') as log:
+            log.write(self.path + '\n')
+        data = json.loads((work / 'http.json').read_text())[self.path]
+        self.send_response(data['status'])
+        for key, value in data.get('headers', {}).items():
+            self.send_header(key, value)
+        self.end_headers()
+    def do_GET(self):
+        self.do_HEAD()
+    def log_message(self, *args):
+        pass
+server = HTTPServer(('127.0.0.1', 0), Handler)
+(work / 'port').write_text(str(server.server_port))
+server.serve_forever()
+PYHTTP
+printf '%s\n' '{"/search?q=live":{"status":200},"/search?q=dead":{"status":404},"/limited":{"status":403,"headers":{"X-RateLimit-Remaining":"0","Retry-After":"120"}}}' > "$work/http.json"
+python3 "$work/http-stub.py" "$work" &
+http_pid=$!
+trap 'kill "$http_pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+for attempt in {1..100}; do [ -s "$work/port" ] && break; sleep 0.01; done
+port=$(cat "$work/port")
+printf 'http://127.0.0.1:%s/search?q=live\nhttp://127.0.0.1:%s/search?q=dead\n' "$port" "$port" > "$md/http-query.md"
+transport_run 'query transport keeps both resources' 1 '1 ok, 0 mismatch, 1 dead' --cache "$work/query-cache" "$md/http-query.md"
+if [ "$(wc -l < "$work/http-requests")" -ne 2 ] || [ "$(ls "$work/query-cache" | wc -l)" -ne 2 ]; then
+  echo 'FAIL query URLs need two requests and two cache entries' >&2; failed=1
+fi
+: > "$work/http-requests"
+transport_run 'query cache keeps both answers' 1 '1 ok, 0 mismatch, 1 dead' --cache "$work/query-cache" "$md/http-query.md"
+if [ -s "$work/http-requests" ]; then echo 'FAIL query cache caused requests' >&2; failed=1; fi
+printf 'http://127.0.0.1:%s/limited\nhttp://127.0.0.1:%s/search?q=live\n' "$port" "$port" > "$md/http-limited.md"
+transport_run 'HEAD rate limit prevents GET fallback and subsequent URLs' 3 'retry after 120 seconds' "$md/http-limited.md"
+if [ "$(wc -l < "$work/http-requests")" -ne 1 ]; then
+  echo 'FAIL confirmed HEAD rate limit must stop after one request' >&2; failed=1
+fi
 
 # --json prints the same run as one document.
 json_out=$(VERIFY_RESEARCH_URLS_STUB="$stub" python3 -I "$script" --json "$md/good.md" 2>/dev/null)
