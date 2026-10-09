@@ -43,9 +43,9 @@ The wave-1 suites ran green from this worktree: `coreJVM/test` 450 passed, `cats
 - **A decision before or after the tag**: #25 the platform contract for the CLI (Windows and
   terminal stdin are not covered by `CliAcceptanceSuite`), #52 whether a sixth published artifact
   (a shared file-identity module) is wanted, #64 adding `changes` to the ruleset's required checks
-  (the docs-only path list already covers everything the build reads, `docs/**` included), whether
-  a symlink's alias or target name should decide the `.json`/`.properties` refusal (#73; today the
-  target name does, so a `.json` alias of a `.conf` target is formatted), and the return of merges
-  behind review once the first release is out (the commit-named entry 803a770, not a PR).
+  (the docs-only path list already covers everything the build reads, `docs/**` included), and the
+  return of merges behind review once the first release is out (the commit-named entry 803a770,
+  not a PR). The symlink alias-or-target-name question is no longer open: it is a documented
+  limitation with an invitation to open an issue (see [limitations](../limitations.md)).
 - **The site and the playground** (#16, #30, #32, #40, #42, #55, #57, #66, #67, #69, #71) are
   wave 2 or later: nothing there is on the JVM artifacts' path.

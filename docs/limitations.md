@@ -206,6 +206,26 @@ name ends in `.json` or `.properties` is refused whatever its content — `Refus
 format under the name it has. Plugin file filters default to `.conf` and `.hocon`; a configured
 include that reaches one of these is reported and left alone.
 
+## Platforms and edge cases
+
+- **Windows and a terminal's stdin are untested for now.** Every suite runs on Linux, in CI too;
+  macOS appears in the release workflow only to link the native binary, and the command line's
+  stdin cases feed it a pipe or a file, never a TTY. Nothing says either cannot work — nothing
+  shows it does.
+- **A symlink is followed, and the name that decides is its target's.** So `alias.json` pointing at
+  `target.conf` is formatted, and `alias.conf` pointing at `target.json` is refused as a JSON file.
+  A directory walk decides what to visit by the entry's own name: an `alias.json` symlink is not
+  visited there, while an `alias.conf` one is and formats its target. If you need the link's own
+  name to decide, open an issue and tell us — the behaviour can change.
+- **When the staged replacement cannot prove it keeps the file's owner, group and mode bits — or
+  the file or its directory is not writable — the formatted text is written in place.** That keeps
+  the inode, but not the crash-atomicity of a rename: the write truncates first, so an interrupted
+  one can leave a partial file (a killed run on an unwritable directory left a 7.4 MB file empty).
+  The Mill plugin always writes in place — a deliberate simplification, since the other plugins
+  get a staged replacement from the Java API, and Mill needs none of that boundary. If the window
+  matters to you, open an issue: we would gladly hear of a better solution.
+  [Usage](usage.md) has the full write contract.
+
 ## Speed
 
 sconfig's parser is about 27 times slower on Scala Native than on the JVM, and its renderer is the

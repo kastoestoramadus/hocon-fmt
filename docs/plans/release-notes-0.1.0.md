@@ -36,7 +36,8 @@ untouched, and it does not fail the run. A `.conf` file that is not HOCON at all
 not UTF-8, a `.json` file, a file whose formatting would lose a comment or an include, and the
 sconfig defects listed in [limitations](../limitations.md) all end that way. The name is the one
 the file is known by: a symlink is followed first, so a `.json` alias of a `.conf` target is
-formatted, and a `.conf` alias of a `.json` target is refused. A file that cannot be
+formatted, and a `.conf` alias of a `.json` target is refused — tell us if you need a link's own
+name to decide instead. A file that cannot be
 *read or written* is a different thing: `cannot read <path>: <reason>` on stderr and exit code 2,
 so a typo in a CI path cannot pass silently.
 
