@@ -137,15 +137,138 @@ expect_run 'a link without text is checked for existence only' \
   0 'checked 1 urls: 1 ok, 0 mismatch, 0 dead, 0 unverifiable (text only)' "$md/no-text.md"
 expect_run 'a link whose text names the wrong issue number is a MISMATCH' \
   1 'claimed: *"#9"' "$md/reference-mismatch.md"
-expect_run 'a rate limit is RETRY, a refused connection and an unknown URL are unverifiable, and none fails the run' \
-  0 'checked 3 urls: 0 ok, 0 mismatch, 0 dead, 3 unverifiable (text only)' "$md/flaky.md"
-expect_run 'a rate limit is labelled RETRY' 0 'RETRY' "$md/flaky.md"
+expect_run 'a rate limit stops the run immediately' \
+  3 'checked 1 urls: 0 ok, 0 mismatch, 0 dead, 1 unverifiable (text only)' "$md/flaky.md"
+expect_run 'a rate limit is labelled RETRY' 3 'RETRY' "$md/flaky.md"
 expect_run 'a bracket inside a code span does not swallow the next link' \
   0 'checked 1 urls: 1 ok, 0 mismatch, 0 dead, 0 unverifiable (text only)' "$md/stray-bracket.md"
 expect_run 'a backticked identifier after a link is not read as its title' \
   0 'checked 1 urls: 1 ok, 0 mismatch, 0 dead, 0 unverifiable (text only)' "$md/code-not-title.md"
 expect_run 'an ellipsis-marked fragment matches a title it is cut from' \
   0 'checked 1 urls: 1 ok, 0 mismatch, 0 dead, 0 unverifiable (text only)' "$md/ellipsis.md"
+
+# Review regressions; transport fixtures exercise the actual gh path as well as canned URLs.
+python3 - "$md" "$stub" <<'PYFIX'
+import json, sys
+from pathlib import Path
+md, stub = map(Path, sys.argv[1:])
+fixtures = {
+    "prose": '[fixed in #83](https://github.com/acme/widgets/pull/83)',
+    "quoted-label": '["WRONG title"](https://github.com/acme/widgets/issues/5)',
+    "backtick-title": '[#5](https://github.com/acme/widgets/issues/5) `WRONG title`',
+    "real-title": '[The real title](https://github.com/acme/widgets/issues/5)',
+    "code": '```md\n[link](https://example.com/gone)\n```\n~~~\nhttps://example.com/gone\n~~~\n`https://example.com/gone`\n``[x](https://example.com/gone)``\n[docs](https://example.com/docs)',
+    "queries": 'https://example.com/search?q=live\nhttps://example.com/search?q=dead',
+    "emphasis": '**https://example.com/docs**\n_https://example.com/docs_',
+    "missing-commit": 'https://github.com/acme/widgets/commit/deadbee',
+    "pull-issue": '[#83](https://github.com/acme/widgets/pull/83)',
+    "issue-pr": '[#84](https://github.com/acme/widgets/issues/84)',
+    "forbidden": 'https://github.com/acme/widgets/issues/85',
+    "limited": 'https://github.com/acme/widgets/issues/86\nhttps://github.com/acme/widgets/issues/84',
+    "reset": 'https://github.com/acme/widgets/issues/87',
+}
+for name, text in fixtures.items():
+    (md / (name + '.md')).write_text(text + '\n')
+manifest = json.loads((stub / 'manifest.json').read_text())
+responses = {
+    'https://github.com/acme/widgets/commit/deadbee': {'status': 422, 'message': 'No commit found for SHA: deadbee'},
+    'https://github.com/acme/widgets/pull/83': {'title': 'An ordinary issue'},
+    'https://example.com/search?q=live': {'status': 200},
+    'https://example.com/search?q=dead': {'status': 404},
+    'https://api.github.com/repos/acme/widgets/pulls/83': {'status': 404},
+    'https://api.github.com/repos/acme/widgets/issues/83': {'title': 'An ordinary issue'},
+    'https://api.github.com/repos/acme/widgets/issues/84': {'title': 'A PR', 'pull_request': {}},
+    'https://api.github.com/repos/acme/widgets/commits/deadbee': {'status': 422, 'message': 'No commit found for SHA: deadbee'},
+    'https://api.github.com/repos/acme/widgets/issues/85': {'status': 403, 'message': 'Resource not accessible by integration'},
+    'https://api.github.com/repos/acme/widgets/issues/86': {'status': 403, 'message': 'API rate limit exceeded', 'headers': {'Retry-After': '120'}},
+    'https://api.github.com/repos/acme/widgets/issues/87': {'status': 429, 'headers': {'X-RateLimit-Reset': '4102444800'}},
+}
+for n, (url, response) in enumerate(responses.items()):
+    name = f'regression-{n}.json'
+    manifest[url] = name
+    (stub / name).write_text(json.dumps(response))
+(stub / 'manifest.json').write_text(json.dumps(manifest))
+PYFIX
+mkdir -p "$work/bin"
+cat > "$work/bin/gh" <<'PYGH'
+#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+if sys.argv[1] == 'auth':
+    sys.exit(1 if os.environ.get('TEST_NO_AUTH') else 0)
+path = next(arg for arg in sys.argv[2:] if arg.startswith('repos/'))
+with open(os.environ['TEST_REQUEST_LOG'], 'a') as log:
+    log.write(path + '\n')
+stub = Path(os.environ['TEST_TRANSPORT_STUB'])
+manifest = json.loads((stub / 'manifest.json').read_text())
+data = json.loads((stub / manifest['https://api.github.com/' + path]).read_text())
+status = data.pop('status', 200)
+headers = data.pop('headers', {})
+if '--include' in sys.argv:
+    print(f'HTTP/2.0 {status} Fixture')
+    for key, value in headers.items():
+        print(f'{key}: {value}')
+    print()
+print(json.dumps(data))
+if status >= 400:
+    print(f'gh: {data.get("message", "error")} (HTTP {status})', file=sys.stderr)
+    sys.exit(1)
+PYGH
+chmod +x "$work/bin/gh"
+expect_run 'prose labels claim no title' 0 'ok (no title claimed)' --verbose "$md/prose.md"
+expect_run 'a quoted wrong link label still mismatches' 1 'WRONG title' "$md/quoted-label.md"
+expect_run 'a backticked wrong title still mismatches' 1 'WRONG title' "$md/backtick-title.md"
+expect_run 'a real unquoted title passes' 0 '1 ok' "$md/real-title.md"
+expect_run 'fenced and inline code links are skipped' 0 'skipped 4 in code' "$md/code.md"
+expect_run 'plain query strings identify distinct resources' 1 'checked 2 urls: 1 ok, 0 mismatch, 1 dead' "$md/queries.md"
+expect_run 'markdown emphasis wrappers are stripped' 0 'checked 2 urls: 2 ok' "$md/emphasis.md"
+
+transport_run() { # Exercise gh with the same canned JSON, without bypassing fetch/cache.
+  local name="$1" want="$2" pattern="$3"
+  shift 3
+  local out status
+  out=$(env -u VERIFY_RESEARCH_URLS_STUB PATH="$work/bin:$PATH" \
+    TEST_TRANSPORT_STUB="$stub" TEST_REQUEST_LOG="$work/requests" \
+    python3 -I "$script" "$@" 2>&1) && status=0 || status=$?
+  if [ "$status" -ne "$want" ] || ! grep -q -- "$pattern" <<< "$out"; then
+    echo "FAIL $name: exit $status (wanted $want), expected '$pattern': $out" >&2
+    failed=1
+  else
+    echo "ok   $name"
+  fi
+}
+transport_run 'pull URL can name an issue' 0 '1 ok' "$md/pull-issue.md"
+transport_run 'issue URL can name a PR' 0 '1 ok' "$md/issue-pr.md"
+expect_run 'canned missing commit HTTP 422 is DEAD' 1 '1 dead' "$md/missing-commit.md"
+transport_run 'missing commit HTTP 422 is DEAD' 1 '1 dead' "$md/missing-commit.md"
+transport_run 'ordinary HTTP 403 is unverifiable' 0 'UNVERIFIABLE' "$md/forbidden.md"
+: > "$work/requests"
+transport_run 'rate limit stops with Retry-After advice' 3 'retry after 120 seconds' --sleep 0 --jobs 4 --cache "$work/cache" "$md/limited.md"
+if [ "$(wc -l < "$work/requests")" -ne 1 ]; then
+  echo 'FAIL rate limit must make exactly one request' >&2; failed=1
+else
+  echo 'ok   rate limit makes exactly one request'
+fi
+if [ -d "$work/cache" ] && [ -n "$(ls -A "$work/cache")" ]; then
+  echo 'FAIL rate limit must not be cached' >&2; failed=1
+else
+  echo 'ok   rate limit is not cached'
+fi
+transport_run 'reset header is reported' 3 'retry at 2100-01-01' --sleep 0 "$md/reset.md"
+TEST_NO_AUTH=1 transport_run 'unauthenticated runs warn' 0 'warning: running without gh authentication' "$md/issue-pr.md"
+# Definitive responses remain cacheable; an old RETRY cache entry must be ignored.
+transport_run 'definitive response is cached' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
+: > "$work/requests"
+transport_run 'definitive cache avoids requests' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
+if [ -s "$work/requests" ]; then echo 'FAIL definitive cache was ignored' >&2; failed=1; fi
+python3 - "$work/good-cache" <<'PYCACHE'
+import json, sys
+from pathlib import Path
+for path in Path(sys.argv[1]).glob('*.json'):
+    data = json.loads(path.read_text()); data['status'] = 'retry'
+    path.write_text(json.dumps(data))
+PYCACHE
+transport_run 'legacy retry cache is ignored' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
 
 # --json prints the same run as one document.
 json_out=$(VERIFY_RESEARCH_URLS_STUB="$stub" python3 -I "$script" --json "$md/good.md" 2>/dev/null)
