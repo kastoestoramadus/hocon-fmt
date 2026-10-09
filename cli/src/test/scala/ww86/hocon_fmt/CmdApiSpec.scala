@@ -144,14 +144,34 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
-  tmp.test("a file that cannot be read is reported without stopping the others") { dir =>
+  // A missing file is not a refusal of any content: it is the run's own error, as a usage error
+  // is, so a typo in a CI script's path cannot pass silently.
+  tmp.test("a missing file is reported as unreadable and exits 2, without stopping the others") { dir =>
     for {
       file <- write(dir, "a.conf", unformatted)
       run  <- rewrite(dir / "missing.conf", file)
       text <- textOf(file)
     } yield {
-      assert(run.rendered.contains("missing.conf"), run.rendered)
+      assertEquals(run.exitCode, ExitCode(2))
+      assertEquals(run.errors, s"cannot read ${(dir / "missing.conf").absolute}: no such file\n")
+      assert(!run.rendered.contains("missing.conf"), run.rendered)
       assertEquals(text, formatted)
+    }
+  }
+
+  tmp.test("--check exits 2 when a file is missing even when another is unformatted") { dir =>
+    for {
+      unformattedFile <- write(dir, "present.conf", unformatted)
+      run             <- check(dir / "missing.conf", unformattedFile)
+    } yield assertEquals(run.exitCode, ExitCode(2))
+  }
+
+  tmp.test("a directory named for formatting that does not exist is unreadable too") { dir =>
+    for {
+      run <- rewrite(dir / "nope" / "deep.conf")
+    } yield {
+      assertEquals(run.exitCode, ExitCode(2))
+      assert(run.errors.contains("no such file"), run.errors)
     }
   }
 
