@@ -274,6 +274,17 @@ for path in Path(sys.argv[1]).glob('*.json'):
 PYCACHE
 transport_run 'legacy retry cache is ignored' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
 
+python3 - "$work/good-cache" <<'PYOLD'
+import json, sys
+from pathlib import Path
+for path in Path(sys.argv[1]).glob('*.json'):
+    data = json.loads(path.read_text())
+    data.pop('version', None)
+    data['status'] = 'dead'
+    path.write_text(json.dumps(data))
+PYOLD
+transport_run 'old-format false DEAD cache is ignored' 0 '1 ok' --cache "$work/good-cache" "$md/issue-pr.md"
+
 expect_run 'an unclosed fence skips the rest of the file' 0 'skipped 1 in code' "$md/unclosed-code.md"
 expect_run 'a literal trailing underscore is kept' 0 '1 ok' "$md/literal-underscore.md"
 
