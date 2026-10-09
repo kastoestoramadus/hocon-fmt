@@ -16,7 +16,11 @@ final case class GitIgnore(patterns: List[GitIgnore.Pattern]) {
     * excluded: the last pattern that matches it wins, and no match excludes nothing.
     */
   def excluded(path: String, isDirectory: Boolean): Boolean =
-    patterns.reverse.iterator.find(_.matches(path, isDirectory)).exists(!_.negate)
+    decision(path, isDirectory).contains(true)
+
+  /** No match leaves an inherited ignore rule in charge; a negation explicitly clears it. */
+  def decision(path: String, isDirectory: Boolean): Option[Boolean] =
+    patterns.reverse.iterator.find(_.matches(path, isDirectory)).map(!_.negate)
 }
 
 object GitIgnore {
