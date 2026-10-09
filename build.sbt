@@ -111,6 +111,14 @@ def guardPublish(p: Project): Project =
 val checkSconfigFork =
   taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
 
+/** Fails unless every project a release uploads also uploads the projects it depends on: a POM
+  * names its dependencies, so a release set that leaves one out publishes an artifact no consumer
+  * can resolve (`hocon-fmt-cli_3`'s POM names `hocon-fmt-cats_3`). The set itself is at the bottom,
+  * next to the release aliases.
+  */
+val checkReleaseSet =
+  taskKey[Unit]("Fails unless the release set is closed under its inter-project dependencies.")
+
 ThisBuild / checkSconfigFork := {
   val ivyHome  = ivyPaths.value.ivyHome.getOrElse(Path.userHome / ".ivy2")
   val artifact = ivyHome / "local" / "org.ekrich" / "sconfig_sjs1_3" / sconfigFork
@@ -156,6 +164,7 @@ lazy val root = project
     Test / test / aggregate := false,
     Test / test             := Def
       .sequential(
+        checkReleaseSet,
         coreJVM / Test / test,
         catsJVM / Test / test,
         cliJVM / Test / test,
@@ -665,25 +674,31 @@ lazy val javaApi = guardPublish(
     .dependsOn(coreJVM)
 )
 
-// What a release uploads: the libraries and the sbt plugin, signed. Stops at the upload, so the
-// deployment waits in the portal until someone clicks Publish.
-val signedReleaseTasks =
+// Wave 1 is what the first release uploads: the JVM artifacts — the core, the CLI, the Java API
+// and the sbt plugin. Wave 2 adds the JS and Native artifacts and the zio adapter.
+val releaseProjectIds =
   Seq(
     coreJVM.id,
-    coreJS.id,
-    coreNative.id,
-    catsJVM.id,
-    catsJS.id,
-    catsNative.id,
     cliJVM.id,
     javaApi.id,
-    zioJVM.id,
-    zioJS.id,
-    zioNative.id,
-    "sbtPlugin"
+    sbtPlugin.id
   )
-    .map(id => s"$id/publishSigned")
-    .mkString("; ")
+
+ThisBuild / checkReleaseSet := {
+  val inSet = releaseProjectIds.toSet
+  val needs = buildDependencies.value.classpathTransitive.map { case (from, to) =>
+    from.project -> to.map(_.project)
+  }
+  val missing = releaseProjectIds.sorted
+    .flatMap(id => needs.getOrElse(id, Nil).filterNot(inSet).map(dependency => s"$dependency (needed by $id)"))
+  if (missing.nonEmpty)
+    sys.error(s"the release set is not closed under its dependencies: ${missing.mkString(", ")}")
+}
+
+// What a release uploads: the wave-1 set, signed. Stops at the upload, so the deployment waits in
+// the portal until someone clicks Publish.
+val signedReleaseTasks =
+  releaseProjectIds.map(id => s"$id/publishSigned").mkString("; ")
 
 addCommandAlias("signRelease", signedReleaseTasks)
 addCommandAlias("publishRelease", signedReleaseTasks + "; sonaUpload")
