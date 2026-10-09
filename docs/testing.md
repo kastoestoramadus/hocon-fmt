@@ -103,6 +103,15 @@ examples need no expected file: their verdict is pinned. Refused catalogue examp
 output are compared exactly, including the final newline. Only the `default` option set
 exists today.
 
+To regenerate a successful shared example with the golden-file workflow, copy its
+`input.conf` to `core/jvm-native/src/test/resources/shared-example.conf`, run
+`UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hocon_fmt.GoldenFileSpec"`, and copy
+`shared-example.expected.conf` back to the example's `expected/default.conf`.
+Remove both temporary resource files, inspect the expected-output diff, then run
+`ExamplesSpec` without `UPDATE_GOLDEN`. Refused inputs are never combined: one
+file can only pin the first refusal. When merging successful inputs, retain each
+old input verbatim and update the metadata to describe every retained behaviour.
+
 The sbt source generator reads `example.conf` with sconfig and embeds both directories
 in core test and site Scala data; tests and the site use it without runtime file I/O. Metadata carries
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),

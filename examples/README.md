@@ -22,3 +22,9 @@ site derivative remain attributed. All five previous buttons survive in `catalog
 as `messy`, `includes`, `comments`, `not-hocon` and `sconfig-defect`, and all five
 also appear after the six stories. Upstream gaps carry linked `upstream` notes;
 the page distinguishes the published core’s refusal from its fork’s result.
+
+Successful small fixtures are grouped by subject: `comments` retains the original
+slash-comment and triple-quoted-string inputs; `messy` retains the optional substitution
+and lone append; `showcase/02-set-twice` retains the duplicate logging filter. Refused
+fixtures stay separate because each file pins one refusal. The original five buttons
+keep their `playground-order` values.
