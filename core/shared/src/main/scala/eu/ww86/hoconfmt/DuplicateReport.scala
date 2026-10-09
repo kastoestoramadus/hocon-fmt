@@ -103,21 +103,26 @@ object DuplicateReport {
     * object (two objects merge, so neither replaces the other), whether it holds a substitution,
     * and whether it writes nothing (an object with no value inside: the only work it does is
     * replace a value that is not an object).
+    *
+    * `position` counts the statements the walk has passed, so two definitions sharing a line can
+    * still be told apart by which stands first. A line carries no column, and an include on the
+    * same line as a definition is either before it or after it; only the position says which.
     */
   private[hoconfmt] case class Definition(
       keyPath: KeyPath,
       line: Int,
+      position: Int,
       objectValued: Boolean,
       holdsSubstitution: Boolean,
       writesNothing: Boolean,
       arrayScope: List[Int]
   )
 
-  /** One `include` directive: the line it stands on, the object it stands in, and the array scope
-    * of that object. Read from the masked text, where an include is a placeholder field, so the
-    * walk finds it by that field's key.
+  /** One `include` directive: the line it stands on, its position among the statements, the object
+    * it stands in, and the array scope of that object. Read from the masked text, where an include
+    * is a placeholder field, so the walk finds it by that field's key.
     */
-  private[hoconfmt] case class Include(line: Int, scope: KeyPath, arrayScope: List[Int])
+  private[hoconfmt] case class Include(line: Int, position: Int, scope: KeyPath, arrayScope: List[Int])
 
   /** Everything the walk finds in source order: the fields and the includes. */
   private[hoconfmt] case class Outline(definitions: Vector[Definition], includes: Vector[Include]) {
@@ -203,21 +208,25 @@ object DuplicateReport {
   ): (Int, Outline) = {
     val segments = pathOf(field.path)
     val path     = at ++ segments
+    // Every field leaves one definition of its own behind, so the count of what stands in `found`
+    // has grown by one per field passed: it says where this statement stands in the source.
+    val position = found.definitions.size + found.includes.size
     // `+=` is the self-referential `${?key} [ ... ]` in another spelling: it reads the earlier
     // value, which the parser only desugars in the merged tree, not in this document tree.
     val holds    = appends(field) || holdsSubstitution(field.value)
     val contents =
-      if (placeholder(segments)) found.add(Include(line, KeyPath(at), arrayScope))
+      if (placeholder(segments)) found.add(Include(line, position, KeyPath(at), arrayScope))
       else {
         val own = Definition(
           KeyPath(path),
           line,
+          position,
           objectValued = objectValued(field.value),
           holdsSubstitution = holds,
           writesNothing = writesNothing(field.value),
           arrayScope = arrayScope
         )
-        found.addAll(implicitObjects(at, segments, line, holds, arrayScope)).add(own)
+        found.addAll(implicitObjects(at, segments, line, position, holds, arrayScope)).add(own)
       }
     // The path and the separator only advance the line; the value may hold fields of its own.
     field.children.asScala.toList.foldLeft((line, contents)) { case ((current, acc), child) =>
@@ -247,6 +256,7 @@ object DuplicateReport {
       at: List[KeyPath.Segment],
       segments: List[KeyPath.Segment],
       line: Int,
+      position: Int,
       holdsSubstitution: Boolean,
       arrayScope: List[Int]
   ): Vector[Definition] =
@@ -254,6 +264,7 @@ object DuplicateReport {
       Definition(
         KeyPath(at ++ segments.take(length)),
         line,
+        position,
         objectValued = true,
         holdsSubstitution = holdsSubstitution,
         // A leaf stands below it, so it writes something.
@@ -267,7 +278,7 @@ object DuplicateReport {
     * or over an earlier substitution, whose object merges with it — takes nothing away: `a = ${b}`
     * then `a.c = 2` resolves to b's fields with c beside them.
     */
-  private def replaces(later: Definition, earlier: Definition): Boolean =
+  private[hoconfmt] def erases(later: Definition, earlier: Definition): Boolean =
     !later.holdsSubstitution && (!later.objectValued || (!earlier.objectValued && !earlier.holdsSubstitution))
 
   private def prefixes(path: KeyPath): Vector[KeyPath] =
@@ -281,7 +292,7 @@ object DuplicateReport {
       prefixes(earlier.keyPath)
         .flatMap(path => byPath.getOrElse((earlier.arrayScope, path), Vector.empty))
         .filter { case (later, next) =>
-          next > at && (if (later.keyPath == earlier.keyPath) replaces(later, earlier)
+          next > at && (if (later.keyPath == earlier.keyPath) erases(later, earlier)
                         else !later.objectValued && !later.holdsSubstitution)
         }
         .minByOption(_._2)

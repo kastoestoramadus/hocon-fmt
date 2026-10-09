@@ -24,15 +24,20 @@ import scala.util.Try
   *     carries no value on its own line is one the formatting dropped.
   *
   * A dropped definition is refused over when the include could have written its path, that is when
-  * it stands in the include's object and another definition of the same object names the same path
-  * or one above or below it, and when its dropping could let the included values merge where they
-  * did not:
+  * it stands in the include's object after the include, and another definition of the same object
+  * names the same path or one above or below it, and when its dropping could let the included
+  * values merge where they did not:
   *
   *   - the definition writes a value (not an object), and a later definition makes the path an
   *     object again, which merges into what the include left there;
   *   - or the definition is an object with nothing inside it, which replaces what is not an object,
   *     and no later definition of that path follows, so nothing else of the file replaces the
-  *     include's values either.
+  *     include's values either;
+  *   - or the definition shares its line with another definition of the same path that keeps it out
+  *     of the merged tree — one of the two writes a value, or this one is an object with nothing
+  *     inside it, which vanishes into the other's object. Neither the merge's origins nor the
+  *     rendering tell one of the two from the other — a line carries no column, and fields sharing
+  *     a line come out in no defined order — so the survivor cannot vouch for the dropped one.
   *
   * Refusing a little too much is the point: the included file cannot be read at format time (a
   * web page has no filesystem, and the include may name a URL), so the contents that could arrive
@@ -63,7 +68,9 @@ private[hoconfmt] object IncludeShadow {
     * names the line of the field that put it there. A definition survives exactly when its path and
     * its line are one of these pairs. The line alone cannot decide it, since `a.o = 3` writes the
     * object `a` and the value `a.o` on one line, and the object the merge keeps would make the
-    * dropped leaf look kept.
+    * dropped leaf look kept. Neither can the pair decide between two definitions written on one
+    * line, which share both halves; [[replacedOnItsLine]] refuses those rather than let one vouch
+    * for the other.
     *
     * The root's own origin is left out: it is the text's first line, which a definition can share
     * only by standing at the very top, where no include can stand before it. Objects, arrays and
@@ -99,14 +106,40 @@ private[hoconfmt] object IncludeShadow {
       .iterator
       .flatMap { include =>
         val inItsObject = outline.definitions.filter(definition => standsIn(definition, include))
-        inItsObject
-          .filter(definition => definition.line > include.line && !survives(kept, definition))
-          .sortBy(_.line)
+        inItsObject.zipWithIndex
+          .filter { case (definition, at) =>
+            definition.position > include.position &&
+            (!survives(kept, definition) || overshadowedOnItsLine(inItsObject, at, definition).nonEmpty)
+          }
+          .sortBy { case (definition, _) => definition.line }
           .iterator
-          .flatMap(definition => shadowOf(definition, include, inItsObject, root, kept))
+          .flatMap { case (definition, at) =>
+            Option.when[Refusal.ShadowedByInclude](shadowed(definition, at, include, inItsObject, root, kept))(
+              Refusal.ShadowedByInclude(definition.keyPath.rendered, include.line, definition.line)
+            )
+          }
       }
       .nextOption()
   }
+
+  /** The definitions beside `definition` on its line that keep it out of the merged tree: the same
+    * path, and either the other writes a value the two cannot merge with, or this one is an object
+    * with nothing inside it, which the other's object swallows whole — `p {}` beside `p { a = 1 }`
+    * leaves nothing of its own to see in the rendering. The merged tree carries a path and a line
+    * per value and no column, so which of the two a value at that path on that line came from
+    * cannot be read off it: [[survives]] can vouch for neither.
+    */
+  private def overshadowedOnItsLine(
+      inItsObject: Vector[DuplicateReport.Definition],
+      at: Int,
+      definition: DuplicateReport.Definition
+  ): Vector[DuplicateReport.Definition] =
+    inItsObject.zipWithIndex.collect {
+      case (other, otherAt)
+          if otherAt != at && other.line == definition.line && other.keyPath == definition.keyPath &&
+            (DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued) =>
+        other
+    }
 
   /** Whether a definition stands in the object an include stands in. Definitions elsewhere never
     * meet the include: the included file's fields are inlined into that object alone.
@@ -114,44 +147,51 @@ private[hoconfmt] object IncludeShadow {
   private def standsIn(definition: DuplicateReport.Definition, include: DuplicateReport.Include): Boolean =
     definition.arrayScope == include.arrayScope && definition.keyPath.segments.startsWith(include.scope.segments)
 
-  private def shadowOf(
+  /** Whether a definition the merge dropped could let the include's values through.
+    *
+    * The statements the walk passed give every definition its place in the source, so a definition
+    * on the include's own line counts only when it stands after it: one in front of the include
+    * cannot be what kept the included values out of the path.
+    */
+  private def shadowed(
       definition: DuplicateReport.Definition,
+      at: Int,
       include: DuplicateReport.Include,
       inItsObject: Vector[DuplicateReport.Definition],
       root: ConfigObject,
       kept: Set[(KeyPath, Int)]
-  ): Option[Refusal.ShadowedByInclude] = {
-    val later   = inItsObject.filter(_.line > definition.line)
+  ): Boolean = {
+    val later =
+      inItsObject.filter(_.position > definition.position) ++
+        overshadowedOnItsLine(inItsObject, at, definition).filter(DuplicateReport.erases(_, definition))
     val related =
-      inItsObject.exists(other => other.line != definition.line && relatedPaths(other.keyPath, definition.keyPath))
-    val shadowed =
-      if (!related) false
-      else if (definition.objectValued) {
-        // An object with nothing inside it adds nothing to a merge, so replacing a value that is
-        // not an object is the only work it does. Only a definition the rendering keeps, between
-        // the include and this one and on this path or a path below it, has made the path an
-        // object already — a dropped one may have done nothing itself. And a later definition the
-        // rendering keeps ends the merge with a value of its own.
-        definition.writesNothing &&
-        !later.exists(other => survives(kept, other) && sameOrBelow(other.keyPath, definition.keyPath)) &&
-        !inItsObject.exists(other =>
-          other.line > include.line && other.line < definition.line && survives(kept, other) &&
-            (sameOrBelow(other.keyPath, definition.keyPath) && other.objectValued ||
-              sitsBelow(definition.keyPath, other.keyPath))
-        )
-      } else {
-        // A value that is not an object erases what came before, the included file's value
-        // included. Losing it lets the included value merge into the object a later definition of
-        // the path leaves behind; a merged tree that is not an object at the path means the
-        // rendering ends with a value that erases the included one instead.
-        later.exists(other =>
-          (other.keyPath == definition.keyPath && other.objectValued) ||
-            sitsBelow(definition.keyPath, other.keyPath)
-        ) && objectAt(root, definition.keyPath)
+      inItsObject.zipWithIndex.exists { case (other, otherAt) =>
+        otherAt != at && relatedPaths(other.keyPath, definition.keyPath)
       }
-    Option.when(shadowed)(
-      Refusal.ShadowedByInclude(definition.keyPath.rendered, include.line, definition.line)
-    )
+    if (!related) false
+    else if (definition.objectValued) {
+      // An object with nothing inside it adds nothing to a merge, so replacing a value that is
+      // not an object is the only work it does. Only a definition the rendering keeps, between
+      // the include and this one and on this path or a path below it, has made the path an
+      // object already — a dropped one may have done nothing itself. And a later definition the
+      // rendering keeps ends the merge with a value of its own.
+      definition.writesNothing &&
+      !later.exists(other => survives(kept, other) && sameOrBelow(other.keyPath, definition.keyPath)) &&
+      !inItsObject.exists(other =>
+        other.position > include.position && other.position < definition.position && survives(kept, other) &&
+          (sameOrBelow(other.keyPath, definition.keyPath) && other.objectValued ||
+            sitsBelow(definition.keyPath, other.keyPath))
+      )
+    } else {
+      // A value that is not an object erases what came before, the included file's value
+      // included. Losing it lets the included value merge into the object a later definition of
+      // the path leaves behind; a merged tree that is not an object at the path means the
+      // rendering ends with a value that erases the included one instead.
+      later.exists(other =>
+        (other.keyPath == definition.keyPath && other.objectValued) ||
+          sitsBelow(definition.keyPath, other.keyPath)
+      ) && objectAt(root, definition.keyPath)
+    }
   }
 
   /** Whether the merged tree holds an object at the path. */
