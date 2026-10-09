@@ -38,6 +38,19 @@ class HoconFormatterPluginFunctionalTest {
     }
 
     @Test
+    void repositoryStyleAndDuplicatesMatchTheCli() throws IOException {
+        Path fixture = Path.of("../test-fixtures/plugin-options");
+        write(".hocon-fmt.conf", Files.readString(fixture.resolve(".hocon-fmt.conf")));
+        Path file = write("src/main/resources/app.conf", Files.readString(fixture.resolve("input.conf")));
+        String output = build("hoconFormat").getOutput();
+        assertEquals(Files.readString(fixture.resolve("expected.conf")), read(file));
+        assertTrue(output.contains("defined again"), output);
+        write("src/main/resources/app.conf", Files.readString(fixture.resolve("input.conf")));
+        writeBuild("", "hoconFormatter { failOnDuplicates.set(true) }\n");
+        assertTrue(buildAndFail("hoconFormat").getOutput().contains("duplicate"));
+    }
+
+    @Test
     void formatRewritesAnUnformattedFileAndLeavesAFormattedOneAlone() throws IOException {
         Path unformatted = write("src/main/resources/unformatted.conf", UNFORMATTED);
         Path formatted = write("src/main/resources/formatted.hocon", FORMATTED);

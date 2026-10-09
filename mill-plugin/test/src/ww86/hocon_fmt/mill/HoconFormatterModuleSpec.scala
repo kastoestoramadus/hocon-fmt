@@ -32,7 +32,18 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     val stream = PrintStream(output, true, "UTF-8")
     UnitTester(module, os.temp.dir(), outStream = stream, errStream = stream).scoped { eval =>
       files.foreach((path, content) => os.write(module.moduleDir / os.RelPath(path), content, createFolders = true))
-      test(Run(eval, output))
+      test("repository style and duplicate warnings match the CLI") {
+    withFiles(project,
+      ".hocon-fmt.conf" -> text("separator = \":\"\n"),
+      "resources/app.conf" -> text("a=1\na=2\nb {c=3}\n")
+    ) { run =>
+      assert(run.eval(project.hoconFormat()).isRight)
+      assertEquals(read(project, "resources/app.conf"), "a : 2\nb.c : 3\n")
+      assert(run.log.contains("defined again"), run.log)
+    }
+  }
+
+  test(Run(eval, output))
     }
   }
 
