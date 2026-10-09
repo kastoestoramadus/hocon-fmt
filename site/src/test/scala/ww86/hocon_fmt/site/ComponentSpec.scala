@@ -60,7 +60,14 @@ class ComponentSpec extends munit.FunSuite {
           store.update(key, value)
           ()
         }
-      )
+      ),
+      // The pane sync writes on the next animation frame, so that a browser finishes delivering
+      // its resize observations first. The fake runs that frame at once: the reaction chain stays
+      // synchronous, which is what the fake DOM's depth cap counts.
+      requestAnimationFrame = js.Any.fromFunction1 { (callback: js.Function1[Double, Unit]) =>
+        callback(0.0)
+        0
+      }
     )
   }
 
@@ -128,6 +135,17 @@ class ComponentSpec extends munit.FunSuite {
     pane.updateDynamic("value")(text)
     val _ = pane.fire("input")
   }
+
+  /** What a browser reports once a drag has resized a pane: the fake ResizeObserver hears of the
+    * new box height, and every height write the page answers with re-fires it.
+    */
+  def fireResize(pane: js.Dynamic, heightPx: Int): Unit = {
+    val _ = js.Dynamic.global.document.fireResize(pane, heightPx)
+  }
+
+  /** The height a pane carries in its inline style, the way a browser reports it. */
+  def styleHeight(pane: js.Dynamic): String =
+    pane.style.getPropertyValue("height").asInstanceOf[String]
 
   /** What the page is supposed to show for a text: the core's own answer, not a second opinion. */
   def formatted(text: String): String = Verdict.of(text) match {
@@ -220,6 +238,22 @@ class ComponentSpec extends munit.FunSuite {
       val _ = root.unmount()
       ()
     }
+  }
+
+  test("a pane dragged to a height takes the other pane with it, and settles") {
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    assertEquals(styleHeight(input), "", "the stylesheet's default height rules until the first drag")
+    fireResize(input, 420)
+    assertEquals(styleHeight(input), "420px")
+    assertEquals(styleHeight(output), "420px", "the owner: grab one window, both grow")
+    fireResize(output, 260)
+    assertEquals(styleHeight(input), "260px")
+    assertEquals(styleHeight(output), "260px")
+    // The fake re-fires the observers on every height write, one chain deeper each time, so a
+    // sync that answered its own writes with a fresh height would fail here instead of hanging.
+    val _ = root.unmount()
   }
 
   test("an example button puts its example back into both panes") {

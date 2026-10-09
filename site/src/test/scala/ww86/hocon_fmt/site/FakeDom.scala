@@ -9,13 +9,24 @@ import scala.scalajs.js
   * skip a platform; this is a plain JS source string instead, linked with the tests themselves.
   *
   * Two things it deliberately does not model, because the components under test never reach for
-  * them: HTML parsing (elements are built through `createElement`/`appendChild`) and layout.
+  * them: HTML parsing (elements are built through `createElement`/`appendChild`) and real layout.
   * Event dispatch is simplified where the components never reach either: an event runs only the
   * listeners on its target — no bubbling or capture, and the `addEventListener` options are
   * dropped — while a fired event carries just `type` and `target`, not `preventDefault` or
   * `currentTarget`. The structure it does model — parents, siblings, listeners, attributes — it
   * models the way browsers report it, so a test asserting on the mounted tree reads like the
   * page itself.
+  *
+  * The one sliver of layout it does model is element height, for the playground's pane sync, and
+  * `ResizeObserver` is simulated, not implemented: a test calls `document.fireResize(el, px)` to
+  * say what a real browser reports after a drag, and the observed element's `offsetHeight` reads
+  * that value back. Heights start at 0 — there is no stylesheet here — so the height a pane
+  * starts with is 0 until a test or a style write says otherwise. What keeps the simulation
+  * honest is the feedback a real browser also has: a `height` write in px through the style API
+  * changes the element's box, so the fake re-fires the observers — chained, each reaction one
+  * level deeper. A height ping-pong between panes fails at depth 12 with "resize loop did not
+  * settle", instead of hanging the test on an invisible loop. Nothing else about layout is
+  * faked: widths, scroll, and computed styles stay out.
   */
 object FakeDom {
 
@@ -33,12 +44,30 @@ object FakeDom {
       |      this.parentNode = null;
       |      this.attributes = {};
       |      this.listeners = {};
+      |      this._height = 0;
+      |      const self = this;
       |      this.style = {
-      |        setProperty: function () {},
-      |        removeProperty: function () {},
-      |        getPropertyValue: function () { return ""; }
+      |        properties: {},
+      |        setProperty: function (name, value) {
+      |          if (value === null || value === undefined) { this.removeProperty(name); return; }
+      |          this.properties[name] = String(value);
+      |          // A px height write resizes the box, so the observers fire again, as in a browser;
+      |          // the write happens inside the reaction it answers, one level deeper.
+      |          if (name === "height" && /px$/.test(String(value))) {
+      |            const px = parseFloat(value);
+      |            if (px !== self._height) {
+      |              self._height = px;
+      |              FakeResizeObserver.report(self, FakeResizeObserver.depth + 1);
+      |            }
+      |          }
+      |        },
+      |        removeProperty: function (name) { delete this.properties[name]; },
+      |        getPropertyValue: function (name) {
+      |          return Object.prototype.hasOwnProperty.call(this.properties, name) ? this.properties[name] : "";
+      |        }
       |      };
       |    }
+      |    get offsetHeight() { return this._height; }
       |    get firstChild() { return this.childNodes[0] || null; }
       |    get lastChild() { return this.childNodes.length ? this.childNodes[this.childNodes.length - 1] : null; }
       |    get nextSibling() {
@@ -175,6 +204,13 @@ object FakeDom {
       |      this.body = new HTMLElement("BODY");
       |      this.documentElement.appendChild(this.body);
       |      this.appendChild(this.documentElement);
+      |      /** What a browser does right after the user dragged a resize handle: the box has the
+      |        * new height, and the observers are about to hear of it.
+      |        */
+      |      this.fireResize = function (element, heightPx) {
+      |        element._height = heightPx;
+      |        FakeResizeObserver.report(element, 0);
+      |      };
       |    }
       |    createElement(name) { return new (constructorFor(String(name).toUpperCase()))(String(name).toUpperCase()); }
       |    createElementNS(namespace, name) { return this.createElement(name); }
@@ -182,11 +218,57 @@ object FakeDom {
       |    createComment(data) { return new Comment(data); }
       |  }
       |
+      |  /** The one browser API the pane sync needs, simulated: observations are remembered, a test
+      |    * or a style write reports a new height, and every reaction is one level deeper so a sync
+      |    * that never settles throws instead of hanging the test.
+      |    */
+      |  class FakeResizeObserver {
+      |    constructor(callback) {
+      |      this._callback = callback;
+      |      this._observed = [];
+      |    }
+      |    observe(element) {
+      |      if (!element._resizeObservers) element._resizeObservers = [];
+      |      if (!element._resizeObservers.includes(this)) {
+      |        element._resizeObservers.push(this);
+      |        this._observed.push(element);
+      |      }
+      |    }
+      |    unobserve(element) {
+      |      const at = element._resizeObservers ? element._resizeObservers.indexOf(this) : -1;
+      |      if (at !== -1) element._resizeObservers.splice(at, 1);
+      |      const among = this._observed.indexOf(element);
+      |      if (among !== -1) this._observed.splice(among, 1);
+      |    }
+      |    disconnect() {
+      |      this._observed.slice().forEach(element => this.unobserve(element));
+      |    }
+      |  }
+      |  FakeResizeObserver.depth = 0;
+      |  FakeResizeObserver.report = function (element, depth) {
+      |    if (depth > 12) {
+      |      throw new Error("resize loop did not settle: " + depth + " chained height reactions");
+      |    }
+      |    const outer = FakeResizeObserver.depth;
+      |    FakeResizeObserver.depth = depth;
+      |    try {
+      |      (element._resizeObservers || []).slice().forEach(function (observer) {
+      |        observer._callback(
+      |          [{ target: element, borderBoxSize: [{ inlineSize: 0, blockSize: element._height }] }],
+      |          observer
+      |        );
+      |      });
+      |    } finally {
+      |      FakeResizeObserver.depth = outer;
+      |    }
+      |  };
+      |
       |  const dom = {
       |    Node: Node, Element: Element, HTMLElement: HTMLElement, Text: Text, Comment: Comment,
       |    HTMLAnchorElement: HTMLAnchorElement, HTMLButtonElement: HTMLButtonElement,
       |    HTMLInputElement: HTMLInputElement, HTMLOptionElement: HTMLOptionElement,
-      |    HTMLSelectElement: HTMLSelectElement, HTMLTextAreaElement: HTMLTextAreaElement
+      |    HTMLSelectElement: HTMLSelectElement, HTMLTextAreaElement: HTMLTextAreaElement,
+      |    ResizeObserver: FakeResizeObserver
       |  };
       |  Object.keys(dom).forEach(function (name) { globalThis[name] = dom[name]; });
       |  return new Document();
