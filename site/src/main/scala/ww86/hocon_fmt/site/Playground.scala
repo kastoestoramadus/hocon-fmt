@@ -3,6 +3,7 @@ package ww86.hocon_fmt.site
 import com.raquo.laminar.api.L.*
 
 import org.ekrich.config.{ConfigFactory, ConfigRenderOptions, ConfigResolveOptions, ConfigUtil}
+import org.scalajs.dom
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
@@ -15,13 +16,15 @@ import ww86.hocon_fmt.{DuplicateReport, ExampleData, Finding, FormatOptions, Inc
 object Playground {
 
   def apply(): HtmlElement = {
-    val first    = ExampleData.showcase.headOption.fold("")(_.input)
-    val input    = Var(first)
-    val style    = Var(FormatOptions.default)
-    val resolved = Var(false)
-    val settled  = settledText(input.signal, first, 150)
-    val verdict  = settled.combineWith(style.signal).map { (text, options) =>
-      text -> Verdict.of(text, "playground", options)
+    val first       = ExampleData.showcase.headOption.fold("")(_.input)
+    val input       = Var(first)
+    val options     = Var(FormatOptions.default)
+    val resolved    = Var(false)
+    val paneHeight  = Var(Option.empty[Int])
+    val settled     = settledText(input.signal, first, 150)
+    val paneHeights = paneHeight.signal.map(_.fold("")(px => s"${px}px"))
+    val verdict     = settled.combineWith(options.signal).map { (text, chosen) =>
+      text -> Verdict.of(text, "playground", chosen)
     }
 
     sectionTag(
@@ -94,9 +97,9 @@ object Playground {
           cls := "separator-option",
           tpe := "button",
           "Separator: ",
-          child.text <-- style.signal.map(o => if o.separator == Separator.Equals then "=" else ":"),
+          child.text <-- options.signal.map(o => if o.separator == Separator.Equals then "=" else ":"),
           onClick --> { _ =>
-            style.update(o =>
+            options.update(o =>
               o.copy(separator = if o.separator == Separator.Equals then Separator.Colon else Separator.Equals)
             )
           }
@@ -104,16 +107,16 @@ object Playground {
         button(
           cls := "nesting-option",
           tpe := "button",
-          child.text <-- style.signal.map(o => if o.simplifyNestedObjects then "Keep nesting" else "Flatten nesting"),
-          onClick --> { _ => style.update(o => o.copy(simplifyNestedObjects = !o.simplifyNestedObjects)) }
+          child.text <-- options.signal.map(o => if o.simplifyNestedObjects then "Keep nesting" else "Flatten nesting"),
+          onClick --> { _ => options.update(o => o.copy(simplifyNestedObjects = !o.simplifyNestedObjects)) }
         ),
         button(
           cls := "indent-option",
           tpe := "button",
-          child.text <-- style.signal.map(o =>
+          child.text <-- options.signal.map(o =>
             if o.doubleIndent then "Use 2-space indentation" else "Use 4-space indentation"
           ),
-          onClick --> { _ => style.update(o => o.copy(doubleIndent = !o.doubleIndent)) }
+          onClick --> { _ => options.update(o => o.copy(doubleIndent = !o.doubleIndent)) }
         )
       ),
       div(
@@ -148,7 +151,9 @@ object Playground {
             spellCheck  := false,
             placeholder := "paste HOCON here",
             value <-- input.signal,
-            onInput.mapToValue --> input
+            onInput.mapToValue --> input,
+            height <-- paneHeights,
+            syncedPane(paneHeight)
           )
         ),
         label(
@@ -162,7 +167,9 @@ object Playground {
               .map { case (text, decision, resolve) =>
                 val entry = text -> decision
                 if resolve then resolvedOutput(entry) else out(entry)
-              }
+              },
+            height <-- paneHeights,
+            syncedPane(paneHeight)
           )
         )
       ),
@@ -202,6 +209,46 @@ object Playground {
       title := example.shows,
       example.title,
       onClick.mapTo(example.input) --> input
+    )
+
+  /** One viewport, twice: the reader drags either pane, and the other takes the same height. The
+    * sync holds on the phone layout too — there the panes are stacked, so the equal heights do
+    * not sit beside each other, but they still show the same number of lines of the input and of
+    * its output as the reader scrolls between them, and a drag there is a deliberate request for
+    * that many lines.
+    *
+    * The shared height stays empty until the first drag — the stylesheet's default rules until
+    * then, so the phone layout keeps its own, smaller height. Each pane's starting height is read
+    * once, at mount: the observer reporting that same height is the size the pane began with, not
+    * a drag. Any other reported height that is not already the shared one is the reader's, and
+    * the page writes it back to both panes; the other pane's observer hears that write as a new
+    * size, but it equals the shared height, so the chain ends there. That equality — not a timer
+    * or a guard flag — is what keeps the observer from feeding itself.
+    */
+  private def syncedPane(shared: Var[Option[Int]]): Modifier[HtmlElement] =
+    onMountUnmountCallbackWithState[HtmlElement, dom.ResizeObserver](
+      mount = { ctx =>
+        val pane     = ctx.thisNode.ref
+        val starting = pane.offsetHeight.toInt
+        // The write waits for the next frame. Changing the other pane's box while the browser is
+        // still delivering resize observations leaves that change undelivered for the frame,
+        // which Chrome reports as a ResizeObserver loop; a drag already takes more than a frame.
+        def sync(height: Int): Unit = {
+          val _ = dom.window.requestAnimationFrame { _ =>
+            if !shared.now().contains(height) then shared.set(Some(height))
+          }
+        }
+        val observer = new dom.ResizeObserver((_, _) => {
+          val height = pane.offsetHeight.toInt
+          shared.now() match {
+            case Some(current) => if height != current then sync(height)
+            case None          => if height != starting then sync(height)
+          }
+        })
+        observer.observe(pane)
+        observer
+      },
+      unmount = (_, observer) => observer.foreach(_.disconnect())
     )
 
   /** One verdict per settled input; kept separate from the DOM for reactive tests. Typed text has
