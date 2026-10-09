@@ -45,6 +45,7 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    systemProperty("maven.repo.local", System.getProperty("maven.repo.local", "${System.getProperty("user.home")}/.m2/repository"))
     // The contract suite loads exactly the jar this version names in Maven Local, so a stale jar
     // of another version there cannot pass for the packaging under test.
     systemProperty("hocon-fmt-java-api.version", version.toString())

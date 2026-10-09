@@ -117,6 +117,165 @@ public final class HoconFmt {
         return textOf(ww86.hocon_fmt.Verdict.of(text, name), text);
     }
 
+    /**
+     * Judges text with explicit options.
+     * @param text source or config text
+     * @param name origin used in diagnostics
+     * @param options explicit renderer options
+     * @return the result of the operation
+     */
+    public static Verdict check(String text, String name, FormatOptions options) {
+        return mirror(ww86.hocon_fmt.Verdict.of(text, name, options.core()));
+    }
+
+    /**
+     * Judges original bytes with explicit options.
+     * @param content original UTF-8 bytes
+     * @param name origin used in diagnostics
+     * @param options explicit renderer options
+     * @return the result of the operation
+     */
+    public static Verdict check(byte[] content, String name, FormatOptions options) {
+        return mirror(ww86.hocon_fmt.Verdict.of(content, name, options.core()));
+    }
+
+    /**
+     * Parses repository options with the core's strict parser.
+     * @param text source or config text
+     * @param name origin used in diagnostics
+     * @return the result of the operation
+     */
+    public static FormatOptions parseOptions(String text, String name) {
+        var parsed = ww86.hocon_fmt.FormatOptions.parse(text, name);
+        if (parsed.isLeft()) {
+            throw new IllegalArgumentException(parsed.swap().toOption().get());
+        }
+        return FormatOptions.of(parsed.toOption().get());
+    }
+
+    /**
+     * Finds the nearest config up to and including the first .git directory or file.
+     * @param file source file
+     * @return the result of the operation
+     */
+    public static java.util.Optional<Path> discoverConfig(Path file) {
+        for (Path dir = file.toAbsolutePath().normalize().getParent(); dir != null; dir = dir.getParent()) {
+            Path config = dir.resolve(".hocon-fmt.conf");
+            String decision = ww86.hocon_fmt.ConfigLookup.decide(Files.exists(config), Files.exists(dir.resolve(".git"))).toString();
+            if (decision.equals("Found")) return java.util.Optional.of(config);
+            if (decision.equals("Stop")) break;
+        }
+        return java.util.Optional.empty();
+    }
+
+    /**
+     * Reads config strictly as UTF-8, then applies only explicitly supplied CLI-named keys.
+     * @param file source file
+     * @param overrides explicit CLI-named keys and values
+     * @return the result of the operation
+     * @throws IOException when file access or UTF-8 decoding fails
+     */
+    public static FormatOptions optionsFor(Path file, java.util.Map<String, String> overrides) throws IOException {
+        var config = discoverConfig(file);
+        FormatOptions base = config.isPresent()
+            ? readOptions(config.get()) : FormatOptions.DEFAULT;
+        // Validate every supplied key and value through the same parser, including overridden values.
+        String text = overrides.entrySet().stream()
+            .map(entry -> entry.getKey() + " = \"" + entry.getValue().replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+            .collect(java.util.stream.Collectors.joining("\n"));
+        FormatOptions explicit = parseOptions(text, "plugin settings");
+        return new FormatOptions(
+            overrides.containsKey("separator") ? explicit.separator() : base.separator(),
+            overrides.containsKey("double-indent") ? explicit.doubleIndent() : base.doubleIndent(),
+            overrides.containsKey("simplify-nested-objects") ? explicit.simplifyNestedObjects() : base.simplifyNestedObjects(),
+            overrides.containsKey("fail-on-duplicates") ? explicit.failOnDuplicates() : base.failOnDuplicates());
+    }
+
+    private static FormatOptions readOptions(Path config) throws IOException {
+        try {
+            return parseOptions(Files.readString(config), config.toString());
+        } catch (IOException e) {
+            throw new IOException("cannot read " + config + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Reports definitions from the source, before formatting can remove them.
+     * @param text source or config text
+     * @param name origin used in diagnostics
+     * @return the result of the operation
+     */
+    public static DuplicateReport report(String text, String name) {
+        var result = ww86.hocon_fmt.DuplicateReport.findings(text, name);
+        if (result.isLeft()) {
+            return new DuplicateReport(java.util.List.of(), java.util.Optional.of(result.swap().toOption().get().reason()));
+        }
+        var findings = new java.util.ArrayList<DuplicateReport.Finding>();
+        var iterator = result.toOption().get().iterator();
+        while (iterator.hasNext()) {
+            var finding = iterator.next();
+            if (finding instanceof ww86.hocon_fmt.Finding.KeyDefinedAgain again) {
+                findings.add(new DuplicateReport.Finding(again.keyPath().rendered(), again.earlierLine(), again.laterLine()));
+            } else {
+                throw new IllegalStateException("unknown finding: " + finding);
+            }
+        }
+        return new DuplicateReport(findings, java.util.Optional.empty());
+    }
+
+    /**
+     * Inspects one read; optionally writes using the identity-preserving file operation.
+     * @param file source file
+     * @param overrides explicit CLI-named keys and values
+     * @param write whether to write a NeedsFormatting verdict
+     * @return the result of the operation
+     * @throws IOException when file access or UTF-8 decoding fails
+     */
+    public static Inspection inspectFile(Path file, java.util.Map<String, String> overrides, boolean write) throws IOException {
+        FormatOptions options = optionsFor(file, overrides);
+        Path target = file.toRealPath();
+        byte[] content = Files.readAllBytes(target);
+        Verdict verdict = check(content, file.toString(), options);
+        DuplicateReport report;
+        try {
+            String text = java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                .decode(java.nio.ByteBuffer.wrap(content)).toString();
+            report = verdict instanceof Verdict.Refused refused && refused.kind() == RefusalKind.OtherFormat
+                ? new DuplicateReport(java.util.List.of(), java.util.Optional.empty()) : report(text, file.toString());
+        } catch (java.nio.charset.CharacterCodingException e) {
+            report = new DuplicateReport(java.util.List.of(), java.util.Optional.empty());
+        }
+        if (write && verdict instanceof Verdict.NeedsFormatting needed) {
+            AtomicFile.write(target, needed.formatted());
+        }
+        return new Inspection(verdict, report, options);
+    }
+
+    /**
+     * Checks a file with explicit options, without repository lookup.
+     * @param file source file
+     * @param options explicit renderer options
+     * @return the result of the operation
+     * @throws IOException when file access or UTF-8 decoding fails
+     */
+    public static Verdict checkFile(Path file, FormatOptions options) throws IOException {
+        return check(Files.readAllBytes(file), file.toString(), options);
+    }
+
+    /**
+     * Formats a file with explicit options, without repository lookup.
+     * @param file source file
+     * @param options explicit renderer options
+     * @return the result of the operation
+     * @throws IOException when file access or UTF-8 decoding fails
+     */
+    public static Verdict formatFile(Path file, FormatOptions options) throws IOException {
+        Path target = file.toRealPath();
+        Verdict verdict = check(Files.readAllBytes(target), target.toString(), options);
+        if (verdict instanceof Verdict.NeedsFormatting needed) AtomicFile.write(target, needed.formatted());
+        return verdict;
+    }
+
     private static String textOf(ww86.hocon_fmt.Verdict verdict, String text) throws FormatRefusedException {
         if (verdict instanceof ww86.hocon_fmt.Verdict.NeedsFormatting needed) {
             return needed.formatted();

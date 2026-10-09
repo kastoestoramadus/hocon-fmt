@@ -7,33 +7,8 @@ import fs2.io.file.{Files, Path}
 import java.nio.ByteBuffer
 import java.nio.charset.{CharacterCodingException, StandardCharsets}
 
-/** The options the command line gives a file. A field that is set wins over the config file; one
-  * left unset leaves the file's own `.hocon-fmt.conf`, or the default, in charge.
-  */
-final case class StyleOverrides(
-    separator: Option[Separator] = None,
-    doubleIndent: Option[Boolean] = None,
-    simplifyNestedObjects: Option[Boolean] = None,
-    failOnDuplicates: Option[Boolean] = None
-) derives CanEqual {
-
-  def applyTo(base: FormatOptions): FormatOptions =
-    FormatOptions(
-      separator = separator.getOrElse(base.separator),
-      doubleIndent = doubleIndent.getOrElse(base.doubleIndent),
-      simplifyNestedObjects = simplifyNestedObjects.getOrElse(base.simplifyNestedObjects),
-      failOnDuplicates = failOnDuplicates.getOrElse(base.failOnDuplicates)
-    )
-}
-
-object StyleOverrides {
-  val none: StyleOverrides = StyleOverrides()
-}
-
-/** Finding and reading a repository's `.hocon-fmt.conf`. The lookup and the file reading are
-  * effects, so they live here in the cli; parsing the option values is [[FormatOptions.parse]],
-  * shared with the core, so the build-tool plugins can reuse it when they grow config-file
-  * support after their migration to the java API.
+/** Finding and reading a repository's `.hocon-fmt.conf`. Filesystem probes and reads stay here; [[ConfigLookup]] decides the walk and
+  * [[FormatOptions.parse]] parses values, shared with the build-tool integrations.
   */
 object ConfigFile {
 
@@ -44,13 +19,10 @@ object ConfigFile {
   def discover[F[_]: Async: Files](from: Path): F[Option[Path]] = {
     val config                           = FormatOptions.ConfigFileName
     def walk(dir: Path): F[Option[Path]] =
-      Files[F].exists(dir / config).flatMap {
-        case true  => (dir / config).some.pure[F]
-        case false =>
-          Files[F].exists(dir / ".git").flatMap {
-            case true  => none[Path].pure[F]
-            case false => dir.parent.fold(none[Path].pure[F])(walk)
-          }
+      (Files[F].exists(dir / config), Files[F].exists(dir / ".git")).mapN(ConfigLookup.decide).flatMap {
+        case ConfigLookup.Decision.Found  => (dir / config).some.pure[F]
+        case ConfigLookup.Decision.Stop   => none[Path].pure[F]
+        case ConfigLookup.Decision.Parent => dir.parent.fold(none[Path].pure[F])(walk)
       }
     from.parent.fold(walk(Path(".")))(walk)
   }
