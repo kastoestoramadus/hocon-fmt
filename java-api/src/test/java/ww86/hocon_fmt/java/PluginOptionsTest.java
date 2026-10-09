@@ -40,7 +40,8 @@ class PluginOptionsTest {
             () -> HoconFmt.optionsFor(file, Map.of("separator", "=")));
         assertTrue(error.getMessage().contains(config.toString()));
         Files.write(config, new byte[]{(byte) 0xff});
-        assertThrows(java.io.IOException.class, () -> HoconFmt.optionsFor(file, Map.of()));
+        var readError = assertThrows(java.io.IOException.class, () -> HoconFmt.optionsFor(file, Map.of()));
+        assertTrue(readError.getMessage().contains(config.toString()), readError.getMessage());
     }
 
     @Test void optionsAndReportUseJdkRecords() {
