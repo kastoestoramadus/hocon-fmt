@@ -103,6 +103,15 @@ examples need no expected file: their verdict is pinned. Refused catalogue examp
 output are compared exactly, including the final newline. Only the `default` option set
 exists today.
 
+To regenerate a successful shared example with the golden-file workflow, copy its
+`input.conf` to `core/jvm-native/src/test/resources/shared-example.conf`, run
+`UPDATE_GOLDEN=1 sbt "coreJVM/testOnly ww86.hocon_fmt.GoldenFileSpec"`, and copy
+`shared-example.expected.conf` back to the example's `expected/default.conf`.
+Remove both temporary resource files, inspect the expected-output diff, then run
+`ExamplesSpec` without `UPDATE_GOLDEN`. Refused inputs are never combined: one
+file can only pin the first refusal. When merging successful inputs, retain each
+old input verbatim and update the metadata to describe every retained behaviour.
+
 The sbt source generator reads `example.conf` with sconfig and embeds both directories
 in core test and site Scala data; tests and the site use it without runtime file I/O. Metadata carries
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
@@ -126,11 +135,11 @@ examples also require `url` and `licence`. A distilled entry may carry
 ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.
 
-The two showcase fork differences declare `now-site: formatted` and carry
+Fork differences with pinned page output declare `now-site: formatted` and carry
 `expected/site-default.conf`. The published suites still assert `now`; the fork's
 `Variant.ledger` routes these inputs to `CommentCarrierSpec`, which asserts `now-site`
-and the exact fork output. `target` is always authored independently. Verbatim
-provenance may also carry `source.sha`, embedded alongside the URL and licence.
+and the exact fork output for showcase and catalogue fixtures. `target` is always authored
+independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
 
 An upstream gap (`now != target`, except the formatter’s own same-line include
 restriction) requires `upstream: { issue: "https://github.com/ekrich/sconfig/…",
