@@ -222,6 +222,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .jvmSettings(announceRuntime("core on the JVM"))
   .jsSettings(announceRuntime("core on Scala.js"))
   .nativeSettings(announceRuntime("core on Scala Native"))
+  .jvmSettings(LibraryDefects.recordDefectRun)
+  .jsSettings(LibraryDefects.recordDefectRun)
+  .nativeSettings(LibraryDefects.recordDefectRun)
   .platformsSettings(JSPlatform, NativePlatform)(
     // sconfig reaches for java.time, which neither the Scala.js nor the Scala Native javalib
     // carries. Provided, as sconfig itself declares it: an application supplies exactly one
@@ -555,13 +558,74 @@ addCommandAlias(
     .map(p => s"${p.id}/Test/compile")
     .mkString("; ")
 )
-// On every platform: sconfig's Scala.js and Scala Native builds have defects of their own.
-addCommandAlias(
-  "libraryDefects",
-  (Seq(coreJVM, coreJS, coreNative).map(p => s"${p.id}/testOnly ww86.hocon_fmt.SconfigDefectsSpec") :+
-    // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
-    s"${coreJVM.id}/testOnly ww86.hocon_fmt.KeepDetachedCommentsGuardSpec").mkString("; ")
-)
+
+/** On every platform: sconfig's Scala.js and Scala Native builds have defects of their own. These
+  * suites are red by design, and sbt drops the rest of a command sequence at the first failure, so
+  * as a chain of `testOnly`s only the JVM one ever ran. A task runs each, takes the failure as a
+  * value, and names every red at the end.
+  *
+  * One labelled line per platform and suite goes out even when the verdict is not a plain red: a
+  * test failure is red by design, but a compile error or a missing Node or clang is a build
+  * failure, and is reported as one instead of "red by design". The suites record what they
+  * reported through `LibraryDefects.recordDefectRun`; a suite with no record never ran.
+  */
+val libraryDefects =
+  taskKey[Unit]("Runs the library-defect suites on every platform; red by design while the upstream bugs are open.")
+
+Global / libraryDefects := {
+  // Each run waits on its own record cleanup, so a record left by an earlier run is gone before
+  // the suite can report: without it, a failure before the test run would read as a stale verdict.
+  val jvmDefects = (coreJVM / Test / testOnly)
+    .toTask(" ww86.hocon_fmt.SconfigDefectsSpec")
+    .result
+    .dependsOn(LibraryDefects.cleanRecord("jvm", "ww86.hocon_fmt.SconfigDefectsSpec"))
+    .value
+  val jsDefects = (coreJS / Test / testOnly)
+    .toTask(" ww86.hocon_fmt.SconfigDefectsSpec")
+    .result
+    .dependsOn(LibraryDefects.cleanRecord("js", "ww86.hocon_fmt.SconfigDefectsSpec"))
+    .value
+  val nativeDefects = (coreNative / Test / testOnly)
+    .toTask(" ww86.hocon_fmt.SconfigDefectsSpec")
+    .result
+    .dependsOn(LibraryDefects.cleanRecord("native", "ww86.hocon_fmt.SconfigDefectsSpec"))
+    .value
+  // UPSTREAM-SCONFIG: the signal to return to upstream sconfig; delete with the fork.
+  val guard = (coreJVM / Test / testOnly)
+    .toTask(" ww86.hocon_fmt.KeepDetachedCommentsGuardSpec")
+    .result
+    .dependsOn(LibraryDefects.cleanRecord("jvm", "ww86.hocon_fmt.KeepDetachedCommentsGuardSpec"))
+    .value
+  LibraryDefects.report(
+    Seq(
+      (
+        "coreJVM/SconfigDefectsSpec",
+        jvmDefects,
+        (coreJVM / Test / target).value,
+        "ww86.hocon_fmt.SconfigDefectsSpec"
+      ),
+      (
+        "coreJS/SconfigDefectsSpec",
+        jsDefects,
+        (coreJS / Test / target).value,
+        "ww86.hocon_fmt.SconfigDefectsSpec"
+      ),
+      (
+        "coreNative/SconfigDefectsSpec",
+        nativeDefects,
+        (coreNative / Test / target).value,
+        "ww86.hocon_fmt.SconfigDefectsSpec"
+      ),
+      (
+        "coreJVM/KeepDetachedCommentsGuardSpec",
+        guard,
+        (coreJVM / Test / target).value,
+        "ww86.hocon_fmt.KeepDetachedCommentsGuardSpec"
+      )
+    ),
+    streams.value.log
+  )
+}
 
 // Statement and branch coverage for the JVM modules, aggregate last. Dotty's coverage runtime
 // needs java.util.UUID over java.security.SecureRandom, which neither the Scala.js nor the Scala
