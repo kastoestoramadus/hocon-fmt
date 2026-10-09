@@ -1,0 +1,345 @@
+package eu.ww86.hoconfmt.gradle;
+
+import static java.nio.charset.StandardCharsets.ISO_8859_1;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.gradle.testkit.runner.TaskOutcome.FAILED;
+import static org.gradle.testkit.runner.TaskOutcome.SUCCESS;
+import static org.gradle.testkit.runner.TaskOutcome.UP_TO_DATE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import org.gradle.testkit.runner.BuildResult;
+import org.gradle.testkit.runner.GradleRunner;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class HoconFormatterPluginFunctionalTest {
+
+    static final String UNFORMATTED = "a=1\nb {c=2}\n";
+    static final String FORMATTED = "a = 1\nb.c = 2\n";
+
+    @TempDir
+    Path projectDir;
+
+    @BeforeEach
+    void writeConsumerBuild() throws IOException {
+        writeConsumerBuild(projectDir);
+    }
+
+    @Test
+    void repositoryStyleAndDuplicatesMatchTheCli() throws IOException {
+        Path fixture = Path.of("../test-fixtures/plugin-options");
+        write(".hocon-fmt.conf", Files.readString(fixture.resolve(".hocon-fmt.conf")));
+        Path file = write("src/main/resources/app.conf", Files.readString(fixture.resolve("input.conf")));
+        String output = build("hoconFormat").getOutput();
+        assertEquals(Files.readString(fixture.resolve("expected.conf")), read(file));
+        assertTrue(output.contains("defined again"), output);
+        write("src/main/resources/app.conf", Files.readString(fixture.resolve("input.conf")));
+        writeBuild("", "hoconFormatter { failOnDuplicates.set(true) }\n");
+        assertTrue(buildAndFail("hoconFormat").getOutput().contains("duplicate"));
+    }
+
+    @Test
+    void formatRewritesAnUnformattedFileAndLeavesAFormattedOneAlone() throws IOException {
+        Path unformatted = write("src/main/resources/unformatted.conf", UNFORMATTED);
+        Path formatted = write("src/main/resources/formatted.hocon", FORMATTED);
+        FileTime longAgo = FileTime.from(Instant.parse("2000-01-01T00:00:00Z"));
+        Files.setLastModifiedTime(formatted, longAgo);
+
+        BuildResult result = build("hoconFormat");
+
+        assertEquals(SUCCESS, result.task(":hoconFormat").getOutcome());
+        assertEquals(FORMATTED, read(unformatted));
+        assertEquals(FORMATTED, read(formatted));
+        // Equal content cannot tell a skipped write from a rewrite with the same text.
+        assertEquals(longAgo, Files.getLastModifiedTime(formatted));
+    }
+
+    @Test
+    void checkListsEveryUnformattedFileWithoutWritingAndPassesAfterFormat() throws IOException {
+        Path main = write("src/main/resources/main.conf", UNFORMATTED);
+        Path test = write("src/test/resources/test.conf", UNFORMATTED);
+        write("src/main/resources/fine.conf", FORMATTED);
+
+        BuildResult failed = buildAndFail("hoconFormatCheck");
+
+        assertEquals(FAILED, failed.task(":hoconFormatCheck").getOutcome());
+        assertTrue(failed.getOutput().contains("src/main/resources/main.conf"), failed.getOutput());
+        assertTrue(failed.getOutput().contains("src/test/resources/test.conf"), failed.getOutput());
+        assertFalse(failed.getOutput().contains("fine.conf"), failed.getOutput());
+        assertEquals(UNFORMATTED, read(main));
+        assertEquals(UNFORMATTED, read(test));
+
+        build("hoconFormat");
+        BuildResult passed = build("hoconFormatCheck");
+
+        assertEquals(SUCCESS, passed.task(":hoconFormatCheck").getOutcome());
+    }
+
+    @Test
+    void aRefusedFileStaysByteForByteAndFailsNeitherTask() throws IOException {
+        byte[] broken = "a : ${\n".getBytes(UTF_8);
+        Path file = write("src/main/resources/broken.conf", broken);
+
+        BuildResult format = build("hoconFormat");
+        BuildResult check = build("hoconFormatCheck");
+
+        assertEquals(SUCCESS, format.task(":hoconFormat").getOutcome());
+        assertEquals(SUCCESS, check.task(":hoconFormatCheck").getOutcome());
+        assertArrayEquals(broken, Files.readAllBytes(file));
+        for (BuildResult result : List.of(format, check)) {
+            assertTrue(result.getOutput().contains("src/main/resources/broken.conf"), result.getOutput());
+            assertTrue(result.getOutput().contains("was not closed"), result.getOutput());
+        }
+    }
+
+    @Test
+    void aFileThatIsNotUtf8IsRefusedRatherThanRewrittenWithReplacementCharacters() throws IOException {
+        byte[] latin1 = "name = \"café\"\n".getBytes(ISO_8859_1);
+        Path file = write("src/main/resources/latin1.conf", latin1);
+
+        BuildResult result = build("hoconFormat");
+
+        assertArrayEquals(latin1, Files.readAllBytes(file));
+        assertTrue(result.getOutput().contains("src/main/resources/latin1.conf"), result.getOutput());
+    }
+
+    @Test
+    void anIncludeSurvivesFormatting() throws IOException {
+        write("src/main/resources/other.conf", "b = 2\n");
+        Path app = write("src/main/resources/app.conf", "include \"other.conf\"\na = 1\n");
+
+        build("hoconFormat");
+
+        String formatted = read(app);
+        assertTrue(formatted.contains("include \"other.conf\"\n"), formatted);
+        assertTrue(formatted.contains("a = 1\n"), formatted);
+    }
+
+    @Test
+    void theFilesCanBeChosenInTheBuildScript() throws IOException {
+        writeBuild("", "hoconFormatter {\n    source.setFrom(fileTree(\"config\") { include(\"**/*.conf\") })\n}\n");
+        Path chosen = write("config/app.conf", UNFORMATTED);
+        Path notChosen = write("src/main/resources/app.conf", UNFORMATTED);
+
+        build("hoconFormat");
+
+        assertEquals(FORMATTED, read(chosen));
+        assertEquals(UNFORMATTED, read(notChosen));
+    }
+
+    // Lightbend's loader reads .json and .properties too; a round trip hands back HOCON, not the
+    // file its name promises, so the name alone decides.
+    @Test
+    void aFileWhoseExtensionIsAnotherFormatIsRefusedNotRewrittenAsHocon() throws IOException {
+        writeBuild("", "hoconFormatter {\n    source.setFrom(fileTree(\"config\") { include(\"**/*.json\") })\n}\n");
+        byte[] json = "{\n    \"b\": 1,\n    \"a\": 2\n}\n".getBytes(UTF_8);
+        Path file = write("config/application.json", json);
+
+        BuildResult result = build("hoconFormat");
+
+        assertArrayEquals(json, Files.readAllBytes(file));
+        assertTrue(result.getOutput().contains("config/application.json"), result.getOutput());
+        assertTrue(result.getOutput().contains("a JSON file, and hocon-fmt formats HOCON only"), result.getOutput());
+    }
+
+    @Test
+    void checkRunsTheFormatCheckWhenBaseIsAppliedAfterThePlugin() throws IOException {
+        writeBuild("    base\n", "");
+        write("src/main/resources/app.conf", UNFORMATTED);
+
+        BuildResult result = buildAndFail("check");
+
+        assertEquals(FAILED, result.task(":hoconFormatCheck").getOutcome());
+    }
+
+    @Test
+    void theCheckIsUpToDateUntilAFileChanges() throws IOException {
+        Path file = write("src/main/resources/app.conf", FORMATTED);
+
+        assertEquals(SUCCESS, build("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        assertEquals(UP_TO_DATE, build("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+
+        Files.writeString(file, UNFORMATTED);
+
+        assertEquals(FAILED, buildAndFail("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+    }
+
+    @Test
+    void aReusedConfigurationCacheEntrySeesTheFilesAsTheyAreNow() throws IOException {
+        Path file = write("src/main/resources/app.conf", FORMATTED);
+
+        BuildResult stored = build("hoconFormatCheck", "--configuration-cache");
+        Files.writeString(file, UNFORMATTED);
+        BuildResult reused = buildAndFail("hoconFormatCheck", "--configuration-cache");
+
+        assertTrue(stored.getOutput().contains("Configuration cache entry stored."), stored.getOutput());
+        assertTrue(reused.getOutput().contains("Reusing configuration cache."), reused.getOutput());
+        assertEquals(FAILED, reused.task(":hoconFormatCheck").getOutcome());
+
+        build("hoconFormat", "--configuration-cache");
+        Files.writeString(file, UNFORMATTED);
+        BuildResult reusedFormat = build("hoconFormat", "--configuration-cache");
+
+        assertTrue(reusedFormat.getOutput().contains("Reusing configuration cache."), reusedFormat.getOutput());
+        assertEquals(FORMATTED, read(file));
+    }
+
+    // The worker calls the Java API; the core and the Scala library come with it, transitively.
+    @Test
+    void theWorkerClasspathResolvesTheJavaApiAndItsCore() throws IOException {
+        writeBuild(
+                "",
+                "tasks.register(\"showWorkerClasspath\") {\n"
+                        + "    val files = configurations.named(\"hoconFormatterClasspath\")\n"
+                        + "    doLast { files.get().files.forEach { println(\"worker: \" + it.name) } }\n"
+                        + "}\n");
+
+        String output = build("showWorkerClasspath").getOutput();
+
+        assertTrue(output.contains("worker: hocon-fmt-java-api-"), output);
+        assertTrue(output.contains("worker: hocon-fmt-core_3-"), output);
+    }
+
+    @Test
+    void formatUsesIdentityPreservingReplacement() throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                projectDir.getFileSystem().supportedFileAttributeViews().contains("unix"));
+        Path target = write("src/main/resources/app.conf", UNFORMATTED);
+        Files.setAttribute(target, "unix:mode", 02750);
+        var identity = Files.readAttributes(target, "unix:uid,gid,mode");
+        Path other = Files.createLink(projectDir.resolve("old-content"), target);
+        Path link = Files.createSymbolicLink(target.resolveSibling("alias.conf"), target.getFileName());
+        build("hoconFormat");
+        assertEquals(FORMATTED, read(target));
+        assertEquals(UNFORMATTED, read(other));
+        assertTrue(Files.isSymbolicLink(link));
+        assertEquals(identity, Files.readAttributes(target, "unix:uid,gid,mode"));
+    }
+
+    @Test
+    void aConfigAboveTheGitBoundaryDoesNotInvalidateTheCheck() throws IOException {
+        Path repo = Files.createDirectories(projectDir.resolve("repo"));
+        writeConsumerBuild(repo);
+        Files.createDirectory(repo.resolve(".git"));
+        write(repo, ".hocon-fmt.conf", "separator = \":\"\n");
+        write(repo, "src/main/resources/app.conf", "a: 1\n");
+        // The lookup reads no further up than the repository root, so a config above it is not an
+        // input: editing it must leave the check up to date.
+        write(".hocon-fmt.conf", "separator = \"=\"\n");
+
+        assertEquals(SUCCESS, buildIn(repo, "hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        assertEquals(UP_TO_DATE, buildIn(repo, "hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+
+        write(".hocon-fmt.conf", "separator = \":\"\n");
+        assertEquals(UP_TO_DATE, buildIn(repo, "hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+    }
+
+    @Test
+    void configChangesInvalidateAnUpToDateCheck() throws IOException {
+        write("src/main/resources/app.conf", "a = 1\n");
+        build("hoconFormatCheck");
+        assertEquals(UP_TO_DATE, build("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        write(".hocon-fmt.conf", "separator = \":\"\n");
+        assertEquals(FAILED, buildAndFail("hoconFormatCheck").task(":hoconFormatCheck").getOutcome());
+        build("hoconFormat");
+        build("hoconFormatCheck");
+        writeBuild("", "hoconFormatter { separator.set(\"=\"); doubleIndent.set(true); simplifyNestedObjects.set(false) }\n");
+        buildAndFail("hoconFormatCheck");
+        build("hoconFormat");
+        assertEquals("a = 1\n", read(projectDir.resolve("src/main/resources/app.conf")));
+    }
+
+    @Test
+    void duplicateFailureStillNamesEveryUnformattedFile() throws IOException {
+        write(".hocon-fmt.conf", "fail-on-duplicates = true\n");
+        write("src/main/resources/duplicate.conf", "a=1\na=2\n");
+        write("src/main/resources/other.conf", "b=3\n");
+        String output = buildAndFail("hoconFormatCheck").getOutput();
+        assertTrue(output.contains("defined again"), output);
+        assertTrue(output.contains("other.conf"), output);
+    }
+
+    void writeConsumerBuild(Path dir) throws IOException {
+        write(dir, "settings.gradle.kts", "rootProject.name = \"consumer\"\n");
+        writeBuild(dir, "", "");
+    }
+
+    void writeBuild(String extraPlugins, String configuration) throws IOException {
+        writeBuild(projectDir, extraPlugins, configuration);
+    }
+
+    void writeBuild(Path dir, String extraPlugins, String configuration) throws IOException {
+        write(
+                dir,
+                "build.gradle.kts",
+                "plugins {\n"
+                        + "    id(\"eu.ww86.hocon-fmt\")\n"
+                        + extraPlugins
+                        + "}\n"
+                        + "\n"
+                        + "repositories {\n"
+                        + "    mavenLocal()\n"
+                        + "    mavenCentral()\n"
+                        + "}\n"
+                        + configuration);
+    }
+
+    BuildResult build(String... arguments) {
+        return runner(arguments).build();
+    }
+
+    BuildResult buildIn(Path dir, String... arguments) {
+        return runner(dir, arguments).build();
+    }
+
+    BuildResult buildAndFail(String... arguments) {
+        return runner(arguments).buildAndFail();
+    }
+
+    GradleRunner runner(String... arguments) {
+        return runner(projectDir, arguments);
+    }
+
+    GradleRunner runner(Path dir, String... arguments) {
+        List<String> all = new ArrayList<>(List.of(arguments));
+        // A deprecation in the plugin should fail here, not in a user's build after the next upgrade.
+        all.add("--warning-mode=fail");
+        all.add("-Dmaven.repo.local=" + System.getProperty("maven.repo.local"));
+        return GradleRunner.create()
+                .withProjectDir(dir.toFile())
+                .withPluginClasspath()
+                .withArguments(all);
+    }
+
+    Path write(String relativePath, String content) throws IOException {
+        return write(projectDir.resolve(relativePath), content.getBytes(UTF_8));
+    }
+
+    Path write(Path dir, String relativePath, String content) throws IOException {
+        return write(dir.resolve(relativePath), content.getBytes(UTF_8));
+    }
+
+    Path write(String relativePath, byte[] content) throws IOException {
+        return write(projectDir.resolve(relativePath), content);
+    }
+
+    Path write(Path file, byte[] content) throws IOException {
+        Files.createDirectories(file.getParent());
+        return Files.write(file, content);
+    }
+
+    String read(Path file) throws IOException {
+        return Files.readString(file);
+    }
+}

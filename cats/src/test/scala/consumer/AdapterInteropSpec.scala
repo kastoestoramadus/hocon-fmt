@@ -1,7 +1,7 @@
 package consumer
 
-import ww86.hocon_fmt.*
-import ww86.hocon_fmt.interop.cats.{FileFormatter, FormatOutcome}
+import eu.ww86.hoconfmt.*
+import eu.ww86.hoconfmt.interop.cats.{FileFormatter, FormatOutcome}
 
 import cats.effect.IO
 import fs2.Stream

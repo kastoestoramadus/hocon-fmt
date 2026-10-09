@@ -32,7 +32,7 @@ the plugin matches on `Verdict` directly.
 **Build layout.** A standalone `sbt2-plugin/` build with its own `project/build.properties`
 (`sbt.version=2.0.10`), as `mill-plugin/`, `gradle-plugin/` and `maven-plugin/` stand alone; wave
 1's build and artifacts are untouched. `libraryDependencies += "eu.ww86" %% "hocon-fmt-core" %
-<version>`, package `ww86.hocon_fmt.sbt2`. Rejected: an sbt 2 row in the wave-1 project (sbt
+<version>`, package `eu.ww86.hoconfmt.sbt2`. Rejected: an sbt 2 row in the wave-1 project (sbt
 1.12.5's `SbtPlugin` emits the `_2.12_1.0` flavor and sbt 1 metadata, not `_sbt2_3` and
 `sbt/sbt.autoplugins`, and shared sources would be forced into Scala 2.12); `sbt2-compat` (unifies
 the host API, not the two implementations — reflective java-api versus direct core — so it still

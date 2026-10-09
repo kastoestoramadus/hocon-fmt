@@ -53,10 +53,10 @@ object UseItGenerator {
       .map { case (key, name) => key -> IO.read(root / "site" / "snippets" / name) }
     def entries(values: Seq[(String, String)]): String =
       values.map { case (key, value) => quoted(key) + " -> " + quoted(value) }.mkString(",\n")
-    val file = out / "ww86" / "hocon_fmt" / "site" / "UseItExamples.scala"
+    val file = out / "eu" / "ww86" / "hoconfmt" / "site" / "UseItExamples.scala"
     IO.write(
       file,
-      "package ww86.hocon_fmt.site\nobject UseItExamples {\n" +
+      "package eu.ww86.hoconfmt.site\nobject UseItExamples {\n" +
         "val commands: Map[String, String] = Map(" + entries(commands) + ")\n" +
         "val actions: Map[String, List[String]] = Map(" +
         actions

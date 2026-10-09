@@ -237,7 +237,7 @@ sbt-scalafmt has moved.
 
 ### Mill without a trait (S)
 
-`./mill ww86.hocon_fmt.mill.HoconFormatter/checkAll __.resources`, an external module like Mill's
+`./mill eu.ww86.hoconfmt.mill.HoconFormatter/checkAll __.resources`, an external module like Mill's
 own `ScalafmtModule/checkFormatAll`, so a build can check its files without changing its modules.
 
 ### Gradle version matrix (S)
