@@ -6,8 +6,8 @@ object CoreExample {
     println(HoconFormatter.format(source))
     Verdict.of(source) match {
       case Verdict.NeedsFormatting(text) => println(text)
-      case Verdict.AlreadyFormatted => println(source)
-      case Verdict.Refused(reason) => println(reason.reason)
+      case Verdict.AlreadyFormatted      => println(source)
+      case Verdict.Refused(reason)       => println(reason.reason)
     }
   }
 }
