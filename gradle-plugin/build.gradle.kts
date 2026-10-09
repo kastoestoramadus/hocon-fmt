@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "eu.ww86"
-version = "0.1.0-SNAPSHOT"
+version = "0.1.0"
 
 repositories {
     // Until the core reaches Maven Central, `sbt coreJVM/publishM2 javaApi/publishM2` puts it here.

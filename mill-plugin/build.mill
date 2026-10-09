@@ -9,7 +9,7 @@ import mill.*, scalalib.*, publish.*
 // lets the plugin call the core directly, where the sbt plugin needs an isolated class loader.
 object `package` extends ScalaModule, PublishModule {
   def millVersion      = "1.1.4"
-  def formatterVersion = "0.1.0-SNAPSHOT"
+  def formatterVersion = "0.1.0"
 
   def scalaVersion   = "3.8.2"
   def platformSuffix = "_mill1"

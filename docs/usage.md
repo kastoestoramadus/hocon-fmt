@@ -463,7 +463,7 @@ released in lockstep with the plugin, so a build has nothing else to declare.
 
 Add `"eu.ww86" %% "hocon-fmt-zio" % "0.1.0"` on the JVM, or use `%%%` in a
 Scala.js / Scala Native build. From a checkout, run
-`sbt coreJVM/publishLocal zioJVM/publishLocal` and use `0.1.0-SNAPSHOT`, adding the
+`sbt coreJVM/publishLocal zioJVM/publishLocal` and use `0.1.0`, adding the
 `coreJS`/`zioJS` or `coreNative`/`zioNative` pair for those platforms: the adapter
 depends on `hocon-fmt-core`, so publishing it alone resolves nothing.
 The adapter uses ZIO 2.1.26 and has no cats or cats-effect dependency.
