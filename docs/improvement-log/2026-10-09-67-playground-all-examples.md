@@ -1,4 +1,4 @@
-# 2026-10-09 — — — Every playground example
+# 2026-10-09 — [#67](https://github.com/kastoestoramadus/hocon-fmt/pull/67) — Every playground example
 
 **Change:** Restored the five original buttons after the six stories, using `playground-order` metadata rather than copying or moving fixtures. Added linked upstream report/fix/state notes for the published core’s gaps, including #646/#647, merged-but-unreleased #598 and still-open #600. Refusals lead with a plain explanation and an unchanged-input promise, with the diagnostic on its own wrapping line. Component tests click all eleven buttons and check both tabs; shared tests require evidence for every upstream gap. Tests were committed first and observed failing (component 3/13, metadata 1/29). Verification passed: 2,039 tests, both scalafmt checks and `sbt site/build`; Chromium verified all eleven buttons on HTTP/desktop and offline file/mobile, with three actual refusals and no overflow or page errors.
 
