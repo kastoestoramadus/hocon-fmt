@@ -94,4 +94,39 @@ class UseItSpec extends munit.FunSuite {
     assert(!container.textContent.asInstanceOf[String].contains("Dependencies are fixed"))
     val _ = root.unmount()
   }
+  test("displayed install commands are verbatim usage documentation") {
+    val fs    = js.Dynamic.global.require("fs")
+    val usage = fs.readFileSync("docs/usage.md", "utf8").asInstanceOf[String]
+    assertEquals(
+      UseItExamples.commands.keySet,
+      Set("native", "npm", "jvm", "pre-commit", "sbt", "gradle", "maven", "mill")
+    )
+    UseItExamples.commands.values.foreach(command => assert(usage.contains(command), command))
+    UseItExamples.actions.values.flatten.foreach(command => assert(usage.contains(command), command))
+  }
+
+  test("Scastie receives arbitrary edited code and only the chosen build") {
+    val core    = UseIt.integrations.find(_.id == "core").get
+    val code    = "object Main { def main(args: Array[String]): Unit = println(42) }"
+    val url     = ScalaShowcase.scastieUrl(core, code).toOption.get
+    val decoded = js.URIUtils.decodeURIComponent(url.drop(url.indexOf("inputs=") + 7))
+    val inputs  = js.JSON.parse(decoded).asInstanceOf[js.Dynamic].SbtInputs
+    assertEquals(inputs.code.asInstanceOf[String], code)
+    assertEquals(inputs.sbtConfigExtra.asInstanceOf[String], ScalaShowcase.buildConfig(core))
+    assertEquals(inputs.target.Scala3.scalaVersion.asInstanceOf[String], "3.8.2")
+    assert(ScalaShowcase.scastieUrl(core, "import $ivy.`x:y:1`").isLeft)
+  }
+
+  test("API edits survive selecting another integration") {
+    val container = installed("#use-it-core")
+    val root      = render(container.asInstanceOf[dom.Element], UseIt())
+    val box       = nodes(container, "TEXTAREA").head
+    box.updateDynamic("value")("println(42)")
+    val _ = box.fire("input")
+    val _ = named(container, "ZIO").fire("click")
+    val _ = named(container, "Core").fire("click")
+    assertEquals(nodes(container, "TEXTAREA").head.value.asInstanceOf[String], "println(42)")
+    val _ = root.unmount()
+  }
+
 }

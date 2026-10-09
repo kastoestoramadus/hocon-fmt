@@ -41,6 +41,9 @@ class ComponentSpec extends munit.FunSuite {
 
     def window(document: js.Dynamic): js.Dynamic = js.Dynamic.literal(
       document = document,
+      location = js.Dynamic.literal(hash = ""),
+      addEventListener = js.Any.fromFunction2((_: String, _: js.Any) => ()),
+      removeEventListener = js.Any.fromFunction2((_: String, _: js.Any) => ()),
       fetch = js.Any.fromFunction2 { (url: String, _: js.Any) =>
         searched += url
         new js.Promise[js.Any]((resolve, _) => {
