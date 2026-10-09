@@ -51,7 +51,7 @@ repo=$work/repo
 git init -q -b main "$repo"
 git -C "$repo" config user.email classifier-test@example.com
 git -C "$repo" config user.name classifier-test
-mkdir -p "$repo/docs" "$repo/examples" "$repo/core"
+mkdir -p "$repo/docs" "$repo/examples" "$repo/core" "$repo/scripts" "$repo/.github/workflows"
 printf 'a = 1\n'         > "$repo/examples/other.conf"
 printf '# the readme\n'  > "$repo/docs/readme.md"
 printf 'object Probe2\n' > "$repo/core/probe2.scala"
@@ -67,6 +67,24 @@ check "a docs-only edit (ci.yml)" false \
   "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
 check "a docs-only edit (pages.yml)" false \
   "$(classify .github/workflows/pages.yml "$repo" "$base" site)"
+
+base=$(git -C "$repo" rev-parse HEAD)
+
+# scripts/ and .github/workflows/ are code: the `release-guards` job runs the guard scripts, and
+# a workflow teaches the gates themselves, so neither may classify as docs-only.
+printf 'echo probe\n' > "$repo/scripts/probe.sh"
+git -C "$repo" add scripts/probe.sh
+git -C "$repo" commit -qm "change a guard script"
+check "a change under scripts/ (ci.yml)" true \
+  "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
+
+base=$(git -C "$repo" rev-parse HEAD)
+
+printf 'name: probe\n' > "$repo/.github/workflows/probe.yml"
+git -C "$repo" add .github/workflows/probe.yml
+git -C "$repo" commit -qm "change a workflow"
+check "a change under .github/workflows/ (ci.yml)" true \
+  "$(classify .github/workflows/ci.yml "$repo" "$base" code)"
 
 base=$(git -C "$repo" rev-parse HEAD)
 

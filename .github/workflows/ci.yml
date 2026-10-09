@@ -66,6 +66,21 @@ jobs:
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
+  # The release guards are plain bash against fixture trees — no JDK, seconds each — so they run
+  # on every code change, scripts/ and the workflows included. A docs-only diff skips them with
+  # the rest; it cannot touch a guard. scripts/release-smoke-test.sh needs a linked native binary
+  # and runs in cli-acceptance, which has one.
+  release-guards:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The version guard still splits the waves
+        run: scripts/check-release-version-test.sh
+      - name: The classifiers still answer as the gates assume
+        run: scripts/changes-classifiers-test.sh
+
   build:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -244,6 +259,9 @@ jobs:
       # Links the Scala.js and Scala Native builds, and runs the suite against all three runtimes.
       - name: Acceptance tests
         run: sbt -batch acceptance/test
+      # The smoke step release.yml runs against the binary the acceptance suite has just linked.
+      - name: Release smoke test
+        run: scripts/release-smoke-test.sh
 
   # Report-only: shared runners are too noisy to fail a build on. main keeps the history in
   # refs/notes/benchmarks; a pull request is compared against it in the job summary.
