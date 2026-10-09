@@ -28,7 +28,7 @@ class ComponentSpec extends munit.FunSuite {
   )
 
   /** A GitHub that answers only when the test says so, and counts what was asked. */
-  final class Github {
+  final class Github(responses: Map[String, (Int, String)] = Map.empty) {
     val searched = scala.collection.mutable.ListBuffer.empty[String]
     val waiting  = scala.collection.mutable.ListBuffer.empty[() => Unit]
     val store    = scala.collection.mutable.Map.empty[String, String]
@@ -47,8 +47,12 @@ class ComponentSpec extends munit.FunSuite {
           waiting += (() => {
             val _ = resolve(
               js.Dynamic.literal(
-                status = 200,
-                text = js.Any.fromFunction0(() => js.Promise.resolve("""{"total_count":0,"items":[]}"""))
+                status = responses.get(url).fold(200)(_._1),
+                text = js.Any.fromFunction0(() =>
+                  js.Promise.resolve(
+                    responses.get(url).fold("""{"total_count":0,"items":[]}""")(_._2)
+                  )
+                )
               )
             )
           })
@@ -588,6 +592,179 @@ class ComponentSpec extends munit.FunSuite {
     settle(50).map { _ =>
       assert(stateLine(container).startsWith("State as of"), stateLine(container))
       val _ = second.unmount()
+      ()
+    }
+  }
+
+  // These tests use the rendered controls so a correct options model cannot hide broken wiring.
+  List(
+    ("separator-option", "Separator: =", "Separator: :", "name = orders", "name: orders"),
+    ("nesting-option", "Keep nesting", "Flatten nesting", "database.host = localhost", "database {"),
+    (
+      "indent-option",
+      "Use 4-space indentation",
+      "Use 2-space indentation",
+      "\n  name = orders",
+      "\n    name = orders"
+    )
+  ).foreach { case (control, initialLabel, clickedLabel, initialText, clickedText) =>
+    test(s"coverage: $control changes formatted output and switches back") {
+      val container   = install(Github())
+      val root        = mount(container)(Playground())
+      val (_, output) = panes(container)
+      val button      = find(container, control)
+      val original    = output.value.asInstanceOf[String]
+      val untouched   = List("separator-option", "nesting-option", "indent-option")
+        .filter(_ != control)
+        .map(name => find(container, name) -> find(container, name).textContent.asInstanceOf[String])
+      assert(original.contains(initialText), original)
+      assertEquals(button.textContent.asInstanceOf[String], initialLabel)
+      assertEquals(button.getAttribute("type").asInstanceOf[String], "button")
+      val _       = button.fire("click")
+      val changed = output.value.asInstanceOf[String]
+      assert(changed.contains(clickedText), changed)
+      assert(changed != original, "a switch must change the rendered output")
+      assertEquals(button.textContent.asInstanceOf[String], clickedLabel)
+      untouched.foreach { case (other, label) => assertEquals(other.textContent.asInstanceOf[String], label) }
+      assertEquals(find(container, "formatted-tab").getAttribute("aria-pressed").asInstanceOf[String], "true")
+      val _ = button.fire("click")
+      assertEquals(output.value.asInstanceOf[String], original)
+      assertEquals(button.textContent.asInstanceOf[String], initialLabel)
+      val _ = root.unmount()
+    }
+  }
+
+  test("coverage: tabs expose the selected view and hide the local resolution note") {
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    val formattedTab    = find(container, "formatted-tab")
+    val resolvedTab     = find(container, "resolved-tab")
+    val note            = find(container, "resolution-note")
+    val original        = output.value.asInstanceOf[String]
+    assertEquals(output.readOnly.asInstanceOf[Boolean], true)
+    assert(js.isUndefined(input.readOnly) || !input.readOnly.asInstanceOf[Boolean])
+    def selected(resolved: Boolean): Unit = {
+      assertEquals(formattedTab.getAttribute("aria-pressed").asInstanceOf[String], (!resolved).toString)
+      assertEquals(resolvedTab.getAttribute("aria-pressed").asInstanceOf[String], resolved.toString)
+      assertEquals(note.hidden.asInstanceOf[Boolean], !resolved)
+      assertEquals(
+        findAll(container, "pane-title").last.textContent.asInstanceOf[String],
+        if resolved then "Resolved" else "Formatted"
+      )
+    }
+    selected(false)
+    val _ = resolvedTab.fire("click")
+    selected(true)
+    val resolved = output.value.asInstanceOf[String]
+    val _        = resolvedTab.fire("click")
+    selected(true)
+    assertEquals(output.value.asInstanceOf[String], resolved)
+    val _ = formattedTab.fire("click")
+    selected(false)
+    assertEquals(output.value.asInstanceOf[String], original)
+    val _ = root.unmount()
+  }
+
+  test("coverage: refusal details and help links disappear when valid input settles") {
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    val status          = find(container, "status")
+    assertEquals(status.getAttribute("aria-live").asInstanceOf[String], "polite")
+    assertEquals(find(container, "findings").getAttribute("aria-live").asInstanceOf[String], "polite")
+    type_(input, "a = [\n")
+    settle(250)
+      .flatMap { _ =>
+        assertEquals(output.value.asInstanceOf[String], "a = [\n")
+        assert(status.textContent.asInstanceOf[String].contains("Left unchanged"))
+        assert(find(container, "refusal-detail").textContent.asInstanceOf[String].contains("playground"))
+        val links = status
+          .findAll((n: js.Dynamic) => n.nodeName.asInstanceOf[String] == "A")
+          .asInstanceOf[js.Array[js.Dynamic]]
+          .toList
+        assertEquals(links.size, 1)
+        assertEquals(links.head.getAttribute("href").asInstanceOf[String], Status.limitationsPage)
+        assertEquals(links.head.target.asInstanceOf[String], "_blank")
+        assertEquals(links.head.getAttribute("rel").asInstanceOf[String], "noopener noreferrer")
+        type_(input, "a = 1\n")
+        settle(250)
+      }
+      .map { _ =>
+        assertEquals(status.textContent.asInstanceOf[String], "Already formatted.")
+        assertEquals(findAll(container, "refusal-detail"), Nil)
+        assertEquals(
+          status
+            .findAll((n: js.Dynamic) => n.nodeName.asInstanceOf[String] == "A")
+            .asInstanceOf[js.Array[js.Dynamic]]
+            .length,
+          0
+        )
+        val _ = root.unmount()
+        ()
+      }
+  }
+
+  test("coverage: partial refresh shows the failed repository and links other recent work") {
+    val github = Github(
+      Map(
+        GitHubApi.searchUrl(Library.Sconfig.repo) -> (
+          200,
+          """{"items":[{"number":999,"title":"new work","state":"open","pull_request":{"merged_at":null}}]}"""
+        ),
+        GitHubApi.searchUrl(Library.LightbendConfig.repo) -> (403, "rate limit")
+      )
+    )
+    val container = install(github)
+    val root      = mount(container)(ContributionsView())
+    assertEquals(find(container, "state-line").getAttribute("aria-live").asInstanceOf[String], "polite")
+    github.answer()
+    settle(50).map { _ =>
+      assert(
+        stateLine(container).contains("snapshot; GitHub did not answer for lightbend/config"),
+        stateLine(container)
+      )
+      assertEquals(findAll(container, "library").size, Library.values.size)
+      val entries = findAll(container, "entry")
+      assertEquals(entries.size, Contributions.all.size + 1)
+      val other = entries
+        .find(_.textContent.asInstanceOf[String].contains("#999"))
+        .getOrElse(fail("the live repository's other recent work is missing"))
+      val link = children(other).head
+      assertEquals(link.getAttribute("href").asInstanceOf[String], "https://github.com/ekrich/sconfig/pull/999")
+      assert(other.textContent.asInstanceOf[String].contains("new work"))
+      val failedLibrary = findAll(container, "library")
+        .find(node =>
+          children(children(node).head).head.getAttribute("href").asInstanceOf[String] ==
+            "https://github.com/lightbend/config"
+        )
+        .getOrElse(fail("the failed repository's snapshot is missing"))
+      assertEquals(findAll(failedLibrary, "entry").size, Contributions.all.count(_.library == Library.LightbendConfig))
+      val _ = root.unmount()
+      ()
+    }
+  }
+
+  test("coverage: failed searches settle on the shipped snapshot and its badges") {
+    val github    = Github(Library.values.toList.map(l => GitHubApi.searchUrl(l.repo) -> (403, "rate limit")).toMap)
+    val container = install(github)
+    val root      = mount(container)(ContributionsView())
+    github.answer()
+    settle(50).map { _ =>
+      assertEquals(stateLine(container), s"State as of ${Contributions.readOn} (the shipped snapshot).")
+      assertEquals(findAll(container, "entry").size, Contributions.all.size)
+      val badges = findAll(container, "library").flatMap(findAll(_, "badge"))
+      assertEquals(badges.size, Contributions.all.size)
+      Contributions.all.foreach { contribution =>
+        val entry = findAll(container, "entry")
+          .find { node =>
+            children(node).head.getAttribute("href").asInstanceOf[String] ==
+              s"https://github.com/${contribution.library.repo}/pull/${contribution.number}"
+          }
+          .getOrElse(fail(s"missing snapshot PR ${contribution.number}"))
+        assertEquals(find(entry, "badge").textContent.asInstanceOf[String], contribution.state.label)
+      }
+      val _ = root.unmount()
       ()
     }
   }
