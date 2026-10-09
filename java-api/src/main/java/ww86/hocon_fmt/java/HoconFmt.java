@@ -161,9 +161,9 @@ public final class HoconFmt {
     public static java.util.Optional<Path> discoverConfig(Path file) {
         for (Path dir = file.toAbsolutePath().normalize().getParent(); dir != null; dir = dir.getParent()) {
             Path config = dir.resolve(".hocon-fmt.conf");
-            String decision = ww86.hocon_fmt.ConfigLookup.decide(Files.exists(config), Files.exists(dir.resolve(".git"))).toString();
-            if (decision.equals("Found")) return java.util.Optional.of(config);
-            if (decision.equals("Stop")) break;
+            var decision = ww86.hocon_fmt.ConfigLookup.decide(Files.exists(config), Files.exists(dir.resolve(".git")));
+            if (decision.found()) return java.util.Optional.of(config);
+            if (decision.stops()) return java.util.Optional.empty();
         }
         return java.util.Optional.empty();
     }
@@ -181,7 +181,7 @@ public final class HoconFmt {
             ? readOptions(config.get()) : FormatOptions.DEFAULT;
         // Validate every supplied key and value through the same parser, including overridden values.
         String text = overrides.entrySet().stream()
-            .map(entry -> entry.getKey() + " = \"" + entry.getValue().replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+            .map(entry -> entry.getKey() + " = \"" + hoconString(entry.getValue()) + "\"")
             .collect(java.util.stream.Collectors.joining("\n"));
         FormatOptions explicit = parseOptions(text, "plugin settings");
         return new FormatOptions(
@@ -189,6 +189,33 @@ public final class HoconFmt {
             overrides.containsKey("double-indent") ? explicit.doubleIndent() : base.doubleIndent(),
             overrides.containsKey("simplify-nested-objects") ? explicit.simplifyNestedObjects() : base.simplifyNestedObjects(),
             overrides.containsKey("fail-on-duplicates") ? explicit.failOnDuplicates() : base.failOnDuplicates());
+    }
+
+    /**
+     * A value as a HOCON string literal: a quote, a backslash or a control character in a value
+     * must not change the document the settings are read from. A value that does break it would
+     * be reported as a position in a synthetic config, not as the setting that carries it.
+     */
+    private static String hoconString(String value) {
+        var escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\' -> escaped.append("\\\\");
+                case '"' -> escaped.append("\\\"");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        escaped.append(c);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     private static FormatOptions readOptions(Path config) throws IOException {

@@ -30,7 +30,9 @@ final class IsolatedFormatter private (check: Method, formatFile: Method, inspec
 
   def inspect(file: Path, overrides: Map[String, String], write: Boolean): Inspection = {
     import scala.collection.JavaConverters._
-    val result                                   = inspectFile.invoke(null, file, overrides.asJava, Boolean.box(write))
+    // Through `call`, so a rejected setting arrives as the Java API's IllegalArgumentException,
+    // message intact, not as the reflection wrapper with no message of its own.
+    val result                                   = call(inspectFile, file, overrides.asJava, Boolean.box(write))
     def read(value: AnyRef, key: String): AnyRef = value.getClass.getMethod(key).invoke(value)
     val report                                   = read(result, "report")
     val findings                                 = read(report, "findings")

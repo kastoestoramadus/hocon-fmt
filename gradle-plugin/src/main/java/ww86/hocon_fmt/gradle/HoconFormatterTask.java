@@ -46,7 +46,10 @@ public abstract class HoconFormatterTask extends DefaultTask {
     @Input @Optional
     public abstract Property<Boolean> getFailOnDuplicates();
 
-    /** Config files are inputs too: adding, removing or editing one invalidates a check. */
+    /** Config files are inputs too: adding, removing or editing one invalidates a check. The walk
+     * stops where the lookup stops — after the first directory holding .git — so a config the
+     * formatter would never read cannot invalidate the check either.
+     */
     @InputFiles
     @PathSensitive(PathSensitivity.ABSOLUTE)
     public org.gradle.api.provider.Provider<java.util.Set<java.io.File>> getConfigFiles() {
@@ -55,6 +58,7 @@ public abstract class HoconFormatterTask extends DefaultTask {
             for (org.gradle.api.file.FileSystemLocation file : locations) {
                 for (java.nio.file.Path dir = file.getAsFile().toPath().toAbsolutePath().getParent(); dir != null; dir = dir.getParent()) {
                     configs.add(dir.resolve(".hocon-fmt.conf").toFile());
+                    if (java.nio.file.Files.exists(dir.resolve(".git"))) break;
                 }
             }
             return configs;

@@ -32,7 +32,12 @@ object HoconFormatterPlugin extends AutoPlugin {
       .withRank(KeyRanks.Invisible)
 
   private val hoconInputs =
-    taskKey[Seq[(File, Map[String, String])]]("Sources with their project's explicit overrides.")
+    taskKey[Seq[Input]]("Sources with the project's explicit overrides.")
+
+  /** One source file with the settings of the project that lists it: a file two aggregated
+    * projects both list carries their settings so a conflict can be named rather than dropped.
+    */
+  final case class Input(file: File, options: Map[String, String], project: String)
 
   final case class Examined(
       file: File,
@@ -54,7 +59,8 @@ object HoconFormatterPlugin extends AutoPlugin {
         hoconSimplifyNestedObjects.value.map(value => "simplify-nested-objects" -> value.toString),
         hoconFailOnDuplicates.value.map(value => "fail-on-duplicates" -> value.toString)
       ).flatten.toMap
-      hoconFormatSources.value.map(_ -> overrides)
+      val project = thisProject.value.id
+      hoconFormatSources.value.map(file => Input(file, overrides, project))
     },
     hoconFormatSources := {
       val directories = (Compile / unmanagedResourceDirectories).value ++ (Test / unmanagedResourceDirectories).value
@@ -124,23 +130,48 @@ object HoconFormatterPlugin extends AutoPlugin {
 
   private def examine(
       root: File,
-      files: Seq[(File, Map[String, String])],
+      inputs: Seq[Input],
       classpath: Seq[File],
       write: Boolean
   ): Seq[Examined] =
     IsolatedFormatter.using(classpath) { formatter =>
-      files
-        .map { case (file, options) => file.getAbsoluteFile -> options }
+      inputs
+        .map(input => input.file.getAbsoluteFile -> input)
         .groupBy(_._1.getCanonicalFile)
         .toSeq
         .sortBy(_._1)
-        .map { case (_, inputs) =>
-          val file   = inputs.head._1
-          val path   = IO.relativize(root.getCanonicalFile, file).getOrElse(file.getPath)
-          val result = formatter.inspect(file.toPath, inputs.head._2, write)
-          Examined(file, path, result.verdict, result.warnings, result.failsOnDuplicates)
+        .map { case (_, grouped) =>
+          val input = grouped.head._2
+          val path  = IO.relativize(root.getCanonicalFile, input.file).getOrElse(input.file.getPath)
+          refuseConflict(path, grouped.map(_._2))
+          val result = formatter.inspect(input.file.toPath, input.options, write)
+          Examined(input.file, path, result.verdict, result.warnings, result.failsOnDuplicates)
         }
     }
+
+  /** A file two aggregated projects both list is examined once, but their explicit settings must
+    * agree: silently formatting it with whichever project came first would depend on the order
+    * of the aggregation filter and could leave the other project's check failing.
+    */
+  private def refuseConflict(path: String, inputs: Seq[Input]): Unit = {
+    val owners = inputs.map(input => (input.project, input.options)).distinct.sortBy(_._1)
+    if (owners.map(_._2).distinct.size > 1) {
+      val names =
+        if (owners.size == 2) owners.map(_._1).mkString(" and ") else owners.map(_._1).mkString(", ")
+      val details = owners
+        .map { case (project, options) =>
+          val settings =
+            if (options.isEmpty) "nothing"
+            else options.toSeq.sortBy(_._1).map { case (key, value) => s"$key = $value" }.mkString(", ")
+          s"$project sets $settings"
+        }
+        .mkString(", ")
+      throw new MessageOnlyException(
+        s"$path: projects $names share this file but set different HOCON options ($details); " +
+          "give them the same options or move the file"
+      )
+    }
+  }
 
   private def failOnDuplicates(examined: Seq[Examined]): Unit =
     if (examined.exists(_.failsOnDuplicates)) throw new MessageOnlyException("HOCON duplicate definitions found.")
