@@ -23,7 +23,16 @@ esac
 
 expect() { # file, pattern, minimum matches
   local found
+  # A place that is not there cannot be scanned: `grep` prints nothing to a command substitution
+  # then, and the empty operand makes `test`'s usage error read as a false condition, so the tag
+  # would pass with the place never checked.
+  if [ ! -f "$root/$1" ]; then
+    echo "$1: no such file" >&2
+    status=1
+    return 0
+  fi
   found=$(grep -Ec -- "$2" "$root/$1" || true)
+  found=${found:-0}
   if [ "$found" -lt "$3" ]; then
     echo "$1: expected at least $3 match(es) of $2, found $found" >&2
     status=1
