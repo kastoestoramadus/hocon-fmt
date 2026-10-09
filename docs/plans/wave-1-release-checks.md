@@ -19,6 +19,7 @@ append-only, so a checked item is recorded here rather than ticked in its own fi
 | #73 unreviewed scan | run `scripts/changes-classifiers-test.sh` | `all classifier cases pass` |
 | #44 cats file identity, #52 rename pins | keep the JVM rename and hard-link pins green | `catsJVM/test` green (18 passed) |
 | #2 golden files, #13 include preservation, #35 lost comments, #38 env override, #48 catalogue | the defect suite is the ledger; its failures are the list to shrink | `sbt coreJVM/testOnly …SconfigDefectsSpec` is `Failed: Total 20, Failed 19, Passed 1` on the JVM, the documented 19 red by design — nothing to remove yet |
+| [first release](first-release.md) item 3 | the version is in six places and `java-api` is checked | `scripts/check-release-version.sh 0.1.0` names all six today, `java-api/build.gradle.kts` among them, so a tag before the bump stops; the sbt `hocon-fmt-java-api` follows `build.sbt` (the published POM carried 0.1.0 while the build said `-SNAPSHOT`) |
 
 The wave-1 suites ran green from this worktree: `coreJVM/test` 450 passed, `catsJVM/test` 18,
 `cliJVM/test` 64, `acceptance/test` 57 (the CLI's real-process suite), `checkReleaseSet` passed, and
@@ -36,8 +37,9 @@ The wave-1 suites ran green from this worktree: `coreJVM/test` 450 passed, `cats
   platform; #51 wants `sbt coverageJvm`.
 - **Needs the wave-2 builds**: #63 identity-preserving writes on every release platform (the
   `java-api/` Gradle tests and the scripted suites), #47 the Java API's Gradle `maven-publish`
-  block, #53 `./gradlew check` in `java-api/`, #10/#29/#59 the Maven and Mill plugins, #9/#56 the
-  Gradle plugin, #15 Mill.
+  block, #53 `./gradlew check` in `java-api/`, #43 the zio adapter's per-platform identity sources,
+  #10/#29/#59 the Maven and Mill plugins, #9/#56 the Gradle plugin, #15 Mill, #27 the Gradle Plugin
+  Portal's `eu.ww86.hocon-fmt`.
 - **A decision before or after the tag**: #25 the platform contract for the CLI (Windows and
   terminal stdin are not covered by `CliAcceptanceSuite`), #52 whether a sixth published artifact
   (a shared file-identity module) is wanted, #64 adding `changes` to the ruleset's required checks

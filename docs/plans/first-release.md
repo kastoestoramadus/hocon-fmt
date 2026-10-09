@@ -7,7 +7,10 @@ one-time account setup are in [releasing](../releasing.md); this file only says 
 ## Two waves (decided 2026-10-09)
 
 **Wave 1, the first publish:** the JVM artifacts sbt uploads to Maven Central with `publishRelease`:
-`hocon-fmt-core_3`, `hocon-fmt-cli_3`, `eu.ww86:hocon-fmt-java-api` and the sbt plugin.
+`hocon-fmt-core_3`, `hocon-fmt-cats_3`, `hocon-fmt-cli_3`, `eu.ww86:hocon-fmt-java-api` and the sbt
+plugin. The adapter is in the list because `hocon-fmt-cli_3`'s POM names it: a repository holding
+the other four fails the CLI with `Error downloading eu.ww86:hocon-fmt-cats_3:0.1.0`. The wave-1 dry
+run (#79) found that, made `publishRelease` this set, and made `sbt test` check the set is closed.
 **Wave 2:** the Maven, Mill and Gradle plugins, PyPI wheels, npm, native binaries, the web script and
 the pre-commit hooks. So for wave 1 the PyPI, npm and Gradle accounts below, and items 1 (PyPI, npm,
 Gradle jobs) and the Gradle part of the secrets, can wait; a tag in wave 1 must not run the wave 2
