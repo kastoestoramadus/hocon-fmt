@@ -675,10 +675,12 @@ lazy val javaApi = guardPublish(
 )
 
 // Wave 1 is what the first release uploads: the JVM artifacts — the core, the CLI, the Java API
-// and the sbt plugin. Wave 2 adds the JS and Native artifacts and the zio adapter.
+// and the sbt plugin, with the cats adapter the CLI's POM names, so the set can be resolved whole.
+// Wave 2 adds the JS and Native artifacts and the zio adapter.
 val releaseProjectIds =
   Seq(
     coreJVM.id,
+    catsJVM.id,
     cliJVM.id,
     javaApi.id,
     sbtPlugin.id
