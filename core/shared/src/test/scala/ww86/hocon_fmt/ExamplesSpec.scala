@@ -18,6 +18,22 @@ class ExamplesSpec extends munit.FunSuite {
     case Refusal.UnstableOutput  => "unstable-output"
   }
 
+  test("richer examples retain every merged input verbatim") {
+    val originals = List(
+      "catalogue/comments"    -> "// the port\nport = 8080\n",
+      "catalogue/comments"    -> "intro = \"\"\"Welcome\nto the app.\"\"\"\n",
+      "catalogue/messy"       -> "host : ${?HOST}\n",
+      "catalogue/messy"       -> "a += 2\n",
+      "showcase/02-set-twice" -> "logging.filter = \"com.example.Verbose\"\nlogging.filter = \"com.example.Quiet\"\n"
+    )
+    originals.foreach { case (id, input) =>
+      val example = ExampleData.all.find(_.id == id).getOrElse(fail(s"missing $id"))
+      assert(example.input.contains(input), s"$id lost merged input: $input")
+      assert(example.input.linesIterator.size > 4, s"$id is still too small")
+    }
+    assert(ExampleData.all.filter(e => e.now == "formatted").forall(_.input.linesIterator.size > 4))
+  }
+
   test("every refusal maps to a kind the generator accepts") {
     // `Refusal.values` is not defined for enums with non-singleton cases ("a values array is not
     // defined"), so one sample instance per case stands in; a case missing from the list still
