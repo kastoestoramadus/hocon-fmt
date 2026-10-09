@@ -270,6 +270,38 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
+  test("resolution preserves user placeholder names, explains missing values, and keeps refusals untouched") {
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    type_(input, "__INCLUDE_0 = user-value\n")
+    settle(250)
+      .flatMap { _ =>
+        val _ = find(container, "resolved-tab").fire("click")
+        assert(output.value.asInstanceOf[String].contains("user-value"))
+        type_(input, "value = ${MISSING}\n")
+        settle(250)
+      }
+      .flatMap { _ =>
+        assert(output.value.asInstanceOf[String].startsWith("Resolution unavailable:"))
+        val safety = ExampleData.showcase.last.input
+        type_(input, safety)
+        settle(250).map { _ =>
+          assertEquals(output.value.asInstanceOf[String], safety)
+          assert(find(container, "findings").textContent.asInstanceOf[String].contains("service.port"))
+          val _ = find(container, "formatted-tab").fire("click")
+          assertEquals(output.value.asInstanceOf[String], safety)
+          type_(input, "a = 1\n")
+        }
+      }
+      .flatMap(_ => settle(250))
+      .map { _ =>
+        assertEquals(find(container, "findings").textContent.asInstanceOf[String], "")
+        val _ = root.unmount()
+        ()
+      }
+  }
+
   // --- the contributions section ---------------------------------------------------------------
 
   test("building the contributions section asks GitHub nothing; mounting it asks once per repository") {
