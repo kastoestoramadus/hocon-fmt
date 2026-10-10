@@ -118,6 +118,16 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
   this shape, every one resolving differently once formatted; the doubt covers the piece whole, so
   the check reads nothing inside a concatenation off the merged tree.
 
+- **A definition a kept twin's line vouches for**: `q = 0, q.a = 1, include "f.conf", q {}`, with
+  `q = 9` in the included file. The file resolves `q` to `{}` — `q {}` cleared the included scalar —
+  and the check formatted it until this rule, dropping `q {}`: the merged tree carried a value at
+  `q` on that line (the kept `q.a = 1`), and the pair of path and line matched all three
+  definitions, so the empty object passed for kept. The merge follows the source, so a definition a
+  later twin on the same line erases cannot be the value the pair carries, and the pair no longer
+  vouches for it — `q = 0` is erased by both `q.a = 1` and `q {}`, and `q {}` is refused. The doubt
+  is one-sided: a twin in front cannot have replaced anything, so `include "f.conf", p {}, p = 3`,
+  where `p = 3` is the value the merge keeps, still formats.
+
   The included file cannot be read at format time — a web page has no filesystem, and the target
   may be a URL — so the formatter cannot check whether the dropped definition mattered. It refuses,
   naming the include's line and the definition's line, and leaves the file for the user to rework by
@@ -132,9 +142,13 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
   The doubt covering a whole piece refuses ordinary configs too: `app={servers=["one"]} { include
   "f.conf"` `pool {}` `pool.size=8 }` cannot change what the file resolves to when formatted — an
   oracle resolved it the same against every one of 29 included bodies tried — but nothing inside the
-  concatenation vouches for `pool {}`, so it is refused like the hazards above. Of the files in
-  `examples/`, the golden files and the research probes, exactly the three that reproduce the first
-  two cases are refused that were not before.
+  concatenation vouches for `pool {}`, so it is refused like the hazards above. The doubt was
+  measured once more with the one-sided same-line rule in place: reading object pieces off the
+  merged tree again formats 331 sources the doubt refuses and lets five of them (21 comparisons
+  across the reviewer's bodies) resolve differently, the empty object after the include merging away
+  with no erasing twin on its line, so the doubt stays and those configs stay refused. Of the files
+  in `examples/`, the golden files and the research probes, exactly the three that reproduce the
+  first two cases are refused that were not before.
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 

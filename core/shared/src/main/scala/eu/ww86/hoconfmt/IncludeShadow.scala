@@ -33,11 +33,11 @@ import scala.util.Try
   *   - or the definition is an object with nothing inside it, which replaces what is not an object,
   *     and no later definition of that path follows, so nothing else of the file replaces the
   *     include's values either;
-  *   - or the definition shares its line with another definition of the same path that keeps it out
-  *     of the merged tree — one of the two writes a value, or this one is an object with nothing
-  *     inside it, which vanishes into the other's object. Neither the merge's origins nor the
-  *     rendering tell one of the two from the other — a line carries no column, and fields sharing
-  *     a line come out in no defined order — so the survivor cannot vouch for the dropped one.
+  *   - or the definition shares its line with a later definition of the same path that erases it, so
+  *     the value the merged tree carries at that path and line is the later one's own and cannot
+  *     vouch for this one. The merge follows the source, and a doubt that looked both ways refused
+  *     shapes like `include "f.conf", p {}, p = 3` whose pair carries the kept `p = 3`; only the
+  *     later twin can have replaced the definition, so only it denies the vouch.
   *
   * A definition inside a piece of a concatenation is not read off the merged tree at all. An array
   * piece counts its elements from zero where the merged list counts them across the pieces, and an
