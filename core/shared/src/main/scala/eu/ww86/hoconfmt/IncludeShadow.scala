@@ -113,30 +113,129 @@ private[hoconfmt] object IncludeShadow {
     outline.includes
       .sortBy(_.line)
       .iterator
-      .flatMap { include =>
-        val inItsObject = outline.definitions.filter(definition => standsIn(definition, include))
-        // One group per line and path, built once: the fallback below asks every definition
-        // whether another one beside it on its line keeps it out of the merge, and scanning the
-        // whole object for each of them is what made a large include-bearing file quadratic.
-        val onItsLine = inItsObject.zipWithIndex.groupBy { case (definition, _) =>
-          (definition.line, definition.keyPath)
-        }
-        inItsObject.zipWithIndex
-          .filter { case (definition, at) =>
-            definition.position > include.position &&
-            (!survives(kept, definition) || overshadowedOnItsLine(onItsLine, at, definition).nonEmpty)
-          }
-          .sortBy { case (definition, _) => definition.line }
-          .iterator
-          .flatMap { case (definition, at) =>
-            Option.when[Refusal.ShadowedByInclude](
-              shadowed(definition, at, include, inItsObject, onItsLine, root, kept)
-            )(
-              Refusal.ShadowedByInclude(definition.keyPath.rendered, include.line, definition.line)
-            )
-          }
-      }
+      .flatMap(include => firstStanding(include, outline.definitions, root, kept))
       .nextOption()
+  }
+
+  /** The first definition of an include's object to refuse over, in line order.
+    *
+    * The questions a refusal asks are about the definitions around one of them: what stands after
+    * it, what stands between the include and it, and which paths are related to its own. Asking
+    * them of one definition at a time scans the object once per definition, which a large file
+    * with an array concatenation pays for every definition — a definition inside a later piece is
+    * never read off the merged tree, so each of them is a candidate. Everything the answers read is
+    * therefore indexed once per include and once per path: which the merge kept, what stands after
+    * a position, what stands before one, and which paths hold a relative of another.
+    */
+  private def firstStanding(
+      include: DuplicateReport.Include,
+      definitions: Vector[DuplicateReport.Definition],
+      root: ConfigObject,
+      kept: Set[(KeyPath, Int)]
+  ): Option[Refusal.ShadowedByInclude] = {
+    val inItsObject = definitions.filter(definition => standsIn(definition, include))
+    // One group per line and path, built once: the fallback below asks every definition whether
+    // another one beside it on its line keeps it out of the merge, and scanning the whole object
+    // for each of them is what made a large include-bearing file quadratic.
+    val onItsLine = inItsObject.zipWithIndex.groupBy { case (definition, _) =>
+      (definition.line, definition.keyPath)
+    }
+    val survivesAt = inItsObject.map(definition => survives(kept, definition))
+    val candidates = inItsObject.indices.filter { at =>
+      val definition = inItsObject(at)
+      definition.position > include.position &&
+      (!survivesAt(at) || overshadowedOnItsLine(onItsLine, at, definition).nonEmpty)
+    }
+    if (candidates.isEmpty) None
+    else {
+      val around = new Around(include, inItsObject, survivesAt, onItsLine)
+      candidates
+        .sortBy(at => inItsObject(at).line)
+        .iterator
+        .flatMap { at =>
+          Option.when[Refusal.ShadowedByInclude](refuses(inItsObject(at), at, around, root))(
+            Refusal.ShadowedByInclude(inItsObject(at).keyPath.rendered, include.line, inItsObject(at).line)
+          )
+        }
+        .nextOption()
+    }
+  }
+
+  /** One include's object, and every answer a refusal reads off it, built once: which definitions
+    * the merge kept, the groups sharing a line and path, the paths related to each other, and what
+    * stands after a definition and between the include and it.
+    */
+  final private class Around(
+      include: DuplicateReport.Include,
+      definitions: Vector[DuplicateReport.Definition],
+      survives: Vector[Boolean],
+      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]]
+  ) {
+
+    private val related = new RelatedPaths(definitions)
+
+    /** What the definitions after one another answer together: whether a survived definition stands
+      * at its path or below it, whether an object stands at it, and whether one stands below it.
+      */
+    private val afterAll      = new PathCounts
+    private val afterSurvived = new PathCounts
+    private val afterObjects  = new PathCounts
+
+    /** The same, for the definitions between the include and the one asked about — only the ones
+      * the merge kept, since a dropped definition there did nothing.
+      */
+    private val beforeSurvived = new PathCounts
+    private val beforeObjects  = new PathCounts
+
+    private val after: Vector[(Boolean, Boolean, Boolean)] = definitions.indices.foldRight(Vector.empty) {
+      (at, answers) =>
+        val definition = definitions(at)
+        val answer     = (
+          afterSurvived.atOrBelow(definition.keyPath) > 0,
+          afterObjects.exact(definition.keyPath) > 0,
+          afterAll.below(definition.keyPath)
+        )
+        afterAll.add(definition.keyPath)
+        if (survives(at)) afterSurvived.add(definition.keyPath)
+        if (definition.objectValued) afterObjects.add(definition.keyPath)
+        answer +: answers
+    }
+
+    private val before: Vector[(Boolean, Boolean)] = definitions.indices.foldLeft(Vector.empty) { (answers, at) =>
+      val definition = definitions(at)
+      val answer     =
+        if (definition.position <= include.position) (false, false)
+        else
+          (
+            beforeObjects.atOrBelow(definition.keyPath) > 0,
+            beforeSurvived.below(definition.keyPath)
+          )
+      if (survives(at) && definition.position > include.position) {
+        beforeSurvived.add(definition.keyPath)
+        if (definition.objectValued) beforeObjects.add(definition.keyPath)
+      }
+      answers :+ answer
+    }
+
+    def keptAt(at: Int): Boolean                                            = survives(at)
+    def overshadowingOf(at: Int): Vector[(DuplicateReport.Definition, Int)] =
+      overshadowedOnItsLine(onItsLine, at, definitions(at))
+    def relatedTo(at: Int): Boolean = related.relatedTo(at)
+
+    /** Whether a survived definition stands after this one at its path or below it. */
+    def afterAtOrBelow(at: Int): Boolean = after(at)._1
+
+    /** Whether an object stands after this one at its path, whatever the merge kept of it. */
+    def afterObjectAt(at: Int): Boolean = after(at)._2
+
+    /** Whether anything stands after this one below its path. */
+    def afterBelow(at: Int): Boolean = after(at)._3
+
+    /** Whether a survived object stands between the include and this one at its path or below it. */
+    def beforeObjectsAtOrBelow(at: Int): Boolean = before(at)._1
+
+    /** Whether a survived definition stands between the include and this one below its path. */
+    def beforeBelow(at: Int): Boolean = before(at)._2
   }
 
   /** The definitions beside `definition` on its line that keep it out of the merged tree: the same
@@ -145,20 +244,20 @@ private[hoconfmt] object IncludeShadow {
     * leaves nothing of its own to see in the rendering. The merged tree carries a path and a line
     * per value and no column, so which of the two a value at that path on that line came from
     * cannot be read off it: [[survives]] can vouch for neither. The group is read off
-    * `onItsLine`, built once per include.
+    * `onItsLine`, built once per include, and each definition comes with its place in it.
     */
   private def overshadowedOnItsLine(
       onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
       at: Int,
       definition: DuplicateReport.Definition
-  ): Vector[DuplicateReport.Definition] =
+  ): Vector[(DuplicateReport.Definition, Int)] =
     onItsLine
       .getOrElse((definition.line, definition.keyPath), Vector.empty)
       .collect {
         case (other, otherAt)
             if otherAt != at &&
               (DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued) =>
-          other
+          (other, otherAt)
       }
 
   /** Whether a definition stands in the object an include stands in. Definitions elsewhere never
@@ -173,23 +272,14 @@ private[hoconfmt] object IncludeShadow {
     * on the include's own line counts only when it stands after it: one in front of the include
     * cannot be what kept the included values out of the path.
     */
-  private def shadowed(
+  private def refuses(
       definition: DuplicateReport.Definition,
       at: Int,
-      include: DuplicateReport.Include,
-      inItsObject: Vector[DuplicateReport.Definition],
-      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
-      root: ConfigObject,
-      kept: Set[(KeyPath, Int)]
+      around: Around,
+      root: ConfigObject
   ): Boolean = {
-    val later =
-      inItsObject.filter(_.position > definition.position) ++
-        overshadowedOnItsLine(onItsLine, at, definition).filter(DuplicateReport.erases(_, definition))
-    val related =
-      inItsObject.zipWithIndex.exists { case (other, otherAt) =>
-        otherAt != at && relatedPaths(other.keyPath, definition.keyPath)
-      }
-    if (!related) false
+    val erasing = around.overshadowingOf(at).filter { case (other, _) => DuplicateReport.erases(other, definition) }
+    if (!around.relatedTo(at)) false
     else if (definition.objectValued) {
       // An object with nothing inside it adds nothing to a merge, so replacing a value that is
       // not an object is the only work it does. Only a definition the rendering keeps, between
@@ -197,23 +287,75 @@ private[hoconfmt] object IncludeShadow {
       // object already — a dropped one may have done nothing itself. And a later definition the
       // rendering keeps ends the merge with a value of its own.
       definition.writesNothing &&
-      !later.exists(other => survives(kept, other) && sameOrBelow(other.keyPath, definition.keyPath)) &&
-      !inItsObject.exists(other =>
-        other.position > include.position && other.position < definition.position && survives(kept, other) &&
+      !(around.afterAtOrBelow(at) ||
+        erasing.exists { case (other, otherAt) =>
+          around.keptAt(otherAt) && sameOrBelow(other.keyPath, definition.keyPath)
+        }) &&
+      !(around.beforeObjectsAtOrBelow(at) ||
+        around.beforeBelow(at) ||
+        erasing.exists { case (other, otherAt) =>
+          around.keptAt(otherAt) &&
           (sameOrBelow(other.keyPath, definition.keyPath) && other.objectValued ||
             sitsBelow(definition.keyPath, other.keyPath))
-      )
+        })
     } else {
       // A value that is not an object erases what came before, the included file's value
       // included. Losing it lets the included value merge into the object a later definition of
       // the path leaves behind; a merged tree that is not an object at the path means the
       // rendering ends with a value that erases the included one instead.
-      later.exists(other =>
-        (other.keyPath == definition.keyPath && other.objectValued) ||
+      (around.afterObjectAt(at) ||
+        around.afterBelow(at) ||
+        erasing.exists { case (other, _) =>
+          (other.keyPath == definition.keyPath && other.objectValued) ||
           sitsBelow(definition.keyPath, other.keyPath)
-      ) && couldHoldObject(root, definition)
+        }) && couldHoldObject(root, definition)
     }
   }
+
+  /** Which definitions of one object are related to another one — a definition of the same path, of
+    * a path below it, or of a path above it. One lookup answers what [[refuses]] asks of every
+    * candidate, where scanning the object for each of them was a scan per definition: the prefixes
+    * of a path and the paths that hold a prefix of their own are read off sets.
+    */
+  final private class RelatedPaths(definitions: Vector[DuplicateReport.Definition]) {
+    private val paths          = definitions.map(_.keyPath)
+    private val counts         = paths.groupMapReduce(identity)(_ => 1)(_ + _)
+    private val defined        = paths.toSet
+    private val withDescendant = paths.flatMap(path => properPrefixes(path)).toSet
+
+    def relatedTo(at: Int): Boolean = {
+      val path = paths(at)
+      counts.getOrElse(path, 0) > 1 ||
+      withDescendant.contains(path) ||
+      properPrefixes(path).exists(defined.contains)
+    }
+  }
+
+  /** The paths a pass over the definitions has seen, counted at each path and at every path above
+    * it: whether a definition writes a path or a path below it is then one lookup. The path itself
+    * is counted too, so what stands strictly below it is the difference.
+    */
+  final private class PathCounts {
+    private val atOrBelowCounts = scala.collection.mutable.HashMap.empty[KeyPath, Int]
+    private val exactCounts     = scala.collection.mutable.HashMap.empty[KeyPath, Int]
+
+    def add(path: KeyPath): Unit = {
+      (path :: properPrefixes(path)).foreach { counted =>
+        atOrBelowCounts.update(counted, atOrBelowCounts.getOrElse(counted, 0) + 1)
+      }
+      exactCounts.update(path, exactCounts.getOrElse(path, 0) + 1)
+    }
+
+    def atOrBelow(path: KeyPath): Int = atOrBelowCounts.getOrElse(path, 0)
+    def exact(path: KeyPath): Int     = exactCounts.getOrElse(path, 0)
+
+    /** Whether one of the paths seen stands strictly below `path`. */
+    def below(path: KeyPath): Boolean = atOrBelow(path) > exact(path)
+  }
+
+  /** The paths above a path, from the one-segment path down to the full one but not including it. */
+  private def properPrefixes(path: KeyPath): List[KeyPath] =
+    path.segments.inits.filter(_.nonEmpty).drop(1).map(KeyPath(_)).toList
 
   /** Whether the merged tree could hold an object where a definition writes. A definition inside a
     * piece of a concatenation writes positions the merged list numbers differently, so the merged
@@ -244,10 +386,6 @@ private[hoconfmt] object IncludeShadow {
           case _                => None
         }
     }
-
-  /** Whether either path is the other, or a field inside it. */
-  private def relatedPaths(one: KeyPath, other: KeyPath): Boolean =
-    one == other || sitsBelow(one, other) || sitsBelow(other, one)
 
   private def sameOrBelow(one: KeyPath, other: KeyPath): Boolean = one == other || sitsBelow(other, one)
 
