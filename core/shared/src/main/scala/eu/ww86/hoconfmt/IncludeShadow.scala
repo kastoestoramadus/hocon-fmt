@@ -76,8 +76,8 @@ private[hoconfmt] object IncludeShadow {
     * its line are one of these pairs. The line alone cannot decide it, since `a.o = 3` writes the
     * object `a` and the value `a.o` on one line, and the object the merge keeps would make the
     * dropped leaf look kept. Neither can the pair decide between two definitions written on one
-    * line, which share both halves; [[overshadowedOnItsLine]] names those, and the candidate filter
-    * refuses one of the two rather than let the other vouch for it.
+    * line that erase each other, which share both halves; [[survives]] denies the pair's vouch when
+    * [[erasedByALaterLineTwin]] finds one, and the candidate filter refuses over both reads.
     *
     * The root's own origin is left out: it is the text's first line, which a definition can share
     * only by standing at the very top, where no include can stand before it. Objects, arrays and
@@ -102,14 +102,26 @@ private[hoconfmt] object IncludeShadow {
     case leaf => Set(KeyPath(path) -> leaf.origin.lineNumber)
   }
 
-  /** Whether the merge kept the definition: a value stands at its path on its line. A definition
-    * inside a piece of a concatenation is not read off the merged tree at all: an array piece
-    * counts its elements from zero where the merged list counts them across the pieces, and an
-    * object piece merges with the others, so the value at its path and line may be the survivor of
-    * another definition and nothing there vouches for this one.
+  /** Whether the merge kept the definition: a value stands at its path on its line, and no later
+    * twin on that line erases it. A definition inside a piece of a concatenation is not read off the
+    * merged tree at all: an array piece counts its elements from zero where the merged list counts
+    * them across the pieces, and an object piece merges with the others, so the value at its path
+    * and line may be the survivor of another definition and nothing there vouches for this one.
+    *
+    * A later erasing twin on the line is the same doubt in a smaller place: `q = 0` and `q {}`
+    * written on one line erase each other, the merge follows the source, and the later one's value
+    * is the value at the pair — so the pair carries the later one's origin and cannot vouch for the
+    * earlier. `q=0, q.a=1, include "f.conf", q {}` showed what trusting it cost: the kept leaf
+    * `q.a = 1` put a value at `q` on the line, that value vouched for the dropped `q {}` through
+    * `q = 0`, and the refusal the empty object needed was never reached — the include's `q = 9`
+    * then stayed where the empty object had cleared it.
     */
-  private def survives(kept: Set[(KeyPath, Int)], definition: DuplicateReport.Definition): Boolean =
-    definition.arrayPositionsTrusted && kept.contains((definition.keyPath, definition.line))
+  private def survives(
+      kept: Set[(KeyPath, Int)],
+      definition: DuplicateReport.Definition,
+      erasedByALaterLineTwin: Boolean
+  ): Boolean =
+    definition.arrayPositionsTrusted && kept.contains((definition.keyPath, definition.line)) && !erasedByALaterLineTwin
 
   private def first(outline: DuplicateReport.Outline, root: ConfigObject): Option[Refusal.ShadowedByInclude] = {
     val kept = keptValues(root)
@@ -143,7 +155,9 @@ private[hoconfmt] object IncludeShadow {
     val onItsLine = inItsObject.zipWithIndex.groupBy { case (definition, _) =>
       (definition.line, definition.keyPath)
     }
-    val survivesAt = inItsObject.map(definition => survives(kept, definition))
+    val survivesAt = inItsObject.zipWithIndex.map { case (definition, at) =>
+      survives(kept, definition, erasedByALaterLineTwin(onItsLine, at, definition))
+    }
     val candidates = inItsObject.indices.filter { at =>
       val definition = inItsObject(at)
       definition.position > include.position &&
@@ -241,6 +255,22 @@ private[hoconfmt] object IncludeShadow {
     def beforeBelow(at: Int): Boolean = before(at)._2
   }
 
+  /** Whether a definition standing later on the same line and path erases this one. The later one's
+    * value is the value the merge kept at the pair, so the pair carries the later one's origin and
+    * cannot vouch for the earlier — the doubt is one-sided: a twin in front cannot have replaced
+    * anything, since the merge follows the source. `q=0, q.a=1, include "f.conf", q {}` is what the
+    * doubt is for: `q = 0` is erased by both `q.a = 1` and `q {}`, so the pair did not vouch for it,
+    * and the refusal `q {}` needed was reached even though the pair's value came from the leaf.
+    */
+  private def erasedByALaterLineTwin(
+      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
+      at: Int,
+      definition: DuplicateReport.Definition
+  ): Boolean =
+    lineTwins(onItsLine, at, definition).exists { case (other, otherAt) =>
+      otherAt > at && DuplicateReport.erases(other, definition)
+    }
+
   /** The definitions beside `definition` on its line that keep it out of the merged tree: the same
     * path, and either the other writes a value the two cannot merge with, or this one is an object
     * with nothing inside it, which the other's object swallows whole — `p {}` beside `p { a = 1 }`
@@ -254,14 +284,21 @@ private[hoconfmt] object IncludeShadow {
       at: Int,
       definition: DuplicateReport.Definition
   ): Vector[(DuplicateReport.Definition, Int)] =
-    onItsLine
-      .getOrElse((definition.line, definition.keyPath), Vector.empty)
-      .collect {
-        case (other, otherAt)
-            if otherAt != at &&
-              (DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued) =>
-          (other, otherAt)
-      }
+    lineTwins(onItsLine, at, definition).filter { case (other, _) =>
+      DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued
+    }
+
+  /** The group of definitions sharing `definition`'s line and path, each with its place, this one
+    * left out: what the two reads above ask of a line.
+    */
+  private def lineTwins(
+      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
+      at: Int,
+      definition: DuplicateReport.Definition
+  ): Vector[(DuplicateReport.Definition, Int)] =
+    onItsLine.getOrElse((definition.line, definition.keyPath), Vector.empty).filter { case (_, otherAt) =>
+      otherAt != at
+    }
 
   /** Whether a definition stands in the object an include stands in. Definitions elsewhere never
     * meet the include: the included file's fields are inlined into that object alone.
