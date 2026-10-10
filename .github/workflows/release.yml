@@ -105,7 +105,8 @@ jobs:
   # Wave 2: attaching the wave-2 artifacts to the GitHub release the tag names.
   release:
     if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
-    needs: [native, npm, web]
+    # central is where the version and signing checks run; a tag they reject must not ship a release.
+    needs: [native, npm, web, central]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
