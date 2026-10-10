@@ -68,12 +68,14 @@ follows and the mismatches left open: [naming](naming.md).
    definition is refused over when another definition of its object names the same path or one above
    or below it and the dropping could let values through — it writes a value and a later definition
    makes the path an object again, or it is an object with nothing inside it and no later definition
-   of the path follows. A definition inside a piece of an array concatenation is never vouched for
-   by the merged tree: the piece counts its elements from zero and the merged list counts them
-   across the pieces, so the document's own path names another element there. It counts as possibly
-   dropped and its path is assumed to hold an object, refusing it rather than reading a value that
-   belongs to another element. The check is deliberately conservative: the included file cannot be
-   read at format time, so it refuses a form a later, better-informed pass could allow.
+   of the path follows. A definition inside a piece of a concatenation is never vouched for by the
+   merged tree, array piece or object piece: the piece counts its elements from zero where the
+   merged list counts them across the pieces, and the merged value at a path and line a piece writes
+   may be the survivor of a definition the merge dropped, with nothing in the tree to tell that it
+   is not the piece's own. It counts as possibly dropped and its path is assumed to hold an object,
+   refusing it rather than reading a value that may belong to another element or another definition.
+   The check is deliberately conservative: the included file cannot be read at format time, so it
+   refuses a form a later, better-informed pass could allow.
 
 `HoconText` finds the strings and comments of a text in one pass. Masking asks it whether an
 `include` is code, and the comment check asks it for each comment's text.

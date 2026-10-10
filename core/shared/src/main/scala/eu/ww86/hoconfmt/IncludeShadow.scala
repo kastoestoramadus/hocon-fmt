@@ -39,10 +39,12 @@ import scala.util.Try
   *     rendering tell one of the two from the other — a line carries no column, and fields sharing
   *     a line come out in no defined order — so the survivor cannot vouch for the dropped one.
   *
-  * A definition inside a piece of an array concatenation stands at positions the merged list
-  * numbers differently, so the merged tree cannot answer for it at all: it is never read as kept,
-  * and it is refused whenever the rest of the check could let the include's values through, rather
-  * than skipped over a value that belongs to another element.
+  * A definition inside a piece of a concatenation is not read off the merged tree at all. An array
+  * piece counts its elements from zero where the merged list counts them across the pieces, and an
+  * object piece merges with the others: the merged value at a path and line a piece writes may be
+  * the survivor of a definition the merge dropped. Such a definition is never read as kept, and it
+  * is refused whenever the rest of the check could let the include's values through, rather than
+  * skipped over a value that may belong to another element or another definition.
   *
   * Refusing a little too much is the point: the included file cannot be read at format time (a
   * web page has no filesystem, and the include may name a URL), so the contents that could arrive
@@ -101,9 +103,10 @@ private[hoconfmt] object IncludeShadow {
   }
 
   /** Whether the merge kept the definition: a value stands at its path on its line. A definition
-    * inside a piece of a concatenation is not read off the merged tree at all: the piece counts its
-    * elements from zero and the merged list counts them across the pieces, so the path names
-    * another element there and no value on it vouches for this definition.
+    * inside a piece of a concatenation is not read off the merged tree at all: an array piece
+    * counts its elements from zero where the merged list counts them across the pieces, and an
+    * object piece merges with the others, so the value at its path and line may be the survivor of
+    * another definition and nothing there vouches for this one.
     */
   private def survives(kept: Set[(KeyPath, Int)], definition: DuplicateReport.Definition): Boolean =
     definition.arrayPositionsTrusted && kept.contains((definition.keyPath, definition.line))
@@ -122,10 +125,10 @@ private[hoconfmt] object IncludeShadow {
     * The questions a refusal asks are about the definitions around one of them: what stands after
     * it, what stands between the include and it, and which paths are related to its own. Asking
     * them of one definition at a time scans the object once per definition, which a large file
-    * with an array concatenation pays for every definition — a definition inside a later piece is
-    * never read off the merged tree, so each of them is a candidate. Everything the answers read is
-    * therefore indexed once per include and once per path: which the merge kept, what stands after
-    * a position, what stands before one, and which paths hold a relative of another.
+    * with a concatenation pays for every definition — a definition inside a piece is never read off
+    * the merged tree, so each of them is a candidate. Everything the answers read is therefore
+    * indexed once per include and once per path: which the merge kept, what stands after a
+    * position, what stands before one, and which paths hold a relative of another.
     */
   private def firstStanding(
       include: DuplicateReport.Include,
@@ -358,9 +361,11 @@ private[hoconfmt] object IncludeShadow {
     path.segments.inits.filter(_.nonEmpty).drop(1).map(KeyPath(_)).toList
 
   /** Whether the merged tree could hold an object where a definition writes. A definition inside a
-    * piece of a concatenation writes positions the merged list numbers differently, so the merged
-    * tree cannot answer for it; the check assumes the worst rather than read the value of another
-    * element, which would let the included file's values through unnoticed.
+    * piece of a concatenation is not read off the merged tree — an array piece counts its elements
+    * from zero where the merged list counts them across the pieces, and an object piece merges with
+    * the others — so the check assumes the worst rather than read a value that may belong to
+    * another element or another definition, which would let the included file's values through
+    * unnoticed.
     */
   private def couldHoldObject(root: ConfigObject, definition: DuplicateReport.Definition): Boolean =
     !definition.arrayPositionsTrusted || objectAt(root, definition.keyPath)

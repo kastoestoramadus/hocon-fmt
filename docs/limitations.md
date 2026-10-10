@@ -109,6 +109,14 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
   counts its elements from zero while the merged list counts them across the pieces, so the merged
   tree cannot say what stands at the definition's own element; the check refuses the definition
   rather than read the value of the element its path names there.
+- **A definition in a piece of an object concatenation**: `app = {} { q = 0, q.a = 1, include
+  "f.conf", q {} }`, with `q = 9` in the included file. The file resolves `app.q` to `{}` — `q {}`
+  cleared the included scalar — and formatted, the dropped `q {}` lets the scalar through,
+  resolving `q = 9`. An object piece merges with the pieces beside it, and the merged value at a
+  path and line a piece writes may be the survivor of a definition the merge dropped, with nothing
+  in the tree to tell that it is not the piece's own. An independent review found 18 sources of
+  this shape, every one resolving differently once formatted; the doubt covers the piece whole, so
+  the check reads nothing inside a concatenation off the merged tree.
 
   The included file cannot be read at format time — a web page has no filesystem, and the target
   may be a URL — so the formatter cannot check whether the dropped definition mattered. It refuses,
@@ -121,8 +129,12 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
   This refuses a little too much. `x.a = 5`, the include, `x {}` is refused even when the included
   file says nothing about `x` (as one research probe's `f.conf` does): the check sees the text, not
   the included file, and a file whose included contents are unknown is not one to resolve on a guess.
-  Of the files in `examples/`, the golden files and the research probes, exactly the three that
-  reproduce the cases above are refused that were not before.
+  The doubt covering a whole piece refuses ordinary configs too: `app={servers=["one"]} { include
+  "f.conf"` `pool {}` `pool.size=8 }` cannot change what the file resolves to when formatted — an
+  oracle resolved it the same against every one of 29 included bodies tried — but nothing inside the
+  concatenation vouches for `pool {}`, so it is refused like the hazards above. Of the files in
+  `examples/`, the golden files and the research probes, exactly the three that reproduce the first
+  two cases are refused that were not before.
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
