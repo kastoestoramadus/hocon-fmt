@@ -50,13 +50,36 @@ follows and the mismatches left open: [naming](naming.md).
    reproduces it: output that will not parse
    again is `Refusal.BrokenOutput`, output that changes again is `Refusal.UnstableOutput`. Input
    sconfig cannot read is `Refusal.NotHocon`.
-5. Last, `IncludeOrder` refuses output in which an include has changed places with a field
+5. `IncludeOrder` refuses output in which an include has changed places with a field
    (`Refusal.MovedInclude`). The placeholder is a field to sconfig, which orders fields by the line
    they start on and fields sharing a line arbitrarily, so the include can end up on the other side
    of a field that a later definition would override. For each include it compares the full paths
    of the keys defined before it in its object, in the masked rendering and in the source; the source
    is read with `mask(_, onOwnLines = true)`, which puts each placeholder on a line of its own, since
    its real line does not say where it stood.
+6. `IncludeShadow` refuses output in which a definition the merge drops stood in the include's
+   object on a path the include may write (`Refusal.ShadowedByInclude`). The placeholder makes the
+   parse resolve the text as if the included file said nothing, so a definition a later one replaces
+   — or an object that merges into an object beside it and adds nothing — leaves no trace in the
+   rendered tree, although it may have been what kept the included file's values out of the path.
+   `DuplicateReport` gives the definitions and the includes of the masked text (the same document
+   walk the report reads), and the parsed tree's origins say which lines survived the merge: a
+   value, an object or an array carries the line of the field that put it there. A dropped
+   definition is refused over when another definition of its object names the same path or one above
+   or below it and the dropping could let values through — it writes a value and a later definition
+   makes the path an object again, or it is an object with nothing inside it and no later definition
+   of the path follows. A definition a later definition of the same path on its line erases is not
+   vouched for by the pair of path and line either: the merge follows the source, so the value at
+   the pair is the later one's, and `q = 0, q.a = 1, include "f.conf", q {}` slipped through that
+   hole until the doubt was made one-sided. A definition inside a piece of a concatenation is never
+   vouched for by the merged tree, array piece or object piece: the piece counts its elements from
+   zero where the merged list counts them across the pieces, and the merged value at a path and line
+   a piece writes may be the survivor of a definition the merge dropped, with nothing in the tree to
+   tell that it is not the piece's own. It counts as possibly dropped and its path is assumed to
+   hold an object, refusing it rather than reading a value that may belong to another element or
+   another definition.
+   The check is deliberately conservative: the included file cannot be read at format time, so it
+   refuses a form a later, better-informed pass could allow.
 
 `HoconText` finds the strings and comments of a text in one pass. Masking asks it whether an
 `include` is code, and the comment check asks it for each comment's text.

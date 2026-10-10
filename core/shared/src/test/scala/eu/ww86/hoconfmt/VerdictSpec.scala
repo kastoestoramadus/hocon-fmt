@@ -107,6 +107,7 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
       Refusal.LostComment("detail"),
       Refusal.LostInclude("detail"),
       Refusal.MovedInclude("detail"),
+      Refusal.ShadowedByInclude("o", 2, 1),
       Refusal.ReservedName,
       Refusal.UnstableOutput
     )

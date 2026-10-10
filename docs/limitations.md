@@ -89,15 +89,66 @@ Moved across a field (`Refusal.MovedInclude`):
   include: a key defined twice is merged when parsing. For the same reason sorting fields would
   move includes across them, and is never offered.
 
-  **Not detected:** sconfig drops a definition that a later one of the same key overrides, and
-  after an include that definition may have been what overrode the included file. Neither the parse
-  of the source nor that of the output shows it, so the comparison above cannot. The duplicate
-  report reads a parse that keeps every definition, and it catches one of the two shapes but not
-  the other: `include "f.conf"` then `o = 3` then `o.c = 7` is reported, because the dotted path
-  replaces the scalar, while `x.a = 5`, the include, `x {}` is not, because a repeated object
-  merges instead of replacing (see "What the duplicate report does not claim"). The report is a
-  warning even with `--fail-on-duplicates`, and that run still writes: the file is formatted today,
-  and in the formatted text the included file's values for `o` and `x` now survive.
+Dropped in the include's object (`Refusal.ShadowedByInclude`):
+
+- **A definition a later one replaces, with the include before it**: `include "f.conf"` (which
+  defines `o.retained`), `o = 3`, `o.c = 7`. The scalar erased the included `o`, and `o.c = 7`
+  replaced the scalar, so the file resolves `o` to `{c = 7}`; `o = 3` leaves no trace in the
+  rendered tree and is dropped, after which the included `o.retained` merges into `o.c = 7`. This
+  is the shape the duplicate report catches, reading a parse that keeps every definition.
+- **An empty object, with the include before it**: `x.a = 5`, `include "scalar.conf"` (which
+  defines `x = 3`), `x {}`. The empty object replaced the included scalar, so the file resolves
+  `x` to `{}`; nothing of it survives the merge, it is dropped, and the include's scalar is what
+  `x` resolves to. The report does not catch this one: a repeated object merges instead of
+  replacing (see "What the duplicate report does not claim").
+- **A definition in a later piece of an array concatenation**: `rows = [0] [{ include "f.conf"`,
+  `q = false`, `q.child = 8 }]`, with `q = { retained = 91 }` in the included file. The file
+  resolves `rows[1].q` to `{ child = 8 }` — `q = false` erased the included object and
+  `q.child = 8` replaced the scalar — and formatted, the dropped `q = false` lets the included
+  object merge back in, resolving `{ child = 8, retained = 91 }`. Each piece of a concatenation
+  counts its elements from zero while the merged list counts them across the pieces, so the merged
+  tree cannot say what stands at the definition's own element; the check refuses the definition
+  rather than read the value of the element its path names there.
+- **A definition in a piece of an object concatenation**: `app = {} { q = 0, q.a = 1, include
+  "f.conf", q {} }`, with `q = 9` in the included file. The file resolves `app.q` to `{}` — `q {}`
+  cleared the included scalar — and formatted, the dropped `q {}` lets the scalar through,
+  resolving `q = 9`. An object piece merges with the pieces beside it, and the merged value at a
+  path and line a piece writes may be the survivor of a definition the merge dropped, with nothing
+  in the tree to tell that it is not the piece's own. An independent review found 18 sources of
+  this shape, every one resolving differently once formatted; the doubt covers the piece whole, so
+  the check reads nothing inside a concatenation off the merged tree.
+
+- **A definition a kept twin's line vouches for**: `q = 0, q.a = 1, include "f.conf", q {}`, with
+  `q = 9` in the included file. The file resolves `q` to `{}` — `q {}` cleared the included scalar —
+  and the check formatted it until this rule, dropping `q {}`: the merged tree carried a value at
+  `q` on that line (the kept `q.a = 1`), and the pair of path and line matched all three
+  definitions, so the empty object passed for kept. The merge follows the source, so a definition a
+  later twin on the same line erases cannot be the value the pair carries, and the pair no longer
+  vouches for it — `q = 0` is erased by both `q.a = 1` and `q {}`, and `q {}` is refused. The doubt
+  is one-sided: a twin in front cannot have replaced anything, so `include "f.conf", p {}, p = 3`,
+  where `p = 3` is the value the merge keeps, still formats.
+
+  The included file cannot be read at format time — a web page has no filesystem, and the target
+  may be a URL — so the formatter cannot check whether the dropped definition mattered. It refuses,
+  naming the include's line and the definition's line, and leaves the file for the user to rework by
+  hand. Deleting the dropped line, moving the include below the definitions, or writing the value
+  the file resolves to as one definition all format; which one is right depends on what the file was
+  meant to say. `o = null` is not a way out: the null is dropped like any other replaced definition,
+  and the include then writes the key again.
+
+  This refuses a little too much. `x.a = 5`, the include, `x {}` is refused even when the included
+  file says nothing about `x` (as one research probe's `f.conf` does): the check sees the text, not
+  the included file, and a file whose included contents are unknown is not one to resolve on a guess.
+  The doubt covering a whole piece refuses ordinary configs too: `app={servers=["one"]} { include
+  "f.conf"` `pool {}` `pool.size=8 }` cannot change what the file resolves to when formatted — an
+  oracle resolved it the same against every one of 29 included bodies tried — but nothing inside the
+  concatenation vouches for `pool {}`, so it is refused like the hazards above. The doubt was
+  measured once more with the one-sided same-line rule in place: reading object pieces off the
+  merged tree again formats 331 sources the doubt refuses and lets five of them (21 comparisons
+  across the reviewer's bodies) resolve differently, the empty object after the include merging away
+  with no erasing twin on its line, so the doubt stays and those configs stay refused. Of the files
+  in `examples/`, the golden files and the research probes, exactly the three that reproduce the
+  first two cases are refused that were not before.
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
@@ -247,10 +298,12 @@ Default-plus-environment overrides and some substitution/object/array combinatio
 limitations. Several fixes are merged upstream but not released; the ledger above names them. We will
 re-check them when upgrading rather than silently enable formatting because a newer version compiles.
 
-There is one known safety gap: an overridden definition beside an include can disappear while its
-include remains, so the formatter **writes a file whose meaning silently changed** — the included
-value survives although the source overrode it. The duplicate warning is useful evidence, but it
-does not repair the meaning, and `--fail-on-duplicates` fails the run only after that write. The
-[research probes](research/formatters/REPORT.md#probe-results) reproduce this with a real include
-fixture. Tell us if this blocks you, including the smallest input and the formatter version. No
-upstream issue is posted by the research task.
+The one known safety gap the research left behind — an overridden definition beside an include
+disappearing while its include remains, so the formatter wrote a file whose meaning silently
+changed — is refused now (`Refusal.ShadowedByInclude`, above), and the two inputs that reproduced
+it are in the catalogue. The duplicate warning remains useful evidence of the override; it is no
+longer the only thing standing between the user and those bytes. The
+[research probes](research/formatters/REPORT.md#probe-results) keep the inputs and their recorded
+refusals. Tell us if a file is refused that you think is safe, including the smallest input and
+the formatter version: the check sees the text, not the file the include names, so it refuses a
+little too much by design. No upstream issue is posted by the research task.

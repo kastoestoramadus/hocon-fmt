@@ -41,6 +41,14 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
     "a key defined again after the include" -> (
       "a.b = 1\ninclude \"defaults.conf\"\na.c = 2",
       """include "defaults.conf""""
+    ),
+    "an empty object the include would cross" -> (
+      "p { a = 1 }\ninclude \"defaults.conf\"\np.q {}",
+      """include "defaults.conf""""
+    ),
+    "an empty object the include would cross in an object" -> (
+      "a {\n  p { a = 1 }\n  include \"defaults.conf\"\n  p.q {}\n}\n",
+      """include "defaults.conf""""
     )
   )
 
@@ -67,7 +75,15 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
       "zone = \"us\", include \"defaults.conf\"",
       "zone = us\ninclude \"defaults.conf\"\n"
     ),
-    "an include alone in its object" -> ("app { include \"defaults.conf\" }", "app {\n  include \"defaults.conf\"\n}\n")
+    "an include alone in its object" -> (
+      "app { include \"defaults.conf\" }",
+      "app {\n  include \"defaults.conf\"\n}\n"
+    ),
+    "an empty object before the include" -> (
+      "p.q {}\ninclude \"defaults.conf\"",
+      "p.q {}\ninclude \"defaults.conf\"\n"
+    ),
+    "an empty object after the include" -> ("include \"defaults.conf\"\np.q {}", "include \"defaults.conf\"\np.q {}\n")
   )
 
   kept.foreach { case (name, (raw, expected)) =>

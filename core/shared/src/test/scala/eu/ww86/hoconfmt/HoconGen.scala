@@ -310,7 +310,160 @@ object HoconGen {
     Document(doc.nodes :+ Node.Field(key, " = ", Value.Scalar(value)))
   }
 
-  /** Renames fields so no two at one level share the first segment of their path. */
+  // ---- the include-shadow family ---------------------------------------------------------------
+
+  /** The shapes a definition around an include takes: a value that erases what came before, an
+    * object that merges, an empty object, a path below the key, an array — at one key, and under a
+    * multi-segment path spelled dotted, nested, or one of each. The path matters as much as the
+    * shape: `p.q = 3` writes the object `p` and the value `p.q` on one line, so whether the merge
+    * kept something on that line says nothing about which of the two it kept.
+    *
+    * An element holding a comma carries two statements on one line: a value the merge drops beside
+    * the definition that keeps the path an object — `p = 3, p.c = 7` writes the value `p` and the
+    * object `p` down to its leaf on one line. The pair is what the one-statement shapes cannot
+    * express, and it is what an empty object after the include needs to be dangerous without a
+    * concatenation: the empty object's own line becomes the merged value's line when nothing keeps
+    * the path before the include (so the pair `p = 3` / `p {}` renders the empty object after the
+    * include, values unchanged — instead the joined spelling moves the include and is refused),
+    * while a kept definition before the include fixes the merged line there, and then the empty
+    * object sharing that line looks kept and lets the included values through.
+    */
+  val shadowDefinitions: List[String] =
+    List(
+      "p = 3",
+      "p { a = 1 }",
+      "p {}",
+      "p.c = 7",
+      "p = null",
+      "p = [1]",
+      "p.q = 3",
+      "p.q { a = 1 }",
+      "p.q {}",
+      "p.q.c = 7",
+      "p.q = null",
+      "p { q = 3 }",
+      "p.q.r = 3",
+      "p.q.r.c = 7",
+      "p = 3, p.c = 7",
+      "p = null, p.c = 7",
+      "p = 3, p { c = 7 }",
+      "p.q = 3, p.q.c = 7"
+    )
+
+  /** What the file the include names holds when it writes the same path, and what it holds when it
+    * writes something else — at one key, and under the multi-segment paths above.
+    */
+  val shadowBodies: List[String] =
+    List(
+      "p = 9",
+      "p { b = 9 }",
+      "p {}",
+      "p.c = 9",
+      "q = 1",
+      "p.q = 9",
+      "p.q { b = 9 }",
+      "p.q.c = 9",
+      "p.q.r { b = 9 }"
+    )
+
+  val shadowInclude: String = "include \"inc.conf\""
+
+  /** One case: the text, the layout it is written in, and what the file it includes holds. The
+    * layout is carried along because the resolve suites check one layout per test: the family is
+    * large, and a test's own timeout should answer for one layout rather than for all of them.
+    */
+  final case class ShadowCase(text: String, layout: Layout, includeBody: String)
+
+  /** How a case's statements stand: each on a line of its own, the definitions sharing one line,
+    * every statement on one line with the file's closing newline left out, or the case in the third
+    * piece of an array concatenation, `rows=[{...}] [{...}] [{\n...\n}]`. A definition in a later
+    * piece counts its position inside that piece, which is not the position the merged list carries
+    * — the check must not read the merged list by the document's path.
+    */
+  enum Layout derives CanEqual {
+    case OwnLines
+    case DefinitionsJoined
+    case OneLine
+    case ConcatenatedSegments
+  }
+
+  /** The lines of a case, each a group of statements joined with a comma where the layout puts
+    * them on one line.
+    */
+  def shadowLines(definitions: List[String], at: Int, layout: Layout): List[List[String]] = {
+    val (before, after) = (definitions.take(at), definitions.drop(at))
+    layout match {
+      case Layout.OwnLines | Layout.ConcatenatedSegments =>
+        before.map(List(_)) ++ List(List(shadowInclude)) ++ after.map(List(_))
+      case Layout.DefinitionsJoined =>
+        List(before).filter(_.nonEmpty) ++ List(List(shadowInclude)) ++ List(after).filter(_.nonEmpty)
+      case Layout.OneLine => List(before ++ List(shadowInclude) ++ after)
+    }
+  }
+
+  /** The layouts worth generating for a placement: sharing a line only says something new where
+    * there are two definitions to put on it, and the joined layout repeats the plain one when the
+    * include splits them. The concatenation is only worth generating where a definition stands
+    * after the include, since a piece's shifted positions matter for a definition the formatting
+    * may drop and the include may then reach.
+    */
+  def shadowLayouts(definitions: List[String], at: Int): List[Layout] = {
+    val layouts =
+      if (definitions.size < 2 || at == 1) List(Layout.OwnLines, Layout.OneLine)
+      else List(Layout.OwnLines, Layout.DefinitionsJoined, Layout.OneLine)
+    if (at < definitions.size) layouts :+ Layout.ConcatenatedSegments else layouts
+  }
+
+  /** Every way one or two of the shapes stand around an include, in every layout, with every body
+    * beside it, at the file root and inside an object. The included file cannot be read at format
+    * time — a web page has no filesystem and the target may be a URL — so a definition there may
+    * be what kept its values out, and the formatter must either refuse the case or hand back text
+    * that still resolves the same way. The suites that can resolve write the file named by
+    * `shadowInclude` beside the text and check exactly that.
+    */
+  lazy val shadowCases: List[ShadowCase] = {
+    def around(definitions: List[String], at: Int, layout: Layout): String = {
+      val lines = shadowLines(definitions, at, layout).filter(_.nonEmpty)
+      layout match {
+        case Layout.ConcatenatedSegments =>
+          // Two pieces before the one holding the case: its element is not the merged list's
+          // first, so the positions its definitions count are shifted. The case itself stays one
+          // element, since only definitions beside the include are the check's business.
+          def piece(body: String) = s"[{\n$body\n}]"
+          val caseLines           = lines.map(_.mkString(", ")).mkString("\n")
+          s"rows = ${piece("filler = 1")} ${piece("filler = 2")} ${piece(caseLines)}"
+        case _ =>
+          val text = lines.map(_.mkString(", ")).mkString("\n")
+          text + (if (layout == Layout.OneLine) "" else "\n")
+      }
+    }
+
+    def insideAnObject(text: String): String =
+      "a {\n" + text.stripSuffix("\n").linesIterator.map("  " + _).mkString("\n") + "\n}\n"
+
+    val oneStatement = for {
+      definition <- shadowDefinitions
+      at         <- 0 to 1
+    } yield List(definition) -> at
+    val twoStatements = for {
+      first  <- shadowDefinitions
+      second <- shadowDefinitions
+      at     <- 0 to 2
+    } yield List(first, second) -> at
+    for {
+      (definitions, at) <- oneStatement ++ twoStatements
+      layout            <- shadowLayouts(definitions, at)
+      nested            <- List(false, true)
+      body              <- shadowBodies
+    } yield {
+      val text = around(definitions, at, layout)
+      ShadowCase(if (nested) insideAnObject(text) else text, layout, body)
+    }
+  }
+
+  /** The cases of one layout. */
+  def shadowCases(layout: Layout): List[ShadowCase] =
+    shadowCases.filter(_.layout == layout)
   def withDistinctKeys(nodes: List[Node]): List[Node] =
     nodes.zipWithIndex.map {
       case (Node.Field(key, separator, value, joined), i) =>

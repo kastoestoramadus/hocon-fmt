@@ -129,6 +129,13 @@ No specific upstream fix was located for either; [Java #733](https://github.com/
 (ordering) and [#300](https://github.com/lightbend/config/issues/300) (document traversal) are related,
 not fixes. No upstream messages were posted and no formatter implementation was changed.
 
+**Follow-up, 2026-10-09:** the guard has it. Both shapes are refused now
+(`Refusal.ShadowedByInclude`, PR [#104](https://github.com/kastoestoramadus/hocon-fmt/pull/104)),
+which is recommendation 3 of this report; `probes.tsv` and `actual.json` were re-recorded, and
+these rows read "refused as designed", check-before 0 and stdin 1. The tables above stay as the
+run that found them; [limitations](../../limitations.md) describes the rule and the rewrites that
+were verified by hand.
+
 **A run that fails on duplicates still writes the file.** Re-measured on this JVM CLI with a
 private Maven repository: with `--fail-on-duplicates` and no `--check`, a B1 run exits **1** and
 writes the changed output (the file becomes `include "f.conf"` then `o.c = 7`); `--check` exits 1 without
@@ -138,7 +145,9 @@ changed on disk — the one signal a B1 file gets comes from a run that already 
 duplicate report fires for B1 (`438.conf:2: o defined again at line 3; the earlier value never
 takes effect`) but **not for B2**: `--fail-on-duplicates` on B2 exits **0** and writes, because a
 repeated object merges rather than replacing
-([limitations](../../limitations.md#what-the-duplicate-report-does-not-claim)).
+([limitations](../../limitations.md#what-the-duplicate-report-does-not-claim)). After the
+follow-up above, neither shape reaches a write at all: the file is refused, so this observation
+stands for the run that made it.
 
 ### Surprises, not product bugs
 

@@ -27,6 +27,7 @@ object ExampleGenerator {
         "lost-comment",
         "lost-include",
         "moved-include",
+        "shadowed-by-include",
         "unstable-output",
         "reserved-name"
       )
