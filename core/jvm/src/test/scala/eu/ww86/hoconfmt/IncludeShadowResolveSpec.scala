@@ -101,6 +101,43 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
     }
   }
 
+  // The object-concatenation hazards an independent review found: the empty object the format
+  // drops is what cleared the value the include left at the path, so with a real file beside the
+  // text the output resolves differently — which is why the check cannot be replaced by reading the
+  // merged tree. Every source must refuse, whatever the included file holds.
+  test("an object concatenation's dropped empty object refuses with a real file") {
+    val root   = Files.createTempDirectory("include-shadow-object-concat")
+    val bodies = List("q = 9", "q { retained = 91 }", "q = null")
+    val cases  = List(
+      "app={} {q=0, q.a=1, include \"inc.conf\", q {}}\n",
+      "app={} {q.a.c=2, include \"inc.conf\", q {}, q {}}\n",
+      "app={} {q.a.c=2, include \"inc.conf\", q.a {}, q.a {}}\n",
+      "app={} {q=0, q.a {}, include \"inc.conf\", q {}}\n",
+      "app={} {q={z=3}, include \"inc.conf\", q {}, q {}}\n",
+      "app={} {q=0, q.a.c=2, include \"inc.conf\", q {}}\n",
+      "app={} {q=0, q={z=3}, include \"inc.conf\", q {}}\n",
+      "app={} {q=null, q.a=1, include \"inc.conf\", q {}}\n",
+      "app={} {q=null, q.a {}, include \"inc.conf\", q {}}\n",
+      "app={} {q=null, q.a.c=2, include \"inc.conf\", q {}}\n",
+      "app={} {q=null, q={z=3}, include \"inc.conf\", q {}}\n",
+      "app={} {q=[], q.a=1, include \"inc.conf\", q {}}\n",
+      "app={} {q=[], q.a {}, include \"inc.conf\", q {}}\n",
+      "app={} {q=[], q.a.c=2, include \"inc.conf\", q {}}\n",
+      "app={} {q=[], q={z=3}, include \"inc.conf\", q {}}\n",
+      "app={} {q.a=1, include \"inc.conf\", q {}, q {}}\n",
+      "app={} {q.a=1, q.a.c=2, include \"inc.conf\", q.a {}}\n",
+      "app={} {q.a {}, include \"inc.conf\", q {}, q {}}\n"
+    )
+    cases.zipWithIndex.foreach { case (text, index) =>
+      bodies.foreach { body =>
+        refusedOrUnchanged(root, index, HoconGen.ShadowCase(text, HoconGen.Layout.OwnLines, body)) match {
+          case Verdict.Refused(_) => ()
+          case other              => fail(s"$text with `$body`: expected a refusal, got $other")
+        }
+      }
+    }
+  }
+
   test("the include's place decides: after the definitions it still formats") {
     val root = Files.createTempDirectory("include-shadow-places")
     // The dropped dotted definition is the include's own line, so the shadow check has nothing to

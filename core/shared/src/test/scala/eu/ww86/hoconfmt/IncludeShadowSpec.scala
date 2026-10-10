@@ -12,6 +12,8 @@ package eu.ww86.hoconfmt
   */
 class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
 
+  import IncludeShadowSpec.*
+
   // B1: `f.conf` holds `o { retained = 9 }`. `o = 3` erases the included object and `o.c = 7`
   // replaces the scalar, so the file resolves o to `{ c = 7 }`; without line 2 the included
   // `retained` merges into `o.c = 7`.
@@ -135,20 +137,27 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
-  // An object concatenation is not an array concatenation: two objects merging under one name
-  // count no element, so a definition beside the include stands where the merged tree says it
-  // does, and refusing it costs the formatter a file it must format. These are the shapes an
-  // ordinary config writes — an empty section beside its leaf, before or after it.
-  val objectConcatenations = List(
-    "an empty object before its leaf"     -> "app={servers=[\"one\"]} {\ninclude \"f.conf\"\npool {}\npool.size=8\n}\n",
-    "an empty section beside another key" -> "app={servers=[\"one\"]} {\ninclude \"f.conf\"\nmetrics {}\npool.size=8\n}\n",
-    "an empty object after its leaf"      -> "app={servers=[\"one\"]} {\ninclude \"f.conf\"\npool {size=8}\npool {}\n}\n"
-  )
+  test("a concatenation's dropped empty object: refused, object piece or array piece") {
+    concatenationHazards.foreach { case (name, text, path, definitionLine, includeLine) =>
+      refusalOf(text) match {
+        case refusal: Refusal.ShadowedByInclude =>
+          assertEquals(refusal.path, path, name)
+          assertEquals(refusal.definitionLine, definitionLine, name)
+          assertEquals(refusal.includeLine, includeLine, name)
+        case other => fail(s"$name: expected a shadowed-definition refusal, got $other")
+      }
+    }
+  }
 
-  test("an object concatenation names no position: the ordinary shapes still format") {
-    objectConcatenations.foreach { case (name, text) =>
-      val formatted = HoconFormatter.format(text).fold(refusal => fail(s"$name: ${refusal.reason}"), identity)
-      assertEquals(HoconFormatter.format(formatted), Right(formatted), name)
+  test("an object concatenation's ordinary shapes: refused, a documented over-refusal") {
+    objectConcatenationsOverRefused.foreach { case (name, text, path, definitionLine, includeLine) =>
+      refusalOf(text) match {
+        case refusal: Refusal.ShadowedByInclude =>
+          assertEquals(refusal.path, path, name)
+          assertEquals(refusal.definitionLine, definitionLine, name)
+          assertEquals(refusal.includeLine, includeLine, name)
+        case other => fail(s"$name: expected a shadowed-definition refusal, got $other")
+      }
     }
   }
 
@@ -186,4 +195,105 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
       Right("include \"f.conf\"\no.c = 7\n")
     )
   }
+}
+
+object IncludeShadowSpec {
+
+  /** An independent review's counterexamples, all eighteen: an object concatenation whose last
+    * piece ends in an empty object beside the include. The empty object is what clears the value the
+    * include left at the path, so dropping it — and the merge does, since it adds nothing to the
+    * object it merges into — lets the included value through. `app={} {q=0, q.a=1, include "f.conf",
+    * q {}}` came out `app { q.a = 1, include "f.conf" }`, which resolves `app.q` to 9 where the
+    * input resolves `{}`. The reviewer resolved each source against a real file with the bodies
+    * `q=9`, `q=null`, `q=[9]` and `q={retained=91,a={nested=92}}`: 74 comparisons, every one
+    * different. Nothing inside a concatenation can vouch for a definition beside the include — two
+    * objects merging under one name count no element, but the merged tree holds one value at the
+    * shared path and line, and which of the definitions put it there cannot be read off it — so the
+    * doubt covers the piece whole, object or array. The last four spell one source other ways; the
+    * same hazard in an object that is no concatenation is older than this rule and not claimed here.
+    */
+  val concatenationHazards = List(
+    ("a value and a leaf before the empty object", "app={} {q=0, q.a=1, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("a dotted leaf before two empty objects", "app={} {q.a.c=2, include \"f.conf\", q {}, q {}}\n", "app.q", 1, 1),
+    (
+      "a dotted leaf before two empty leaf objects",
+      "app={} {q.a.c=2, include \"f.conf\", q.a {}, q.a {}}\n",
+      "app.q.a",
+      1,
+      1
+    ),
+    ("an empty leaf object before the empty object", "app={} {q=0, q.a {}, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("an object value before the empty objects", "app={} {q={z=3}, include \"f.conf\", q {}, q {}}\n", "app.q", 1, 1),
+    ("a value and a dotted leaf before it", "app={} {q=0, q.a.c=2, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("two values before it", "app={} {q=0, q={z=3}, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("a null and a leaf before it", "app={} {q=null, q.a=1, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("a null and an empty leaf before it", "app={} {q=null, q.a {}, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("a null and a dotted leaf before it", "app={} {q=null, q.a.c=2, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("a null and an object before it", "app={} {q=null, q={z=3}, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("an array and a leaf before it", "app={} {q=[], q.a=1, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("an array and an empty leaf before it", "app={} {q=[], q.a {}, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("an array and a dotted leaf before it", "app={} {q=[], q.a.c=2, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("an array and an object before it", "app={} {q=[], q={z=3}, include \"f.conf\", q {}}\n", "app.q", 1, 1),
+    ("a leaf before two empty objects", "app={} {q.a=1, include \"f.conf\", q {}, q {}}\n", "app.q", 1, 1),
+    (
+      "a leaf and a dotted leaf before an empty leaf object",
+      "app={} {q.a=1, q.a.c=2, include \"f.conf\", q.a {}}\n",
+      "app.q.a",
+      1,
+      1
+    ),
+    (
+      "an empty leaf object before two empty objects",
+      "app={} {q.a {}, include \"f.conf\", q {}, q {}}\n",
+      "app.q",
+      1,
+      1
+    ),
+    ("the same, each statement on its own line", "app={} {\nq=0\nq.a=1\ninclude \"f.conf\"\nq {}\n}\n", "app.q", 5, 4),
+    (
+      "the same, definitions joined on the include's line",
+      "app={} {\nq=0, q.a=1, include \"f.conf\", q {}\n}\n",
+      "app.q",
+      2,
+      2
+    ),
+    ("the same, CRLF line endings", "app={} {\r\nq=0, q.a=1, include \"f.conf\", q {}\r\n}\r\n", "app.q", 2, 2),
+    ("the same, a quoted non-ASCII key", "\"表\"={} {q=0, q.a=1, include \"f.conf\", q {}}\n", "表.q", 1, 1)
+  )
+
+  /** The three ordinary object-concatenation shapes the fourth round pinned as must-format are
+    * refused again, and the refusal is documented over-refusal: the doubt covers a concatenation's
+    * definitions whole, so nothing beside the include inside `app={servers=["one"]} { ... }`
+    * vouches for the empty section, although none of the three can change the values — the first
+    * `pool {}` is followed by `pool.size=8` at its own path, the last is preceded by
+    * `pool {size=8}`, and `metrics {}` is not dropped at all (the rendering keeps it). The oracle
+    * ran every one against 29 included bodies, `pool` and `metrics` shapes among them, and resolved
+    * the same before and after on the revision that formatted them; refusing them is the price of
+    * the rule that keeps the hazards above out. `metrics {}` is also not one to delete by hand: with
+    * the include's `metrics = 9` it is what clears the included scalar, so the workaround the
+    * refusal suggests — deleting the dropped definition — does not apply to it.
+    */
+  val objectConcatenationsOverRefused = List(
+    (
+      "an empty object before its leaf",
+      "app={servers=[\"one\"]} {\ninclude \"f.conf\"\npool {}\npool.size=8\n}\n",
+      "app.pool",
+      3,
+      2
+    ),
+    (
+      "an empty section beside another key",
+      "app={servers=[\"one\"]} {\ninclude \"f.conf\"\nmetrics {}\npool.size=8\n}\n",
+      "app.metrics",
+      3,
+      2
+    ),
+    (
+      "an empty object after its leaf",
+      "app={servers=[\"one\"]} {\ninclude \"f.conf\"\npool {size=8}\npool {}\n}\n",
+      "app.pool",
+      4,
+      2
+    )
+  )
 }
