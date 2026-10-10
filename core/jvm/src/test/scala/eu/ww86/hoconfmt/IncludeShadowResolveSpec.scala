@@ -138,6 +138,29 @@ class IncludeShadowResolveSpec extends munit.FunSuite {
     }
   }
 
+  // The same hazard with no concatenation: the dropped definition and the empty object share a line
+  // with the twin the merge kept, so the merged tree's pair of path and line matched all three and
+  // vouched for the empty object. Every body is checked — a scalar, a null, an array, an object, an
+  // empty object and a quoted key holding a dot — since the file the include names decides whether
+  // the output would resolve differently, and the formatter must not read it to decide.
+  test("a dropped definition a kept twin's line vouches for refuses with a real file") {
+    val root   = Files.createTempDirectory("include-shadow-same-line-vouch")
+    val bodies = List("q = 9", "q = null", "q = [9]", "q { retained = 91 }", "q {}", "\"q.dot\" = 9")
+    val cases  = List(
+      "q=0, q.a=1, include \"inc.conf\", q {}\n",
+      "app { q=0, q.a=1, include \"inc.conf\", q {} }\n",
+      "app { rows=[{q=0, q.a=1, include \"inc.conf\", q {}}] }\n"
+    )
+    cases.zipWithIndex.foreach { case (text, index) =>
+      bodies.foreach { body =>
+        refusedOrUnchanged(root, index, HoconGen.ShadowCase(text, HoconGen.Layout.OwnLines, body)) match {
+          case Verdict.Refused(_) => ()
+          case other              => fail(s"$text with `$body`: expected a refusal, got $other")
+        }
+      }
+    }
+  }
+
   test("the include's place decides: after the definitions it still formats") {
     val root = Files.createTempDirectory("include-shadow-places")
     // The dropped dotted definition is the include's own line, so the shadow check has nothing to

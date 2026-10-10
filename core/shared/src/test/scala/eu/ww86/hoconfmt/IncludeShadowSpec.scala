@@ -149,6 +149,25 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The same hazard with no concatenation anywhere: the definition the formatting drops and the
+  // empty object that clears the included value share one line with the definition the merge kept.
+  // The merged tree carries one value per path and line, and the pair matches all three, so the
+  // empty object passed for kept while the value at the pair was the kept twin's — the dropped
+  // definition's own contribution, and the empty object's, are exactly what the pair cannot show.
+  // `q=0, q.a=1, include "f.conf", q {}` came out `q.a = 1, include "f.conf"`; with `f.conf`
+  // holding `q = 9` the input resolves `{q={}}` and the output `{q=9}`.
+  test("a definition a kept twin's line vouches for: refused, root, object or array") {
+    sameLineVouches.foreach { case (name, text, path, definitionLine, includeLine) =>
+      refusalOf(text) match {
+        case refusal: Refusal.ShadowedByInclude =>
+          assertEquals(refusal.path, path, name)
+          assertEquals(refusal.definitionLine, definitionLine, name)
+          assertEquals(refusal.includeLine, includeLine, name)
+        case other => fail(s"$name: expected a shadowed-definition refusal, got $other")
+      }
+    }
+  }
+
   test("an object concatenation's ordinary shapes: refused, a documented over-refusal") {
     objectConcatenationsOverRefused.foreach { case (name, text, path, definitionLine, includeLine) =>
       refusalOf(text) match {
@@ -199,6 +218,17 @@ class IncludeShadowSpec extends munit.FunSuite with HoconTestSupport {
 
 object IncludeShadowSpec {
 
+  /** The same hazard as [[concatenationHazards]] with no concatenation anywhere: the definition the
+    * formatting drops and the empty object that clears the included value share one line with the
+    * definition the merge kept, so the merged tree's path-and-line pair matched all three and the
+    * empty object passed for kept. The resolver suite checks the values each file body gives.
+    */
+  val sameLineVouches = List(
+    ("at the root", "q=0, q.a=1, include \"f.conf\", q {}\n", "q", 1, 1),
+    ("inside an object", "app { q=0, q.a=1, include \"f.conf\", q {} }\n", "app.q", 1, 1),
+    ("inside an array element", "app { rows=[{q=0, q.a=1, include \"f.conf\", q {}}] }\n", "app.rows[0].q", 1, 1)
+  )
+
   /** An independent review's counterexamples, all eighteen: an object concatenation whose last
     * piece ends in an empty object beside the include. The empty object is what clears the value the
     * include left at the path, so dropping it — and the merge does, since it adds nothing to the
@@ -209,8 +239,9 @@ object IncludeShadowSpec {
     * different. Nothing inside a concatenation can vouch for a definition beside the include — two
     * objects merging under one name count no element, but the merged tree holds one value at the
     * shared path and line, and which of the definitions put it there cannot be read off it — so the
-    * doubt covers the piece whole, object or array. The last four spell one source other ways; the
-    * same hazard in an object that is no concatenation is older than this rule and not claimed here.
+    * doubt covers the piece whole, object or array. The last four spell one source other ways. The
+    * same hazard with no concatenation is [[sameLineVouches]], where one line carries the dropped
+    * definition, the kept twin and the empty object all at once.
     */
   val concatenationHazards = List(
     ("a value and a leaf before the empty object", "app={} {q=0, q.a=1, include \"f.conf\", q {}}\n", "app.q", 1, 1),

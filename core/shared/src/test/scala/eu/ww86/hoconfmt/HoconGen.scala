@@ -317,6 +317,16 @@ object HoconGen {
     * multi-segment path spelled dotted, nested, or one of each. The path matters as much as the
     * shape: `p.q = 3` writes the object `p` and the value `p.q` on one line, so whether the merge
     * kept something on that line says nothing about which of the two it kept.
+    *
+    * An element holding a comma carries two statements on one line: a value the merge drops beside
+    * the definition that keeps the path an object — `p = 3, p.c = 7` writes the value `p` and the
+    * object `p` down to its leaf on one line. The pair is what the one-statement shapes cannot
+    * express, and it is what an empty object after the include needs to be dangerous without a
+    * concatenation: the empty object's own line becomes the merged value's line when nothing keeps
+    * the path before the include (so the pair `p = 3` / `p {}` renders the empty object after the
+    * include, values unchanged — instead the joined spelling moves the include and is refused),
+    * while a kept definition before the include fixes the merged line there, and then the empty
+    * object sharing that line looks kept and lets the included values through.
     */
   val shadowDefinitions: List[String] =
     List(
@@ -333,7 +343,11 @@ object HoconGen {
       "p.q = null",
       "p { q = 3 }",
       "p.q.r = 3",
-      "p.q.r.c = 7"
+      "p.q.r.c = 7",
+      "p = 3, p.c = 7",
+      "p = null, p.c = 7",
+      "p = 3, p { c = 7 }",
+      "p.q = 3, p.q.c = 7"
     )
 
   /** What the file the include names holds when it writes the same path, and what it holds when it
