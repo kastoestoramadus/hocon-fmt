@@ -39,6 +39,7 @@ public final class HoconFormatterPlugin implements Plugin<Project> {
             task.getDoubleIndent().set(extension.getDoubleIndent());
             task.getSimplifyNestedObjects().set(extension.getSimplifyNestedObjects());
             task.getFailOnDuplicates().set(extension.getFailOnDuplicates());
+            task.getFailOnRefusal().set(extension.getFailOnRefusal());
             task.getFormatterClasspath().from(formatterClasspath);
             task.getProjectDirectory().set(project.getLayout().getProjectDirectory());
         });

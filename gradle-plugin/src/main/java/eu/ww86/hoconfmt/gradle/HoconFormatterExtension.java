@@ -16,4 +16,6 @@ public abstract class HoconFormatterExtension {
 
     public abstract Property<Boolean> getFailOnDuplicates();
 
+    public abstract Property<Boolean> getFailOnRefusal();
+
 }

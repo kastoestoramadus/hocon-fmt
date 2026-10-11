@@ -30,6 +30,7 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         Property<Boolean> getDoubleIndent();
         Property<Boolean> getSimplifyNestedObjects();
         Property<Boolean> getFailOnDuplicates();
+        Property<Boolean> getFailOnRefusal();
     }
 
     /** What the formatter makes of one file's content. */
@@ -69,6 +70,8 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
         if (getParameters().getDoubleIndent().isPresent()) overrides.put("double-indent", getParameters().getDoubleIndent().get().toString());
         if (getParameters().getSimplifyNestedObjects().isPresent()) overrides.put("simplify-nested-objects", getParameters().getSimplifyNestedObjects().get().toString());
         if (getParameters().getFailOnDuplicates().isPresent()) overrides.put("fail-on-duplicates", getParameters().getFailOnDuplicates().get().toString());
+        if (getParameters().getFailOnRefusal().isPresent()) overrides.put("fail-on-refusal", getParameters().getFailOnRefusal().get().toString());
+        var refusalFailure = new java.util.concurrent.atomic.AtomicBoolean(false);
         var duplicateFailure = new java.util.concurrent.atomic.AtomicBoolean(false);
         List<Examined> examined = getParameters().getFiles().getFiles().stream()
                 .map(File::toPath)
@@ -80,6 +83,7 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
                         inspection.report().findings().forEach(finding -> LOGGER.warn("{}: {}", path, finding.warning()));
                         inspection.report().failure().ifPresent(reason -> LOGGER.warn("{}: duplicate report could not run: {}", path, reason));
                         if (inspection.failsOnDuplicates()) duplicateFailure.set(true);
+                        if (inspection.failsOnRefusal()) refusalFailure.set(true);
                         return new Examined(file, path, Outcome.of(inspection.verdict()));
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
@@ -98,6 +102,7 @@ public abstract class FormatAction implements WorkAction<FormatAction.Parameters
             format(examined);
         }
         if (duplicateFailure.get()) throw new GradleException("HOCON duplicate definitions found.");
+        if (refusalFailure.get()) throw new GradleException("HOCON formatting refusals found.");
     }
 
     static void format(List<Examined> examined) {
