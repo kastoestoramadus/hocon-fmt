@@ -64,8 +64,8 @@ object HoconFormatter {
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     for {
       pass <- formatOnce(source, parse, options, probe = true)(Refusal.NotHocon(_))
-      _    <- commentsKept(source, pass.text)
       _    <- secondPassAgrees(pass.text, parse, options)
+      _    <- commentsKept(source, pass.text)
       _    <- includesKeptInPlace(source, pass)
       _    <- definitionsKept(pass)
     } yield pass.text
@@ -189,11 +189,24 @@ object HoconFormatter {
   private def definitionsKept(pass: Pass): Either[Refusal, Unit] =
     IncludeShadow.shadowed(pass.parsedText, pass.originals, pass.root).toLeft(())
 
-  /** Every comment of the source, as many times as it occurs; the multiset difference names the
-    * first one missing.
+  /** Every comment of the source, as many times as it occurs: the output must carry exactly the
+    * multiset of the input, no comment dropped and none printed twice. A difference alone misses
+    * the second kind — sconfig's `+=` desugaring copies the comment of the appended field onto
+    * both halves of the expansion — and a comment nobody wrote is as much a change to the file as
+    * a lost one. The refusal names the first comment in source order whose count differs, a loss
+    * before a duplicate.
+    *
+    * Judged after the second pass, as the include's place is: a file sconfig mis-renders is refused
+    * for that first. The rendering of an unresolved merge is a banner of comments nobody wrote,
+    * which would otherwise be read here as a duplicate the author is not to blame for; the banner
+    * also grows on every pass, so the second pass catches it, and the file is refused as output
+    * that will not settle rather than as a comment changed.
     */
-  private def commentsKept(source: String, formatted: String): Either[Refusal, Unit] =
-    HoconText.comments(source).diff(HoconText.comments(formatted)).headOption.map(Refusal.LostComment(_)).toLeft(())
+  private def commentsKept(source: String, formatted: String): Either[Refusal, Unit] = {
+    val before = HoconText.comments(source)
+    val after  = HoconText.comments(formatted)
+    before.diff(after).headOption.orElse(after.diff(before).headOption).map(Refusal.LostComment(_)).toLeft(())
+  }
 
   private def attempt[A](run: => A)(refusal: String => Refusal): Either[Refusal, A] =
     Try(run).toEither.left.map(e => refusal(Option(e.getMessage).getOrElse(e.toString)))

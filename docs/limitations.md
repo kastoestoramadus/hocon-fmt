@@ -45,12 +45,19 @@ Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`):
   String API callers can also supply raw unpaired halves in those contexts or an include target;
   output containing one is refused. No rendering workaround is applied.
 
-Rendered without a comment (`Refusal.LostComment`); a comment has no meaning to compare, so only
-this check notices. sconfig attaches a comment to the field after it; one that ends up attached
-to no field is dropped:
+Rendered without a comment, or with it twice (`Refusal.LostComment`); a comment has no meaning to
+compare, so only this check notices, and it compares the input's comments with the output's as
+multisets — a comment is refused as much when the output prints it twice as when it drops it.
+sconfig attaches a comment to the field after it; one that ends up attached to no field is
+dropped:
 
 - **A comment no field follows**: after the last field of the file or of an object, and every
   comment of a file that holds nothing else.
+- **A comment on an appended field**: `# c` above `a += 2` is copied onto both halves of the
+  desugared expansion — above the key and again inside the appended array — so the output holds a
+  comment the author never wrote. Found in 8 of the 1,257 corpus files, all of them `+=` fields;
+  the write would have added a second copy of the comment. `SconfigDefectsSpec` pins the library's
+  rendering of the same input.
 - **A comment a blank line follows**: the blank line ends the attachment, so the comment is
   dropped although a field does come after it, and a blank line inside a comment block takes the
   part above it with it. This is what real files hit, since nearly all open with a licence header

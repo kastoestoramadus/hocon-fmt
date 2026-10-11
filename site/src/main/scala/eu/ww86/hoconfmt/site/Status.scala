@@ -85,7 +85,7 @@ object Status {
     case RefusalKind.BrokenOutput =>
       "Formatting would produce text that the parser cannot read back."
     case RefusalKind.LostComment =>
-      "Formatting would lose the comment shown below. This can happen when a later definition replaces a commented field, or when the library drops a detached comment."
+      "Formatting would lose the comment shown below, or write it twice. This can happen when a later definition replaces a commented field, when the library drops a detached comment, or when it copies a comment onto both halves of an appended field."
     case RefusalKind.LostInclude  => "Formatting would drop an include directive."
     case RefusalKind.MovedInclude =>
       "Formatting would put an include on the other side of a field, so a later definition wins."
