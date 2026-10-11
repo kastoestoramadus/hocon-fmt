@@ -69,6 +69,21 @@ class FormatOptionsSpec extends munit.FunSuite {
     )
   }
 
+  test("fail-on-refusal is opt-in and validates boolean configuration") {
+    val enabled = FormatOptions.parse("fail-on-refusal = true", "team.conf")
+    assert(enabled.isRight, enabled)
+    assert(enabled != Right(FormatOptions.default))
+    assertEquals(FormatOptions.parse("fail-on-refusal = false", "team.conf"), Right(FormatOptions.default))
+    assertEquals(
+      FormatOptions.parse("fail-on-refusal = maybe", "team.conf"),
+      Left("team.conf: fail-on-refusal: expected true or false, got: maybe")
+    )
+    assertEquals(
+      FormatOptions.parse("fail-on-refusal = null", "team.conf"),
+      Left("team.conf: fail-on-refusal: expected true or false, got: null")
+    )
+  }
+
   test("an explicit null is an error naming the file and the key, not an absent option") {
     List("separator", "double-indent", "simplify-nested-objects", "fail-on-duplicates").foreach { key =>
       val result = FormatOptions.parse(s"$key = null", "team.conf")

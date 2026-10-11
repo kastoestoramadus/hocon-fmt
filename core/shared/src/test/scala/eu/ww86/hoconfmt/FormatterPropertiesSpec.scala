@@ -31,6 +31,15 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   override def scalaCheckTestParameters = super.scalaCheckTestParameters
     .withMinSuccessfulTests(sys.props.get("hocon.properties").map(_.toInt).getOrElse(1000))
 
+  property("failure policies preserve the formatting verdict for every input") {
+    val strict = FormatOptions
+      .parse("fail-on-refusal = true\nfail-on-duplicates = true", "policy.conf")
+      .fold(reason => fail(reason), identity)
+    forAll(documents(includes = true)) { doc =>
+      assertEquals(Verdict.of(doc.text, strict), Verdict.of(doc.text, FormatOptions.default))
+    }
+  }
+
   property("never loses a comment, in any option combination") {
     forAll(documents(includes = true)) { doc =>
       allOptions.foreach { options =>
