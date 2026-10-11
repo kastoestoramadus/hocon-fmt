@@ -61,7 +61,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   }
 
   tmp.test("refused input is never written, including invalid UTF-8") { dir =>
-    List("a: ${".getBytes(UTF_8), Array(0xff.toByte)).traverse_ { source =>
+    List("a: ${".getBytes(UTF_8), "a = \"\\udc00\"\n".getBytes(UTF_8), Array(0xff.toByte)).traverse_ { source =>
       for {
         file    <- write(dir, "refused.conf", source)
         outcome <- formatter.format(file)
@@ -73,6 +73,22 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
         })
         assertEquals(bytes, source.toList)
       }
+    }
+  }
+
+  // fs2's writeUtf8 replaces what UTF-8 cannot encode with '?'; a write that does not round-trip
+  // must fail and leave the file as it was.
+  tmp.test("write fails, leaving the file, when the text has no UTF-8 encoding") { dir =>
+    val original = "a = 1\n".getBytes(UTF_8)
+    for {
+      file   <- write(dir, "a.conf", original)
+      result <- formatter.write(file, "a = \ud83d\n").attempt
+      bytes  <- read(file)
+      names  <- Files[IO].list(dir).map(_.fileName.toString).compile.toList
+    } yield {
+      assert(result.isLeft, s"write succeeded: $result")
+      assertEquals(bytes, original.toList)
+      assertEquals(names, List("a.conf"))
     }
   }
 

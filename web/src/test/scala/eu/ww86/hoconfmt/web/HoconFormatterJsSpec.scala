@@ -56,6 +56,14 @@ class HoconFormatterJsSpec extends munit.FunSuite {
     assertEquals(field(result, "reason"), Some("a comment would be lost: trailing"))
   }
 
+  test("an unpaired surrogate escape is refused without exposing formatted text") {
+    val result = format("a = \"\\ud83d\"\n")
+    assertEquals(field(result, "verdict"), Some("refused"))
+    assertEquals(field(result, "formatted"), None)
+    assertEquals(field(result, "refusal"), Some("brokenOutput"))
+    assert(field(result, "reason").exists(_.contains("surrogate")), field(result, "reason"))
+  }
+
   test("every refusal has a name a page can branch on") {
     val names = Map(
       Refusal.NotUtf8                      -> "notUtf8",
