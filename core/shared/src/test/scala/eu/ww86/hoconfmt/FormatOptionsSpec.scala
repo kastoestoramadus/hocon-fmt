@@ -80,7 +80,7 @@ class FormatOptionsSpec extends munit.FunSuite {
     )
     assertEquals(
       FormatOptions.parse("fail-on-refusal = null", "team.conf"),
-      Left("team.conf: fail-on-refusal: expected true or false, got: null")
+      Left("team.conf: fail-on-refusal: expected true or false, got: ?")
     )
   }
 
