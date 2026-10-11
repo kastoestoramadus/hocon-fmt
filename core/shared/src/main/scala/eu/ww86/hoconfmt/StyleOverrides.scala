@@ -7,7 +7,8 @@ final case class StyleOverrides(
     separator: Option[Separator] = None,
     doubleIndent: Option[Boolean] = None,
     simplifyNestedObjects: Option[Boolean] = None,
-    failOnDuplicates: Option[Boolean] = None
+    failOnDuplicates: Option[Boolean] = None,
+    failOnRefusal: Option[Boolean] = None
 ) derives CanEqual {
 
   def applyTo(base: FormatOptions): FormatOptions =
@@ -15,7 +16,8 @@ final case class StyleOverrides(
       separator = separator.getOrElse(base.separator),
       doubleIndent = doubleIndent.getOrElse(base.doubleIndent),
       simplifyNestedObjects = simplifyNestedObjects.getOrElse(base.simplifyNestedObjects),
-      failOnDuplicates = failOnDuplicates.getOrElse(base.failOnDuplicates)
+      failOnDuplicates = failOnDuplicates.getOrElse(base.failOnDuplicates),
+      failOnRefusal = failOnRefusal.getOrElse(base.failOnRefusal)
     )
 }
 

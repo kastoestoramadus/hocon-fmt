@@ -15,15 +15,15 @@ enum Separator derives CanEqual {
   * flags and the `.hocon-fmt.conf` file.
   *
   * Anything not listed here is sconfig's renderer deciding, not an option: see the pins in
-  * `OptionsSpec`. `failOnDuplicates` is the one that reaches no renderer: it says whether a
-  * finding of the duplicate report fails a `--check` run, and travels in this type because the
-  * config file names it beside the style keys.
+  * `OptionsSpec`. Failure policies reach no renderer: they decide whether refusals or duplicate
+  * findings fail a run, and travel here because the config file names them beside style keys.
   */
 final case class FormatOptions(
     separator: Separator = Separator.Equals,
     doubleIndent: Boolean = false,
     simplifyNestedObjects: Boolean = true,
-    failOnDuplicates: Boolean = false
+    failOnDuplicates: Boolean = false,
+    failOnRefusal: Boolean = false
 ) derives CanEqual
 
 object FormatOptions {
@@ -34,7 +34,8 @@ object FormatOptions {
   /** The file a repository keeps its style in, looked up from the formatted file upwards. */
   val ConfigFileName = ".hocon-fmt.conf"
 
-  private val KnownKeys = Set("separator", "double-indent", "simplify-nested-objects", "fail-on-duplicates")
+  private val KnownKeys =
+    Set("separator", "double-indent", "simplify-nested-objects", "fail-on-duplicates", "fail-on-refusal")
 
   /** Reads the options from a config file's text. Unknown keys and mistyped values are an error
     * naming the file and the key — never silently ignored.
@@ -55,7 +56,8 @@ object FormatOptions {
           doubleIndent          <- booleanOf(config, file, "double-indent", default.doubleIndent)
           simplifyNestedObjects <- booleanOf(config, file, "simplify-nested-objects", default.simplifyNestedObjects)
           failOnDuplicates      <- booleanOf(config, file, "fail-on-duplicates", default.failOnDuplicates)
-        } yield FormatOptions(separator, doubleIndent, simplifyNestedObjects, failOnDuplicates)
+          failOnRefusal         <- booleanOf(config, file, "fail-on-refusal", default.failOnRefusal)
+        } yield FormatOptions(separator, doubleIndent, simplifyNestedObjects, failOnDuplicates, failOnRefusal)
     }
   }
 
