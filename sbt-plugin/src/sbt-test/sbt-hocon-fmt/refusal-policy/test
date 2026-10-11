@@ -1,0 +1,21 @@
+> hoconFormat
+> hoconFormatCheck
+> set hoconFailOnRefusal := Some(true)
+-> hoconFormat
+-> hoconFormatCheck
+> assertUntouched
+> set hoconFailOnRefusal := Some(false)
+> hoconFormatCheck
+$ copy-file strict.conf .hocon-fmt.conf
+> set hoconFailOnRefusal := None
+-> hoconFormat
+-> hoconFormatCheck
+> set hoconFailOnDuplicates := Some(false)
+-> hoconFormatCheck
+> set hoconFailOnRefusal := Some(false)
+> hoconFormatCheck
+$ copy-file duplicate.conf src/main/resources/duplicate.conf
+> set hoconFailOnDuplicates := Some(true)
+-> hoconFormat
+$ must-mirror src/main/resources/duplicate.conf expected.conf
+> assertUntouched
