@@ -1,5 +1,14 @@
 # Known limitations
 
+Refused files are always left unchanged. File runs report refusals without failing by default,
+so a green `--check` means no failing condition under the chosen policy, rather than a promise
+that every selected file was formatted. `--fail-on-refusal` (or `fail-on-refusal = true` in
+`.hocon-fmt.conf`) makes any selected refusal fail both format and check; `--no-fail-on-refusal`
+clears it. The policy is independent of `fail-on-duplicates`: disabling one leaves the other
+active. I/O, usage and config errors take precedence as exit 2; otherwise a check change or an
+enabled refusal/duplicate failure gives 1. Stdin refusals already exit 1 under either policy.
+The CLI summary counts skipped (refused) files. See [usage](usage.md#fail-on-refusal).
+
 ## sconfig defects the formatter refuses
 
 Each is reproduced with a bare sconfig parse-render round trip, with no code of ours involved.

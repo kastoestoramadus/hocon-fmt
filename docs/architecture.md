@@ -134,7 +134,16 @@ as `format` does. A failed document parse or an unsupported document tree produc
 duplicate report could not run, rather than an empty successful report. The Java API mirrors options, findings and report failures in JDK records. Its `inspectFile`
 reads original bytes once, reports duplicates from those bytes and writes only a `NeedsFormatting`
 verdict. sbt reads these records reflectively; Gradle and Maven call them directly. Mill stays on
-core and reads and writes at its own edge. All four apply the file's effective duplicate policy.
+core and reads and writes at its own edge. All four apply the file's effective duplicate and
+refusal policies. `fail-on-refusal` is false by default; when enabled it makes a refused selected
+file fail either task, with no write. Java
+`Inspection.failsOnRefusal` exposes this per-file decision across the isolated sbt loader too.
+
+The CLI carries the file's effective policies in `CmdApi.Outcome`. Its `fails` combines check
+changes, enabled refusal failures and enabled duplicate findings with OR; `Run.exitCode` gives
+I/O errors precedence as 2, otherwise a failing outcome gives 1, otherwise 0. Usage and config
+errors also return 2. Stdin refusals always return 1. The file summary counts skipped refusals,
+including under the compatibility default, and clearing one policy does not clear the other.
 
 `ConfigLookup` contains the pure lookup decision: a config wins even in a directory holding `.git`,
 otherwise `.git` stops the walk, otherwise the parent is next. Filesystem existence probes, parent
