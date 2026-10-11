@@ -29,6 +29,29 @@ import org.junit.jupiter.api.Test;
  */
 class IsolatedLoaderContractTest {
 
+    @Test void refusalPolicyAccessorsCrossTheIsolatedLoader() throws Exception {
+        withIsolatedLoader(loader -> {
+            Path dir = Files.createTempDirectory("refusal-policy");
+            Path file = dir.resolve("app.conf");
+            Path config = dir.resolve(".hocon-fmt.conf");
+            try {
+                Files.writeString(file, "# only a comment\n");
+                Files.writeString(config, "fail-on-refusal = true\n");
+                Class<?> api = loader.loadClass("eu.ww86.hoconfmt.java.HoconFmt");
+                Object result = api.getMethod("inspectFile", Path.class, java.util.Map.class, boolean.class)
+                    .invoke(null, file, java.util.Map.of(), true);
+                assertEquals(true, result.getClass().getMethod("failsOnRefusal").invoke(result));
+                Object options = result.getClass().getMethod("options").invoke(result);
+                assertEquals(true, options.getClass().getMethod("failOnRefusal").invoke(options));
+                assertEquals("# only a comment\n", Files.readString(file));
+            } finally {
+                Files.deleteIfExists(file);
+                Files.deleteIfExists(config);
+                Files.deleteIfExists(dir);
+            }
+        });
+    }
+
     /** A call into the isolated loader; reflection reports failures as exceptions. */
     @FunctionalInterface
     interface Loaded {
