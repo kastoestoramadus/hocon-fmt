@@ -37,6 +37,28 @@ class HoconFormatterPluginFunctionalTest {
     }
 
     @Test
+    void refusalPolicyAppliesToBothTasksAndCanBeClearedIndependently() throws IOException {
+        Path file = write("src/main/resources/refused.conf", "# only a comment\n");
+        write(".hocon-fmt.conf", "fail-on-refusal = true\nfail-on-duplicates = true\n");
+        for (String task : List.of("hoconFormat", "hoconFormatCheck")) {
+            String strict = buildAndFail(task).getOutput();
+            assertTrue(strict.contains("HOCON formatting refusals found."), strict);
+            assertEquals("# only a comment\n", read(file));
+        }
+        writeBuild("", "hoconFormatter { failOnRefusal.set(false) }\n");
+        build("hoconFormatCheck");
+        writeBuild("", "hoconFormatter { failOnDuplicates.set(false) }\n");
+        assertTrue(buildAndFail("hoconFormatCheck").getOutput().contains("HOCON formatting refusals found."));
+        writeBuild("", "hoconFormatter { failOnRefusal.set(false); failOnDuplicates.set(true) }\n");
+        Path duplicate = write("src/main/resources/duplicate.conf", "x=1\nx=2\n");
+        assertTrue(buildAndFail("hoconFormat").getOutput().contains("HOCON duplicate definitions found."));
+        assertEquals("x = 2\n", read(duplicate));
+        assertEquals("# only a comment\n", read(file));
+        writeBuild("", "hoconFormatter { failOnRefusal.set(true); failOnDuplicates.set(false) }\n");
+        assertTrue(buildAndFail("hoconFormatCheck").getOutput().contains("HOCON formatting refusals found."));
+    }
+
+    @Test
     void repositoryStyleAndDuplicatesMatchTheCli() throws IOException {
         Path fixture = Path.of("../test-fixtures/plugin-options");
         write(".hocon-fmt.conf", Files.readString(fixture.resolve(".hocon-fmt.conf")));
