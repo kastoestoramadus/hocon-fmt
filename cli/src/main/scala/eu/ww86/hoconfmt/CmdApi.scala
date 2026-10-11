@@ -55,7 +55,8 @@ object CmdApi extends IOApp {
     toggle(
       "fail-on-duplicates",
       "Exit 1 when a key is defined again and the earlier value never takes effect; overrides the config file."
-    )
+    ),
+    toggle("fail-on-refusal", "Exit 1 when a selected file cannot be formatted; overrides the config file.")
   ).mapN(StyleOverrides.apply)
 
   private val configOpt: Opts[Option[Path]] =
@@ -119,7 +120,8 @@ object CmdApi extends IOApp {
       path: String,
       findings: List[Finding],
       failOnDuplicates: Boolean,
-      reportFailure: Option[Refusal] = None
+      reportFailure: Option[Refusal] = None,
+      failOnRefusal: Boolean = false
   ) {
 
     def ioFailed: Boolean = result match {
@@ -130,6 +132,7 @@ object CmdApi extends IOApp {
     def fails: Boolean = result match {
       case Result.NeedsFormatting(_)                   => true
       case Result.Unreadable(_) | Result.Unwritable(_) => false
+      case Result.Unformattable(_)                     => failOnRefusal || (failOnDuplicates && findings.nonEmpty)
       case _                                           => failOnDuplicates && findings.nonEmpty
     }
   }
@@ -145,13 +148,19 @@ object CmdApi extends IOApp {
       else if (outcomes.exists(_.fails)) ExitCode(1)
       else ExitCode.Success
 
-    def rendered: String =
-      (s"Running HOCON formatter for ${outcomes.size} files.\n" :: outcomes.map(render)).mkString
+    def rendered: String = {
+      val skipped = outcomes.count(_.result match {
+        case Result.Unformattable(_) => true
+        case _                       => false
+      })
+      (s"Running HOCON formatter for ${outcomes.size} files.\n" :: outcomes.map(render)).mkString +
+        s"\nHOCON files: $skipped skipped (refused).\n"
+    }
 
     // Filesystem failures are errors, so their diagnostics go to stderr like usage errors.
     def errors: String = outcomes.collect {
-      case Outcome(Result.Unreadable(reason), path, _, _, _) => s"cannot read $path: $reason\n"
-      case Outcome(Result.Unwritable(reason), path, _, _, _) => s"cannot write $path: $reason\n"
+      case Outcome(Result.Unreadable(reason), path, _, _, _, _) => s"cannot read $path: $reason\n"
+      case Outcome(Result.Unwritable(reason), path, _, _, _, _) => s"cannot write $path: $reason\n"
     }.mkString
 
   }
@@ -259,7 +268,14 @@ object CmdApi extends IOApp {
           Outcome(Result.Unreadable(ReadFailure.message(e)), path, Nil, failOnDuplicates = false).pure[IO]
         case Right(inspection) =>
           def outcome(result: Result) =
-            Outcome(result, path, inspection.findings, options.failOnDuplicates, inspection.reportFailure)
+            Outcome(
+              result,
+              path,
+              inspection.findings,
+              options.failOnDuplicates,
+              inspection.reportFailure,
+              options.failOnRefusal
+            )
           inspection.verdict match {
             case Verdict.AlreadyFormatted           => outcome(Result.AlreadyFormatted).pure[IO]
             case Verdict.Refused(refusal)           => outcome(Result.Unformattable(refusal)).pure[IO]
