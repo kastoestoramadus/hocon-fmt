@@ -79,6 +79,19 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The other direction: sconfig's `+=` desugaring copies the comment of the appended field onto
+  // both halves of the expansion (`a = ${?a}[` and the appended element), so a render of `# c`
+  // above `a += 2` holds it twice. A duplicated comment is a phantom the author never wrote, and
+  // it is refused the way a lost one is — SconfigDefectsSpec pins the library bug.
+  List(
+    "on an appended field"               -> "# c\na += 2",
+    "on an appended field, in an object" -> "o {\n  # c\n  a += 2\n}"
+  ).foreach { case (name, raw) =>
+    test(s"formatter: never duplicates a comment: $name") {
+      assertEquals(refusalOf(raw), Refusal.LostComment("c"))
+    }
+  }
+
   // The commonest lost comment in the wild: a blank line between the comment and the field that
   // follows, as under a licence header or a banner, or inside a comment block split by one.
   // sconfig drops the comment outright (see SconfigDefectsSpec), so the only safe answer is to

@@ -163,6 +163,16 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The `+=` desugaring puts the comment of the appended field on both halves of the expansion:
+  // `# c` above `a += 2` renders once above the key and again inside the appended array, so the
+  // output holds a comment the author never wrote. Loss is not the only way a render can change
+  // what someone wrote down; the formatter refuses the double as it refuses a drop.
+  test("library: a comment on an appended field should survive rendering once") {
+    val rendered = "# c\na += 2".renderedByLibrary
+    val held     = HoconText.comments(rendered).count(_ == "c")
+    assertEquals(held, 1, s"OPEN sconfig BUG: the comment was rendered $held times: [$rendered]")
+  }
+
   // --- Should read back what it renders, on every platform ----------------------------------------
 
   // On Scala.js, rendering an object nested 32 or more deep gives text that fails to parse with
