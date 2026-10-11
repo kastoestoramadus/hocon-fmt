@@ -15,7 +15,6 @@ object Variant {
     "catalogue/unresolved-merge-in-array"                                                -> fork,
     "catalogue/detached-header-comment"                                                  -> "the banner above a blank line is kept",
     "catalogue/trailing-comment-in-object"                                               -> "the comment before the closing brace is kept",
-    "commentAboveBlankLine: a header followed by a blank line"                           -> "the header is kept",
     "commentAboveBlankLine: a comment block split by a blank line"                       -> "both halves are kept",
     "catalogue/sconfig-defect"                                                           -> fork,
     "catalogue/env-override-root-not-parseable"                                          -> fork,

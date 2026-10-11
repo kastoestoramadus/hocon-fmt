@@ -35,7 +35,7 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("the comment cases of the ledger now format") {
-    assertEquals(Variant.ledger.size, 18)
+    assertEquals(Variant.ledger.size, 17)
     List("catalogue/detached-header-comment", "catalogue/trailing-comment-in-object").foreach { id =>
       Verdict.of(example(id).input) match {
         case Verdict.Refused(refusal) => fail(s"$id: ${refusal.reason}")

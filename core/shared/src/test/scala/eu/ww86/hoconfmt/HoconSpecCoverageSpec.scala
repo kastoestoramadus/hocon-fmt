@@ -93,12 +93,12 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   // The commonest lost comment in the wild: a blank line between the comment and the field that
-  // follows, as under a licence header or a banner, or inside a comment block split by one.
-  // sconfig drops the comment outright (see SconfigDefectsSpec), so the only safe answer is to
-  // refuse; 20 of 23 reference.conf files in the Akka, Pekko, Play, Kamon, Gatling and ssl-config
-  // corpus hold such a comment.
+  // follows. Inside an object, where no preamble can stand, sconfig drops the comment outright
+  // (see SconfigDefectsSpec), so the only safe answer is to refuse; 20 of 23 reference.conf files
+  // in the Akka, Pekko, Play, Kamon, Gatling and ssl-config corpus hold such a comment. A block at
+  // the top of the file, which the command line keeps as a preserved preamble and the page's fork
+  // keeps through its carrier, is pinned by PreambleSpec and CommentCarrierSpec.
   def commentAboveBlankLine = Map(
-    "a header followed by a blank line"     -> "# Copyright 2025\n\na : 1",
     "a comment block split by a blank line" ->
       "o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"
   )
@@ -112,6 +112,17 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
           case other                  => fail(s"$name: refused for the wrong reason: ${other.reason}")
         }
       }
+  }
+
+  // The header the two variants keep differently: the command line takes the block verbatim — the
+  // blank line included — while the fork renders the same comments through its carrier. The exact
+  // output of each is pinned by its own suite (PreambleSpec, CommentCarrierSpec); here both must
+  // keep the comment and the meaning.
+  test("formatter: keeps a detached header: a header followed by a blank line") {
+    val source = "# Copyright 2025\n\na : 1"
+    val out    = formatted(source)
+    assert(out.contains("# Copyright 2025"), out)
+    assertSameMeaning(out, source, s"the header changed the meaning of:\n$source")
   }
 
   // --- Normalised on purpose: meaning kept, original spelling not ------------------------------
