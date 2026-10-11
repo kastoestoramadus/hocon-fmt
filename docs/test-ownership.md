@@ -25,7 +25,11 @@ The policy:
 Evidence: counts are JVM runs on 2026-10-09 against sconfig 1.12.4 (`-Dmaven.repo.local=<task>/m2`);
 bare-sconfig outputs are `probe/` in the task directory, seen through `scala-cli` with
 `sconfig_3-1.12.4.jar` and the options `HoconFormatter` pins; the release check built sconfig main
-`f351262a` (`sconfigJVM/publishLocal`, `++3.8.2!`) into a private Ivy home.
+`f351262a` (`sconfigJVM/publishLocal`, `++3.8.2!`) into a private Ivy home. Re-measured on
+2026-10-11 for the suites the preserved-preamble change touched: `SconfigDefectsSpec` 21 cases (20
+red on 1.12.4), `HoconSpecCoverageSpec` 30, `FormatterPropertiesSpec` 10, `ExamplesSpec` 31,
+`PreambleSpec` 12 (new), `CommentCarrierSpec` 15 with a 17-entry ledger; core JVM 517 cases with
+495 passing (`sbt test` excludes the two defect suites).
 
 ## 1. Inventory
 
@@ -36,12 +40,12 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 |---|---:|---|---|
 | `SconfigDefectsSpec` (core/shared) | 28 | SCONFIG | bare round trip; 27 red on JVM/Native, 28 on JS with 1.12.4; earlier main measurements predate the six numeric cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
-| `HoconSpecCoverageSpec` (core/shared) | 28 | 17 SCONFIG / 11 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 11 MIXED |
+| `HoconSpecCoverageSpec` (core/shared) | 30 | 17 SCONFIG / 13 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 13 MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
 | `FormatterPropertiesSpec` (core/shared) | 11 | 10 OURS / 1 MIXED | 1000 generated documents × 8 option sets each |
 | `NumericRenderingSpec` (core/shared) | 8 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
 | `DuplicateReportSpec` (core/shared) | 28 | 18 OURS / 10 MIXED | resolution assertions are sconfig's |
-| `ExamplesSpec` (core/shared) | 29 | 22 OURS / 7 MIXED | one case per example (21) plus 8 suite tests |
+| `ExamplesSpec` (core/shared) | 31 | 23 OURS / 8 MIXED | one case per example (23) plus 8 suite tests |
 | `IncludeDetectionSpec` (core/shared) | 23 | OURS | the detection contract |
 | `IncludeOrderSpec` (core/shared) | 13 | OURS | moved include = our refusal |
 | `IncludeCollisionSpec` (core/shared) | 235 | OURS | placeholder collision, every option set |
@@ -50,6 +54,7 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 | `GoldenFileSpec` (core/jvm-native) | 3 | OURS | our output, byte for byte |
 | `ShowcaseSafetySpec`, `TryAndFutureSpec` (core/shared) | 3 | OURS | |
 | `CommentCarrierDefaultSpec` (core/default-shared) | 3 | OURS | the published no-op carrier |
+| `PreambleSpec` (core/default-shared) | 12 | OURS | the published core's preserved preamble: the rule's boundary, the verbatim header, the file's own lines in a refusal |
 | `CommentCarrierSpec` (core/site-shared) | 15 | OURS | the fork seam and its ledger |
 | `FileFormatterSpec`, failure, consumer (cats, JVM) | 18 | OURS | writes, identity, atomicity |
 | `CmdApiSpec`, `GitIgnoreSpec` (cli, JVM) | 64 | OURS | exit codes, walk, config lookup |

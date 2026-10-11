@@ -39,26 +39,35 @@ follows and the mismatches left open: [naming](naming.md).
 
 ## The pipeline
 
-1. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
-2. The source and parsed tree are checked for placeholder collisions (see
+1. A [preserved preamble](#the-preserved-preamble) is taken first: the leading block of comments
+   and blank lines is kept verbatim and stands in for the parse as blank lines, one per line, so
+   every line number stays the file's own and the block is put back in front of the formatted body.
+2. `IncludeMasking.mask` swaps every `include` statement for placeholder fields.
+3. The source and parsed tree are checked for placeholder collisions (see
    [include masking](#include-masking) and [comment carrier](#comment-carrier)).
    sconfig renders the masked tree with the `FormatOptions` asked for: the default
    style (`=`), or what the caller — the CLI's flags over a `.hocon-fmt.conf` — requested.
-3. `IncludeMasking.unmask` puts the original statements back.
-4. The result is refused if an include statement did not come back (`Refusal.LostInclude`) or a
-   comment of the source is missing from it (`Refusal.LostComment`), and unless a second pass
-   reproduces it. The restored output must also be encodable as UTF-8: a raw unpaired UTF-16
-   surrogate can parse in memory but is replaced when encoded. Output that cannot survive encoding
-   or will not parse again is `Refusal.BrokenOutput`, output that changes again is
-   `Refusal.UnstableOutput`. Input sconfig cannot read is `Refusal.NotHocon`.
-5. `IncludeOrder` refuses output in which an include has changed places with a field
+4. `IncludeMasking.unmask` puts the original statements back.
+5. The restored output must be encodable as UTF-8: an unpaired UTF-16 surrogate is replaced
+   when encoded. The result is also refused unless a second pass reproduces it. Output that cannot
+   survive encoding or parse again is `Refusal.BrokenOutput`; output that changes again is
+   `Refusal.UnstableOutput`. Input
+   sconfig cannot read is `Refusal.NotHocon`. The second pass judges sconfig's mis-renderings
+   before anything our own placeholders could have done to the text, which is why it comes first:
+   an unresolved merge renders as a banner of comments nobody wrote, and that banner growing on
+   every pass is the sharper reason to refuse the file than the comments it invented.
+6. The output's comment multiset must be the source's, exactly: a comment dropped or printed twice
+   is `Refusal.LostComment`. A difference alone would miss the second kind — sconfig's `+=`
+   desugaring copies the comment of the appended field onto both halves of the expansion — and a
+   comment nobody wrote is as much a change to the file as a lost one.
+7. `IncludeOrder` refuses output in which an include has changed places with a field
    (`Refusal.MovedInclude`). The placeholder is a field to sconfig, which orders fields by the line
    they start on and fields sharing a line arbitrarily, so the include can end up on the other side
    of a field that a later definition would override. For each include it compares the full paths
    of the keys defined before it in its object, in the masked rendering and in the source; the source
    is read with `mask(_, onOwnLines = true)`, which puts each placeholder on a line of its own, since
    its real line does not say where it stood.
-6. `IncludeShadow` refuses output in which a definition the merge drops stood in the include's
+8. `IncludeShadow` refuses output in which a definition the merge drops stood in the include's
    object on a path the include may write (`Refusal.ShadowedByInclude`). The placeholder makes the
    parse resolve the text as if the included file said nothing, so a definition a later one replaces
    — or an object that merges into an object beside it and adds nothing — leaves no trace in the
@@ -191,6 +200,37 @@ object. A second field keeps the object from collapsing.
 
 **Why the whole statement:** the previous scheme replaced only the keyword and commented out the
 rest of the line, which swallowed closing braces and entries following the include.
+
+## The preserved preamble
+
+The commonest refusal in real files is a licence header or a banner: a block of comments that a
+blank line separates from the field below, which sconfig drops (see
+[limitations](limitations.md#the-preserved-preamble)). `Preamble` finds the block a file opens
+with, and `HoconFormatter` takes it verbatim before anything is parsed, replacing it in the text
+the parse reads with blank lines, one per line. Comments and blank lines are both non-tokens, so
+the parse, the rendering and every origin line of the body are the ones the file itself would give:
+a refusal that names a line names the file's own, and `IncludeShadow`'s two lines stay the lines a
+user can find. What is returned is the preamble put back in front of the formatted body, so the
+block keeps its marker, spacing and blank lines while the body takes every normalisation.
+
+`Preamble` reads only the lines the file opens with, and reads them from their own first
+characters: no string can be open before the first line of content, so a `#` or `//` that opens a
+line there really opens a comment, and the scan stops at the first line that is neither blank nor a
+comment. A large file pays for its header and no more.
+
+The rule, and what it deliberately leaves out: the preamble is the run of blank and comment-only
+lines the file opens with, less the comment block directly above the first line of the body — that
+block is what the parse attaches to the field below it, and taking it would move it. What is left
+must hold a comment: a file that opens with blank lines only has no preamble, and a file of
+comments only has no body to format. The source-level collision guard (`__INCLUDE_` written out)
+still reads the file's own text, preamble included, so a reserved spelling in the block is refused
+as it was before the path existed; nothing of the preamble is parsed or restored, so nothing of it
+can be mistaken for a placeholder, and an `include` written in a comment is no directive to mask.
+
+`CommentCarrier.keepsDetachedComments` is what turns the path off: where the parse already keeps a
+detached block (the page's fork), the block survives the ordinary path and the carrier renders it,
+and the preamble path stays out of its way — one mechanism owns a block, never both. The seam goes
+with the fork, the preamble path does not: it keeps what the released library drops.
 
 ## Comment carrier
 

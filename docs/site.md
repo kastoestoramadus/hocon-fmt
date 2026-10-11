@@ -212,11 +212,16 @@ it is red until released sconfig has `setKeepDetachedComments`, and green once t
    `pages.yml`.
 2. Delete the `coreSite` project, point `site` back at `coreJS`, and drop it from `root`'s aggregate and `test` sequence and from `crossCompile`.
 3. In `core`, enable the option in `HoconFormatter.parseOptions` and delete the seam:
-   `CommentCarrier`, `Carried`, `core/default-shared`, `core/site-shared` (only the masking of
-   blocks no field follows may still be wanted: compare with the measured corpus), the calls in
-   `HoconFormatter`, and `Variant` in the tests with its ledger. Then the four pinned refusals
-   (`detached-header-comment`, `trailing-comment-in-object`, the two `commentAboveBlankLine`
-   cases) flip for the command line as well.
+   `CommentCarrier` with `keepsDetachedComments` (which gates the preamble path: with the option
+   on, the parse keeps a detached block itself), `Carried`, `core/default-shared`,
+   `core/site-shared` (only the masking of blocks no field follows may still be wanted: compare
+   with the measured corpus), the calls in `HoconFormatter`, and `Variant` in the tests with its
+   ledger. Then the two pinned refusals left (`trailing-comment-in-object`, the
+   `commentAboveBlankLine` block split by a blank line) flip for the command line as well; the
+   leading header case already formats, kept verbatim by the
+   [preamble path](limitations.md#the-preserved-preamble), and one decision is left: with the
+   option on, does the preamble path keep the header verbatim (blank lines and all) or does the
+   parse's own attachment render it? Pinned expectations on both sides answer for the choice.
 4. Delete the muted line under the playground (`Playground.scala`), update the showcase fork
    metadata and expected files, and drop the
    fork-only text where the marker sits: the "Comment carrier" section and the `coreSite` row in
