@@ -74,6 +74,19 @@ class PluginIntegrationSpec extends munit.FunSuite {
 
       val recheck = tester.eval("__.hoconFormatCheck")
       assert(recheck.isSuccess, recheck.debugString)
+      Seq("app.hoconFormat", "app.hoconFormatCheck").foreach { command =>
+        val strict = tester.eval(Seq(command, "--fail-on-refusal", "true"))
+        assert(!strict.isSuccess, strict.debugString)
+        assert(strict.err.contains("HOCON formatting refusals found."), strict.debugString)
+        assertEquals(os.read(nginx), nginxBefore)
+      }
+      os.write(tester.workspacePath / ".hocon-fmt.conf", "fail-on-refusal = true\nfail-on-duplicates = true\n")
+      val cleared = tester.eval(Seq("app.hoconFormatCheck", "--fail-on-refusal", "false"))
+      assert(cleared.isSuccess, cleared.debugString)
+      val independent = tester.eval(Seq("app.hoconFormatCheck", "--fail-on-duplicates", "false"))
+      assert(!independent.isSuccess, independent.debugString)
+      assert(independent.err.contains("HOCON formatting refusals found."), independent.debugString)
+      assertEquals(os.read(nginx), nginxBefore)
     } finally tester.close()
   }
 }
