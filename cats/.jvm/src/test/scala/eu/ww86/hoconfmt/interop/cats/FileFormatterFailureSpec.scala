@@ -20,11 +20,10 @@ class FileFormatterFailureSpec extends munit.CatsEffectSuite {
     val handler = new InvocationHandler {
       override def invoke(proxy: Object, method: Method, arguments: Array[Object] | Null): Object | Null = {
         val args = Option(arguments).getOrElse(Array.empty[Object])
-        if (method.getName == "writeUtf8") {
-          val path                            = args.toList.collectFirst { case value: Path => value }.getOrElse(fail("missing write path"))
-          val pipe: Pipe[IO, String, Nothing] = _.flatMap { content =>
-            Stream.emit(content.take(2)).through(actual.writeUtf8(path)) ++ Stream.exec(afterPartialWrite)
-          }
+        if (method.getName == "writeAll") {
+          val path                          = args.toList.collectFirst { case value: Path => value }.getOrElse(fail("missing write path"))
+          val pipe: Pipe[IO, Byte, Nothing] = content =>
+            content.take(2).through(actual.writeAll(path)) ++ Stream.exec(afterPartialWrite)
           pipe
         } else method.invoke(actual, args*)
       }

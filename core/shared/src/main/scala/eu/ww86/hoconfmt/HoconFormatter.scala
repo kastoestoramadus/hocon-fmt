@@ -1,6 +1,7 @@
 package eu.ww86.hoconfmt
 
 import org.ekrich.config.*
+import scala.annotation.tailrec
 import scala.util.Try
 
 /** Formats HOCON text.
@@ -127,9 +128,11 @@ object HoconFormatter {
     }
   }
 
-  /** Formatting the output again is the whole check. The CLI writes on success, so output that
+  /** Checking UTF-8 encodability and formatting the output again protects the written file. Output that
     * will not parse again would replace a valid config with a broken one; and a formatter that is
-    * not a fixed point keeps producing diffs on unchanged files. Parsing alone would not do:
+    * not a fixed point keeps producing diffs on unchanged files. A raw unpaired surrogate parses
+    * in a String but cannot survive UTF-8 encoding, so check the restored output before masking it.
+    * Parsing alone would not do:
     * sconfig renders an unresolved merge as a comment banner that parses but grows on every pass.
     *
     * The pass parses the masked form. The include statements in the output are the ones just put
@@ -146,9 +149,31 @@ object HoconFormatter {
       parse: ConfigParseOptions,
       options: FormatOptions
   ): Either[Refusal, Unit] =
-    formatOnce(formatted, parse, options, probe = false)(Refusal.BrokenOutput(_))
-      .filterOrElse(_.text == formatted, Refusal.UnstableOutput)
-      .map(_ => ())
+    for {
+      _ <- Either.cond(
+             utf8Encodable(formatted),
+             (),
+             Refusal.BrokenOutput("an unpaired surrogate cannot be encoded as UTF-8")
+           )
+      _ <- formatOnce(formatted, parse, options, probe = false)(Refusal.BrokenOutput(_))
+             .filterOrElse(_.text == formatted, Refusal.UnstableOutput)
+    } yield ()
+
+  // A UTF-16 half has no UTF-8 encoding on its own. Scan without allocating a byte copy on
+  // every formatting pass, and leave escaping to sconfig rather than repair its rendering.
+  private def utf8Encodable(text: String): Boolean = {
+    @tailrec
+    def pairedAt(index: Int): Boolean =
+      if (index == text.length) true
+      else {
+        val character = text.charAt(index)
+        if (Character.isHighSurrogate(character)) {
+          index + 1 < text.length && Character.isLowSurrogate(text.charAt(index + 1)) && pairedAt(index + 2)
+        } else if (Character.isLowSurrogate(character)) false
+        else pairedAt(index + 1)
+      }
+    pairedAt(0)
+  }
 
   /** Judged last, so a file sconfig mis-renders is refused for that and not for where the includes
     * ended up in text nobody will read. Only the first pass is compared with the source: the second

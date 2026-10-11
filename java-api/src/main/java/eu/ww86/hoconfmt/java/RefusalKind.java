@@ -12,7 +12,7 @@ public enum RefusalKind {
     NotHocon,
     /** The file is named as a format of its own that Lightbend's loader also reads. */
     OtherFormat,
-    /** sconfig rendered text it cannot read back. */
+    /** Output cannot be read back safely, including after UTF-8 encoding. */
     BrokenOutput,
     /** sconfig would drop a comment that no field follows. */
     LostComment,
