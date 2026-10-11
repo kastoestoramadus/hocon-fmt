@@ -62,14 +62,40 @@ object HoconFormatter {
 
   private def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
+    val read  = reading(source)
     for {
-      pass <- formatOnce(source, parse, options, probe = true)(Refusal.NotHocon(_))
-      _    <- secondPassAgrees(pass.text, parse, options)
-      _    <- commentsKept(source, pass.text)
+      pass <- formatOnce(read, parse, options, probe = true)(Refusal.NotHocon(_))
+      text  = read.putBack(pass.text)
+      _    <- secondPassAgrees(text, parse, options)
+      _    <- commentsKept(source, text)
       _    <- includesKeptInPlace(source, pass)
       _    <- definitionsKept(pass)
-    } yield pass.text
+    } yield text
   }
+
+  /** The source as the pipeline reads it: `source` is the file's own text, which the source-level
+    * checks read; `parsed` is what the parse and the include checks read; `putBack` returns the
+    * file's text with the formatted body. The two differ only through a preserved preamble.
+    */
+  private case class Reading(source: String, parsed: String, preamble: String) {
+    def putBack(body: String): String = preamble + body
+  }
+
+  /** A leading block sconfig would drop is taken verbatim and replaced, line for line, by blank
+    * lines: comments and blank lines are both non-tokens, so the body parses to the tree and the
+    * origin lines the file itself would give, and a refusal from the body names the file's lines.
+    *
+    * Where the parse already keeps detached comments (the page's fork), the block survives the
+    * ordinary path through the carrier instead, and this path stays out of its way: one mechanism
+    * owns the block, never both.
+    */
+  private def reading(source: String): Reading =
+    if (CommentCarrier.keepsDetachedComments) Reading(source, source, "")
+    else
+      Preamble.split(source) match {
+        case Some(split) => Reading(source, split.blankLines + split.body, split.preamble)
+        case None        => Reading(source, source, "")
+      }
 
   /** What one round trip produced: the text with the includes put back, the masked text it came
     * from, which names the includes by the index the source gave them, and the parse of that
@@ -89,15 +115,22 @@ object HoconFormatter {
     * formatter's on the second. `probe` asks for the collision probe, which only the first pass
     * needs: its input is the user's text, where a mimic of a placeholder can hide behind an
     * identical generated field.
+    *
+    * The parse reads `reading.parsed`; the source-level guard reads the file's own text, so a
+    * reserved spelling in a preserved preamble is refused exactly as it was before the path
+    * existed. Nothing of the preamble is parsed or restored, so it can never be mistaken for a
+    * placeholder — keeping the guard whole-file is the conservative reading, not a necessity.
     */
-  private def formatOnce(source: String, parse: ConfigParseOptions, options: FormatOptions, probe: Boolean)(
+  private def formatOnce(reading: Reading, parse: ConfigParseOptions, options: FormatOptions, probe: Boolean)(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
-    val masked = IncludeMasking.mask(source)
+    val masked  = IncludeMasking.mask(reading.parsed)
+    val written =
+      if (reading.preamble.isEmpty) masked else IncludeMasking.mask(reading.source)
     // UPSTREAM-SCONFIG: the seam call; inline `restore`'s absence once the option is released.
     val carried = CommentCarrier.mask(masked.text)
     for {
-      _         <- Either.cond(!IncludeMasking.collides(masked), (), Refusal.ReservedName)
+      _         <- Either.cond(!IncludeMasking.collides(written), (), Refusal.ReservedName)
       parsed    <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
       collision <- attempt(IncludeMasking.collides(masked, parsed.root))(unreadable)
       _         <- Either.cond(!collision, (), Refusal.ReservedName)
@@ -106,7 +139,7 @@ object HoconFormatter {
       rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
       _         <- if (!probe || masked.originals.isEmpty) Right(())
            else {
-             val probeText = IncludeMasking.collisionProbe(source, rendered)
+             val probeText = IncludeMasking.collisionProbe(reading.parsed, rendered)
              attempt(ConfigFactory.parseString(probeText.text, parse))(unreadable).flatMap { checked =>
                attempt(IncludeMasking.probeCollides(checked.root))(unreadable).flatMap { collision =>
                  Either.cond(!collision, (), Refusal.ReservedName)
@@ -148,16 +181,18 @@ object HoconFormatter {
       formatted: String,
       parse: ConfigParseOptions,
       options: FormatOptions
-  ): Either[Refusal, Unit] =
+  ): Either[Refusal, Unit] = {
+    val read = reading(formatted)
     for {
       _ <- Either.cond(
              utf8Encodable(formatted),
              (),
              Refusal.BrokenOutput("an unpaired surrogate cannot be encoded as UTF-8")
            )
-      _ <- formatOnce(formatted, parse, options, probe = false)(Refusal.BrokenOutput(_))
-             .filterOrElse(_.text == formatted, Refusal.UnstableOutput)
+      _ <- formatOnce(read, parse, options, probe = false)(Refusal.BrokenOutput(_))
+             .filterOrElse(pass => read.putBack(pass.text) == formatted, Refusal.UnstableOutput)
     } yield ()
+  }
 
   // A UTF-16 half has no UTF-8 encoding on its own. Scan without allocating a byte copy on
   // every formatting pass, and leave escaping to sconfig rather than repair its rendering.

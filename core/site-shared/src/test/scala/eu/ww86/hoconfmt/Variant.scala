@@ -13,7 +13,7 @@ object Variant {
     "showcase/04-library-file"                                                           -> "the detached licence header is kept",
     "catalogue/detached-array-comment"                                                   -> "the detached array-element comment is kept",
     "catalogue/unresolved-merge-in-array"                                                -> fork,
-    "catalogue/detached-header-comment"                                                  -> "the banner above a blank line is kept",
+    "catalogue/detached-header-comment"                                                  -> "the fork's carrier keeps the banner without the blank line the command line's preamble path keeps verbatim",
     "catalogue/trailing-comment-in-object"                                               -> "the comment before the closing brace is kept",
     "commentAboveBlankLine: a comment block split by a blank line"                       -> "both halves are kept",
     "catalogue/sconfig-defect"                                                           -> fork,

@@ -31,7 +31,7 @@ class PreambleSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("a preamble-only change leaves the file already formatted") {
-    assertEquals(Verdict.of("# Copyright 2025\n\na : 1\n"), Verdict.AlreadyFormatted)
+    assertEquals(Verdict.of("# Copyright 2025\n\na = 1\n"), Verdict.AlreadyFormatted)
   }
 
   // The block above the first field is the parse's own to attach; taking it would move it away from
