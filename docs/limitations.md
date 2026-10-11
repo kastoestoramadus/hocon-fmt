@@ -11,17 +11,18 @@ The CLI summary counts skipped (refused) files. See [usage](usage.md#fail-on-ref
 
 ## sconfig defects the formatter refuses
 
-Each is reproduced with a bare sconfig parse-render round trip, with no code of ours involved.
-`format` verifies its own output and returns a `Refusal`, so no integration writes the file.
+The refused defects below are reproduced with a bare sconfig parse-render round trip, with no
+code of ours involved. `format` verifies its own output and returns a `Refusal`, so no integration
+writes the file. The same defect suite also tracks the accepted numeric limitation below.
 
 Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought to produce. The
-expected text is not guessed: each case is paired with a plainly written config that means the same
-thing and renders correctly, and the test first asserts both `resolve()` to the same value. A
-failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 21 failures on the JVM and Native, 22 on Scala.js.
-When a sconfig release fixes one, its test turns green: that is the signal to drop the refusal and
-the entry below. sconfig 2.0.0 was tried on 2026-09-25: the regular suites pass on it, and the
-defects then known remain.
+plain-equivalent cases first assert that both forms resolve to the same value; the numeric cases
+compare string conversion or value type before and after rendering. A failure therefore prints a diff ready to paste into an upstream issue. Run them with
+`sbt libraryDefects`, on all three platforms: 25 failures on the JVM and Native, 26 on Scala.js
+in `SconfigDefectsSpec` (plus the separate JVM detached-comment guard).
+When a sconfig release fixes one, its test turns green: update the corresponding refusal or
+numeric output pin and the entry here. The numeric cases below remain accepted. sconfig 2.0.0
+was tried on 2026-09-25: the regular suites pass on it, and the defects then known remain.
 
 Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`):
 
@@ -248,8 +249,9 @@ value can still matter, and it reads one text at a time.
 
 ## Intentional normalisations
 
-These are sconfig's renderer doing what the `ConfigFormatOptions` in `HoconFormatter` ask of it,
-not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpecCoverageSpec`:
+These changes come from sconfig's renderer and the formatter's text handling. Original spelling
+is not kept. Most preserve meaning; numeric rendering has the known limitation below. Pinned in
+`HoconSpecCoverageSpec` and `NumericRenderingSpec`:
 
 - `//` comments become `#`
 - `:` becomes `=` — the default separator, and `:` on request (`--separator :`, or a
@@ -261,7 +263,19 @@ not defects. Meaning is preserved, original spelling is not. Pinned in `HoconSpe
   `examples/catalogue/messy/expected/default.conf` pins, not `a = ${?a}[2]` on one
   line): sconfig renders the expanded form, keeping no trace of the shorthand (an append after an
   earlier definition of the key is instead the `+=` field-separator defect above, and is refused)
-- number literals are canonicalised (`1.5e3` becomes `1500`)
+- **Numbers converted to strings can change.** The renderer rewrites numbers to their canonical
+  spelling: `1e5` becomes `100000`, `1.0` becomes `1`, and `0.10` becomes `0.1` (`1.5e3` becomes
+  `1500`). With `a = 1e5` and `b = ${a}ms`, `b` then resolves to `"100000ms"` instead of
+  `"1e5ms"`. This also happens one substitution away (`b = ${a}`, `c = ${b}ms`) and beside an
+  include. If only another file concatenates the number, no check reading one text can see that
+  use; the formatter does not read included files. A consumer's `getString("a")` changes from
+  `"1e5"` to `"100000"` even without a substitution. `1e400` becomes `Infinity`, which re-reads
+  as a string rather than a number. These cases are **not refused for changed numeric spelling,
+  string conversion, or the `Infinity` type change**; the usual comment, include, parseability
+  and stability checks still apply. This is a known renderer limitation, reported as
+  [ekrich/sconfig#654](https://github.com/ekrich/sconfig/issues/654); Lightbend config 1.4.9
+  produces byte-identical rendering for these numeric cases. `NumericRenderingSpec` pins the
+  formatter's accepted output so a renderer fix calls for updated expectations.
 - unicode escapes are resolved (`\u0041` becomes `A`)
 - line endings become `\n`, and a UTF-8 byte-order mark is dropped
 - a comment at the end of a line moves to its own line above

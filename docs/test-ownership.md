@@ -34,11 +34,12 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 
 | suite (where) | cases | class | notes |
 |---|---:|---|---|
-| `SconfigDefectsSpec` (core/shared) | 20 | SCONFIG | bare round trip; 19 red on 1.12.4, 14 on main |
+| `SconfigDefectsSpec` (core/shared) | 26 | SCONFIG | bare round trip; 25 red on JVM/Native, 26 on JS with 1.12.4; earlier main measurements predate the six numeric cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
 | `HoconSpecCoverageSpec` (core/shared) | 28 | 17 SCONFIG / 11 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 11 MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
 | `FormatterPropertiesSpec` (core/shared) | 9 | 8 OURS / 1 MIXED | 1000 generated documents × 8 option sets each |
+| `NumericRenderingSpec` (core/shared) | 8 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
 | `DuplicateReportSpec` (core/shared) | 28 | 18 OURS / 10 MIXED | resolution assertions are sconfig's |
 | `ExamplesSpec` (core/shared) | 29 | 22 OURS / 7 MIXED | one case per example (21) plus 8 suite tests |
 | `IncludeDetectionSpec` (core/shared) | 23 | OURS | the detection contract |
@@ -59,8 +60,14 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 | gradle functionalTest, maven `src/it`, mill, sbt scripted | 16 / 15 / 12 / 10 | OURS | integrations |
 | `CliAcceptanceSuite` (acceptance) | 11 | OURS | processes, all three runtimes |
 
-Core JVM totals 450 passing; with the two defect suites, 471, of which 20 are red today (19
-`SconfigDefectsSpec` cases plus the guard; 20 defects on Scala.js, which has the nesting defect of
+The numeric rendering limitation adds eight acceptance/output pins (MIXED) and six bare-library
+reproductions (SCONFIG). It remains accepted by owner decision: no numeric refusal or rendering
+patch is carried. `SconfigDefectsSpec` now has 25 red cases on JVM/Native and 26 on Scala.js,
+plus the separate JVM detached-comment guard. The totals below describe the earlier
+2026-10-09 snapshot.
+
+At the 2026-10-09 snapshot, core JVM totalled 450 passing; with the two defect suites, 471, of
+which 20 were red (19 `SconfigDefectsSpec` cases plus the guard; 20 defects on Scala.js, which has the nesting defect of
 its own).
 
 Evidence, one quote per class:
@@ -103,8 +110,9 @@ Not portable, and why:
 
 ## 3. The red list: tests that must stay here
 
-These look like sconfig's but pin **our** refusal of a defect. Each turns green, and the refusal is
-dropped, only when the named upstream work is in a release.
+The bare-library cases assert the behavior a fix should provide; most formatter cases pin
+**our** refusal of a defect. The numeric cases instead pin accepted output. When a release fixes
+them, flip the numeric output pins and update the limitation; no numeric refusal needs removal.
 
 | our tests (count) | pins | upstream | turns green when |
 |---|---|---|---|
@@ -118,6 +126,7 @@ dropped, only when the named upstream work is in a release.
 | `HoconSpecCoverageSpec` refusals `mustRefuse` (4), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
 | `UnresolvedMergeSpec` (16) | the variant rendering of an unresolved merge under an include | `#598`/`#600` | a release formats those merges stably |
 | `ExamplesSpec` catalogue refusals (7) | the pinned `now` of the defect examples | `#598`, `#605`, `#646`/`#647` | the examples move to `target` and the metadata's `upstream` note goes |
+| Numeric rendering (6 library tests), `NumericRenderingSpec` (8) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |
 | `KeepDetachedCommentsGuardSpec` (1) | `setKeepDetachedComments` exists | `#647` | the released library carries the option; then the fork and carrier are deleted |
 
 Checked on 2026-10-09 by running the two defect suites against sconfig main `f351262a`:

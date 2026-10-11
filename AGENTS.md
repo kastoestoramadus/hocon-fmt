@@ -12,7 +12,7 @@ sbt test                  # core + cli on JVM, Scala.js, Scala Native, web, and 
 sbt coverageJvm           # statement and branch coverage on the JVM (reports under */target/scala-*/scoverage-report; not a gate)
 sbt crossCompile          # compile every platform's tests; needs neither Node nor clang
 sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
-sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 21 (JVM, Native), 22 (JS);
+sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 25 (JVM, Native), 26 (JS);
                           # then KeepDetachedCommentsGuardSpec (JVM): red until released sconfig has the option
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt coreJVM/publishM2 javaApi/publishM2  # needed before the Gradle and Maven builds
@@ -53,7 +53,9 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
 - **`include` handling is ours; everything else is sconfig's.** Wrong output for any other reason
   is an upstream bug: reproduce it against bare sconfig in `SconfigDefectsSpec` (named `library:`),
   make `format` refuse the input, record it in [docs/limitations.md](docs/limitations.md). Never
-  work around it in `HoconFormatter`.
+  work around it in `HoconFormatter`. The documented numeric rendering limitation
+  [#654](https://github.com/ekrich/sconfig/issues/654) remains accepted by owner decision; pin
+  its current output instead of adding a refusal.
 - **`IncludeMasking` is the core algorithm.** Read
   [the masking section](docs/architecture.md#include-masking) before changing it. Its regexes must
   run on RE2 (Scala Native) and ES2015 JavaScript (Scala.js): no lookaround, no backreferences, no

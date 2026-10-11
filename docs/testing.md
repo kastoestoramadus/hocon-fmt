@@ -15,6 +15,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
 | `OptionsSpec` | `core/shared` | the parse and render options the formatter pins explicitly: the final newline, empty text, and how env-variable values render |
+| `NumericRenderingSpec` | `core/shared` | accepted output for the documented numeric renderer limitation; flip the pins when sconfig fixes it |
 | `SconfigDefectsSpec` | `core/shared` | sconfig's own bugs, with none of our code involved; red by design |
 | `HoconFormatterJsSpec` | `web` | the JavaScript API a page calls, through its global, on the Closure-compiled script |
 | site suites | `site` | the page's pure logic on Scala.js/Node: the status model, the snapshot/live merge, the grouping, the fetch path against a fake; see [site](site.md#testing) |
@@ -65,8 +66,10 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **Golden files.** Adding a fixture is a two-file drop. Regenerate with
   `UPDATE_GOLDEN=1 sbt "coreJVM/testOnly eu.ww86.hoconfmt.GoldenFileSpec"` and read the diff before
   committing: a golden file is worth what the human who approved it looked at.
-- **Meaning preservation** is asserted on include-free inputs only: an include of a missing file
-  cannot be parsed on its own. Files with includes are covered by idempotence.
+- **Meaning preservation** is asserted on generated and selected include-free inputs; it is not
+  a guarantee for number-to-string conversion (see [limitations](limitations.md#intentional-normalisations)).
+  An include of a missing file cannot be parsed on its own. Files with includes are covered by
+  idempotence.
 - **`library:` and `formatter:`** prefixes in `SconfigDefectsSpec` and `HoconSpecCoverageSpec`
   record who is responsible for a failure, so nobody fixes an upstream bug here.
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
