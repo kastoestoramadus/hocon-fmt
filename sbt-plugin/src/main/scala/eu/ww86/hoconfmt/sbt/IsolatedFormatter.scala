@@ -14,7 +14,12 @@ object Verdict {
   final case class Refused(kind: String, reason: String) extends Verdict
 }
 
-final case class Inspection(verdict: Verdict, warnings: Seq[String], failsOnDuplicates: Boolean)
+final case class Inspection(
+    verdict: Verdict,
+    warnings: Seq[String],
+    failsOnDuplicates: Boolean,
+    failsOnRefusal: Boolean
+)
 
 /** The Scala 3 formatter, loaded apart from sbt's own Scala 2.12 library.
   *
@@ -46,7 +51,8 @@ final class IsolatedFormatter private (check: Method, formatFile: Method, inspec
       findings ++ (if (failure.isPresent)
                      Seq("duplicate report could not run: " + failure.get())
                    else Nil),
-      read(result, "failsOnDuplicates").asInstanceOf[java.lang.Boolean].booleanValue()
+      read(result, "failsOnDuplicates").asInstanceOf[java.lang.Boolean].booleanValue(),
+      read(result, "failsOnRefusal").asInstanceOf[java.lang.Boolean].booleanValue()
     )
   }
 
