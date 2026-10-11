@@ -7,7 +7,8 @@ import eu.ww86.hoconfmt.HoconFormatter.format
   * Everything here exercises our pipeline, so every test is named `formatter:`. Where the
   * formatter refuses an input, the underlying fault is the library's, not ours - those defects
   * are reproduced against bare sconfig in [[SconfigDefectsSpec]]. Our only responsibility is to
-  * notice and refuse rather than write corrupted output.
+  * notice and refuse these defects. The accepted numeric rendering limitation is pinned in
+  * [[NumericRenderingSpec]].
   *
   * Coverage of the HOCON specification.
   *

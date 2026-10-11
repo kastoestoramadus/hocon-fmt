@@ -7,8 +7,8 @@ import org.ekrich.config.ConfigRenderOptions
   *
   * The division of labour in this project is that everything except `include` handling is the
   * library's job. So these are not ours to fix in `HoconFormatter` - they are upstream bugs, and
-  * all `HoconFormatter` does about them is refuse to emit the result (see
-  * `HoconSpecCoverageSpec`).
+  * `HoconFormatter` refuses unsafe output except for the documented numeric rendering
+  * limitation (#654), which remains accepted (see `NumericRenderingSpec`).
   *
   * Each test asserts what sconfig *should* do, so it is RED while the bug is open. They are
   * therefore excluded from `sbt test` and from CI, and run on demand, on every platform, since
@@ -17,7 +17,7 @@ import org.ekrich.config.ConfigRenderOptions
   * {{{ sbt libraryDefects }}}
   *
   * When a future sconfig release fixes one, its test turns green - that is the signal to drop the
-  * corresponding refusal from `HoconFormatter` and the note from CLAUDE.md.
+  * corresponding refusal or flip the numeric acceptance pins, and update `docs/limitations.md`.
   *
   * Examples are taken from the HOCON specification.
   * @see
@@ -87,6 +87,36 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
         s"OPEN sconfig BUG: $name does not render as the equivalent [$equivalent]"
       )
     }
+  }
+
+  def numericSpellings = List("1e5", "1.0", "0.10")
+
+  numericSpellings.foreach { spelling =>
+    test(s"library: numeric spelling $spelling in a substituted string should survive rendering") {
+      val source   = s"a = $spelling\nb = $${a}ms"
+      val rendered = source.renderedByLibrary
+      assert(rendered.parses.isSuccess, rendered)
+      assertEquals(rendered.renderedByLibrary, rendered)
+      assertEquals(rendered.parsedConfig.resolve().getString("b"), source.parsedConfig.resolve().getString("b"))
+    }
+  }
+
+  test("library: numeric spelling one substitution away should survive rendering") {
+    val source = "a = 1e5\nb = ${a}\nc = ${b}ms"
+    assertEquals(source.renderedByLibrary.parsedConfig.resolve().getString("c"), "1e5ms")
+  }
+
+  test("library: getString of a number should survive rendering without a substitution") {
+    val source = "a = 1e5"
+    assertEquals(source.renderedByLibrary.parsedConfig.getString("a"), source.parsedConfig.getString("a"))
+  }
+
+  test("library: an overflowing number should keep its type after rendering") {
+    val source = "a = 1e400"
+    assertEquals(
+      source.renderedByLibrary.parsedConfig.getValue("a").valueType,
+      source.parsedConfig.getValue("a").valueType
+    )
   }
 
   // --- Should keep every comment -----------------------------------------------------------------
