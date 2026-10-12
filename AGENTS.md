@@ -118,7 +118,9 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   force-pushed.
 - Attribution names the model, its effort and the tool it ran in, never a bare tool name: the model id and
   effort as given by whoever launched the agent (effort `l`, `m`, `h`, `xh` or `max`; `?` if not given). A
-  commit ends with `Co-Authored-By: <model-id>/<effort> through <tool> <noreply@anthropic.com>`. A PR body ends
+  commit has no `Co-Authored-By` trailer for an AI; its message body ends with
+  `Helped by: <model-id>/<effort> by <tool>` (the same exact configuration, one line per helper, for
+  meta-analysis; older commits keep `Co-Authored-By` or `AI assistance:`). A PR body ends
   with an attribution block: `Generated with <model-id>/<effort> through <tool>` (the tool may be a link), then
   one line per later pass in the same form, `Revised by …` for whoever changed the PR and `Reviewed by …` for
   each review, e.g. `Reviewed by deepseek-flash/h through ZCode`; whoever relays a review adds its line.
