@@ -9,6 +9,19 @@ import org.junit.jupiter.api.io.TempDir;
 class PluginOptionsTest {
     @TempDir Path dir;
 
+    @Test void strictOtherFormatsFailBothModesWithoutWriting() throws Exception {
+        for (String name : java.util.List.of("app.json", "app.properties")) {
+            Path file = Files.writeString(dir.resolve(name), "a = 1\n");
+            assertFalse(HoconFmt.inspectFile(file, Map.of(), true).failsOnRefusal());
+            for (boolean write : new boolean[]{false, true}) {
+                Inspection result = HoconFmt.inspectFile(file, Map.of("fail-on-refusal", "true"), write);
+                assertTrue(result.failsOnRefusal());
+                assertEquals(RefusalKind.OtherFormat, ((Verdict.Refused) result.verdict()).kind());
+                assertEquals("a = 1\n", Files.readString(file));
+            }
+        }
+    }
+
     @Test void refusalPolicyIsMirroredAndOverridesRemainIndependent() throws Exception {
         assertFalse(FormatOptions.DEFAULT.failOnRefusal());
         Path file = Files.writeString(dir.resolve("app.conf"), "# only a comment\n");
