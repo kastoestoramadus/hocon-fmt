@@ -7,10 +7,11 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 |---|---|---|
 | `GoldenFileSpec` | `core/jvm-native` | rendering: each `<name>.conf` in `core/jvm-native/src/test/resources` against `<name>.expected.conf` |
 | `HoconFormatterInvariantsSpec` | `core/jvm-native` | idempotence, output re-parses, meaning preserved, inputs shaped like the internal placeholders |
-| `FormatterPropertiesSpec` | `core/shared` | the same guarantees on generated documents: no comment, include or meaning lost, no placeholder leaked, nothing refused without reason |
+| `FormatterPropertiesSpec` | `core/shared` | the same guarantees on generated documents: no comment, include or meaning changed (the comments compared as multisets), no placeholder leaked, nothing refused without reason |
 | `IncludeDetectionSpec` | `core/shared` | which occurrences of `include` are a directive; the contract of the detection regex |
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
+| `PreambleSpec` | `core/default-shared` | the [preserved preamble](limitations.md#the-preserved-preamble) on the published core: the rule's boundary cases, the verbatim header, and that a refusal from the body still names the file's own lines; the page's fork keeps the same comments through its carrier, pinned in `CommentCarrierSpec` |
 | `DuplicateReportSpec` | `core/shared` | the duplicate report: replaced definitions and ancestor barriers, independent array scopes, and resolution showing which values survive |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
@@ -47,7 +48,10 @@ They found what no example covered: a quote inside a comment hid the next includ
 JVM then vanished; a comment with no field after it was dropped; an include in an object that a
 later definition replaces vanished with it, after 11356 documents; and, in sconfig, a one-field
 object inside an array loses its braces when it does not fit on one line, which one CI run turned
-up after 859 documents.
+up after 859 documents. The comment multiset property reads both directions, and the case that
+made it necessary came from the corpus rather than the generator: sconfig renders the comment of
+an appended field twice, which eight corpus files would have been written with (see
+[limitations](limitations.md#sconfig-defects-the-formatter-refuses)).
 
 ## Benchmarks
 

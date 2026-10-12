@@ -12,6 +12,7 @@ class CommentCarrierDefaultSpec extends munit.FunSuite {
     assert(!carried.collides(ConfigFactory.parseString("a = \"__COMMENT_0\"").root), "the no-op judges nothing")
     val options = HoconFormatter.parseOptions
     assert(CommentCarrier.parseOptions(options) eq options)
+    assert(!CommentCarrier.keepsDetachedComments, "the preamble path, not the parse, keeps a detached block here")
   }
 
   test("a comment no field follows is still refused") {

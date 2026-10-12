@@ -22,8 +22,10 @@ enum Refusal derives CanEqual {
     */
   case BrokenOutput(detail: String)
 
-  /** sconfig drops a comment that no field follows. A comment carries no meaning, so no other
-    * check notices; losing one still loses what someone wrote down.
+  /** sconfig drops a comment that no field follows, and prints the comment of an appended field
+    * twice. A comment carries no meaning, so no other check notices; losing one still loses what
+    * someone wrote down, and a duplicate writes down what nobody did. The check compares the
+    * output's comment multiset with the input's, so both are this case.
     */
   case LostComment(text: String)
 
@@ -60,7 +62,7 @@ enum Refusal derives CanEqual {
     case NotHocon(detail)                                     => s"not valid HOCON: $detail"
     case OtherFormat(format)                                  => s"a $format file, and hocon-fmt formats HOCON only"
     case BrokenOutput(detail)                                 => s"the output would not parse again: $detail"
-    case LostComment(text)                                    => s"a comment would be lost: $text"
+    case LostComment(text)                                    => s"a comment would be lost or duplicated: $text"
     case LostInclude(text)                                    => s"an include would be lost: $text"
     case MovedInclude(text)                                   => s"an include would change places with a field: $text"
     case ShadowedByInclude(path, includeLine, definitionLine) =>

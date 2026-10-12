@@ -45,6 +45,12 @@ private[hoconfmt] object CommentCarrier {
   /** How often each placeholder writes its prefix: the key, the value and the guard's key. */
   private val PrefixPerPlaceholder = 3
 
+  /** The parse options below keep a comment a blank line detaches from the field below, so the
+    * detached block is this carrier's business here and `HoconFormatter` leaves its own preamble
+    * path out of the way: one mechanism owns a block, never both.
+    */
+  val keepsDetachedComments: Boolean = true
+
   def parseOptions(base: ConfigParseOptions): ConfigParseOptions = base.setKeepDetachedComments(true)
 
   def mask(source: String): Carried = {

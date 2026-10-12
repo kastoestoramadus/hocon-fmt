@@ -53,7 +53,7 @@ class HoconFormatterJsSpec extends munit.FunSuite {
   test("a comment that would be lost is a refusal of its own") {
     val result = format("a : 1\n# trailing\n")
     assertEquals(field(result, "refusal"), Some("lostComment"))
-    assertEquals(field(result, "reason"), Some("a comment would be lost: trailing"))
+    assertEquals(field(result, "reason"), Some("a comment would be lost or duplicated: trailing"))
   }
 
   test("an unpaired surrogate escape is refused without exposing formatted text") {

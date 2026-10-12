@@ -18,7 +18,7 @@ writes the file. The same defect suite also tracks the accepted numeric limitati
 Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought to produce. The
 plain-equivalent cases first assert that both forms resolve to the same value; the numeric cases
 compare string conversion or value type before and after rendering. A failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 27 failures on the JVM and Native, 28 on Scala.js
+`sbt libraryDefects`, on all three platforms: 28 failures on the JVM and Native, 29 on Scala.js
 in `SconfigDefectsSpec` (plus the separate JVM detached-comment guard).
 When a sconfig release fixes one, its test turns green: update the corresponding refusal or
 numeric output pin and the entry here. The numeric cases below remain accepted. sconfig 2.0.0
@@ -45,12 +45,19 @@ Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`):
   String API callers can also supply raw unpaired halves in those contexts or an include target;
   output containing one is refused. No rendering workaround is applied.
 
-Rendered without a comment (`Refusal.LostComment`); a comment has no meaning to compare, so only
-this check notices. sconfig attaches a comment to the field after it; one that ends up attached
-to no field is dropped:
+Rendered without a comment, or with it twice (`Refusal.LostComment`); a comment has no meaning to
+compare, so only this check notices, and it compares the input's comments with the output's as
+multisets — a comment is refused as much when the output prints it twice as when it drops it.
+sconfig attaches a comment to the field after it; one that ends up attached to no field is
+dropped:
 
 - **A comment no field follows**: after the last field of the file or of an object, and every
   comment of a file that holds nothing else.
+- **A comment on an appended field**: `# c` above `a += 2` is copied onto both halves of the
+  desugared expansion — above the key and again inside the appended array — so the output holds a
+  comment the author never wrote. Found in 12 of the 1,257 corpus files, all of them `+=` fields;
+  eight of them formatted before the multiset check, and the write would have added a second copy
+  of the comment. `SconfigDefectsSpec` pins the library's rendering of the same input.
 - **A comment a blank line follows**: the blank line ends the attachment, so the comment is
   dropped although a field does come after it, and a blank line inside a comment block takes the
   part above it with it. This is what real files hit, since nearly all open with a licence header
@@ -60,27 +67,86 @@ to no field is dropped:
   and a blank line — strip those comment blocks and 261 of the 265 format. Nothing on sconfig
   main, among its open pull requests, or on the sHOCON `bugs-comments` branch fixes it (checked
   2026-10-08), and the gap is the same on sconfig 2.0.0.
-  The command line and the plugins still refuse these. The project page's playground runs on a
-  sconfig fork that keeps them and masks the rest, see below; the investigation is in
+  **A block at the very top of the file, a blank line under it, is kept by the command line** as a
+  [preserved preamble](#the-preserved-preamble); everywhere else in the file these still refuse.
+  The project page's playground runs on a sconfig fork that keeps them and masks the rest, see
+  below; the investigation is in
   [investigations/blank-line-comments.md](investigations/blank-line-comments.md).
+
+## The preserved preamble
+
+A file that opens with a block of comments and blank lines, a blank line under the block and the
+first field after that, keeps the block **verbatim**: `HoconFormatter` takes it before anything is
+parsed and puts it back unchanged in front of the formatted body. Marker, spacing, blank lines and
+line endings are the file's own; the body is formatted as always. This is what the command line
+does about the commonest refusal in real files — 394 corpus files were refused for a lost comment,
+and most of them open with a licence, an SPDX line or a banner — and a file whose body already
+formats under such a header is `Verdict.AlreadyFormatted`: it is left exactly as it is, header and
+all.
+
+The rule is narrow, so that a block the parse needs never moves:
+
+- **The preamble is the run of blank and comment-only lines the file opens with, without the
+  comment block directly above the first line of the body.** That block is what the parse attaches
+  to the field below (`# section` in `# head\n\n# section\na = 1` stays with `a`); only the blocks
+  a blank line detaches are taken. Blank lines the file opens with are part of the preamble, so
+  they survive too, which they do not anywhere else.
+- **What is left must hold a comment.** A file that opens with blank lines only has no preamble:
+  the leading blank lines are dropped as before. A file of nothing but comments has no body to
+  format, so it has no preamble and is still refused.
+- **The block is taken before any masking.** When the file contains an include, the source-level
+  `__INCLUDE_` guard reads the file's own text, preamble included, and refuses a reserved spelling
+  with `ReservedName`. Without an include, the preamble may contain that spelling: the review's
+  `// __INCLUDE_0\n\na : 1` becomes `// __INCLUDE_0\n\na = 1`. Adding
+  `include "defaults.conf"` before the field makes it refuse. Nothing of the preamble is parsed or
+  restored, so it cannot be mistaken for a placeholder; an `include` in a comment is no directive.
+- **The body keeps every normalisation** listed under [intentional
+  normalisations](#intentional-normalisations): `//` becomes `#`, `:` becomes `=`, nested objects
+  are flattened, plain strings are unquoted, the body's line endings become `\n`. The preamble is
+  the part that keeps its spelling, and the body is the only part that changed before.
+
+What the preamble path does **not** cover, and what therefore still refuses as it always did: a
+comment that a blank line separates from the field below anywhere but at the top of the file; a
+comment at the end of the file or of an object; a comment before a closing brace; a block before
+the closing `]` or `)` of an array, where no field could stand. The lines such a refusal names are
+the file's own lines: the parse reads the preamble's lines as blank lines, one for one.
+
+A nonempty braced root's header is covered: the body is formatted from `{`, and the header stands
+before the flattened fields. An empty root is a boundary: `# head\n\n{}\n` refuses with
+`UnstableOutput`, because rendering leaves only the preamble and the next pass treats it as a
+comments-only document. Comments-only inputs still refuse with `LostComment`; no refused file is
+written.
+
+A UTF-8 BOM before the header is outside the preserved path: `\ufeff# licence\n\na : 1\n`
+refuses with `LostComment(licence)`, including when an include follows the header. This is an
+inherited safe refusal. A BOM after the detached header and before the first field is accepted.
+
+Measured on a 1,257-file corpus of 24 public repositories at pinned commits (2026-10-11, one
+`--check` run per file): refusals fall from 483 to 310, and 181 files format that were refused
+before — 8 of them already formatted, so nothing is written. Eight files that formatted before are
+refused now, each a comment on an appended field that the render prints twice; 73 stay refused with
+another kind (`broken-output` 38, `unstable-output` 35), their output not settling, which the second
+pass judges before the comment multiset. None of the 181 has a different comment multiset, each is a
+fixed point, and the 153 the Lightbend 1.4.5 oracle can resolve are unchanged (5 it cannot read, 23
+hold an include and are checked by the second pass alone).
 
 <!-- UPSTREAM-SCONFIG: delete this paragraph once the option is released. -->
 **What the playground keeps that the command line refuses** (`coreSite`, on the sconfig fork of
-[site](site.md#running-ahead-of-the-release)): a comment above a blank line, and a block of comments
-before a closing brace or the end of the file, including a file of comments only. Blank lines
-themselves are still not kept. **What stays refused there too:** a block of comments before the
-closing `]` or `)` of an array, since no field can stand in it (about 30 corpus files), a braced
-root's header comment, and the files whose merges sconfig renders unstably. The fork's base also
-renders some merges and `+=` appends that released sconfig breaks, so the page formats a few inputs
-the command line refuses for those reasons. The page's placeholders get the same protection as the
-include ones: user text that quoting could spell into `__COMMENT_` — `"__COMM""ENT_0"`, or an
-escape — is kept, the prefix stepping aside for it, and a rendering that could not be told from
-the placeholders is refused rather than restored on a guess.
+[site](site.md#running-ahead-of-the-release)): a comment above a blank line anywhere but in the
+file's leading block, and a block of comments before a closing brace or the end of the file,
+including a file of comments only. Blank lines elsewhere are still not kept, there or here. **What
+stays refused there too:** a block of comments before the closing `]` or `)` of an array, since no
+field can stand in it (about 30 corpus files), and the files whose merges sconfig renders
+unstably. The fork's base also renders some merges and `+=` appends that released sconfig breaks,
+so the page formats a few inputs the command line refuses for those reasons. The page's
+placeholders get the same protection as the include ones: user text that quoting could spell into
+`__COMMENT_` — `"__COMM""ENT_0"`, or an escape — is kept, the prefix stepping aside for it, and a
+rendering that could not be told from the placeholders is refused rather than restored on a guess.
 
-Blank lines meet the same blind spot: the parse tree holds values and their comments and nothing
-else, so blank lines are not kept at all — formatting the reference.conf corpus turns 1713 of its
-11132 lines into 0. That is spacing rather than a comment, so the checks pass and the output is
-accepted.
+Blank lines meet the same blind spot outside a preserved preamble: the parse tree holds values and
+their comments and nothing else, so blank lines are not kept at all — formatting the reference.conf
+corpus turns 1713 of its 11132 lines into 0. That is spacing rather than a comment, so the checks
+pass and the output is accepted.
 
 Dropped with its object (`Refusal.LostInclude`):
 

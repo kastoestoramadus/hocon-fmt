@@ -52,6 +52,27 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // Loss is the easy half: the render can also print a comment twice, as it does for the comment of
+  // an appended field (`# c` above `a += 2` comes out once above the key and again inside the
+  // expanded append — SconfigDefectsSpec pins that library bug). A file the formatter writes must
+  // hold every comment exactly as often as its input did, so the check reads both as multisets.
+  property("keeps the comment multiset exactly, in any option combination") {
+    forAll(documents(includes = true)) { doc =>
+      allOptions.foreach { options =>
+        HoconFormatter.format(doc.text, options).foreach { out =>
+          assertEquals(
+            multiset(HoconText.comments(out)),
+            multiset(HoconText.comments(doc.text)),
+            s"the comment multiset changed in:\n$out"
+          )
+        }
+      }
+    }
+  }
+
+  def multiset(items: List[String]): Map[String, Int] =
+    items.groupMapReduce(identity)(_ => 1)(_ + _)
+
   property("never loses an include, in any option combination") {
     forAll(documents(includes = true)) { doc =>
       allOptions.foreach { options =>

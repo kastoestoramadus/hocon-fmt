@@ -66,6 +66,12 @@ object DefectTable {
       DefectRow.noFixYet
     ),
     DefectRow(
+      "a comment on an appended field: the `+=` expansion copies it onto both halves",
+      RefusalKind.LostComment,
+      Nil,
+      DefectRow.noFixYet
+    ),
+    DefectRow(
       "an include in an object that a later definition of the key replaces",
       RefusalKind.LostInclude,
       Nil,
