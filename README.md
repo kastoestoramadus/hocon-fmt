@@ -80,7 +80,7 @@ includes and comments, a file that is not UTF-8, and formatting twice.
 **Command line**, in three builds of the same program:
 
 ```bash
-cli/.native/target/scala-3.8.2/hocon-fmt --check application.conf   # exit 1: not formatted
+cli/.native/target/scala-3.9.0/hocon-fmt --check application.conf   # exit 1: not formatted
 node cli/.js/target/npm-package/hocon-fmt.js application.conf        # rewrites it
 sbt "cliJVM/run --check application.conf"                                  # paths from where sbt runs
 ```
@@ -88,7 +88,7 @@ sbt "cliJVM/run --check application.conf"                                  # pat
 **pre-commit**, in a git repository of your own, with a wheel built from the native binary:
 
 ```bash
-python3 python/build_wheel.py --binary cli/.native/target/scala-3.8.2/hocon-fmt --out dist
+python3 python/build_wheel.py --binary cli/.native/target/scala-3.9.0/hocon-fmt --out dist
 ```
 
 ```yaml

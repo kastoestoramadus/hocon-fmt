@@ -22,7 +22,7 @@ Library adapters expose refusals to the caller: the ZIO adapter uses a typed err
 single operation and a per-file outcome for a streamed check, so the application controls its
 run policy.
 
-All JVM channels need Java 17 or newer, as Scala 3.8 does.
+All JVM channels need Java 17 or newer, as Scala 3.9 does.
 
 ## Command line
 

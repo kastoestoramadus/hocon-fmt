@@ -29,6 +29,6 @@ fi
 git -C "$CACHE" fetch -q --depth 1 origin "$SHA"
 git -C "$CACHE" checkout -q --detach FETCH_HEAD
 
-# The fork's own build is sbt 2; ++3.8.2! pins the Scala version hocon-fmt compiles with.
-(cd "$CACHE" && sbt -batch "set ThisBuild / version := \"$VERSION\"; ++3.8.2!; sconfigJS/publishLocal")
+# The fork's own build is sbt 2; ++3.9.0! pins the Scala version hocon-fmt compiles with.
+(cd "$CACHE" && sbt -batch "set ThisBuild / version := \"$VERSION\"; ++3.9.0!; sconfigJS/publishLocal")
 echo "published sconfig fork $VERSION"

@@ -39,7 +39,7 @@
   </prerequisites>
 
   <properties>
-    <!-- Scala 3.8, which the core is built with, needs JDK 17 at run time. -->
+    <!-- Scala 3.9, which the core is built with, needs JDK 17 at run time. -->
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Compiling against the oldest supported API keeps anything newer out of the plugin. -->

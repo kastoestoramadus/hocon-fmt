@@ -15,7 +15,7 @@ export PRE_COMMIT_HOME="$work/pre-commit-cache"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 (cd "$root" && sbt -batch cliNative/nativeLink cliJS/npmPackage)
-python3 "$root/python/build_wheel.py" --binary "$root/cli/.native/target/scala-3.8.2/hocon-fmt" --out "$work"
+python3 "$root/python/build_wheel.py" --binary "$root/cli/.native/target/scala-3.9.0/hocon-fmt" --out "$work"
 wheel=$(ls "$work"/hocon_fmt-*.whl)
 tarball="$work/$(npm pack --silent --pack-destination "$work" "$root/cli/.js/target/npm-package")"
 

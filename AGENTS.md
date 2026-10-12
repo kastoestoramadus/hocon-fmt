@@ -26,7 +26,7 @@ scripts/pre-commit-e2e.sh # pre-commit hooks as installed from HEAD; needs pre-c
 scripts/bench.py run      # time every phase on every platform, attach to HEAD in git notes
 scripts/bench.py report   # medians per commit, slowdowns flagged
 
-sbt cliNative/nativeLink  # cli/.native/target/scala-3.8.2/hocon-fmt
+sbt cliNative/nativeLink  # cli/.native/target/scala-3.9.0/hocon-fmt
 sbt cliJS/npmPackage      # cli/.js/target/npm-package
 sbt web/bundle            # web/target/bundle/hocon-fmt.js, the script for web pages
 sbt site/build            # site/target/site: the project page (index.html, main.js, CNAME)

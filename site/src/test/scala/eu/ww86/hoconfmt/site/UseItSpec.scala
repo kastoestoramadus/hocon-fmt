@@ -123,7 +123,7 @@ class UseItSpec extends munit.FunSuite {
     val inputs  = js.JSON.parse(decoded).asInstanceOf[js.Dynamic].SbtInputs
     assertEquals(inputs.code.asInstanceOf[String], code)
     assertEquals(inputs.sbtConfigExtra.asInstanceOf[String], ScalaShowcase.buildConfig(core))
-    assertEquals(inputs.target.Scala3.scalaVersion.asInstanceOf[String], "3.8.2")
+    assertEquals(inputs.target.Scala3.scalaVersion.asInstanceOf[String], "3.9.0")
     assert(ScalaShowcase.scastieUrl(core, "import $ivy.`x:y:1`").isLeft)
   }
 
