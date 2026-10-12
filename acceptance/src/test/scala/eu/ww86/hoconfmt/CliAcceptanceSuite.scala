@@ -78,8 +78,7 @@ class CliAcceptanceSuite extends munit.FunSuite {
           .proc(cli, "--report", target, "--fail-on-refusal", "app.conf", "data.json")
           .call(cwd = dir, stderr = os.Pipe, check = false)
         assertEquals(result.exitCode, 1)
-        val expected = os
-          .read(os.pwd / "cli/src/test/resources/reports/process.json")
+        val expected = reportGolden
           .replace("@VERSION@", version)
           .replace("@PATH@", (dir / "data.json").toString)
         assertEquals(if (target == "-") result.out.text() else os.read(dir / "report.json"), expected)
