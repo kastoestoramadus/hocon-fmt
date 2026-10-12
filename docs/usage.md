@@ -96,7 +96,8 @@ all five fields present even when the counts and arrays are empty:
 
 - `version` is the formatter version.
 - `checked` counts distinct selected file outcomes after canonical-path deduplication, including
-  unavailable selected paths; a config error does not count its config as an extra selected file.
+  unavailable explicitly selected files. Unreadable directories appear in `failed` without adding
+  a selected file; a config error does not count its config as an extra selected file.
 - `changed` counts files that would change under `--check`, or were actually rewritten in format
   mode. It is zero when configuration errors stop formatting before any selected file is examined.
 - `refused` contains each refused file's path and full reason, prefixed by its refusal kind.
