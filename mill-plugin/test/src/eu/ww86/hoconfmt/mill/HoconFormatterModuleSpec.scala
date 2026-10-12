@@ -48,6 +48,51 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     case other                                => fail(s"expected a failure, got $other")
   }
 
+  object otherFormats extends TestRootModule, HoconFormatterModule {
+    override def hoconFormatSources = Task.Sources("data.json", "app.properties")
+    lazy val millDiscover = Discover[this.type]
+  }
+
+  test("selected other formats fail strict commands and preserve default success") {
+    withFiles(otherFormats, "data.json" -> text("a = 1\n"), "app.properties" -> text("a = 1\n")) { run =>
+      assert(run.eval(otherFormats.hoconFormat()).isRight)
+      assert(run.eval(otherFormats.hoconFormatCheck()).isRight)
+      assert(failure(run.eval(otherFormats.hoconFormat(failOnRefusal = Some(true))))
+        .contains("HOCON formatting refusals found."))
+      assert(failure(run.eval(otherFormats.hoconFormatCheck(failOnRefusal = Some(true))))
+        .contains("HOCON formatting refusals found."))
+      Seq("data.json", "app.properties").foreach(name => assertEquals(read(otherFormats, name), "a = 1\n"))
+    }
+  }
+
+  test("repository refusal policy fails both commands and preserves refused bytes") {
+    withFiles(project,
+      ".hocon-fmt.conf" -> text("fail-on-refusal = true\n"),
+      "resources/refused.conf" -> text("# only a comment\n")
+    ) { run =>
+      assert(failure(run.eval(project.hoconFormat())).contains("HOCON formatting refusals found."))
+      assert(failure(run.eval(project.hoconFormatCheck())).contains("HOCON formatting refusals found."))
+      assertEquals(read(project, "resources/refused.conf"), "# only a comment\n")
+    }
+  }
+
+  test("explicit refusal and duplicate overrides remain independent") {
+    withFiles(project,
+      ".hocon-fmt.conf" -> text("fail-on-refusal = true\nfail-on-duplicates = true\n"),
+      "resources/refused.conf" -> text("# only a comment\n")
+    ) { run =>
+      assert(run.eval(project.hoconFormatCheck(failOnRefusal = Some(false))).isRight)
+      assert(failure(run.eval(project.hoconFormatCheck(failOnDuplicates = Some(false))))
+        .contains("HOCON formatting refusals found."))
+      os.write(project.moduleDir / "resources" / "duplicate.conf", "x=1\nx=2\n")
+      assert(failure(run.eval(project.hoconFormat(failOnRefusal = Some(false))))
+        .contains("HOCON duplicate definitions found."))
+      assertEquals(read(project, "resources/duplicate.conf"), "x = 2\n")
+      assert(run.eval(project.hoconFormat(failOnRefusal = Some(false), failOnDuplicates = Some(false))).isRight)
+      assertEquals(read(project, "resources/refused.conf"), "# only a comment\n")
+    }
+  }
+
   test("repository style and duplicate warnings match the CLI") {
     withFiles(project,
       ".hocon-fmt.conf" -> text("separator = \":\"\n"),

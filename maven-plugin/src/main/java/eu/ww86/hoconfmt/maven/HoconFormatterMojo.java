@@ -42,6 +42,9 @@ abstract class HoconFormatterMojo extends AbstractMojo {
   @Parameter(property = "hocon-fmt.fail-on-duplicates", alias = "fail-on-duplicates")
   private String failOnDuplicates;
 
+  @Parameter(property = "hocon-fmt.fail-on-refusal", alias = "fail-on-refusal")
+  private String failOnRefusal;
+
   /** A matching file, the path it is reported under, and what the formatter makes of it. */
   record Examined(Path file, String relativePath, Outcome outcome) {}
 
@@ -53,11 +56,13 @@ abstract class HoconFormatterMojo extends AbstractMojo {
     }
 
     boolean duplicateFailure = false;
+    boolean refusalFailure = false;
     var overrides = new java.util.HashMap<String, String>();
     if (separator != null) overrides.put("separator", separator);
     if (doubleIndent != null) overrides.put("double-indent", doubleIndent);
     if (simplifyNestedObjects != null) overrides.put("simplify-nested-objects", simplifyNestedObjects);
     if (failOnDuplicates != null) overrides.put("fail-on-duplicates", failOnDuplicates);
+    if (failOnRefusal != null) overrides.put("fail-on-refusal", failOnRefusal);
     var examined = new ArrayList<Examined>();
     for (String relativePath : matchingFiles()) {
       Path file = baseDirectory.toPath().resolve(relativePath);
@@ -68,6 +73,7 @@ abstract class HoconFormatterMojo extends AbstractMojo {
         inspection.report().findings().forEach(finding -> getLog().warn(relativePath + ": " + finding.warning()));
         inspection.report().failure().ifPresent(reason -> getLog().warn(relativePath + ": duplicate report could not run: " + reason));
         duplicateFailure |= inspection.failsOnDuplicates();
+        refusalFailure |= inspection.failsOnRefusal();
       } catch (IOException | IllegalArgumentException e) {
         throw new MojoExecutionException("Cannot process " + relativePath + ": " + e.getMessage(), e);
       }
@@ -78,6 +84,7 @@ abstract class HoconFormatterMojo extends AbstractMojo {
     }
     actOn(examined);
     if (duplicateFailure) throw new MojoFailureException("HOCON duplicate definitions found.");
+    if (refusalFailure) throw new MojoFailureException("HOCON formatting refusals found.");
   }
 
   /** Receives every matching file; the ones the formatter refused are already reported. */

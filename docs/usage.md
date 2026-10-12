@@ -6,8 +6,9 @@ Every channel runs the same formatter and follows the same rules:
 - **check** writes nothing, names every unformatted file, and then fails.
 - A file the formatter **refuses** (not HOCON, not UTF-8, or hit by a
   [known sconfig defect](limitations.md)) is reported with the reason and left byte-for-byte
-  untouched. A refusal never fails the run: a `.conf` file that is not HOCON at all, such as an
-  nginx config, is common enough that failing on it would make the tool unusable.
+  untouched. By default a refusal does not fail a file run, preserving compatibility with mixed
+  directories containing configs for other tools. `--fail-on-refusal` opts into exit 1 for any
+  selected refused file, in both format and check mode.
 - A file that cannot be **read** — missing, or refused by the filesystem — is a different thing
   from a refusal of its content: the run reports `cannot read <path>: <reason>` on stderr and
   exits 2, as a usage error does, so a typo in a CI script's path cannot pass silently. The
@@ -26,8 +27,8 @@ All JVM channels need Java 17 or newer, as Scala 3.8 does.
 ## Command line
 
 ```
-hocon-fmt [--check] [--separator =|:] [--config <file>] [--fail-on-duplicates] <path>...
-hocon-fmt --stdin [--stdin-filename <name>] [--fail-on-duplicates]
+hocon-fmt [--check] [--separator =|:] [--config <file>] [--fail-on-duplicates] [--fail-on-refusal] <path>...
+hocon-fmt --stdin [--stdin-filename <name>] [--fail-on-duplicates] [--fail-on-refusal]
 hocon-fmt --version
 ```
 
@@ -42,9 +43,35 @@ pipeline; `hocon-fmt --check src/` is enough.
 
 | exit code | meaning |
 |---|---|
-| 0 | done; with `--check`, every file is formatted or refused, and no finding failed the run |
-| 1 | `--check` found an unformatted file, stdin was refused, or a finding met `--fail-on-duplicates` |
+| 0 | no failing condition under the chosen policy |
+| 1 | `--check` found a change, stdin was refused, a refusal met `fail-on-refusal`, or a finding met `fail-on-duplicates` |
 | 2 | the arguments could not be parsed, a file could not be read or written, a config file could not be read or trusted, or stdin could not be read |
+
+Exit conditions compose with OR: an I/O, usage or configuration error takes precedence as 2;
+otherwise any enabled failing condition gives 1; otherwise the run gives 0. Clearing one failure
+policy leaves the other active. A green `--check` means **no failing condition under the chosen
+policy**, and does not promise that every file was formatted. The CLI summary counts skipped
+(refused) files visibly, including when they do not fail the run. The summary line is omitted when no files are refused.
+
+### Fail on refusal
+
+`fail-on-refusal` defaults to `false`. Enable it with `--fail-on-refusal`, or in `.hocon-fmt.conf`:
+
+```hocon
+fail-on-refusal = true
+```
+
+`--no-fail-on-refusal` explicitly overrides a repository's `true`. Refused files are never
+written under either policy; other selected files are still processed. This policy concerns
+selected files, so ignored files and directory entries outside the file filters do not count.
+Strict policy includes name-based refusals such as `OtherFormat`: explicitly selected `.json`
+and `.properties` files fail even when their content would parse as HOCON, and remain untouched.
+Selected `.conf`, `.hocon` or other filenames that cannot be parsed or formatted also fail.
+Without the option these refusals retain exit 0 unless another failing condition applies.
+Default directory filters still select only `.conf` and `.hocon`; other extensions count only
+when selected explicitly or through custom plugin sources.
+
+Stdin refusals always exit 1, even with `--no-fail-on-refusal`.
 
 `--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
 summary. Already formatted input is returned unchanged. A refusal writes nothing to stdout,
@@ -91,8 +118,8 @@ hocon-fmt --separator : application.conf   # one file, the : spelling
 git ls-files '*.conf' | xargs hocon-fmt --check   # the repository, each file styled by its .hocon-fmt.conf
 ```
 
-The build-tool plugins below format with the default style; plugin settings and config-file
-lookup there come after their migration to the java API.
+The build-tool plugins use per-file repository options with explicit plugin overrides; see
+[Repository options in build tools](#repository-options-in-build-tools).
 
 `--version` prints the build version shared by all CLI runtimes and needs no input.
 
@@ -107,9 +134,9 @@ config/application.conf:12: akka.logging-filter defined again at line 21; the ea
 
 Findings are warnings. They are printed in `format`, `--check` and `--stdin` runs (on stderr in
 stdin mode, which keeps stdout the formatted text alone) and change nothing that is written. By
-default they change no exit code either: a refusal still fails nothing, and a file that needs
-formatting still fails `--check`. `--fail-on-duplicates` makes any finding fail the run with exit
-1, and `--no-fail-on-duplicates` clears it again; a repository can ask for the failure in its
+default they change no exit code either. A file that needs formatting still fails `--check`;
+a refusal follows the independently selected refusal policy. `--fail-on-duplicates` makes any
+finding fail the run with exit 1, and `--no-fail-on-duplicates` clears it again; a repository can ask for the failure in its
 `.hocon-fmt.conf`:
 
 ```hocon
@@ -284,6 +311,7 @@ var inspection = HoconFmt.inspectFile(path, Map.of("fail-on-duplicates", "true")
 inspection.report().findings().forEach(finding -> logger.warn(finding.warning()));
 inspection.report().failure().ifPresent(logger::warn);
 if (inspection.failsOnDuplicates()) throw new IllegalStateException("Dead duplicate definitions");
+if (inspection.failsOnRefusal()) throw new IllegalStateException("Formatting refused");
 ```
 
 ## pre-commit
@@ -296,6 +324,7 @@ repos:
     rev: v0.1.0
     hooks:
       - id: hocon-fmt            # rewrites files; the commit stops so you can stage them
+        args: [--fail-on-refusal] # optional: also fail when a selected file is refused
       # - id: hocon-fmt-check    # or only report
 ```
 
@@ -304,6 +333,10 @@ install ruff, so they need nothing but the Python pre-commit already runs on. Wh
 native build, such as Windows, use `hocon-fmt-node` and `hocon-fmt-check-node`, which
 run the Node build. On 20 files a hook run takes about 155 ms native against 290 ms on Node, and
 its environment is 29 MB against 233 MB, mostly the Node that pre-commit downloads.
+
+All four hooks accept `--fail-on-refusal` and `--no-fail-on-refusal` in `args`, and also read the
+repository's `fail-on-refusal` key. The default is false; strict checks still leave refused bytes
+untouched.
 
 ## Repository options in build tools
 
@@ -320,20 +353,24 @@ then the formatter default.
 | `double-indent` | `hoconDoubleIndent` | `doubleIndent` | `double-indent` / `hocon-fmt.double-indent` |
 | `simplify-nested-objects` | `hoconSimplifyNestedObjects` | `simplifyNestedObjects` | `simplify-nested-objects` / `hocon-fmt.simplify-nested-objects` |
 | `fail-on-duplicates` | `hoconFailOnDuplicates` | `failOnDuplicates` | `fail-on-duplicates` / `hocon-fmt.fail-on-duplicates` |
+| `fail-on-refusal` | `hoconFailOnRefusal` | `failOnRefusal` | `fail-on-refusal` / `hocon-fmt.fail-on-refusal` |
 
 Mill accepts these names as arguments to both commands: `--separator :`,
-`--double-indent true`, `--simplify-nested-objects false`, `--fail-on-duplicates true`.
+`--double-indent true`, `--simplify-nested-objects false`, `--fail-on-duplicates true`,
+`--fail-on-refusal true` (or `false` to clear it).
 Boolean arguments take a value, so `false` explicitly overrides a repository's `true`.
 
 All plugins warn about dead duplicate definitions using the original text, before formatting
 removes them. Both format and check fail on findings only when `fail-on-duplicates` is true;
 format still writes the same output, as the CLI does. A report failure is a warning rather than
-an empty successful report. Formatting refusals retain their usual policy.
+an empty successful report. Both tasks also fail on refusals when `fail-on-refusal` is true,
+and leave those files untouched. Both policies default to false and are independent.
 
 ```scala
 // sbt: each aggregated project keeps its own settings
 hoconSeparator := Some(":")
 hoconFailOnDuplicates := Some(true)
+hoconFailOnRefusal := Some(true)
 ```
 
 ```kotlin
@@ -341,6 +378,7 @@ hoconFailOnDuplicates := Some(true)
 hoconFormatter {
     separator.set(":")
     failOnDuplicates.set(true)
+    failOnRefusal.set(true)
 }
 ```
 
@@ -350,12 +388,13 @@ hoconFormatter {
   <separator>:</separator>
   <double-indent>true</double-indent>
   <fail-on-duplicates>true</fail-on-duplicates>
+  <fail-on-refusal>true</fail-on-refusal>
 </configuration>
 ```
 
 ```sh
-./mill app.hoconFormat --separator : --fail-on-duplicates true
-mvn hocon-fmt:check -Dhocon-fmt.fail-on-duplicates=true
+./mill app.hoconFormat --separator : --fail-on-duplicates true --fail-on-refusal true
+mvn hocon-fmt:check -Dhocon-fmt.fail-on-duplicates=true -Dhocon-fmt.fail-on-refusal=true
 ```
 
 Gradle tracks ancestor config files as check inputs, including absent files, up to the directory

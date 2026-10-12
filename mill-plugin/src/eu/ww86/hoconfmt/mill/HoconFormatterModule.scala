@@ -6,9 +6,9 @@ import mill.javalib.JavaModule
 import eu.ww86.hoconfmt.{ConfigLookup, DuplicateReport, Finding, FormatOptions, Refusal, Separator, StyleOverrides, Verdict}
 
 /** Formats the HOCON files of a module: `hoconFormat` rewrites them, `hoconFormatCheck` fails when
-  * one is not formatted. A file the formatter refuses is reported and left alone, without failing
-  * either command. Mix it into each module whose files it should cover, test modules included, and
-  * run `__.hoconFormat` to cover the build.
+  * one is not formatted. A file the formatter refuses is reported and left alone, failing
+  * either command only when fail-on-refusal is enabled. Mix it into each module whose files it
+  * should cover, test modules included, and run `__.hoconFormat` to cover the build.
   */
 trait HoconFormatterModule extends JavaModule {
   import HoconFormatterModule.*
@@ -22,44 +22,48 @@ trait HoconFormatterModule extends JavaModule {
   def hoconFormat(separator: Option[String] = None,
       @mainargs.arg(name = "double-indent") doubleIndent: Option[Boolean] = None,
       @mainargs.arg(name = "simplify-nested-objects") simplifyNestedObjects: Option[Boolean] = None,
-      @mainargs.arg(name = "fail-on-duplicates") failOnDuplicates: Option[Boolean] = None): Command[Unit] = Task.Command {
+      @mainargs.arg(name = "fail-on-duplicates") failOnDuplicates: Option[Boolean] = None,
+      @mainargs.arg(name = "fail-on-refusal") failOnRefusal: Option[Boolean] = None): Command[Unit] = Task.Command {
     val overrides = StyleOverrides(separator.map {
       case "=" => Separator.Equals
       case ":" => Separator.Colon
       case other => throw new IllegalArgumentException(s"separator: expected = or :, got $other")
-    }, doubleIndent, simplifyNestedObjects, failOnDuplicates)
+    }, doubleIndent, simplifyNestedObjects, failOnDuplicates, failOnRefusal)
     val examined = examine(hoconFormatSources(), overrides)
     examined.foreach(e => e.warnings.foreach(warning => Task.log.warn(s"${shown(e.file)}: $warning")))
     examined.foreach {
-      case Examined(file, Verdict.NeedsFormatting(formatted), _, _) =>
+      case Examined(file, Verdict.NeedsFormatting(formatted), _, _, _) =>
         os.write.over(file, formatted)
         Task.log.info(s"Formatted ${shown(file)}")
-      case Examined(file, Verdict.Refused(refusal), _, _) => Task.log.warn(leftAlone(file, refusal))
-      case Examined(_, Verdict.AlreadyFormatted, _, _)    => ()
+      case Examined(file, Verdict.Refused(refusal), _, _, _) => Task.log.warn(leftAlone(file, refusal))
+      case Examined(_, Verdict.AlreadyFormatted, _, _, _)   => ()
     }
     Task.log.info(summary(examined, needingFormatAre = "formatted"))
     if (examined.exists(_.failsOnDuplicates)) { Task.fail("HOCON duplicate definitions found.") }
+    if (examined.exists(_.failsOnRefusal)) { Task.fail("HOCON formatting refusals found.") }
   }
 
   /** Fails if any HOCON file is not formatted, naming each one; writes nothing. */
   def hoconFormatCheck(separator: Option[String] = None,
       @mainargs.arg(name = "double-indent") doubleIndent: Option[Boolean] = None,
       @mainargs.arg(name = "simplify-nested-objects") simplifyNestedObjects: Option[Boolean] = None,
-      @mainargs.arg(name = "fail-on-duplicates") failOnDuplicates: Option[Boolean] = None): Command[Unit] = Task.Command {
+      @mainargs.arg(name = "fail-on-duplicates") failOnDuplicates: Option[Boolean] = None,
+      @mainargs.arg(name = "fail-on-refusal") failOnRefusal: Option[Boolean] = None): Command[Unit] = Task.Command {
     val overrides = StyleOverrides(separator.map {
       case "=" => Separator.Equals
       case ":" => Separator.Colon
       case other => throw new IllegalArgumentException(s"separator: expected = or :, got $other")
-    }, doubleIndent, simplifyNestedObjects, failOnDuplicates)
+    }, doubleIndent, simplifyNestedObjects, failOnDuplicates, failOnRefusal)
     val examined = examine(hoconFormatSources(), overrides)
     examined.foreach(e => e.warnings.foreach(warning => Task.log.warn(s"${shown(e.file)}: $warning")))
     examined.foreach {
-      case Examined(file, Verdict.NeedsFormatting(_), _, _) => Task.log.warn(s"Not formatted: ${shown(file)}")
-      case Examined(file, Verdict.Refused(refusal), _, _)   => Task.log.warn(leftAlone(file, refusal))
-      case Examined(_, Verdict.AlreadyFormatted, _, _)      => ()
+      case Examined(file, Verdict.NeedsFormatting(_), _, _, _) => Task.log.warn(s"Not formatted: ${shown(file)}")
+      case Examined(file, Verdict.Refused(refusal), _, _, _)   => Task.log.warn(leftAlone(file, refusal))
+      case Examined(_, Verdict.AlreadyFormatted, _, _, _)     => ()
     }
     Task.log.info(summary(examined, needingFormatAre = "not formatted"))
     if (examined.exists(_.failsOnDuplicates)) { Task.fail("HOCON duplicate definitions found.") }
+    if (examined.exists(_.failsOnRefusal)) { Task.fail("HOCON formatting refusals found.") }
     val unformatted = examined.count(_.needsFormatting)
     if (unformatted > 0) { Task.fail(s"$unformatted HOCON files are not formatted. Run hoconFormat to fix them.") }
   }
@@ -67,7 +71,8 @@ trait HoconFormatterModule extends JavaModule {
 
 object HoconFormatterModule {
 
-  final private case class Examined(file: os.Path, verdict: Verdict, warnings: Seq[String], failsOnDuplicates: Boolean) {
+  final private case class Examined(file: os.Path, verdict: Verdict, warnings: Seq[String], failsOnDuplicates: Boolean,
+      failsOnRefusal: Boolean) {
     def needsFormatting: Boolean = verdict.isInstanceOf[Verdict.NeedsFormatting]
   }
 
@@ -101,7 +106,11 @@ object HoconFormatterModule {
         case Finding.KeyDefinedAgain(path, earlier, later) =>
           s"${path.rendered} defined again on line $later; definition on line $earlier never takes effect"
       })
-      Examined(file, verdict, warnings, options.failOnDuplicates && report.exists(_.nonEmpty))
+      val refused = verdict match {
+        case Verdict.Refused(_) => true
+        case _                  => false
+      }
+      Examined(file, verdict, warnings, options.failOnDuplicates && report.exists(_.nonEmpty), options.failOnRefusal && refused)
     }
 
   private def hoconFiles(sources: Seq[PathRef]): Seq[os.Path] =

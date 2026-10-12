@@ -46,6 +46,9 @@ public abstract class HoconFormatterTask extends DefaultTask {
     @Input @Optional
     public abstract Property<Boolean> getFailOnDuplicates();
 
+    @Input @Optional
+    public abstract Property<Boolean> getFailOnRefusal();
+
     /** Config files are inputs too: adding, removing or editing one invalidates a check. The walk
      * stops where the lookup stops — after the first directory holding .git — so a config the
      * formatter would never read cannot invalidate the check either.
@@ -83,6 +86,7 @@ public abstract class HoconFormatterTask extends DefaultTask {
                     parameters.getDoubleIndent().set(getDoubleIndent());
                     parameters.getSimplifyNestedObjects().set(getSimplifyNestedObjects());
                     parameters.getFailOnDuplicates().set(getFailOnDuplicates());
+                    parameters.getFailOnRefusal().set(getFailOnRefusal());
                 });
         getWorkerExecutor().await();
     }

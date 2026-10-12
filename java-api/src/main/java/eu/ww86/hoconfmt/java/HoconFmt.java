@@ -188,7 +188,8 @@ public final class HoconFmt {
             overrides.containsKey("separator") ? explicit.separator() : base.separator(),
             overrides.containsKey("double-indent") ? explicit.doubleIndent() : base.doubleIndent(),
             overrides.containsKey("simplify-nested-objects") ? explicit.simplifyNestedObjects() : base.simplifyNestedObjects(),
-            overrides.containsKey("fail-on-duplicates") ? explicit.failOnDuplicates() : base.failOnDuplicates());
+            overrides.containsKey("fail-on-duplicates") ? explicit.failOnDuplicates() : base.failOnDuplicates(),
+            overrides.containsKey("fail-on-refusal") ? explicit.failOnRefusal() : base.failOnRefusal());
     }
 
     /**

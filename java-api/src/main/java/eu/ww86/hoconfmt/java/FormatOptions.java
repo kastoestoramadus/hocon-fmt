@@ -6,11 +6,24 @@ package eu.ww86.hoconfmt.java;
  * @param doubleIndent whether object contents use double indentation
  * @param simplifyNestedObjects whether single-field objects become dotted paths
  * @param failOnDuplicates whether findings fail the caller's run
+ * @param failOnRefusal whether refusals fail the caller's run
  */
 public record FormatOptions(String separator, boolean doubleIndent,
-        boolean simplifyNestedObjects, boolean failOnDuplicates) {
+        boolean simplifyNestedObjects, boolean failOnDuplicates, boolean failOnRefusal) {
     /** Options used when no config or explicit setting supplies a value. */
-    public static final FormatOptions DEFAULT = new FormatOptions("=", false, true, false);
+    public static final FormatOptions DEFAULT = new FormatOptions("=", false, true, false, false);
+
+    /**
+     * Keeps callers of the four-option constructor on the compatibility refusal policy.
+     * @param separator assignment token, = or :
+     * @param doubleIndent whether object contents use double indentation
+     * @param simplifyNestedObjects whether single-field objects become dotted paths
+     * @param failOnDuplicates whether findings fail the caller's run
+     */
+    public FormatOptions(String separator, boolean doubleIndent,
+            boolean simplifyNestedObjects, boolean failOnDuplicates) {
+        this(separator, doubleIndent, simplifyNestedObjects, failOnDuplicates, false);
+    }
 
     /** Validates the assignment token. */
     public FormatOptions {
@@ -22,11 +35,11 @@ public record FormatOptions(String separator, boolean doubleIndent,
     eu.ww86.hoconfmt.FormatOptions core() {
         return new eu.ww86.hoconfmt.FormatOptions(
             separator.equals(":") ? eu.ww86.hoconfmt.Separator.valueOf("Colon") : eu.ww86.hoconfmt.Separator.valueOf("Equals"),
-            doubleIndent, simplifyNestedObjects, failOnDuplicates);
+            doubleIndent, simplifyNestedObjects, failOnDuplicates, failOnRefusal);
     }
 
     static FormatOptions of(eu.ww86.hoconfmt.FormatOptions options) {
         return new FormatOptions(options.separator().toString().equals("Colon") ? ":" : "=",
-            options.doubleIndent(), options.simplifyNestedObjects(), options.failOnDuplicates());
+            options.doubleIndent(), options.simplifyNestedObjects(), options.failOnDuplicates(), options.failOnRefusal());
     }
 }

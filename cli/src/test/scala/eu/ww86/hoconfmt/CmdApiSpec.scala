@@ -48,6 +48,132 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   val formatted   = "a = 1\n"
   val duplicated  = "x = 1\nx = 2\n"
 
+  test("skipped summary is absent when no files are refused") {
+    List(
+      Nil,
+      List(CmdApi.Outcome(CmdApi.Result.AlreadyFormatted, "a.conf", Nil, false)),
+      List(CmdApi.Outcome(CmdApi.Result.Rewritten, "a.conf", Nil, false))
+    ).foreach { outcomes =>
+      assert(!CmdApi.Run(outcomes).rendered.contains("skipped (refused)"))
+    }
+  }
+
+  tmp.test("strict name-based refusals fail both modes and leave JSON and properties untouched") { dir =>
+    List("app.json", "app.properties").traverse { name =>
+      val source = "a = 1\n"
+      for {
+        file    <- write(dir, name, source)
+        plain   <- rewrite(file)
+        results <- List(false, true).traverse { checkOnly =>
+                     CmdApi.examineAll(List(file -> FormatOptions(failOnRefusal = true)), checkOnly)
+                   }
+        output <- textOf(file)
+      } yield {
+        assertEquals(plain.exitCode, ExitCode.Success)
+        results.foreach { run =>
+          assertEquals(run.exitCode, ExitCode(1))
+          assert(run.outcomes.exists(_.result match {
+            case CmdApi.Result.Unformattable(Refusal.OtherFormat(_)) => true
+            case _                                                   => false
+          }))
+        }
+        assertEquals(output, source)
+      }
+    }.void
+  }
+
+  test("arguments: refusal policy has positive and negative overrides") {
+    List("--fail-on-refusal" -> true, "--no-fail-on-refusal" -> false).foreach { case (flag, value) =>
+      val parsed = CmdApi.command.parse(List(flag, "a.conf"))
+      assertEquals(
+        parsed,
+        Right(
+          CmdApi.Invocation.FileMode(
+            Arguments(
+              List(Path("a.conf")),
+              checkOnly = false,
+              config = None,
+              style = StyleOverrides(failOnRefusal = Some(value))
+            )
+          )
+        )
+      )
+    }
+    assert(CmdApi.command.parse(List("--fail-on-refusal", "--no-fail-on-refusal", "a.conf")).isLeft)
+    assert(CmdApi.command.parse(List("--version", "--fail-on-refusal")).isLeft)
+  }
+
+  tmp.test("refusal failure composes with duplicate and check policies without writing refusals") { dir =>
+    val source = "# trailing comment\n"
+    for {
+      refused   <- write(dir, "refused.conf", source)
+      invalid   <- write(dir, "invalid.conf", Array[Byte](0xff.toByte))
+      changed   <- write(dir, "changed.conf", unformatted)
+      duplicate <- write(dir, "duplicate.conf", duplicated)
+      runs      <- (for {
+                strict     <- List(false, true)
+                duplicates <- List(false, true)
+                checkOnly  <- List(false, true)
+              } yield (strict, duplicates, checkOnly)).traverse { case (strict, duplicates, checkOnly) =>
+                val options = FormatOptions(failOnRefusal = strict, failOnDuplicates = duplicates)
+                for {
+                  _           <- write(dir, "changed.conf", unformatted)
+                  _           <- write(dir, "duplicate.conf", duplicated)
+                  refusedOnly <- CmdApi.examineAll(List(refused -> options, invalid -> options), checkOnly)
+                  combined    <-
+                    CmdApi.examineAll(List(refused -> options, changed -> options, duplicate -> options), checkOnly)
+                  unreadable <-
+                    CmdApi.examineAll(List(refused -> options, (dir / "missing.conf") -> options), checkOnly)
+                } yield {
+                  assertEquals(refusedOnly.exitCode, if (strict) ExitCode(1) else ExitCode.Success)
+                  assert(refusedOnly.rendered.contains("2 skipped (refused)"), refusedOnly.rendered)
+                  assertEquals(
+                    combined.exitCode,
+                    if (strict || duplicates || checkOnly) ExitCode(1) else ExitCode.Success
+                  )
+                  assertEquals(unreadable.exitCode, ExitCode(2))
+                }
+              }
+      original      <- textOf(refused)
+      originalBytes <- bytesOf(invalid)
+    } yield {
+      assertEquals(runs.size, 8)
+      assertEquals(original, source)
+      assertEquals(originalBytes, List(0xff.toByte))
+    }
+  }
+
+  tmp.test("repository refusal policy can be cleared without clearing duplicate failures") { dir =>
+    for {
+      _             <- write(dir, ".hocon-fmt.conf", "fail-on-refusal = true\nfail-on-duplicates = true\n")
+      refused       <- write(dir, "refused.conf", "# only a comment\n")
+      duplicate     <- write(dir, "duplicate.conf", "x = 2\n# discarded\nx = 3\n")
+      strict        <- checkWith(StyleOverrides.none, refused)
+      off           <- checkWith(StyleOverrides(failOnRefusal = Some(false)), refused)
+      duplicateOnly <- CmdApi.examineAll(
+                         Arguments(
+                           List(duplicate),
+                           checkOnly = false,
+                           config = None,
+                           style = StyleOverrides(failOnRefusal = Some(false))
+                         )
+                       )
+      refusalOnly <- checkWith(StyleOverrides(failOnDuplicates = Some(false)), refused)
+    } yield {
+      assertEquals(strict.exitCode, ExitCode(1))
+      assertEquals(off.exitCode, ExitCode.Success)
+      assertEquals(duplicateOnly.map(_.exitCode), Right(ExitCode(1)))
+      assertEquals(refusalOnly.exitCode, ExitCode(1))
+    }
+  }
+
+  test("stdin refusals fail even when refusal policy is explicitly cleared") {
+    assertEquals(
+      CmdApi.formatStdin("[[".getBytes(UTF_8), "editor.conf", StyleOverrides(failOnRefusal = Some(false))).exitCode,
+      ExitCode(1)
+    )
+  }
+
   tmp.test("plugin parity fixture uses repository style and the original duplicate report") { dir =>
     for {
       _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")

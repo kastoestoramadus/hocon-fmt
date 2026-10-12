@@ -9,6 +9,40 @@ import org.junit.jupiter.api.io.TempDir;
 class PluginOptionsTest {
     @TempDir Path dir;
 
+    @Test void strictOtherFormatsFailBothModesWithoutWriting() throws Exception {
+        for (String name : java.util.List.of("app.json", "app.properties")) {
+            Path file = Files.writeString(dir.resolve(name), "a = 1\n");
+            assertFalse(HoconFmt.inspectFile(file, Map.of(), true).failsOnRefusal());
+            for (boolean write : new boolean[]{false, true}) {
+                Inspection result = HoconFmt.inspectFile(file, Map.of("fail-on-refusal", "true"), write);
+                assertTrue(result.failsOnRefusal());
+                assertEquals(RefusalKind.OtherFormat, ((Verdict.Refused) result.verdict()).kind());
+                assertEquals("a = 1\n", Files.readString(file));
+            }
+        }
+    }
+
+    @Test void refusalPolicyIsMirroredAndOverridesRemainIndependent() throws Exception {
+        assertFalse(FormatOptions.DEFAULT.failOnRefusal());
+        Path file = Files.writeString(dir.resolve("app.conf"), "# only a comment\n");
+        Files.writeString(dir.resolve(".hocon-fmt.conf"), "fail-on-refusal = true\nfail-on-duplicates = true\n");
+        Inspection strict = HoconFmt.inspectFile(file, Map.of(), true);
+        assertTrue(strict.options().failOnRefusal());
+        assertTrue(strict.failsOnRefusal());
+        assertFalse(strict.failsOnDuplicates());
+        Inspection off = HoconFmt.inspectFile(file, Map.of("fail-on-refusal", "false"), true);
+        assertFalse(off.failsOnRefusal());
+        assertTrue(off.options().failOnDuplicates());
+        assertTrue(HoconFmt.optionsFor(file, Map.of("fail-on-duplicates", "false")).failOnRefusal());
+        assertEquals("# only a comment\n", Files.readString(file));
+        assertThrows(IllegalArgumentException.class,
+            () -> HoconFmt.optionsFor(file, Map.of("fail-on-refusal", "maybe")));
+        FormatOptions enabled = new FormatOptions("=", false, true, false, true);
+        assertEquals(enabled, HoconFmt.parseOptions("fail-on-refusal = true", "options.conf"));
+        assertInstanceOf(Verdict.Refused.class, HoconFmt.check("# only a comment\n", "app.conf", enabled));
+        assertInstanceOf(Verdict.AlreadyFormatted.class, HoconFmt.check("a = 1\n", "app.conf", enabled));
+    }
+
     @Test void repositoryOptionsAndOriginalDuplicates() throws Exception {
         Files.writeString(dir.resolve(".hocon-fmt.conf"), "separator = \":\"\nfail-on-duplicates = true\n");
         Path file = Files.writeString(dir.resolve("app.conf"), "a=1\na=2\nb {c=3}\n");

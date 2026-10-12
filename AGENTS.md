@@ -59,7 +59,8 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   run on RE2 (Scala Native) and ES2015 JavaScript (Scala.js): no lookaround, no backreferences, no
   multiline `^`. The suites on every platform enforce it.
 - **Refuse rather than corrupt.** Losing a comment or an include counts, not only meaning. Every
-  integration acts on `Verdict`; a refused file is never written and never fails a run. The
+  integration acts on `Verdict`; a refused file is never written and, by default, never fails a run.
+  Opt-in `fail-on-refusal` changes the run policy, never the refusal or its bytes. The
   output check parses the *masked* text: sconfig cannot parse an `include` on Scala.js, so do not
   simplify it to parse the finished text.
 - **`core` depends on sconfig only.** The plugins load it into sbt, Gradle and Maven; effects and

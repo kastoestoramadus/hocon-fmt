@@ -11,4 +11,9 @@ public record Inspection(Verdict verdict, DuplicateReport report, FormatOptions 
     public boolean failsOnDuplicates() {
         return options.failOnDuplicates() && !report.findings().isEmpty();
     }
+
+    /** @return whether the effective policy makes this refusal fail the run */
+    public boolean failsOnRefusal() {
+        return options.failOnRefusal() && verdict instanceof Verdict.Refused;
+    }
 }
