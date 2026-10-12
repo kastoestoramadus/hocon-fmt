@@ -48,6 +48,40 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   val formatted   = "a = 1\n"
   val duplicated  = "x = 1\nx = 2\n"
 
+  test("skipped summary is absent when no files are refused") {
+    List(
+      Nil,
+      List(CmdApi.Outcome(CmdApi.Result.AlreadyFormatted, "a.conf", Nil, false)),
+      List(CmdApi.Outcome(CmdApi.Result.Rewritten, "a.conf", Nil, false))
+    ).foreach { outcomes =>
+      assert(!CmdApi.Run(outcomes).rendered.contains("skipped (refused)"))
+    }
+  }
+
+  tmp.test("strict name-based refusals fail both modes and leave JSON and properties untouched") { dir =>
+    List("app.json", "app.properties").traverse { name =>
+      val source = "a = 1\n"
+      for {
+        file    <- write(dir, name, source)
+        plain   <- rewrite(file)
+        results <- List(false, true).traverse { checkOnly =>
+                     CmdApi.examineAll(List(file -> FormatOptions(failOnRefusal = true)), checkOnly)
+                   }
+        output <- textOf(file)
+      } yield {
+        assertEquals(plain.exitCode, ExitCode.Success)
+        results.foreach { run =>
+          assertEquals(run.exitCode, ExitCode(1))
+          assert(run.outcomes.exists(_.result match {
+            case CmdApi.Result.Unformattable(Refusal.OtherFormat(_)) => true
+            case _                                                   => false
+          }))
+        }
+        assertEquals(output, source)
+      }
+    }.void
+  }
+
   test("arguments: refusal policy has positive and negative overrides") {
     List("--fail-on-refusal" -> true, "--no-fail-on-refusal" -> false).foreach { case (flag, value) =>
       val parsed = CmdApi.command.parse(List(flag, "a.conf"))
