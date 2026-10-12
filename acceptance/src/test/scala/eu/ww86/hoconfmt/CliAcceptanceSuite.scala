@@ -61,6 +61,67 @@ class CliAcceptanceSuite extends munit.FunSuite {
   }
 
   for ((runtime, cli) <- runtimes) {
+    test(s"[$runtime] JSON report destinations preserve formatting and strict exit codes") {
+      val version = os.proc(cli, "--version").call().out.text().stripPrefix("hocon-fmt ").trim
+      List("-", "report.json").foreach { target =>
+        val dir = os.temp.dir()
+        os.write(dir / "app.conf", "a=1\n")
+        os.write(dir / "data.json", "a = 1\n")
+        val result = os
+          .proc(cli, "--report", target, "--fail-on-refusal", "app.conf", "data.json")
+          .call(cwd = dir, stderr = os.Pipe, check = false)
+        assertEquals(result.exitCode, 1)
+        val expected = os
+          .read(os.pwd / "cli/src/test/resources/reports/process.json")
+          .replace("@VERSION@", version)
+          .replace("@PATH@", (dir / "data.json").toString)
+        assertEquals(if (target == "-") result.out.text() else os.read(dir / "report.json"), expected)
+        assertEquals(os.read(dir / "app.conf"), "a = 1\n")
+        assertEquals(os.read(dir / "data.json"), "a = 1\n")
+      }
+    }
+
+    test(s"[$runtime] JSON configuration failures retain selected counts and existing bytes") {
+      val dir = os.temp.dir()
+      os.write(dir / "app.conf", "a=1\n")
+      os.write(dir / "bad.cfg", "typo = true\n")
+      val result = os
+        .proc(cli, "--report", "-", "--config", "bad.cfg", "app.conf", "app.conf")
+        .call(cwd = dir, stderr = os.Pipe, check = false)
+      assertEquals(result.exitCode, 2)
+      assert(result.out.text().contains("\"checked\":1,\"changed\":0,\"refused\":[]"))
+      assert(
+        result.out.text().contains("\"failed\":[{\"path\":\"bad.cfg\",\"message\":\"bad.cfg: unknown option: typo\"}]")
+      )
+      assertEquals(os.read(dir / "app.conf"), "a=1\n")
+    }
+
+    test(s"[$runtime] report output failures preserve exits and cannot overwrite refused input") {
+      val dir = os.temp.dir()
+      os.write(dir / "data.json", "a = 1\n")
+      val blocked = os
+        .proc(cli, "--report", "data.json", "--fail-on-refusal", "data.json")
+        .call(cwd = dir, stderr = os.Pipe, check = false)
+      assertEquals(blocked.exitCode, 1)
+      assertEquals(os.read(dir / "data.json"), "a = 1\n")
+      val failed = os
+        .proc(cli, "--report", dir.toString, "data.json")
+        .call(cwd = dir, stderr = os.Pipe, check = false)
+      assertEquals(failed.exitCode, 0)
+      assert(failed.err.text().contains("cannot write report"))
+    }
+
+    test(s"[$runtime] stdin supports a report file while retaining formatted stdout") {
+      val dir    = os.temp.dir()
+      val report = dir / "report.json"
+      val result = os
+        .proc(cli, "--stdin", "--stdin-filename", "editor.conf", "--report", report.toString)
+        .call(stdin = "a=1\n", stderr = os.Pipe, check = false)
+      assertEquals(result.exitCode, 0)
+      assertEquals(result.out.text(), "a = 1\n")
+      assert(os.read(report).contains("\"checked\":1,\"changed\":1,\"refused\":[],\"failed\":[]"))
+    }
+
     for (locale <- List("C", "C.UTF-8")) {
       test(s"[$runtime] --stdin formats and writes UTF-8 under LC_ALL=$locale") {
         val r = redirected(cli, locale, unformatted.getBytes(UTF_8), "--stdin")

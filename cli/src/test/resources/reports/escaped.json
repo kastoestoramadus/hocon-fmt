@@ -1,0 +1,1 @@
+{"version":"test","checked":1,"changed":0,"refused":[{"path":"quote\"\\\n.conf","reason":"LostComment: line\n\t✓"}],"failed":[]}

@@ -48,6 +48,47 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   val formatted   = "a = 1\n"
   val duplicated  = "x = 1\nx = 2\n"
 
+  test("report arguments accept a path or stdout and reject stdout with stdin") {
+    List("report.json", "-").foreach { target =>
+      val parsed = CmdApi.command.parse(List("--report", target, "app.conf"))
+      assert(parsed.isRight, parsed)
+    }
+    assert(CmdApi.command.parse(List("--stdin", "--report", "-")).isLeft)
+    assert(CmdApi.command.parse(List("--stdin", "--report", "report.json")).isRight)
+    assert(CmdApi.command.parse(List("--version", "--report", "report.json")).isLeft)
+    assert(CmdApi.command.parse(List("--report", "", "app.conf")).isLeft)
+  }
+
+  tmp.test("reported configuration errors preserve selection count and write nothing") { dir =>
+    for {
+      file     <- write(dir, "app.conf", unformatted)
+      config   <- write(dir, ".hocon-fmt.conf", "typo = true\n")
+      selected <- CmdApi.examineSelected(
+                    Arguments(List(file, file), checkOnly = false, config = None, style = StyleOverrides.none)
+                  )
+      text <- textOf(file)
+    } yield {
+      assertEquals(selected.checked, 1)
+      assert(selected.result.left.exists(_.path == config.toString))
+      assertEquals(text, unformatted)
+    }
+  }
+
+  tmp.test("report paths cannot replace selected input bytes and report I/O errors remain observational") { dir =>
+    for {
+      file    <- write(dir, "input.json", "a = 1\n")
+      run     <- CmdApi.examineAll(List(file -> FormatOptions(failOnRefusal = true)), checkOnly = false)
+      blocked <- CmdApi.writeReport(file, JsonReport.of(run), List(file))
+      denied  <- CmdApi.writeReport(dir, JsonReport.of(run), Nil)
+      text    <- textOf(file)
+    } yield {
+      assert(blocked.isLeft)
+      assert(denied.isLeft)
+      assertEquals(text, "a = 1\n")
+      assertEquals(run.exitCode, ExitCode(1))
+    }
+  }
+
   test("skipped summary is absent when no files are refused") {
     List(
       Nil,
