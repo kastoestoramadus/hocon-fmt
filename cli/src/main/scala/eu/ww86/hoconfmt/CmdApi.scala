@@ -203,7 +203,11 @@ object CmdApi extends IOApp {
                 case Some(ReportTarget.Stdout) => Console[IO].error(run.rendered)
                 case _                         => IO.print(run.rendered)
               }
-              (output *> Console[IO].error(run.errors), run.exitCode, () => JsonReport.of(run))
+              (
+                output *> Console[IO].error(run.errors),
+                run.exitCode,
+                () => JsonReport.of(run).copy(checked = selected.checked)
+              )
           }
           (human *> emitReport(arguments.report, report(), selected.protectedPaths)).as(code)
         }
@@ -313,18 +317,21 @@ object CmdApi extends IOApp {
                   resolved.sequence.left.map(error => (error, failures))
                 }
             }
-          options.flatMap { resolved =>
-            val styled         = resolved.map(values => files.zip(values.map(arguments.style.applyTo)))
-            val checked        = files.size + unreadable.size
-            val protectedPaths = files ++ arguments.config.toList
-            styled match {
-              case Left((error, failures)) =>
-                Selected(checked, Left(error), protectedPaths, failures, unreadable).pure[IO]
-              case Right(values) =>
-                examineAll(values, arguments.checkOnly).map { run =>
-                  Selected(checked, Right(Run(unreadable ++ run.outcomes)), protectedPaths, Nil, unreadable)
+          expanded.unreadable.traverse(entry => Files[IO].isDirectory(entry.path).handleError(_ => false)).flatMap {
+            directories =>
+              val checked = files.size + directories.count(isDirectory => !isDirectory)
+              options.flatMap { resolved =>
+                val styled         = resolved.map(values => files.zip(values.map(arguments.style.applyTo)))
+                val protectedPaths = files ++ arguments.files ++ arguments.config.toList
+                styled match {
+                  case Left((error, failures)) =>
+                    Selected(checked, Left(error), protectedPaths, failures, unreadable).pure[IO]
+                  case Right(values) =>
+                    examineAll(values, arguments.checkOnly).map { run =>
+                      Selected(checked, Right(Run(unreadable ++ run.outcomes)), protectedPaths, Nil, unreadable)
+                    }
                 }
-            }
+              }
           }
         }
       }
