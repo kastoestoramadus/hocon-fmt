@@ -115,14 +115,29 @@ workflow" for workflows on the default branch.
 
 ### Safeguards
 
-A Central publish cannot be undone, so three independent steps stand between a push and a
-published release. A repository ruleset, `Protect release tags`, blocks creating, moving or
-deleting `v*` tags for everyone but admins, so a contributor with write access cannot start a
-release. The `central` job runs in the repository environment `release`, which requires the owner
-as reviewer, so a tag push or a manual run that can read the secrets waits for an explicit
-approval (Settings → Environments → release). Last, the upload only stages a deployment: nothing
-is public until the Publish click in the portal (sbt's `sonaUpload` is `USER_MANAGED`). A manual
-run signs and uploads nothing, but it reads the secrets, so it needs the approval too.
+A Central publish cannot be undone, so three steps stand between a push and a published release,
+and none of them is complete on its own. A repository ruleset, `Protect release tags`, blocks
+creating, moving or deleting `v*` tags for everyone but admins, so a contributor with write access
+cannot push the tag. The `central` job runs in the repository environment `release`, which requires
+the owner as reviewer, so a tag push or a manual run of that job waits for an explicit approval
+(Settings → Environments → release). Last, the upload only stages a deployment: nothing is public
+until the Publish click in the portal (sbt's `sonaUpload` is `USER_MANAGED`). A manual run signs
+and uploads nothing, but it reads the secrets, so it needs the approval too.
+
+What this does not cover yet: the four secrets (`PGP_SECRET`, `PGP_PASSPHRASE`,
+`SONATYPE_USERNAME`, `SONATYPE_PASSWORD`) are still repository secrets, and the environment gates
+only a job that declares it. Anyone with write access to the repository can read repository
+secrets from another workflow on a branch of their own, with no approval. The next step, which
+the owner does in Settings once this change is on `main`, in this order: move the four secrets into
+the `release` environment, then limit its deployment policy to `main` and `v*` tags. Not before
+the merge: until `central` on `main` declares the environment, it would lose access to the secrets.
+
+If a run fails after the upload: a portal deployment is only staged until Publish, so nothing is
+public. A re-run stages a new deployment, so drop the stale one in Publish → Deployments first.
+Never re-run the upload after a Publish click: Central does not accept the same version twice, so a
+defect needs a new patch version. Expect the environment approval to be asked again on a re-run
+(expected, not verified on GitHub). The `central` job times out after 30 minutes, so a hung upload
+does not hold the secrets for the default six hours.
 
 ## Each release
 
@@ -144,8 +159,8 @@ run signs and uploads nothing, but it reads the secrets, so it needs the approva
    passphrase is checked there, because a typo cannot be seen from outside. In wave 1 `signRelease`
    touches the wave-1 artifacts on the machine that runs it and needs `PGP_PASSPHRASE` to sign.
 3. Push a tag `v<version>`. The `version` job runs `scripts/check-release-version.sh <version>`
-   first, needs no secrets and no approval, and stops the run if a place the wave touches
-   disagrees with the tag; only then does the `central` job ask for approval (below). A wave-1 tag signs the sbt artifacts
+   first, needs no secrets and no approval, and stops the `central` job (the wave-2 `native`, `npm` and `web`
+   jobs still run) if a place the wave touches disagrees with the tag; only then does the `central` job ask for approval (below). A wave-1 tag signs the sbt artifacts
    and uploads the sbt deployment to Central, and stops there. A wave-2 tag (`RELEASE_WAVE=2`)
    also links native binaries for Linux (x86_64, aarch64) and macOS (aarch64), smoke-tests them,
    wraps each in a wheel, packs the npm package, builds the web script, and attaches all of it to

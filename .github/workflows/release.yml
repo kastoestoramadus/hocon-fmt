@@ -142,6 +142,8 @@ jobs:
   central:
     needs: version
     environment: release
+    # A hung upload must not hold the secrets for the default six hours.
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
