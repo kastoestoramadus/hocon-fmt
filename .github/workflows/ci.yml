@@ -207,7 +207,10 @@ jobs:
         working-directory: maven-plugin
         run: ./mvnw -B verify
 
+  # On hold until Mill supports Scala 3.9: Mill 1.1.x runs on 3.8 and cannot read the core's 3.9 TASTy,
+  # so the integration tests fail. Still run, so the day Mill moves shows as green, but not blocking.
   mill-plugin:
+    continue-on-error: true
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest

@@ -8,6 +8,9 @@ object UseIt {
   // The hooks pin PyPI and npm versions wave 1 does not publish; the same sentence heads the
   // pre-commit section of docs/usage.md.
   val wave2Note = "The hooks ship in wave 2: they pin PyPI and npm versions published only then."
+  // The same sentence heads the Mill section of docs/usage.md and the Mill row of the README.
+  val millNote =
+    "Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9."
   final case class Integration(id: String, title: String, module: Option[String] = None)
   val integrations = List(
     Integration("native", "CLI native"),
@@ -61,6 +64,7 @@ object UseIt {
               div(
                 pre(code(UseItExamples.commands.getOrElse(id, ""))),
                 if (id == "pre-commit") p(wave2Note) else emptyNode,
+                if (id == "mill") p(millNote) else emptyNode,
                 p(UseItExamples.actions.getOrElse(id, Nil).map(command => code(command + " "))),
 
                 p(

@@ -52,7 +52,7 @@ with the formatter version and a minimal example.
 | sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
 | Gradle | `id("eu.ww86.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
 | Maven | `hocon-fmt-maven-plugin`, goals `format` / `check` (bound to `verify`) |
-| Mill | `eu.ww86::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |
+| Mill | on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9. Planned: `eu.ww86::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |
 
 Configuration for each: [usage](docs/usage.md). A browser build for web pages is on its way:
 see [playground](docs/playground.md).

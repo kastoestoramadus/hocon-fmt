@@ -176,8 +176,9 @@ jobs:
           </server></servers></settings>
           XML
           cd maven-plugin && ./mvnw -B -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
+      # On hold until Mill supports Scala 3.9 (see docs/releasing.md); `false &&` keeps the step and its secrets wiring.
       - name: Upload, Mill
-        if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
+        if: false && startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
         env:
           MILL_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MILL_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}

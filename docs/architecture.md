@@ -323,12 +323,8 @@ Gradle build in `java-api/` tests, and a contract suite in that build loads the 
 the way the sbt plugin does: a `URLClassLoader` over the platform loader, reached reflectively,
 since the two loaders hold distinct classes under equal names and only values cross.
 
-**Mill** needs none of this: from 1.1.4 it runs on Scala 3.8.2, so its plugin is
-a Scala 3 trait that depends on the core and matches on `Verdict` directly. A Mill plugin works on
-the Mill it was compiled against and on newer ones, so it is compiled against 1.1.4 and tested on
-1.1.4 and the newest Mill. The core is built with Scala 3.9.0, whose TASTy (28.9) a Mill on 3.8.x
-(TASTy up to 28.8) refuses to read, so `mill-plugin/` compiles but its integration tests fail until
-Mill ships on Scala 3.9.
+**Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9.** Until then `mill-plugin/` is kept but not released, and its CI job does not block. Designed for
+Mill 1.1.4 and later, it is a Scala 3 trait that depends on the core and matches on `Verdict` directly.
 
 The cats and ZIO writers encode once and verify that decoding the bytes gives the original text
 before creating a staged file or truncating the target. Both write paths use those verified bytes,

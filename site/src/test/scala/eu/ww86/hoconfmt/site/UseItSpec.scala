@@ -104,6 +104,15 @@ class UseItSpec extends munit.FunSuite {
     val _ = root.unmount()
   }
 
+  test("the Mill channel says the plugin is on hold, as the usage document does") {
+    val container = installed("#use-it-mill")
+    val root      = render(container.asInstanceOf[dom.Element], UseIt())
+    assert(container.textContent.asInstanceOf[String].contains(UseIt.millNote))
+    val usage = js.Dynamic.global.require("fs").readFileSync("docs/usage.md", "utf8").asInstanceOf[String]
+    assert(usage.contains(UseIt.millNote))
+    val _ = root.unmount()
+  }
+
   test("displayed install commands are verbatim usage documentation") {
     val fs    = js.Dynamic.global.require("fs")
     val usage = fs.readFileSync("docs/usage.md", "utf8").asInstanceOf[String]

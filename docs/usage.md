@@ -488,6 +488,8 @@ API, and the core comes with it, so naming the core alone would leave the worker
 
 ## Mill
 
+**Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9.**
+
 ```scala
 //| mvnDeps:
 //| - eu.ww86::mill-hocon-fmt::0.1.0
