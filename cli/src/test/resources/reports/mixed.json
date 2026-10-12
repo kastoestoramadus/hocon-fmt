@@ -1,0 +1,1 @@
+{"version":"test","checked":6,"changed":2,"refused":[{"path":"data.json","reason":"OtherFormat: a JSON file, and hocon-fmt formats HOCON only"}],"failed":[{"path":"missing.conf","message":"cannot read"},{"path":"write.conf","message":"cannot write"}]}

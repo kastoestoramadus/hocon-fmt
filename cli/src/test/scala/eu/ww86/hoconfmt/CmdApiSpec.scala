@@ -48,6 +48,140 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   val formatted   = "a = 1\n"
   val duplicated  = "x = 1\nx = 2\n"
 
+  test("report arguments accept a path or stdout and reject stdout with stdin") {
+    List("report.json", "-").foreach { target =>
+      val parsed = CmdApi.command.parse(List("--report", target, "app.conf"))
+      assert(parsed.isRight, parsed)
+    }
+    assert(CmdApi.command.parse(List("--stdin", "--report", "-")).isLeft)
+    assert(CmdApi.command.parse(List("--stdin", "--report", "report.json")).isRight)
+    assert(CmdApi.command.parse(List("--version", "--report", "report.json")).isLeft)
+    assert(CmdApi.command.parse(List("--report", "", "app.conf")).isLeft)
+  }
+
+  tmp.test("reported configuration errors preserve selection count and write nothing") { dir =>
+    for {
+      file     <- write(dir, "app.conf", unformatted)
+      config   <- write(dir, ".hocon-fmt.conf", "typo = true\n")
+      selected <- CmdApi.examineSelected(
+                    Arguments(List(file, file), checkOnly = false, config = None, style = StyleOverrides.none)
+                  )
+      text <- textOf(file)
+    } yield {
+      assertEquals(selected.checked, 1)
+      assert(selected.result.left.exists(_.path == config.toString))
+      assertEquals(text, unformatted)
+    }
+  }
+
+  tmp.test("report paths cannot replace selected input bytes and report I/O errors remain observational") { dir =>
+    for {
+      file    <- write(dir, "input.json", "a = 1\n")
+      run     <- CmdApi.examineAll(List(file -> FormatOptions(failOnRefusal = true)), checkOnly = false)
+      blocked <- CmdApi.writeReport(file, JsonReport.of(run), List(file))
+      denied  <- CmdApi.writeReport(dir, JsonReport.of(run), Nil)
+      text    <- textOf(file)
+    } yield {
+      assert(blocked.isLeft)
+      assert(denied.isLeft)
+      assertEquals(text, "a = 1\n")
+      assertEquals(run.exitCode, ExitCode(1))
+    }
+  }
+
+  tmp.test("a report cannot overwrite a selected input through a hard link") { dir =>
+    for {
+      file    <- write(dir, "input.json", "a = 1\n")
+      link     = dir / "hard.json"
+      _       <- Files[IO].createLink(link, file)
+      run     <- CmdApi.examineAll(List(file -> FormatOptions(failOnRefusal = true)), checkOnly = false)
+      blocked <- CmdApi.writeReport(link, JsonReport.of(run), List(file))
+      text    <- textOf(file)
+    } yield {
+      assert(blocked.isLeft)
+      assertEquals(text, "a = 1\n")
+    }
+  }
+
+  tmp.test("a report cannot overwrite the active configuration through a hard link") { dir =>
+    for {
+      file    <- write(dir, "app.conf", unformatted)
+      config  <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      link     = dir / "report.json"
+      _       <- Files[IO].createLink(link, config)
+      run     <- CmdApi.examineAll(List(file -> FormatOptions()), checkOnly = true)
+      blocked <- CmdApi.writeReport(link, JsonReport.of(run), List(file))
+      text    <- textOf(config)
+    } yield {
+      assert(blocked.isLeft)
+      assertEquals(text, "separator = \":\"\n")
+    }
+  }
+
+  tmp.test("an invalid explicit config still fails when an empty directory selects no files") { dir =>
+    for {
+      config   <- write(dir, "bad.cfg", "typo = true\n")
+      selected <- CmdApi.examineSelected(
+                    Arguments(List(dir), checkOnly = true, config = Some(config), style = StyleOverrides.none)
+                  )
+    } yield {
+      assertEquals(selected.checked, 0)
+      assert(selected.result.isLeft)
+      assertEquals(selected.configFailures.map(_.path), List(config.toString))
+    }
+  }
+
+  tmp.test("an unreadable directory is a failure without adding a selected file") { dir =>
+    val blocked = dir / "blocked"
+    for {
+      _           <- Files[IO].createDirectories(blocked)
+      permissions <- Files[IO].getPosixPermissions(blocked)
+      selected    <- (Files[IO].setPosixPermissions(
+                    blocked,
+                    permissions
+                      .remove(PosixPermission.OwnerRead)
+                      .remove(PosixPermission.GroupRead)
+                      .remove(PosixPermission.OthersRead)
+                  ) *>
+                    CmdApi.examineSelected(
+                      Arguments(List(blocked), checkOnly = true, config = None, style = StyleOverrides.none)
+                    )).guarantee(Files[IO].setPosixPermissions(blocked, permissions))
+    } yield {
+      assertEquals(selected.checked, 0)
+      assertEquals(selected.result.map(run => JsonReport.of(run).copy(checked = selected.checked).checked), Right(0))
+    }
+  }
+
+  tmp.test("a report cannot create a missing selected input") { dir =>
+    val missing = dir / "missing.conf"
+    for {
+      selected <-
+        CmdApi.examineSelected(Arguments(List(missing), checkOnly = false, config = None, style = StyleOverrides.none))
+      run       = selected.result.fold(error => fail(error.message), identity)
+      delivery <- CmdApi.writeReport(missing, JsonReport.of(run), selected.protectedPaths)
+      exists   <- Files[IO].exists(missing)
+    } yield {
+      assert(delivery.isLeft)
+      assertEquals(exists, false)
+      assertEquals(run.exitCode, ExitCode(2))
+    }
+  }
+
+  tmp.test("a report cannot create a missing selected input through a dot alias") { dir =>
+    val missing = dir / "missing.conf"
+    val offered = dir / "." / "missing.conf"
+    for {
+      selected <-
+        CmdApi.examineSelected(Arguments(List(offered), checkOnly = false, config = None, style = StyleOverrides.none))
+      run       = selected.result.fold(error => fail(error.message), identity)
+      delivery <- CmdApi.writeReport(missing, JsonReport.of(run), selected.protectedPaths)
+      exists   <- Files[IO].exists(missing)
+    } yield {
+      assert(delivery.isLeft)
+      assertEquals(exists, false)
+    }
+  }
+
   test("skipped summary is absent when no files are refused") {
     List(
       Nil,

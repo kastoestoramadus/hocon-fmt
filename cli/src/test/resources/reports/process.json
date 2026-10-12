@@ -1,0 +1,1 @@
+{"version":"@VERSION@","checked":2,"changed":1,"refused":[{"path":"@PATH@","reason":"OtherFormat: a JSON file, and hocon-fmt formats HOCON only"}],"failed":[]}

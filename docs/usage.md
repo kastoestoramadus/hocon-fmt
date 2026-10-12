@@ -84,6 +84,44 @@ hocon-fmt --stdin --stdin-filename application.conf < input.conf > output.conf
 hocon-fmt --version
 ```
 
+### JSON run reports
+
+`--report <path>` writes a UTF-8 JSON report to that path. `--report -` writes only JSON to
+stdout and sends the usual human report to stderr. Reports use exactly this schema, with
+all five fields present even when the counts and arrays are empty:
+
+```json
+{"version":"0.1.0","checked":2,"changed":1,"refused":[{"path":"data.json","reason":"OtherFormat: a JSON file, and hocon-fmt formats HOCON only"}],"failed":[]}
+```
+
+- `version` is the formatter version.
+- `checked` counts distinct selected file outcomes after canonical-path deduplication, including
+  unavailable explicitly selected files. Unreadable directories appear in `failed` without adding
+  a selected file; a config error does not count its config as an extra selected file.
+- `changed` counts files that would change under `--check`, or were actually rewritten in format
+  mode. It is zero when configuration errors stop formatting before any selected file is examined.
+- `refused` contains each refused file's path and full reason, prefixed by its refusal kind.
+- `failed` contains file I/O and configuration errors, with a path and full message. Configuration
+  failures are recorded without reading or writing the selected files.
+
+Diagnostic arrays are sorted by path; report generation adds no timestamps, host details or
+configuration fields. Reports preserve formatting decisions, writes and exit policies. A report
+file may replace an earlier report, but cannot replace a selected input or active configuration
+file. If report output fails, the CLI prints `cannot write report` to stderr and retains the
+formatting exit code; report-output errors are diagnostics about report delivery. Keep the report
+outside the walked tree or give it a non-HOCON name: a `.conf` or `.hocon` report inside a walked
+directory is picked up by the next run.
+
+Stdin can write a report file while preserving its formatted stdout. It counts as one input under
+`--stdin-filename` (or `<stdin>`). `--stdin --report -` is a usage error because formatted text
+already occupies stdout. `--version` cannot be combined with `--report`.
+
+```sh
+hocon-fmt --check --report report.json config/
+hocon-fmt --check --fail-on-refusal --report - application.conf
+hocon-fmt --stdin --stdin-filename application.conf --report report.json < input.conf
+```
+
 ## Style: the separator and friends
 
 The default style writes `key = value`. Three choices are yours to make, from the command line

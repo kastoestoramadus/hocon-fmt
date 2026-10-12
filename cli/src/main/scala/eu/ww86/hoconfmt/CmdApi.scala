@@ -7,7 +7,8 @@ import _root_.cats.effect.std.Console
 import _root_.cats.effect.{ExitCode, IO, IOApp}
 import _root_.cats.syntax.all.*
 import com.monovore.decline.{Command, Help, Opts, PlatformApp}
-import fs2.io.file.{Files, Path}
+import fs2.io.file.{FileKey, Files, Path}
+import fs2.Stream
 import eu.ww86.hoconfmt.interop.cats.{FileFormatter, Inspection}
 
 /** Command line entry point: parses arguments, delegates file operations to [[FileFormatter]],
@@ -22,12 +23,18 @@ object CmdApi extends IOApp {
       files: List[Path],
       checkOnly: Boolean,
       config: Option[Path],
-      style: StyleOverrides
+      style: StyleOverrides,
+      report: Option[ReportTarget] = None
   )
+
+  enum ReportTarget derives CanEqual {
+    case Stdout
+    case File(path: Path)
+  }
 
   enum Invocation derives CanEqual {
     case FileMode(arguments: Arguments)
-    case Stdin(filename: String, style: StyleOverrides)
+    case Stdin(filename: String, style: StyleOverrides, report: Option[ReportTarget] = None)
     case Version
   }
 
@@ -68,6 +75,16 @@ object CmdApi extends IOApp {
       .map(Path(_))
       .orNone
 
+  private val reportOpt: Opts[Option[ReportTarget]] =
+    Opts
+      .option[String]("report", "Write JSON to a path or - for stdout; formatting and exit policies are unchanged.")
+      .mapValidated {
+        case ""   => "--report requires a nonempty path or -.".invalidNel
+        case "-"  => ReportTarget.Stdout.validNel
+        case path => ReportTarget.File(Path(path)).validNel
+      }
+      .orNone
+
   val command: Command[Invocation] =
     Command(
       name = "hocon-fmt",
@@ -86,19 +103,22 @@ object CmdApi extends IOApp {
         Opts.option[String]("stdin-filename", "Name used in stdin diagnostics; no file is read or written.").orNone,
         Opts.flag("version", "Print the formatter version and exit.").orFalse,
         configOpt,
-        styleOpts
-      ).tupled.mapValidated { case (files, checkOnly, stdin, filename, version, config, style) =>
+        styleOpts,
+        reportOpt
+      ).tupled.mapValidated { case (files, checkOnly, stdin, filename, version, config, style, report) =>
         if (
-          version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty || config.nonEmpty || style != StyleOverrides.none)
+          version && (files.nonEmpty || checkOnly || stdin || filename.nonEmpty || config.nonEmpty || report.nonEmpty || style != StyleOverrides.none)
         )
           Validated.invalidNel("--version cannot be combined with formatting arguments.")
         else if (version) Validated.validNel(Invocation.Version)
         else if (stdin && (files.nonEmpty || checkOnly || config.nonEmpty))
           Validated.invalidNel("--stdin cannot be combined with files, --check or --config.")
-        else if (stdin) Validated.validNel(Invocation.Stdin(filename.getOrElse("<stdin>"), style))
+        else if (stdin && report.contains(ReportTarget.Stdout))
+          Validated.invalidNel("--stdin cannot be combined with --report -; use a report file.")
+        else if (stdin) Validated.validNel(Invocation.Stdin(filename.getOrElse("<stdin>"), style, report))
         else if (filename.nonEmpty) Validated.invalidNel("--stdin-filename requires --stdin.")
         else if (files.isEmpty) Validated.invalidNel("At least one file or --stdin is required.")
-        else Validated.validNel(Invocation.FileMode(Arguments(files, checkOnly, config, style)))
+        else Validated.validNel(Invocation.FileMode(Arguments(files, checkOnly, config, style, report)))
       }
     }
 
@@ -169,43 +189,83 @@ object CmdApi extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     command.parse(PlatformApp.ambientArgs.getOrElse(args)) match {
       case Right(Invocation.FileMode(arguments)) =>
-        examineAll(arguments).flatMap {
-          case Left(error) =>
-            // A config nobody asked for must not decide what happens to the files, so the run
-            // stops before any of them is read, the way a usage error does.
-            Console[IO].errorln(error).as(ExitCode(2))
-          case Right(run) =>
-            (IO.print(run.rendered) *> Console[IO].error(run.errors)).as(run.exitCode)
+        examineSelected(arguments).flatMap { selected =>
+          val (human, code, report) = selected.result match {
+            case Left(error) =>
+              val report = () => {
+                val configReport = JsonReport.configurationFailures(selected.checked, selected.configFailures)
+                val failed       = configReport.failed ++ JsonReport.of(Run(selected.unavailable)).failed
+                configReport.copy(failed = failed)
+              }
+              (Console[IO].errorln(error.message), ExitCode(2), report)
+            case Right(run) =>
+              val output = arguments.report match {
+                case Some(ReportTarget.Stdout) => Console[IO].error(run.rendered)
+                case _                         => IO.print(run.rendered)
+              }
+              (
+                output *> Console[IO].error(run.errors),
+                run.exitCode,
+                () => JsonReport.of(run).copy(checked = selected.checked)
+              )
+          }
+          (human *> emitReport(arguments.report, report(), selected.protectedPaths)).as(code)
         }
-      case Right(Invocation.Version)                => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
-      case Right(Invocation.Stdin(filename, style)) =>
+      case Right(Invocation.Version)                             => IO.println(s"hocon-fmt ${BuildInfo.version}").as(ExitCode.Success)
+      case Right(Invocation.Stdin(filename, style, destination)) =>
         StdStreams.readStdin
-          .map(formatStdin(_, filename, style))
+          .map(formatStdin(_, filename, style, includeReport = destination.nonEmpty))
           .handleError { e =>
-            StdinResult("", s"cannot read $filename: ${Option(e.getMessage).getOrElse(e.toString)}\n", ExitCode(2))
+            val message = s"cannot read $filename: ${Option(e.getMessage).getOrElse(e.toString)}"
+            val report  = JsonReport.of(Run(List(Outcome(Result.Unreadable(message), filename, Nil, false))))
+            StdinResult("", s"$message\n", ExitCode(2), Some(report))
           }
           .flatMap(result =>
-            StdStreams.writeStdout(result.stdout) *> Console[IO].error(result.stderr).as(result.exitCode)
+            (StdStreams.writeStdout(result.stdout) *> Console[IO].error(result.stderr) *>
+              result.report.fold(IO.unit)(emitReport(destination, _, Nil))).as(result.exitCode)
           )
       case Left(help) => usage(help)
     }
 
-  final case class StdinResult(stdout: String, stderr: String, exitCode: ExitCode)
+  final case class StdinResult(stdout: String, stderr: String, exitCode: ExitCode, report: Option[JsonReport] = None)
 
   // Stdin takes the flags but no config-file lookup: the name it is given is diagnostics only,
   // and reading a file beside it would break that promise.
-  def formatStdin(content: Array[Byte], filename: String, style: StyleOverrides): StdinResult = {
+  def formatStdin(
+      content: Array[Byte],
+      filename: String,
+      style: StyleOverrides,
+      includeReport: Boolean = false
+  ): StdinResult = {
     val options                                      = style.applyTo(FormatOptions.default)
     val Inspection(verdict, findings, reportFailure) = Inspection.of(content, filename, options)
     val report                                       = findings.map(findingLine(filename, _)).mkString + reportFailureLine(filename, reportFailure)
     // Only stdout carries the formatted text; the report is diagnostics, as a refusal's reason is.
     val failed = if (options.failOnDuplicates && findings.nonEmpty) ExitCode(1) else ExitCode.Success
-    verdict match {
+    val result = verdict match {
       case Verdict.NeedsFormatting(formatted) => StdinResult(formatted, report, failed)
       case Verdict.AlreadyFormatted           => StdinResult(String(content, UTF_8), report, failed)
       case Verdict.Refused(refusal)           =>
         StdinResult("", report + s"cannot format $filename: ${refusal.reason}\n${advice(refusal)}", ExitCode(1))
     }
+    if (includeReport) {
+      val decision = verdict match {
+        case Verdict.NeedsFormatting(_) => Result.Rewritten
+        case Verdict.AlreadyFormatted   => Result.AlreadyFormatted
+        case Verdict.Refused(refusal)   => Result.Unformattable(refusal)
+      }
+      result.copy(report =
+        Some(
+          JsonReport.of(
+            Run(
+              List(
+                Outcome(decision, filename, findings, options.failOnDuplicates, reportFailure, options.failOnRefusal)
+              )
+            )
+          )
+        )
+      )
+    } else result
   }
 
   /** Every file's style: the `.hocon-fmt.conf` found from its directory, overridden by the flags;
@@ -227,22 +287,108 @@ object CmdApi extends IOApp {
     * not be read report alongside the files' outcomes. `Left` is a config-file error, decided
     * before any file is read.
     */
+  final case class Selected(
+      checked: Int,
+      result: Either[ConfigFile.Failure, Run],
+      protectedPaths: List[Path],
+      configFailures: List[ConfigFile.Failure],
+      unavailable: List[Outcome]
+  )
+
   def examineAll(arguments: Arguments): IO[Either[String, Run]] =
+    examineSelected(arguments).map(_.result.left.map(_.message))
+
+  def examineSelected(arguments: Arguments): IO[Selected] =
     formatter.distinctPaths(arguments.files).flatMap { paths =>
       Walk.expand[IO](paths).flatMap { expanded =>
         formatter.distinctPaths(expanded.files).flatMap { files =>
-          styleFor(files, arguments).flatMap {
-            case Left(error)   => Left(error).pure[IO]
-            case Right(styled) =>
-              examineAll(styled, arguments.checkOnly).map { run =>
-                val unreadable = expanded.unreadable.map { case Walk.Unreadable(path, reason) =>
-                  Outcome(Result.Unreadable(reason), path.toString, Nil, failOnDuplicates = false)
+          val unreadable = expanded.unreadable.map { case Walk.Unreadable(path, reason) =>
+            Outcome(Result.Unreadable(reason), path.toString, Nil, failOnDuplicates = false)
+          }
+          val options: IO[Either[(ConfigFile.Failure, List[ConfigFile.Failure]), List[FormatOptions]]] =
+            arguments.config match {
+              case Some(explicit) =>
+                ConfigFile
+                  .readDetailed[IO](explicit)
+                  .map(_.map(base => files.map(_ => base)).left.map(error => (error, List(error))))
+              case None =>
+                files.traverse(ConfigFile.optionsForDetailed[IO](_, StyleOverrides.none)).map { resolved =>
+                  val failures = resolved.collect { case Left(error) => error }.distinct
+                  resolved.sequence.left.map(error => (error, failures))
                 }
-                Right(Run(unreadable ++ run.outcomes))
+            }
+          expanded.unreadable.traverse(entry => Files[IO].isDirectory(entry.path).handleError(_ => false)).flatMap {
+            directories =>
+              val checked = files.size + directories.count(isDirectory => !isDirectory)
+              options.flatMap { resolved =>
+                val styled         = resolved.map(values => files.zip(values.map(arguments.style.applyTo)))
+                val protectedPaths = files ++ arguments.files ++ arguments.config.toList
+                styled match {
+                  case Left((error, failures)) =>
+                    Selected(checked, Left(error), protectedPaths, failures, unreadable).pure[IO]
+                  case Right(values) =>
+                    examineAll(values, arguments.checkOnly).map { run =>
+                      Selected(checked, Right(Run(unreadable ++ run.outcomes)), protectedPaths, Nil, unreadable)
+                    }
+                }
               }
           }
         }
       }
+    }
+
+  def writeReport(path: Path, report: JsonReport, protectedPaths: List[Path]): IO[Either[String, Unit]] = {
+    def canonical(file: Path): IO[Path] = Files[IO].realPath(file).handleError(_ => file.absolute)
+    // Hard links are one file under two canonical paths, so path equality alone lets a report through
+    // to a selected input; a destination that does not exist yet cannot alias anything.
+    // isSameFile only compares paths on Scala.js, so identity comes from the file keys (device and inode).
+    def key(file: Path): IO[Option[FileKey]] =
+      Files[IO].getBasicFileAttributes(file).map(_.fileKey).handleError(_ => None)
+    def sameFile(target: Path, protectedFiles: List[Path]): IO[Boolean] =
+      key(target).flatMap { targetKey =>
+        protectedFiles
+          .existsM(file => key(file).map(fileKey => fileKey.exists(found => targetKey.exists(_.equals(found)))))
+          .map(_ || protectedFiles.contains(target))
+      }
+    val configs = protectedPaths.traverse(ConfigFile.discover[IO]).map(_.flatten)
+    configs
+      .flatMap { discovered =>
+        (canonical(path), (protectedPaths ++ discovered).traverse(canonical)).tupled.flatMap {
+          case (target, protectedFiles) =>
+            sameFile(target, protectedFiles).flatMap { aliased =>
+              if (aliased || target.fileName.toString == FormatOptions.ConfigFileName)
+                Left("report destination is a selected input or configuration file").pure[IO]
+              else
+                Stream
+                  .emit(report.rendered)
+                  .through(Files[IO].writeUtf8(path))
+                  .compile
+                  .drain
+                  .attempt
+                  .map(_.left.map(ReadFailure.message))
+            }
+        }
+      }
+      .handleError(error => Left(ReadFailure.message(error)))
+  }
+
+  private def emitReport(
+      destination: Option[ReportTarget],
+      report: => JsonReport,
+      protectedPaths: List[Path]
+  ): IO[Unit] =
+    destination match {
+      case None                      => IO.unit
+      case Some(ReportTarget.Stdout) =>
+        StdStreams.writeStdout(report.rendered).attempt.flatMap {
+          case Left(error) => Console[IO].errorln(s"cannot write report -: ${ReadFailure.message(error)}")
+          case Right(_)    => IO.unit
+        }
+      case Some(ReportTarget.File(path)) =>
+        writeReport(path, report, protectedPaths).flatMap {
+          case Left(error) => Console[IO].errorln(s"cannot write report $path: $error")
+          case Right(_)    => IO.unit
+        }
     }
 
   /** Examines every file given, even after an unformatted one is found, and each path once.

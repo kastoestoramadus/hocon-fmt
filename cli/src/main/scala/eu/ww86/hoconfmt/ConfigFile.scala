@@ -12,6 +12,17 @@ import java.nio.charset.{CharacterCodingException, StandardCharsets}
   */
 object ConfigFile {
 
+  final case class Failure(path: String, message: String) derives CanEqual
+
+  def readDetailed[F[_]: Async: Files](path: Path): F[Either[Failure, FormatOptions]] =
+    read[F](path).map(_.left.map(message => Failure(path.toString, message)))
+
+  def optionsForDetailed[F[_]: Async: Files](file: Path, overrides: StyleOverrides): F[Either[Failure, FormatOptions]] =
+    discover[F](file).flatMap {
+      case Some(found) => readDetailed[F](found).map(_.map(overrides.applyTo))
+      case None        => overrides.applyTo(FormatOptions.default).asRight[Failure].pure[F]
+    }
+
   /** The first `.hocon-fmt.conf` in the formatted file's directory or its parents, stopping at
     * the first one found or at a directory holding `.git` — a style from outside the checkout
     * must not reach in. The walk ends at the filesystem root, whose parent is none.
