@@ -2,11 +2,12 @@ package eu.ww86.hoconfmt.interop.cats
 
 import _root_.cats.effect.Async
 import _root_.cats.syntax.all.*
-import fs2.{Pipe, Stream}
+import fs2.{Chunk, Pipe, Stream}
 import fs2.io.file.{Files, Path}
 import eu.ww86.hoconfmt.{DuplicateReport, Finding, FormatOptions, FormatRefusedException, Refusal, Verdict}
 
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.CharacterCodingException
 
 /** Result of formatting a file in place. IO failures remain in the effect's error channel. */
 enum FormatOutcome derives CanEqual {
@@ -108,16 +109,22 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
     }
 
   private def replace(target: Path, content: String): F[Unit] =
-    replaceWithStaged(target, content).flatMap {
-      case true  => ().pure[F]
-      case false => writeInPlace(target, content)
+    // Validate the exact bytes both write paths will use, before creating staging or truncating.
+    // write is public, so a caller may supply text that never passed through the core's guard.
+    Async[F].delay(content.getBytes(UTF_8)).flatMap { bytes =>
+      if (String(bytes, UTF_8) != content) Async[F].raiseError(new CharacterCodingException)
+      else
+        replaceWithStaged(target, bytes).flatMap {
+          case true  => ().pure[F]
+          case false => writeInPlace(target, bytes)
+        }
     }
 
   /** True when the target was replaced by a staged copy carrying its identity. A file or
     * directory that cannot be written is not replaced: the write in place then fails the way it
     * always did, rather than a read-only file changing under its owner.
     */
-  private def replaceWithStaged(target: Path, content: String): F[Boolean] =
+  private def replaceWithStaged(target: Path, bytes: Array[Byte]): F[Boolean] =
     target.parent match {
       case None         => false.pure[F]
       case Some(parent) =>
@@ -126,19 +133,19 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
           parentWritable <- files.isWritable(parent)
           identity       <- AtomicFiles.identity(target)
           replaced       <- (writable, parentWritable, identity) match {
-                        case (true, true, Some(kept)) => stage(parent, target, content, kept)
+                        case (true, true, Some(kept)) => stage(parent, target, bytes, kept)
                         case _                        => false.pure[F]
                       }
         } yield replaced
     }
 
-  private def stage(parent: Path, target: Path, content: String, identity: FileIdentity): F[Boolean] =
+  private def stage(parent: Path, target: Path, bytes: Array[Byte], identity: FileIdentity): F[Boolean] =
     files.tempDirectory(Some(parent), ".hocon-fmt-", None).use { directory =>
       val temporary = directory / target.fileName
 
       for {
         _    <- files.createFile(temporary)
-        _    <- Stream.emit(content).through(files.writeUtf8(temporary)).compile.drain
+        _    <- Stream.chunk(Chunk.array(bytes)).through(files.writeAll(temporary)).compile.drain
         kept <- AtomicFiles.keepIdentity(temporary, identity)
         _    <- if kept then AtomicFiles.move(files, temporary, target) else ().pure[F]
       } yield kept
@@ -146,8 +153,8 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
 
   // Truncate and write, as the CLI did before this adapter. The formatted text was verified
   // before either write, so a refusal never reaches here.
-  private def writeInPlace(target: Path, content: String): F[Unit] =
-    Stream.emit(content).through(files.writeUtf8(target)).compile.drain
+  private def writeInPlace(target: Path, bytes: Array[Byte]): F[Unit] =
+    Stream.chunk(Chunk.array(bytes)).through(files.writeAll(target)).compile.drain
 }
 
 object FileFormatter {

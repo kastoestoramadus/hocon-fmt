@@ -120,6 +120,19 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
+  // The render of `a = "\ud83d"` is `a = <U+D83D>`: a string UTF-8 cannot encode. Writing it to a
+  // file turns the character into '?', so the text no longer parses. An escape would survive.
+  List("a value" -> "a = \"\\ud83d\"", "a key" -> "\"\\ud83d\" = 1").foreach { (name, raw) =>
+    test(s"library: an unpaired surrogate in $name should render as text UTF-8 can carry") {
+      val rendered = raw.renderedByLibrary
+      val utf8     = java.nio.charset.StandardCharsets.UTF_8
+      assert(
+        String(rendered.getBytes(utf8), utf8) == rendered,
+        s"OPEN sconfig BUG: the render does not survive UTF-8: [${rendered.map(c => f"\\u${c.toInt}%04x").mkString}]"
+      )
+    }
+  }
+
   // --- Should read back what it renders, on every platform ----------------------------------------
 
   // On Scala.js, rendering an object nested 32 or more deep gives text that fails to parse with

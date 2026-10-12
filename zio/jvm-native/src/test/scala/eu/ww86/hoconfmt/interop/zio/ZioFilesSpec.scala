@@ -55,7 +55,7 @@ class ZioFilesSpec extends munit.FunSuite {
   }
 
   test("refused HOCON and invalid UTF-8 remain byte-for-byte untouched") {
-    List(bytes("a={"), Array[Byte](0xc3.toByte, 0x28.toByte)).foreach { original =>
+    List(bytes("a={"), bytes("a = \"\\ud83d\"\n"), Array[Byte](0xc3.toByte, 0x28.toByte)).foreach { original =>
       withFile(original) { path =>
         val before = Files.getLastModifiedTime(path)
         run(ZioFiles.format(path).either) match {
@@ -89,6 +89,17 @@ class ZioFilesSpec extends munit.FunSuite {
         case FileError.Refused(Refusal.NotHocon(detail)) => assert(detail.startsWith(path.toString + ":"), detail)
         case other                                       => fail(s"expected a HOCON refusal, got $other")
       }
+    }
+  }
+
+  test("write rejects text that cannot round-trip through UTF-8 without touching the file") {
+    withFile(bytes("original")) { path =>
+      val result = run(AtomicFile.write(path, "a = \udc00\n").either)
+      assert(result.isLeft, s"write succeeded: $result")
+      assertEquals(Files.readAllBytes(path).toSeq, bytes("original").toSeq)
+      val entries = Files.list(path.getParent).nn // A file's parent has an open listing.
+      try assertEquals(entries.count(), 1L)
+      finally entries.close()
     }
   }
 

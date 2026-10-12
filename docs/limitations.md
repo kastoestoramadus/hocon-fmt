@@ -18,12 +18,12 @@ Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought
 expected text is not guessed: each case is paired with a plainly written config that means the same
 thing and renders correctly, and the test first asserts both `resolve()` to the same value. A
 failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 19 failures on the JVM and Native, 20 on Scala.js.
+`sbt libraryDefects`, on all three platforms: 21 failures on the JVM and Native, 22 on Scala.js.
 When a sconfig release fixes one, its test turns green: that is the signal to drop the refusal and
 the entry below. sconfig 2.0.0 was tried on 2026-09-25: the regular suites pass on it, and the
 defects then known remain.
 
-Rendered as text that will not parse again (`Refusal.BrokenOutput`):
+Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`):
 
 - **`+=` field separator**: `a : [1]` then `a += 2`
 - **Self-referential substitution**: `a : 1` then `a : ${a}`
@@ -36,6 +36,13 @@ Rendered as text that will not parse again (`Refusal.BrokenOutput`):
 - **A one-field object inside an array that does not fit on one line** loses its braces: holding
   a substitution, `a : [ { b : ${?X} } ]` renders as `a = [ b = ${?X} ]`; so does one whose field is
   an object and that holds a comment. Two fields, or a field that fits on one line, keep them.
+- **An unpaired surrogate escape in a value or quoted key**, such as `a = "\ud83d"` or
+  `"\udc00" = 1`: sconfig renders the raw UTF-16 half instead of an escape. The in-memory text
+  parses again, but the UTF-8 encoder replaces the half with `?`, corrupting the written file.
+  The output check refuses it before encoding. A paired escape (`"\ud83d\ude00"`) formats;
+  backslash escapes in triple-quoted strings and comments remain literal text and format too.
+  String API callers can also supply raw unpaired halves in those contexts or an include target;
+  output containing one is refused. No rendering workaround is applied.
 
 Rendered without a comment (`Refusal.LostComment`); a comment has no meaning to compare, so only
 this check notices. sconfig attaches a comment to the field after it; one that ends up attached

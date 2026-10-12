@@ -47,9 +47,10 @@ follows and the mismatches left open: [naming](naming.md).
 3. `IncludeMasking.unmask` puts the original statements back.
 4. The result is refused if an include statement did not come back (`Refusal.LostInclude`) or a
    comment of the source is missing from it (`Refusal.LostComment`), and unless a second pass
-   reproduces it: output that will not parse
-   again is `Refusal.BrokenOutput`, output that changes again is `Refusal.UnstableOutput`. Input
-   sconfig cannot read is `Refusal.NotHocon`.
+   reproduces it. The restored output must also be encodable as UTF-8: a raw unpaired UTF-16
+   surrogate can parse in memory but is replaced when encoded. Output that cannot survive encoding
+   or will not parse again is `Refusal.BrokenOutput`, output that changes again is
+   `Refusal.UnstableOutput`. Input sconfig cannot read is `Refusal.NotHocon`.
 5. `IncludeOrder` refuses output in which an include has changed places with a field
    (`Refusal.MovedInclude`). The placeholder is a field to sconfig, which orders fields by the line
    they start on and fields sharing a line arbitrarily, so the include can end up on the other side
@@ -276,6 +277,11 @@ since the two loaders hold distinct classes under equal names and only values cr
 a Scala 3 trait that depends on the core and matches on `Verdict` directly. A Mill plugin works on
 the Mill it was compiled against and on newer ones, so it is compiled against 1.1.4 and tested on
 1.1.4 and the newest Mill.
+
+The cats and ZIO writers encode once and verify that decoding the bytes gives the original text
+before creating a staged file or truncating the target. Both write paths use those verified bytes,
+so a direct write cannot silently substitute an unencodable character. The Java API's
+`Files.writeString` also reports encoding failures rather than substituting characters.
 
 The Java API owns file writes for Gradle, Maven and sbt. `formatFile` resolves the real path before
 reading and stages complete UTF-8 output in the target directory. A pure JDK helper reads the unix

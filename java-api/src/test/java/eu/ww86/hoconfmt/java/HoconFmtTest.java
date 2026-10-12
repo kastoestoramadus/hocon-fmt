@@ -45,6 +45,28 @@ class HoconFmtTest {
     }
 
     @Test
+    void formatFileRefusesAnUnpairedSurrogateEscape(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("app.conf");
+        byte[] original = "a = \"\\ud83d\"\n".getBytes(StandardCharsets.UTF_8);
+        Files.write(file, original);
+        Verdict.Refused refused = assertInstanceOf(Verdict.Refused.class, HoconFmt.formatFile(file));
+        assertEquals(RefusalKind.BrokenOutput, refused.kind());
+        assertTrue(refused.reason().contains("surrogate"), refused.reason());
+        assertArrayEquals(original, Files.readAllBytes(file));
+    }
+
+    @Test
+    void writerRejectsUnencodableTextBeforeChangingTheFile(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("app.conf");
+        Files.writeString(file, FORMATTED);
+        assertThrows(java.nio.charset.CharacterCodingException.class, () -> AtomicFile.write(file, "a = \ud83d\n"));
+        assertEquals(FORMATTED, Files.readString(file));
+        try (Stream<Path> entries = Files.list(dir)) {
+            assertEquals(1, entries.count());
+        }
+    }
+
+    @Test
     void checkCarriesTheRefusalKindAndReason() {
         Verdict verdict = HoconFmt.check(NOT_HOCON);
         Verdict.Refused refused = assertInstanceOf(Verdict.Refused.class, verdict);

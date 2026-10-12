@@ -17,7 +17,9 @@ enum Refusal derives CanEqual {
     */
   case OtherFormat(format: String)
 
-  /** sconfig rendered text it cannot read back: one of the defects in `SconfigDefectsSpec`. */
+  /** Output cannot be read back safely, including after UTF-8 encoding: one of the defects in
+    * `SconfigDefectsSpec`.
+    */
   case BrokenOutput(detail: String)
 
   /** sconfig drops a comment that no field follows. A comment carries no meaning, so no other

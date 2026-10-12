@@ -405,6 +405,23 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // The renderer hands back the lone surrogate itself, and the encoder wrote '?' in its place.
+  tmp.test("write mode leaves a file with an unpaired surrogate escape untouched") { dir =>
+    val source = "a = \"\\ud83d\"\n"
+    for {
+      file    <- write(dir, "a.conf", source)
+      run     <- rewrite(file)
+      checked <- check(file)
+      bytes   <- bytesOf(file)
+    } yield {
+      assertEquals(bytes, source.getBytes(UTF_8).toList)
+      assertEquals(run.exitCode, ExitCode.Success)
+      assertEquals(checked.exitCode, ExitCode.Success)
+      assert(run.rendered.contains("cannot format, leaving unchanged"), run.rendered)
+      assert(checked.rendered.contains("cannot format, leaving unchanged"), checked.rendered)
+    }
+  }
+
   // A lenient decode turns each invalid byte into U+FFFD, and writing that back destroys it.
   tmp.test("write mode leaves a file that is not UTF-8 byte-for-byte untouched") { dir =>
     val latin2 = "a   :   \"³\"\n".getBytes(ISO_8859_1) // ł in ISO-8859-2

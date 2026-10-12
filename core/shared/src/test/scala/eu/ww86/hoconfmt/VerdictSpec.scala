@@ -124,4 +124,55 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
     )
     refusals.foreach(r => assert(r.reason.nonEmpty, s"$r has no reason"))
   }
+
+  // A lone surrogate escape is valid HOCON and renders as the raw character, which UTF-8 cannot
+  // carry: writing the output replaced it with '?', so the file on disk no longer parsed.
+  List(
+    "a high half in a value"           -> "a = \"\\ud83d\"\n",
+    "a low half in a value"            -> "a = \"\\udc00\"\n",
+    "a quoted key"                     -> "\"\\ud83d\" = 1\n",
+    "a low half in a key"              -> "\"\\udc00\" = 1\n",
+    "reversed halves"                  -> "a = \"\\udc00\\ud83d\"\n",
+    "a high half before ordinary text" -> "a = \"\\ud83dx\"\n"
+  ).foreach { (name, source) =>
+    test(s"an unpaired surrogate in $name is refused, not written as '?'") {
+      List(Verdict.of(source), Verdict.of(source.getBytes(UTF_8))).foreach {
+        case Verdict.Refused(Refusal.BrokenOutput(detail)) => assert(detail.contains("surrogate"), detail)
+        case other                                         => fail(s"expected BrokenOutput, got $other")
+      }
+    }
+  }
+
+  // String callers can supply raw UTF-16 halves even though a UTF-8 file cannot contain them.
+  List(
+    "a value"                -> "a = \"\ud83d\"\n",
+    "a key"                  -> "\"\udc00\" = 1\n",
+    "a triple-quoted string" -> "a = \"\"\"\ud83d\"\"\"\n",
+    "a comment"              -> "# \udc00\na = 1\n",
+    "an include target"      -> "include \"\ud83d.conf\"\na = 1\n"
+  ).foreach { (name, source) =>
+    test(s"a raw unpaired surrogate in $name is refused by the text API") {
+      Verdict.of(source) match {
+        case Verdict.Refused(Refusal.BrokenOutput(detail)) => assert(detail.contains("surrogate"), detail)
+        case other                                         => fail(s"expected BrokenOutput, got $other")
+      }
+    }
+  }
+
+  // The same characters where no escape is read: a paired escape, a triple-quoted string and a
+  // comment hold text that survives UTF-8.
+  List(
+    "a paired escape"        -> "a = \"\\ud83d\\ude00\"\n",
+    "a triple-quoted string" -> "a = \"\"\"\\ud83d\"\"\"\n",
+    "a comment"              -> "# \\ud83d\na = 1\n",
+    "an include target"      -> "include \"\\ud83d.conf\"\na = 1\n",
+    "a raw pair"             -> "a = \"\ud83d\ude00\"\n"
+  ).foreach { (name, source) =>
+    test(s"$name with surrogate text is not mistaken for an unpaired surrogate") {
+      Verdict.of(source.getBytes(UTF_8)) match {
+        case Verdict.Refused(refusal) => fail(s"refused: ${refusal.reason}")
+        case _                        => ()
+      }
+    }
+  }
 }

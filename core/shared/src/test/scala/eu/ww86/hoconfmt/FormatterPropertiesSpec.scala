@@ -1,6 +1,7 @@
 package eu.ww86.hoconfmt
 
 import org.ekrich.config.{ConfigList, ConfigObject}
+import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
 import scala.jdk.CollectionConverters.*
 
@@ -55,6 +56,47 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
       allOptions.foreach { options =>
         HoconFormatter.format(doc.text, options).foreach { out =>
           doc.includes.foreach(i => assert(out.contains(i), s"[$i] lost from:\n$out"))
+        }
+      }
+    }
+  }
+
+  // Escapes resolve in ordinary strings and quoted keys, but stay literal in comments,
+  // triple-quoted strings and restored include targets. Raw halves also reach the text API.
+  property("no accepted output contains an unpaired surrogate") {
+    val piece = Gen.oneOf(
+      "\\ud83d",
+      "\\ude00",
+      "\\ud83d\\ude00",
+      "\\ude00\\ud83d",
+      "\\udc00",
+      "x",
+      "\ud83d",
+      "\ude00",
+      "\ud83d\ude00"
+    )
+    val text     = Gen.listOf(piece).map(_.mkString)
+    val template = Gen.oneOf[String => String](
+      t => s"a = \"$t\"\n",
+      t => s"\"$t\" = 1\n",
+      t => s"a = \"\"\"$t\"\"\"\n",
+      t => s"# $t\na = 1\n",
+      t => s"include \"$t.conf\"\na = 1\n"
+    )
+    val sources = Gen.oneOf(
+      Gen.zip(template, text).map { (make, t) => make(t) },
+      documents(includes = true).map(_.text)
+    )
+    // Code units keep a failing counterexample printable even when the source is not encodable.
+    forAll(sources.map(_.map(_.toInt).toList)) { units =>
+      val source = units.map(_.toChar).mkString
+      allOptions.foreach { options =>
+        HoconFormatter.format(source, options).foreach { out =>
+          val utf8 = java.nio.charset.StandardCharsets.UTF_8
+          assert(
+            String(out.getBytes(utf8), utf8) == out,
+            s"not UTF-8 safe: ${out.map(c => f"\\u${c.toInt}%04x").mkString}"
+          )
         }
       }
     }
