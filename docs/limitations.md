@@ -195,7 +195,7 @@ Scala.js only:
   parses on the JVM and Native. Both failures come from Scala.js's `java.util.ArrayDeque`, which
   loses elements when it grows while wrapped (33 pushes):
   [scala-js/scala-js#5439](https://github.com/scala-js/scala-js/issues/5439), fixed by
-  [#5440](https://github.com/scala-js/scala-js/pull/5440) (approved, not yet released).
+  [#5440](https://github.com/scala-js/scala-js/pull/5440) (merged on 2026-10-11, milestone 1.23.0, not yet released).
   Reported as [ekrich/sconfig#648](https://github.com/ekrich/sconfig/issues/648); these limitations
   go away with a Scala.js release containing the fix.
 
