@@ -108,7 +108,9 @@ Diagnostic arrays are sorted by path; report generation adds no timestamps, host
 configuration fields. Reports preserve formatting decisions, writes and exit policies. A report
 file may replace an earlier report, but cannot replace a selected input or active configuration
 file. If report output fails, the CLI prints `cannot write report` to stderr and retains the
-formatting exit code; report-output errors are diagnostics about report delivery.
+formatting exit code; report-output errors are diagnostics about report delivery. Keep the report
+outside the walked tree or give it a non-HOCON name: a `.conf` or `.hocon` report inside a walked
+directory is picked up by the next run.
 
 Stdin can write a report file while preserving its formatted stdout. It counts as one input under
 `--stdin-filename` (or `<stdin>`). `--stdin --report -` is a usage error because formatted text

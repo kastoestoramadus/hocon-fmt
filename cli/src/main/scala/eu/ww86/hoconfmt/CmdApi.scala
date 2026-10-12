@@ -7,7 +7,7 @@ import _root_.cats.effect.std.Console
 import _root_.cats.effect.{ExitCode, IO, IOApp}
 import _root_.cats.syntax.all.*
 import com.monovore.decline.{Command, Help, Opts, PlatformApp}
-import fs2.io.file.{Files, Path}
+import fs2.io.file.{FileKey, Files, Path}
 import fs2.Stream
 import eu.ww86.hoconfmt.interop.cats.{FileFormatter, Inspection}
 
@@ -339,21 +339,34 @@ object CmdApi extends IOApp {
 
   def writeReport(path: Path, report: JsonReport, protectedPaths: List[Path]): IO[Either[String, Unit]] = {
     def canonical(file: Path): IO[Path] = Files[IO].realPath(file).handleError(_ => file.absolute)
-    val configs                         = protectedPaths.traverse(ConfigFile.discover[IO]).map(_.flatten)
+    // Hard links are one file under two canonical paths, so path equality alone lets a report through
+    // to a selected input; a destination that does not exist yet cannot alias anything.
+    // isSameFile only compares paths on Scala.js, so identity comes from the file keys (device and inode).
+    def key(file: Path): IO[Option[FileKey]] =
+      Files[IO].getBasicFileAttributes(file).map(_.fileKey).handleError(_ => None)
+    def sameFile(target: Path, protectedFiles: List[Path]): IO[Boolean] =
+      key(target).flatMap { targetKey =>
+        protectedFiles
+          .existsM(file => key(file).map(fileKey => fileKey.exists(found => targetKey.exists(_.equals(found)))))
+          .map(_ || protectedFiles.contains(target))
+      }
+    val configs = protectedPaths.traverse(ConfigFile.discover[IO]).map(_.flatten)
     configs
       .flatMap { discovered =>
         (canonical(path), (protectedPaths ++ discovered).traverse(canonical)).tupled.flatMap {
           case (target, protectedFiles) =>
-            if (protectedFiles.contains(target) || target.fileName.toString == FormatOptions.ConfigFileName)
-              Left("report destination is a selected input or configuration file").pure[IO]
-            else
-              Stream
-                .emit(report.rendered)
-                .through(Files[IO].writeUtf8(path))
-                .compile
-                .drain
-                .attempt
-                .map(_.left.map(ReadFailure.message))
+            sameFile(target, protectedFiles).flatMap { aliased =>
+              if (aliased || target.fileName.toString == FormatOptions.ConfigFileName)
+                Left("report destination is a selected input or configuration file").pure[IO]
+              else
+                Stream
+                  .emit(report.rendered)
+                  .through(Files[IO].writeUtf8(path))
+                  .compile
+                  .drain
+                  .attempt
+                  .map(_.left.map(ReadFailure.message))
+            }
         }
       }
       .handleError(error => Left(ReadFailure.message(error)))
