@@ -94,10 +94,12 @@ The rule is narrow, so that a block the parse needs never moves:
 - **What is left must hold a comment.** A file that opens with blank lines only has no preamble:
   the leading blank lines are dropped as before. A file of nothing but comments has no body to
   format, so it has no preamble and is still refused.
-- **The block is taken before any masking**, and a reserved name in it is refused exactly as it was
-  before the path existed: the source-level `__INCLUDE_` guard reads the file's own text. Nothing
-  of the preamble is parsed or restored, so a comment that reads like one of our placeholders
-  cannot be mistaken for it, and an `include` written in a comment is no directive to mask.
+- **The block is taken before any masking.** When the file contains an include, the source-level
+  `__INCLUDE_` guard reads the file's own text, preamble included, and refuses a reserved spelling
+  with `ReservedName`. Without an include, the preamble may contain that spelling: the review's
+  `// __INCLUDE_0\n\na : 1` becomes `// __INCLUDE_0\n\na = 1`. Adding
+  `include "defaults.conf"` before the field makes it refuse. Nothing of the preamble is parsed or
+  restored, so it cannot be mistaken for a placeholder; an `include` in a comment is no directive.
 - **The body keeps every normalisation** listed under [intentional
   normalisations](#intentional-normalisations): `//` becomes `#`, `:` becomes `=`, nested objects
   are flattened, plain strings are unquoted, the body's line endings become `\n`. The preamble is
@@ -109,9 +111,15 @@ comment at the end of the file or of an object; a comment before a closing brace
 the closing `]` or `)` of an array, where no field could stand. The lines such a refusal names are
 the file's own lines: the parse reads the preamble's lines as blank lines, one for one.
 
-A braced root's header is covered, where the page's fork still refuses it: the root's braces are
-the header's own business, the body is formatted from `{`, and the header stands before the
-flattened fields the braces leave.
+A nonempty braced root's header is covered: the body is formatted from `{`, and the header stands
+before the flattened fields. An empty root is a boundary: `# head\n\n{}\n` refuses with
+`UnstableOutput`, because rendering leaves only the preamble and the next pass treats it as a
+comments-only document. Comments-only inputs still refuse with `LostComment`; no refused file is
+written.
+
+A UTF-8 BOM before the header is outside the preserved path: `\ufeff# licence\n\na : 1\n`
+refuses with `LostComment(licence)`, including when an include follows the header. This is an
+inherited safe refusal. A BOM after the detached header and before the first field is accepted.
 
 Measured on a 1,257-file corpus of 24 public repositories at pinned commits (2026-10-11, one
 `--check` run per file): refusals fall from 483 to 310, and 181 files format that were refused

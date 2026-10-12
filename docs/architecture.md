@@ -223,9 +223,19 @@ lines the file opens with, less the comment block directly above the first line 
 block is what the parse attaches to the field below it, and taking it would move it. What is left
 must hold a comment: a file that opens with blank lines only has no preamble, and a file of
 comments only has no body to format. The source-level collision guard (`__INCLUDE_` written out)
-still reads the file's own text, preamble included, so a reserved spelling in the block is refused
-as it was before the path existed; nothing of the preamble is parsed or restored, so nothing of it
-can be mistaken for a placeholder, and an `include` written in a comment is no directive to mask.
+reads the file's own text, preamble included, when the file contains an include; only then does a
+reserved spelling in the block refuse with `ReservedName`. Without an include, the review's
+`// __INCLUDE_0\n\na : 1` formats to `// __INCLUDE_0\n\na = 1`; adding
+`include "defaults.conf"` before the field makes it refuse. Nothing of the preamble is parsed or
+restored, so nothing of it can be mistaken for a placeholder, and an `include` in a comment is no
+directive to mask.
+
+A BOM before the header stops this scan: `\ufeff# licence\n\na : 1\n` still refuses with
+`LostComment(licence)`, also with an include after the header. A BOM after the detached header and
+before the first field is accepted. A header before an empty root (`# head\n\n{}\n`) refuses
+with `UnstableOutput`: rendering leaves only the preamble, which becomes a comments-only input
+on the next pass. Comments-only input still refuses with `LostComment`. These boundaries of the
+preserved path leave refused files unwritten.
 
 `CommentCarrier.keepsDetachedComments` is what turns the path off: where the parse already keeps a
 detached block (the page's fork), the block survives the ordinary path and the carrier renders it,
