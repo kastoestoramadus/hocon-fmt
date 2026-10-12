@@ -727,6 +727,11 @@ lazy val sbtPlugin = guardPublish(
         "scalaVersion" -> (coreJVM / scalaVersion).value
       ),
       scriptedLaunchOpts += s"-Dplugin.version=${version.value}",
+      // A nested sbt must resolve this checkout's artifacts, including under a private Ivy home.
+      scriptedLaunchOpts ++= {
+        val home = ivyPaths.value.ivyHome.getOrElse(file(sys.props("user.home")) / ".ivy2").getAbsolutePath
+        Seq(s"-Dsbt.ivy.home=$home", s"-Dhocon.fmt.scripted.ivy.home=$home")
+      },
       // The tests read sbt's logs; on CI, sbt colours them, and the escape codes hide `[warn]`.
       scriptedLaunchOpts += "-Dsbt.log.noformat=true",
       // The Java API and its transitive core must be available to the isolated worker.
