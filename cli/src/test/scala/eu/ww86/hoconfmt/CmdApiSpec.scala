@@ -102,6 +102,27 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  tmp.test("an unreadable directory is a failure without adding a selected file") { dir =>
+    val blocked = dir / "blocked"
+    for {
+      _           <- Files[IO].createDirectories(blocked)
+      permissions <- Files[IO].getPosixPermissions(blocked)
+      selected    <- (Files[IO].setPosixPermissions(
+                    blocked,
+                    permissions
+                      .remove(PosixPermission.OwnerRead)
+                      .remove(PosixPermission.GroupRead)
+                      .remove(PosixPermission.OthersRead)
+                  ) *>
+                    CmdApi.examineSelected(
+                      Arguments(List(blocked), checkOnly = true, config = None, style = StyleOverrides.none)
+                    )).guarantee(Files[IO].setPosixPermissions(blocked, permissions))
+    } yield {
+      assertEquals(selected.checked, 0)
+      assertEquals(selected.result.map(run => JsonReport.of(run).copy(checked = selected.checked).checked), Right(0))
+    }
+  }
+
   test("skipped summary is absent when no files are refused") {
     List(
       Nil,
