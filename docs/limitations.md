@@ -18,7 +18,7 @@ writes the file. The same defect suite also tracks the accepted numeric limitati
 Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought to produce. The
 plain-equivalent cases first assert that both forms resolve to the same value; the numeric cases
 compare string conversion or value type before and after rendering. A failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 27 failures on the JVM and Native, 28 on Scala.js
+`sbt libraryDefects`, on all three platforms: 28 failures on the JVM and Native, 29 on Scala.js
 in `SconfigDefectsSpec` (plus the separate JVM detached-comment guard).
 When a sconfig release fixes one, its test turns green: update the corresponding refusal or
 numeric output pin and the entry here. The numeric cases below remain accepted. sconfig 2.0.0

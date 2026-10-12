@@ -38,11 +38,11 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 
 | suite (where) | cases | class | notes |
 |---|---:|---|---|
-| `SconfigDefectsSpec` (core/shared) | 28 | SCONFIG | bare round trip; 27 red on JVM/Native, 28 on JS with 1.12.4; earlier main measurements predate the six numeric cases |
+| `SconfigDefectsSpec` (core/shared) | 29 | SCONFIG | bare round trip; 28 red on JVM/Native, 29 on JS with 1.12.4; earlier main measurements predate the six numeric cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
 | `HoconSpecCoverageSpec` (core/shared) | 30 | 17 SCONFIG / 13 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 13 MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
-| `FormatterPropertiesSpec` (core/shared) | 11 | 10 OURS / 1 MIXED | 1000 generated documents × 8 option sets each |
+| `FormatterPropertiesSpec` (core/shared) | 12 | 11 OURS / 1 MIXED | 1000 generated documents × 8 option sets each |
 | `NumericRenderingSpec` (core/shared) | 8 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
 | `DuplicateReportSpec` (core/shared) | 28 | 18 OURS / 10 MIXED | resolution assertions are sconfig's |
 | `ExamplesSpec` (core/shared) | 31 | 23 OURS / 8 MIXED | one case per example (23) plus 8 suite tests |
@@ -67,7 +67,7 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 
 The numeric rendering limitation adds eight acceptance/output pins (MIXED) and six bare-library
 reproductions (SCONFIG). It remains accepted by owner decision: no numeric refusal or rendering
-patch is carried. `SconfigDefectsSpec` now has 27 red cases on JVM/Native and 28 on Scala.js,
+patch is carried. `SconfigDefectsSpec` now has 28 red cases on JVM/Native and 29 on Scala.js,
 plus the separate JVM detached-comment guard. The totals below describe the earlier
 2026-10-09 snapshot.
 
