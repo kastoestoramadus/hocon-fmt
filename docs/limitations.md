@@ -44,6 +44,8 @@ Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`):
   backslash escapes in triple-quoted strings and comments remain literal text and format too.
   String API callers can also supply raw unpaired halves in those contexts or an include target;
   output containing one is refused. No rendering workaround is applied.
+  Only the adjacent spelling of a pair formats: `a = "\ud83d" "\ude00"` concatenates two
+  strings, renders as two halves separated by a space, and is refused for the same reason.
 
 Rendered without a comment, or with it twice (`Refusal.LostComment`); a comment has no meaning to
 compare, so only this check notices, and it compares the input's comments with the output's as
