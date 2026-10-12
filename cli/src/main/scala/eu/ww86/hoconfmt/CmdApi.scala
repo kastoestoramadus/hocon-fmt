@@ -154,7 +154,7 @@ object CmdApi extends IOApp {
         case _                       => false
       })
       (s"Running HOCON formatter for ${outcomes.size} files.\n" :: outcomes.map(render)).mkString +
-        s"\nHOCON files: $skipped skipped (refused).\n"
+        (if (skipped > 0) s"\nHOCON files: $skipped skipped (refused).\n" else "")
     }
 
     // Filesystem failures are errors, so their diagnostics go to stderr like usage errors.
