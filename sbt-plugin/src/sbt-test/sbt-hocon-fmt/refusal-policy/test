@@ -1,3 +1,4 @@
+> assertArtifactHome
 > hoconFormat
 > hoconFormatCheck
 > set hoconFailOnRefusal := Some(true)
@@ -19,3 +20,12 @@ $ copy-file duplicate.conf src/main/resources/duplicate.conf
 -> hoconFormat
 $ must-mirror src/main/resources/duplicate.conf expected.conf
 > assertUntouched
+
+> set hoconFormatSources := Seq(baseDirectory.value / "data.json", baseDirectory.value / "app.properties")
+> set hoconFailOnRefusal := Some(false)
+> hoconFormat
+> hoconFormatCheck
+> set hoconFailOnRefusal := Some(true)
+-> hoconFormat
+-> hoconFormatCheck
+> assertOtherFormatsUntouched
