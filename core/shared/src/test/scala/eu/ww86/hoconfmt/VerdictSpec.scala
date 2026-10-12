@@ -7,6 +7,17 @@ import java.nio.charset.StandardCharsets.{ISO_8859_1, UTF_8}
   */
 class VerdictSpec extends munit.FunSuite with HoconTestSupport {
 
+  test("strict policy preserves name-based refusals even for valid HOCON content") {
+    List("app.json" -> "JSON", "app.properties" -> "Java properties").foreach { case (name, format) =>
+      List(false, true).foreach { strict =>
+        assertEquals(
+          Verdict.of("a = 1\n".getBytes(UTF_8), name, FormatOptions(failOnRefusal = strict)),
+          Verdict.Refused(Refusal.OtherFormat(format))
+        )
+      }
+    }
+  }
+
   test("formatted content needs nothing") {
     assertEquals(Verdict.of("a = 1\n"), Verdict.AlreadyFormatted)
   }
