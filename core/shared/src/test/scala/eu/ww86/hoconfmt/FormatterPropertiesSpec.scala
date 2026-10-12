@@ -7,12 +7,13 @@ import scala.jdk.CollectionConverters.*
 
 import eu.ww86.hoconfmt.HoconGen.*
 
-/** Properties that must hold for every document, checked on generated ones.
+/** Properties checked on generated documents in the supported domain.
   *
   * The example-based suites pin the cases someone thought of; these look for the ones nobody did.
   * On a failure ScalaCheck prints the shrunk document and the seed that reproduces it. The formatter
-  * may always refuse; what it must never do is hand back text that lost something. Every property
-  * runs for every option combination: a style the user can ask for deserves the same guarantees.
+  * may refuse a document with a known defect. Numeric spelling and number-to-string conversion
+  * are a documented exception to meaning preservation; the generator uses canonical numbers.
+  * Every property runs for every option combination.
   */
 class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSupport {
 
