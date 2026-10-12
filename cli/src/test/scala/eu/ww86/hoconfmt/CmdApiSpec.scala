@@ -89,6 +89,35 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  tmp.test("a report cannot overwrite a selected input through a hard link") { dir =>
+    for {
+      file    <- write(dir, "input.json", "a = 1\n")
+      link     = dir / "hard.json"
+      _       <- Files[IO].createLink(link, file)
+      run     <- CmdApi.examineAll(List(file -> FormatOptions(failOnRefusal = true)), checkOnly = false)
+      blocked <- CmdApi.writeReport(link, JsonReport.of(run), List(file))
+      text    <- textOf(file)
+    } yield {
+      assert(blocked.isLeft)
+      assertEquals(text, "a = 1\n")
+    }
+  }
+
+  tmp.test("a report cannot overwrite the active configuration through a hard link") { dir =>
+    for {
+      file    <- write(dir, "app.conf", unformatted)
+      config  <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")
+      link     = dir / "report.json"
+      _       <- Files[IO].createLink(link, config)
+      run     <- CmdApi.examineAll(List(file -> FormatOptions()), checkOnly = true)
+      blocked <- CmdApi.writeReport(link, JsonReport.of(run), List(file))
+      text    <- textOf(config)
+    } yield {
+      assert(blocked.isLeft)
+      assertEquals(text, "separator = \":\"\n")
+    }
+  }
+
   tmp.test("an invalid explicit config still fails when an empty directory selects no files") { dir =>
     for {
       config   <- write(dir, "bad.cfg", "typo = true\n")
