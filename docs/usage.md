@@ -51,7 +51,7 @@ Exit conditions compose with OR: an I/O, usage or configuration error takes prec
 otherwise any enabled failing condition gives 1; otherwise the run gives 0. Clearing one failure
 policy leaves the other active. A green `--check` means **no failing condition under the chosen
 policy**, and does not promise that every file was formatted. The CLI summary counts skipped
-(refused) files visibly, including when they do not fail the run.
+(refused) files visibly, including when they do not fail the run. The summary line is omitted when no files are refused.
 
 ### Fail on refusal
 
@@ -64,6 +64,13 @@ fail-on-refusal = true
 `--no-fail-on-refusal` explicitly overrides a repository's `true`. Refused files are never
 written under either policy; other selected files are still processed. This policy concerns
 selected files, so ignored files and directory entries outside the file filters do not count.
+Strict policy includes name-based refusals such as `OtherFormat`: explicitly selected `.json`
+and `.properties` files fail even when their content would parse as HOCON, and remain untouched.
+Selected `.conf`, `.hocon` or other filenames that cannot be parsed or formatted also fail.
+Without the option these refusals retain exit 0 unless another failing condition applies.
+Default directory filters still select only `.conf` and `.hocon`; other extensions count only
+when selected explicitly or through custom plugin sources.
+
 Stdin refusals always exit 1, even with `--no-fail-on-refusal`.
 
 `--stdin` reads UTF-8 until EOF and writes only the formatted text to stdout, without a
