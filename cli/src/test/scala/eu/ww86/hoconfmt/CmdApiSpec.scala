@@ -123,6 +123,21 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  tmp.test("a report cannot create a missing selected input") { dir =>
+    val missing = dir / "missing.conf"
+    for {
+      selected <-
+        CmdApi.examineSelected(Arguments(List(missing), checkOnly = false, config = None, style = StyleOverrides.none))
+      run       = selected.result.fold(error => fail(error.message), identity)
+      delivery <- CmdApi.writeReport(missing, JsonReport.of(run), selected.protectedPaths)
+      exists   <- Files[IO].exists(missing)
+    } yield {
+      assert(delivery.isLeft)
+      assertEquals(exists, false)
+      assertEquals(run.exitCode, ExitCode(2))
+    }
+  }
+
   test("skipped summary is absent when no files are refused") {
     List(
       Nil,
