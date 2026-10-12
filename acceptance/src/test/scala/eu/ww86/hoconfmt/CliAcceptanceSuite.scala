@@ -60,6 +60,13 @@ class CliAcceptanceSuite extends munit.FunSuite {
     Result(r.exitCode, r.out.bytes, own(r.err.text()))
   }
 
+  def reportGolden: String = {
+    val relative = os.RelPath("cli/src/test/resources/reports/process.json")
+    List(os.pwd / relative, os.pwd / os.up / relative)
+      .find(os.exists(_))
+      .fold(fail("cannot locate process JSON golden"))(os.read(_))
+  }
+
   for ((runtime, cli) <- runtimes) {
     test(s"[$runtime] JSON report destinations preserve formatting and strict exit codes") {
       val version = os.proc(cli, "--version").call().out.text().stripPrefix("hocon-fmt ").trim

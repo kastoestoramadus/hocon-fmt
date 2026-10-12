@@ -378,7 +378,8 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
       "org.typelevel" %%% "cats-effect"       % catsEffect,
       "co.fs2"        %%% "fs2-io"            % fs2,
       "com.monovore"  %%% "decline-effect"    % decline,
-      "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % Test
+      "org.typelevel" %%% "munit-cats-effect" % munitCatsEffect % Test,
+      "org.scalameta" %%% "munit-scalacheck"  % munitScalaCheck % Test
     )
   )
   // Blocking java.io for the standard streams; Scala.js has no System.in and keeps fs2 (see StdStreams).
