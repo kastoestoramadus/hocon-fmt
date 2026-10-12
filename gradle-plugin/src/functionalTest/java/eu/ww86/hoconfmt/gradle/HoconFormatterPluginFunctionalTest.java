@@ -37,6 +37,21 @@ class HoconFormatterPluginFunctionalTest {
     }
 
     @Test
+    void selectedOtherFormatsFollowStrictPolicyWithoutWriting() throws IOException {
+        writeBuild("", "hoconFormatter { source.setFrom(files(\"data.json\", \"app.properties\")) }\n");
+        Path json = write("data.json", "a = 1\n");
+        Path properties = write("app.properties", "a = 1\n");
+        build("hoconFormat");
+        build("hoconFormatCheck");
+        writeBuild("", "hoconFormatter { source.setFrom(files(\"data.json\", \"app.properties\")); failOnRefusal.set(true) }\n");
+        for (String task : List.of("hoconFormat", "hoconFormatCheck")) {
+            assertTrue(buildAndFail(task).getOutput().contains("HOCON formatting refusals found."));
+        }
+        assertEquals("a = 1\n", read(json));
+        assertEquals("a = 1\n", read(properties));
+    }
+
+    @Test
     void refusalPolicyAppliesToBothTasksAndCanBeClearedIndependently() throws IOException {
         Path file = write("src/main/resources/refused.conf", "# only a comment\n");
         write(".hocon-fmt.conf", "fail-on-refusal = true\nfail-on-duplicates = true\n");
