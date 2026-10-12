@@ -89,6 +89,19 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  tmp.test("an invalid explicit config still fails when an empty directory selects no files") { dir =>
+    for {
+      config   <- write(dir, "bad.cfg", "typo = true\n")
+      selected <- CmdApi.examineSelected(
+                    Arguments(List(dir), checkOnly = true, config = Some(config), style = StyleOverrides.none)
+                  )
+    } yield {
+      assertEquals(selected.checked, 0)
+      assert(selected.result.isLeft)
+      assertEquals(selected.configFailures.map(_.path), List(config.toString))
+    }
+  }
+
   test("skipped summary is absent when no files are refused") {
     List(
       Nil,
