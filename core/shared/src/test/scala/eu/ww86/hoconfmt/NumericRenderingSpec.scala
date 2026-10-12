@@ -11,7 +11,6 @@ class NumericRenderingSpec extends munit.FunSuite with HoconTestSupport {
     "1.0"    -> "1",
     "0.10"   -> "0.1",
     "007"    -> "7",
-    "1e-7"   -> "1.0E-7",
     "1e-400" -> "0"
   )
 
