@@ -104,6 +104,15 @@ class UseItSpec extends munit.FunSuite {
     val _ = root.unmount()
   }
 
+  test("the Mill channel says the plugin is on hold, as the usage document does") {
+    val container = installed("#use-it-mill")
+    val root      = render(container.asInstanceOf[dom.Element], UseIt())
+    assert(container.textContent.asInstanceOf[String].contains(UseIt.millNote))
+    val usage = js.Dynamic.global.require("fs").readFileSync("docs/usage.md", "utf8").asInstanceOf[String]
+    assert(usage.contains(UseIt.millNote))
+    val _ = root.unmount()
+  }
+
   test("displayed install commands are verbatim usage documentation") {
     val fs    = js.Dynamic.global.require("fs")
     val usage = fs.readFileSync("docs/usage.md", "utf8").asInstanceOf[String]
@@ -123,7 +132,7 @@ class UseItSpec extends munit.FunSuite {
     val inputs  = js.JSON.parse(decoded).asInstanceOf[js.Dynamic].SbtInputs
     assertEquals(inputs.code.asInstanceOf[String], code)
     assertEquals(inputs.sbtConfigExtra.asInstanceOf[String], ScalaShowcase.buildConfig(core))
-    assertEquals(inputs.target.Scala3.scalaVersion.asInstanceOf[String], "3.8.2")
+    assertEquals(inputs.target.Scala3.scalaVersion.asInstanceOf[String], "3.9.0")
     assert(ScalaShowcase.scastieUrl(core, "import $ivy.`x:y:1`").isLeft)
   }
 

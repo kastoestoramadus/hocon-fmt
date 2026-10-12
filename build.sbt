@@ -1,6 +1,6 @@
 import scala.scalanative.build.{LTO, Mode}
 
-val scala3  = "3.8.2"
+val scala3  = "3.9.0"
 val sconfig = "1.12.4"
 val munit   = "1.2.4"
 // UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
@@ -756,7 +756,7 @@ lazy val javaApi = guardPublish(
       name             := "hocon-fmt-java-api",
       autoScalaLibrary := false,
       crossPaths       := false,
-      // Scala 3.8 needs Java 17, so a lower target would only move the failure to the first format.
+      // Scala 3.9 needs Java 17, so a lower target would only move the failure to the first format.
       // The Gradle build compiles the same sources with the same flags; -g is Gradle's debug
       // default, and without it sbt's jar would drop the LocalVariableTable Gradle's classes keep.
       Compile / javacOptions ++= Seq("-g", "--release", "17", "-Xlint:all", "-Werror"),

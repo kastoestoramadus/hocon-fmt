@@ -48,14 +48,14 @@ jobs:
         run: sbt cliNative/nativeLink
       - name: Smoke test
         run: |
-          binary=cli/.native/target/scala-3.8.2/hocon-fmt
+          binary=cli/.native/target/scala-3.9.0/hocon-fmt
           printf 'a   =   1\n' > smoke.conf
           if "$binary" --check smoke.conf; then echo "check passed on an unformatted file"; exit 1; fi
           "$binary" smoke.conf && [ "$(cat smoke.conf)" = "a = 1" ]
       # The wheel behind the pre-commit hooks; its platform tag comes from the binary itself.
       - name: Wheel
-        run: python3 python/build_wheel.py --binary cli/.native/target/scala-3.8.2/hocon-fmt
-      - run: mv cli/.native/target/scala-3.8.2/hocon-fmt "hocon-fmt-${{ matrix.target }}"
+        run: python3 python/build_wheel.py --binary cli/.native/target/scala-3.9.0/hocon-fmt
+      - run: mv cli/.native/target/scala-3.9.0/hocon-fmt "hocon-fmt-${{ matrix.target }}"
       - uses: actions/upload-artifact@v4
         with:
           name: hocon-fmt-${{ matrix.target }}
@@ -191,8 +191,9 @@ jobs:
           </server></servers></settings>
           XML
           cd maven-plugin && ./mvnw -B -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
+      # On hold until Mill supports Scala 3.9 (see docs/releasing.md); `false &&` keeps the step and its secrets wiring.
       - name: Upload, Mill
-        if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
+        if: false && startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
         env:
           MILL_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MILL_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}

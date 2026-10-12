@@ -135,7 +135,7 @@ other recent work. The fake GitHub can answer each repository independently. `Us
 have no copy buttons to exercise. Build-stamp formatting is covered by
 `DeployStampSpec`, and the local stamp in the page header by `ComponentSpec`.
 
-On Scala 3.8.2 / Scala.js 1.22.0, `sbt coverage site/test site/coverageReport` compiles the
+On Scala 3.9.0 / Scala.js 1.22.0, `sbt coverage site/test site/coverageReport` compiles the
 instrumented sources but fails linking: `There were linking errors`, including missing
 `java.security.SecureRandom` and concurrent collection internals. No Scala.js coverage
 percentage is reported; the audit ranks source/suite gaps instead. Run ordinary tests with
@@ -187,7 +187,7 @@ sconfig 1.12.4 gets wrong. A muted line under the playground says so. Everything
 command line and the plugins, uses released sconfig unchanged.
 
 - `scripts/fetch-sconfig-fork.sh` clones the fork at the pinned sha into
-  `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes the Scala.js artifact for Scala 3.8.2 to
+  `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes the Scala.js artifact for Scala 3.9.0 to
   the local Ivy repository as `2.0.0-hocon-fmt-<sha10>`. Run it once per sha, before `sbt test`;
   CI and the Pages workflow run it first and cache `~/.ivy2/local/org.ekrich` by the script's hash.
   An sbt source dependency is impossible (the fork builds with sbt 2), and JitPack and GitHub

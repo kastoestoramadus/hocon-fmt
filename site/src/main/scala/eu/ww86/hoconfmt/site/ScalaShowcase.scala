@@ -8,7 +8,7 @@ import scala.scalajs.js
 object ScalaShowcase {
   // Release changes this only after the coordinates resolve from Maven Central.
   val released     = false
-  val scalaVersion = "3.8.2"
+  val scalaVersion = "3.9.0"
 
   def dependencyError(code: String): Option[String] = {
     val compact = code.toLowerCase.replaceAll("\\s+", "")

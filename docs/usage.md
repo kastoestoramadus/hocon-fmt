@@ -22,7 +22,7 @@ Library adapters expose refusals to the caller: the ZIO adapter uses a typed err
 single operation and a per-file outcome for a streamed check, so the application controls its
 run policy.
 
-All JVM channels need Java 17 or newer, as Scala 3.8 does.
+All JVM channels need Java 17 or newer, as Scala 3.9 does.
 
 ## Command line
 
@@ -487,6 +487,8 @@ files nor the formatter change. To pin another formatter version:
 API, and the core comes with it, so naming the core alone would leave the worker without its entry point.
 
 ## Mill
+
+**Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9.**
 
 ```scala
 //| mvnDeps:

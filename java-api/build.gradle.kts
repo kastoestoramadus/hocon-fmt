@@ -25,7 +25,7 @@ kotlin {
     }
 }
 
-// Scala 3.8 needs Java 17, so a lower target would only move the failure to the first format.
+// Scala 3.9 needs Java 17, so a lower target would only move the failure to the first format.
 tasks.withType<JavaCompile>().configureEach {
     options.release = 17
     // As in the Scala build, every warning fails it.

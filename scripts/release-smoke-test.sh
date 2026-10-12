@@ -2,11 +2,11 @@
 # Run the native smoke step from release.yml against a linked binary, in a disposable directory.
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd)
-binary=$(realpath "${1:-$repo/cli/.native/target/scala-3.8.2/hocon-fmt}")
+binary=$(realpath "${1:-$repo/cli/.native/target/scala-3.9.0/hocon-fmt}")
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/cli/.native/target/scala-3.8.2"
-ln -s "$binary" "$work/cli/.native/target/scala-3.8.2/hocon-fmt"
+mkdir -p "$work/cli/.native/target/scala-3.9.0"
+ln -s "$binary" "$work/cli/.native/target/scala-3.9.0/hocon-fmt"
 awk '
   /^      - name: Smoke test$/         { armed = 1; next }
   armed && $0 == "        run: |"     { on = 1; armed = 0; next }
