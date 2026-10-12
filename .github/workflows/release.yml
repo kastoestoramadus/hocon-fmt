@@ -117,13 +117,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-fmt-* hocon_fmt-*.whl hocon-fmt.js
 
+  # The tag-version check needs no secrets, so it runs in a job of its own, without the
+  # environment below: a tag that disagrees with the files fails here, before anyone is asked to
+  # approve anything.
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the versions this wave publishes
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_WAVE: ${{ vars.RELEASE_WAVE || '1' }}
+        run: scripts/check-release-version.sh "${GITHUB_REF_NAME#v}"
+
   # Signs and, on a tag, uploads what the current wave publishes. Run by hand it only proves the
   # signing key and its passphrase work, and uploads nothing; a tag goes on to upload, and each
   # deployment is left in the portal, validated, until someone clicks Publish. Wave 1 is the sbt
   # deployment alone; the Maven signing check and the Maven and Mill uploads wait for
   # RELEASE_WAVE=2, since their builds resolve the core from the local repositories sbt fills
   # here, where it is not on Central until the first deployment is published.
+  #
+  # `environment: release` makes every run that reads the secrets, a tag push or a manual run,
+  # wait for the owner's approval (Settings → Environments → release).
   central:
+    needs: version
+    environment: release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -133,11 +151,6 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      - name: Tag matches the versions this wave publishes
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          RELEASE_WAVE: ${{ vars.RELEASE_WAVE || '1' }}
-        run: scripts/check-release-version.sh "${GITHUB_REF_NAME#v}"
       - name: Import the signing key
         env:
           PGP_SECRET: ${{ secrets.PGP_SECRET }}
