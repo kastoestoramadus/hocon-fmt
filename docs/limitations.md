@@ -190,7 +190,14 @@ Rejected at parse time although the specification allows them (`Refusal.NotHocon
 Scala.js only:
 
 - **An object nested 32 or more deep** renders as text that fails to parse ("empty path") and is
-  refused (`Refusal.BrokenOutput`). 31 levels, and a dotted path of any length, are fine.
+  refused (`Refusal.BrokenOutput`). 31 levels are fine. A dotted path of 33 or more segments
+  (`k0.k1. ... .k32 = 1`) does not parse at all on Scala.js (`BugOrBroken: empty path`), while it
+  parses on the JVM and Native. Both failures come from Scala.js's `java.util.ArrayDeque`, which
+  loses elements when it grows while wrapped (33 pushes):
+  [scala-js/scala-js#5439](https://github.com/scala-js/scala-js/issues/5439), fixed by
+  [#5440](https://github.com/scala-js/scala-js/pull/5440) (merged on 2026-10-11, milestone 1.23.0, not yet released).
+  Reported as [ekrich/sconfig#648](https://github.com/ekrich/sconfig/issues/648); these limitations
+  go away with a Scala.js release containing the fix.
 
 - **Parsing text containing an `include`** throws `NotImplementedError`. See
   [architecture](architecture.md#platforms) for why the formatter is unaffected.
