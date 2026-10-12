@@ -48,6 +48,23 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     case other                                => fail(s"expected a failure, got $other")
   }
 
+  object otherFormats extends TestRootModule, HoconFormatterModule {
+    override def hoconFormatSources = Task.Sources("data.json", "app.properties")
+    lazy val millDiscover = Discover[this.type]
+  }
+
+  test("selected other formats fail strict commands and preserve default success") {
+    withFiles(otherFormats, "data.json" -> text("a = 1\n"), "app.properties" -> text("a = 1\n")) { run =>
+      assert(run.eval(otherFormats.hoconFormat()).isRight)
+      assert(run.eval(otherFormats.hoconFormatCheck()).isRight)
+      assert(failure(run.eval(otherFormats.hoconFormat(failOnRefusal = Some(true))))
+        .contains("HOCON formatting refusals found."))
+      assert(failure(run.eval(otherFormats.hoconFormatCheck(failOnRefusal = Some(true))))
+        .contains("HOCON formatting refusals found."))
+      Seq("data.json", "app.properties").foreach(name => assertEquals(read(otherFormats, name), "a = 1\n"))
+    }
+  }
+
   test("repository refusal policy fails both commands and preserves refused bytes") {
     withFiles(project,
       ".hocon-fmt.conf" -> text("fail-on-refusal = true\n"),
