@@ -7,11 +7,11 @@ import org.ekrich.config.ConfigValueType
   */
 class NumericRenderingSpec extends munit.FunSuite with HoconTestSupport {
   val spellings = List(
-    "1e5" -> "100000",
-    "1.0" -> "1",
-    "0.10" -> "0.1",
-    "007" -> "7",
-    "1e-7" -> "1.0E-7",
+    "1e5"    -> "100000",
+    "1.0"    -> "1",
+    "0.10"   -> "0.1",
+    "007"    -> "7",
+    "1e-7"   -> "1.0E-7",
     "1e-400" -> "0"
   )
 
