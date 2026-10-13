@@ -4,7 +4,19 @@ Written 2026-10-09 from `main` at `b4a441f`. Nothing is published yet. The runbo
 one-time account setup are in [releasing](../releasing.md); this file only says what stands between
 `main` and a tag, in the order to do it. Tick a box in the pull request that closes it.
 
-## Two waves (decided 2026-10-09)
+## Release scope (owner decision, 2026-10-13)
+
+The first release, v0.1.0, is the JVM core and the sbt 1.x, Gradle and Maven plugins. Native
+binaries, npm, PyPI, Mill and sbt 2 plugins follow later. The current refusal list ships as it
+is: files the formatter cannot prove safe are refused, without writing or breaking a file.
+The list has not been reviewed by hand yet; the second release tightens it. The dated JVM
+measurement and corpus caveat are in [limitations](../limitations.md#refusals-in-v010).
+
+The workflow still implements the earlier split below. Before tagging v0.1.0, move Maven
+publishing into the first wave and complete Gradle publishing without enabling the later
+Native, npm or PyPI jobs. Gradle setup is now a first-release blocker.
+
+## Earlier two-wave plan (2026-10-09; scope superseded above)
 
 **Wave 1, the first publish:** the JVM artifacts sbt uploads to Maven Central with `publishRelease`:
 `hocon-fmt-core_3`, `hocon-fmt-cats_3`, `hocon-fmt-cli_3`, `eu.ww86:hocon-fmt-java-api` and the sbt
@@ -42,10 +54,10 @@ jobs. The hooks pin PyPI and npm versions, so they must not be advertised before
    `maven-plugin/pom.xml`, `mill-plugin/build.mill`, `.pre-commit-hooks.yaml`);
    `scripts/check-release-version.sh` guards the tag. Check that `java-api` takes its version from
    `build.sbt` and is among the artifacts the checker covers.
-4. **Sconfig is a snapshot of the world, not of the release.** The core uses published sconfig
-   1.12.4; ekrich/sconfig#598 and #605 are merged but unreleased. Decide whether to wait; if the
-   release goes out on 1.12.4, `docs/limitations.md` must say which inputs are refused because of
-   it (the playground already runs a fork).
+4. **Sconfig and refusals.** The current core uses published sconfig 2.0.0 (`build.sbt`);
+   the playground still uses the pinned fork. The owner's 2026-10-13 decision is to ship the
+   current refusal list in v0.1.0 and tighten it in the second release. Keep
+   [limitations](../limitations.md#refusals-in-v010) explicit about that scope.
 5. **Release notes.** `gh release create --generate-notes` is the only text today. Write them from
    the improvement log's "Look at again before a release" column (below) and the user-facing
    changes since #21.

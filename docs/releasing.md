@@ -1,9 +1,19 @@
 # Releasing
 
-Every channel ships the same core, so all of them are released together, at one version. The
-first publish is **wave 1** only: the JVM artifacts sbt builds, below. Wave 2 turns on the rest
-of the table: the Maven and Mill plugins, the Gradle Plugin Portal, PyPI, npm, the native
-binaries and the pre-commit hooks.
+The owner's 2026-10-13 decision is that **v0.1.0 covers the JVM core and the sbt 1.x, Gradle
+and Maven plugins**. Native binaries, npm, PyPI, Mill and sbt 2 plugins follow later. Channels
+share one core and version; they do not all ship in the first release.
+
+v0.1.0 ships with the current refusal list: files the formatter cannot prove safe are refused.
+The list has not been reviewed by hand yet; the second release tightens it. Refusal never
+writes or breaks a file. The dated JVM measurement and corpus caveat are in
+[limitations](limitations.md#refusals-in-v010).
+
+**Publishing still needs to catch up with this scope.** The workflow's existing wave-1 path
+only uploads the sbt-built JVM artifacts. Before tagging v0.1.0, move the Maven signing and
+upload steps into wave 1, include its version in the first-wave version check, and complete
+Gradle Plugin Portal setup and publishing. Keep Native, npm and PyPI jobs for later. The
+wave mechanics below describe the current implementation, not a completed v0.1.0 pipeline.
 Nothing has been released yet: Maven Central is set up (below), the other registries are still
 to do, and the `Release` workflow has never run.
 
@@ -12,23 +22,24 @@ Secrets and variables → Actions → Variables): unset or `1` ships wave 1, `2`
 The wave-2 jobs stay in the workflow, skipped; a wave-2 release sets the variable, makes its
 release, and can leave it set afterwards.
 
-**Wave 1 is the JVM artifacts**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
+**Currently automated in wave 1**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
 `hocon-fmt-cli_3`, `hocon-fmt-java-api` and `sbt-hocon-fmt`. `sbt publishRelease` uploads exactly
 those, and `sbt test` fails if that set ever stops being closed under what a consumer of it needs:
 the projects the POMs name, and the Java API the sbt plugin resolves at run time by the coordinates
-in its `BuildInfo`. Everything else below is wave 2.
+in its `BuildInfo`. The table records the intended release scope; Maven and Gradle are not yet
+automated in wave 1.
 
-| artifact | wave | built by | published to | users get it through |
+| artifact | planned wave | built by | published to | users get it through |
 |---|---|---|---|---|
 | `hocon-fmt-core_3`, `hocon-fmt-core_sjs1_3`, `hocon-fmt-core_native0.5_3` | 1 (JVM), 2 (JS, Native) | sbt | Maven Central | the pure formatter on every platform |
 | `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | 1 (JVM), 2 (JS, Native) | sbt | Maven Central | cats-effect file operations on every platform |
 | `hocon-fmt-zio_3`, `hocon-fmt-zio_sjs1_3`, `hocon-fmt-zio_native0.5_3` | 2 | sbt | Maven Central | the ZIO library adapter |
 | `hocon-fmt-cli_3` | 1 | sbt | Maven Central | the JVM command line |
 | `hocon-fmt-java-api` | 1 | sbt | Maven Central | a library dependency for Java and Kotlin callers |
-| `sbt-hocon-fmt` | 1 | sbt | Maven Central | `addSbtPlugin` |
-| `hocon-fmt-maven-plugin` | 2 | `maven-plugin/` | Maven Central | `<plugin>` |
+| `sbt-hocon-fmt` | 1 (sbt 1.x); sbt 2 later | sbt | Maven Central | `addSbtPlugin` |
+| `hocon-fmt-maven-plugin` | 1 | `maven-plugin/` | Maven Central | `<plugin>` |
 | `mill-hocon-fmt_mill1_3` | on hold | `mill-plugin/` | Maven Central | `//| mvnDeps` |
-| `eu.ww86.hocon-fmt` | 2 | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
+| `eu.ww86.hocon-fmt` | 1 | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
 | native binaries, `hocon-fmt.js` | 2 | `Release` workflow | GitHub release | a download; the playground |
 | wheels carrying the native binary | 2 | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
 | npm package carrying the Node build | 2 | `Release` workflow | npm | the `-node` pre-commit hooks, `npx` |
@@ -141,7 +152,7 @@ defect needs a new patch version. Expect the environment approval to be asked ag
 (expected, not verified on GitHub). The `central` job times out after 30 minutes, so a hung upload
 does not hold the secrets for the default six hours.
 
-## Each release
+## Current workflow runbook (align with v0.1.0 scope before tagging)
 
 1. Set the version in the six places that carry it: `build.sbt` (`ThisBuild / version`),
    `gradle-plugin/build.gradle.kts` (`version`), `java-api/build.gradle.kts` (`version`),
@@ -173,7 +184,7 @@ does not hold the secrets for the default six hours.
      deployment in the portal (sbt); a wave-2 tag three (sbt, Maven, Mill). Look each over in
      Publish → Deployments, then publish the sbt one first: it carries the wave-1 JVM artifacts
      (core, cats, cli, the Java API and the sbt plugin). A release cannot be undone.
-   - The Gradle Plugin Portal (wave 2).
+   - The Gradle Plugin Portal (v0.1.0, once publishing is aligned).
    - PyPI and npm, before announcing the tag (wave 2): the hooks at that tag pin those exact
      versions.
 5. Try every channel the wave shipped as a user would (below).
@@ -208,9 +219,9 @@ pre-commit.ci.
 
 At a wave-1 tag the hooks do not install: their pins name PyPI and npm versions that wave never
 publishes, so the install of the hook environment fails — pip with `No matching distribution
-found for hocon-fmt==<version>`, npm with a 404 — and the repository is left untouched. Wave 1
-users format through the sbt plugin and the JVM cli; the hooks are worth announcing only from
-the first wave-2 tag, whose pins are published.
+found for hocon-fmt==<version>`, npm with a 404 — and the repository is left untouched. v0.1.0
+users format through the JVM CLI and the sbt 1.x, Gradle and Maven plugins; the hooks are worth
+announcing only from the first wave-2 tag, whose pins are published.
 
 The wheels cover Linux x86_64 and aarch64 with glibc 2.34 or newer and macOS on Apple silicon.
 Anywhere else (Windows, Intel Macs, older Linux) pip finds no wheel, and the `-node` hooks are the
@@ -222,7 +233,7 @@ To check a release, in any repository with a `.conf` file:
 pre-commit try-repo https://github.com/kastoestoramadus/hocon-fmt hocon-fmt --ref v<version> --all-files
 ```
 
-## Wave 1, tried before the first tag
+## Earlier wave-1 dry run
 
 The JVM and Scala.js package is `eu.ww86.hoconfmt`; Java consumers use
 `import eu.ww86.hoconfmt.java.HoconFmt;`. Distribution and artifact names remain `hocon-fmt`.
@@ -252,12 +263,14 @@ Three scratch consumer builds resolved from it alone, with no Maven Local or Ivy
 
 Still to verify, and only with the real secrets: `signRelease` (it reaches `gpg` and fails without
 `PGP_PASSPHRASE`; the `central` job is where it runs) and `sonaUpload`. The Maven and Mill steps of
-the workflow are wave 2 and are left unpublished until then. The user-facing text of the release is
+the current workflow are still gated for wave 2; Maven must move to wave 1 for the updated
+v0.1.0 scope, while Mill remains deferred. The user-facing text of the release is
 [plans/release-notes-0.1.0.md](plans/release-notes-0.1.0.md).
 
 ## Trying a release
 
-Wave 2's channels; wave 1's are in the section above.
+The native and npm commands below are for later releases. For v0.1.0, try the JVM artifacts
+as in the earlier dry run and the sbt 1.x, Gradle and Maven plugins as below.
 
 ```bash
 pipx run hocon-fmt --check application.conf          # the wheel, native
@@ -268,6 +281,7 @@ Try the ZIO usage example from [usage](usage.md) on the JVM and Native, and the 
 Scala.js, with the released adapter version and no local repository configured. Check a refused
 file stays untouched and a streamed check still reports a later readable file.
 
-Then the plugins as [usage](usage.md) shows them, with the released version, in a project that
+Try the sbt 1.x, Gradle and Maven plugins as [usage](usage.md) shows them for v0.1.0; try
+Mill once its plugin ships. Use the released version in a project that
 has no local repositories configured: `mavenLocal()`, `~/.m2` and `~/.ivy2/local` would hide a
 missing publication.

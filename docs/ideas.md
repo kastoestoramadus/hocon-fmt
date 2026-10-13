@@ -88,7 +88,7 @@ and [Macrometa's `akka.logging-filter`](https://github.com/Macrometacorp/macrome
 
 **Code:** as expected, the merged `Config` loses an overridden value's origins, so the report reads
 the pre-merge `ConfigDocument` tree instead — through its implementation, since `ConfigNode` still
-has no public accessor in sconfig 1.12.4: `DuplicateReport` matches the document against
+has no public accessor in sconfig 2.0.0: `DuplicateReport` matches the document against
 `SimpleConfigDocument` and walks `configNodeTree`. That is the piece to revisit when
 [upstream](https://github.com/lightbend/config/issues/300) publishes a traversal API.
 
@@ -269,8 +269,9 @@ output.
 
 ### Keep comments above a blank line in the command line too (M)
 
-Licence headers and banners are the commonest refusal in real files. The project page already
-keeps them on the sconfig fork; the command line and the plugins wait for sconfig to release the
+The command line and plugins already keep leading licence headers and banners verbatim via
+the preserved preamble. Detached comments elsewhere still need the option the project page
+runs on its sconfig fork; the command line and the plugins wait for sconfig to release that
 option (ekrich/sconfig#646/#647) and then flip. **Code:** see
 [the investigation](investigations/blank-line-comments.md) and `docs/site.md`, "Returning to
 upstream sconfig".

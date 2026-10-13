@@ -187,8 +187,10 @@ class ComponentSpec extends munit.FunSuite {
     assert(prose.contains("not been reviewed by hand") && prose.contains("second release"), prose)
     assert(prose.contains("include \"defaults.conf\", zone = \"us\""), prose)
     assert(prose.contains("Left unchanged") && prose.contains("byte for byte"), prose)
-    val links = refusals.findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
-      .asInstanceOf[js.Array[js.Dynamic]].toList
+    val links = refusals
+      .findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
+      .asInstanceOf[js.Array[js.Dynamic]]
+      .toList
     assert(links.exists(_.getAttribute("href").asInstanceOf[String] == Status.limitationsPage))
     val _ = root.unmount()
   }

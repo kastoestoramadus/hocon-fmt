@@ -9,6 +9,25 @@ active. I/O, usage and config errors take precedence as exit 2; otherwise a chec
 enabled refusal/duplicate failure gives 1. Stdin refusals already exit 1 under either policy.
 The CLI summary counts skipped (refused) files. See [usage](usage.md#fail-on-refusal).
 
+## Refusals in v0.1.0
+
+The first release is the JVM core and the sbt 1.x, Gradle and Maven plugins. Native binaries,
+npm, PyPI, Mill and sbt 2 plugins follow later. v0.1.0 ships with the current refusal list:
+the formatter refuses files it cannot prove safe. The list has not been reviewed by hand yet;
+the second release tightens it. Refusal never writes or breaks a file.
+
+The JVM `--check` corpus refresh on 2026-10-13 at `c94d49e` measured **310 refusals out of
+1,257 files (24.7%, rounded)**, with 869 files needing formatting and 78 already formatted.
+It used 24 public repositories at pinned commits. The corpus includes parser test fixtures
+and non-HOCON `.conf` files, so this is not a production prevalence estimate. These are JVM
+CLI verdicts, not a measurement of the fork-backed playground. The measurement and source
+files are recorded in [the improvement log](improvement-log/2026-10-13-release-scope-and-refusals.md).
+
+For example, `include "defaults.conf", zone = "us"` is refused when formatting would move
+the include across the field, potentially changing which value wins. The playground shows
+“Left unchanged” with the reason; file runs report the refusal and leave the original bytes
+untouched. The full reproduction is under [moved includes](#sconfig-defects-the-formatter-refuses).
+
 ## sconfig defects the formatter refuses
 
 The refused defects below are reproduced with a bare sconfig parse-render round trip, with no
@@ -394,8 +413,8 @@ renderer is still the slow part on Scala.js. Current numbers: `scripts/bench.py 
 ## What depending on sconfig means for your files
 
 The published formatter uses sconfig to read values and print them again. That value tree loses
-some source details: licence banners above blank lines, comments at the end of objects/files,
-and definitions hidden by later definitions. The formatter checks for lost comments, broken output
+some source details: detached comments outside the preserved leading preamble, comments at the
+end of objects/files, and definitions hidden by later definitions. The formatter checks for lost comments, broken output
 and unstable output and leaves those files unchanged. This protects your file; a refusal is not a
 claim that your valid HOCON is wrong. The playground temporarily keeps more comments than the CLI.
 

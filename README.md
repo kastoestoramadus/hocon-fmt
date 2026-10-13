@@ -23,6 +23,16 @@ app {
 }
 ```
 
+## What v0.1.0 covers
+
+The first release is the JVM core and the sbt 1.x, Gradle and Maven plugins. Native binaries,
+npm, PyPI, Mill and sbt 2 plugins follow later. v0.1.0 ships with the current refusal list:
+files the formatter cannot prove safe are refused. A JVM corpus check measured on 2026-10-13
+refused 310 of 1,257 files (24.7%); the corpus includes parser test fixtures and non-HOCON
+`.conf` files, so this is not a production prevalence estimate. The refusal list has not been
+reviewed by hand yet; the second release tightens it. Refusal never writes or breaks a file.
+See [known limitations](docs/limitations.md#refusals-in-v010).
+
 ## It refuses rather than corrupts
 
 The tool writes files, so "produced something" is not good enough. Before handing text back it
