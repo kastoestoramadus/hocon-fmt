@@ -26,6 +26,9 @@ import org.ekrich.config.ConfigRenderOptions
 class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
 
   test("library: 10000 nested objects parse and render without exhausting the stack") {
+    // The JVM and JS fail within milliseconds; an unbounded parse on Native would need a process
+    // timeout and a memory cap, which `sbt libraryDefects` does not set.
+    assume(System.getProperty("java.vm.name", "") != "Scala Native", "unbounded recursion on Scala Native")
     val source = "a {" * 10000 + "x=1" + "}" * 10000
     assert(source.parsedConfig.root.render(HoconFormatter.renderOptions).nonEmpty)
   }
