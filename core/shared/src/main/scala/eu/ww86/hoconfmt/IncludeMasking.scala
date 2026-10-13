@@ -143,7 +143,7 @@ private[hoconfmt] object IncludeMasking {
       val matcher = pattern.matcher(rendered)
       @tailrec
       def collect(from: Int, found: List[String]): List[String] =
-        if (!matcher.find(from)) found
+        if (!findNext(rendered, pattern, matcher, from)) found
         else {
           val index = matcher.group(1)
           val valid = !placeholder || index == matcher.group(2)
@@ -183,7 +183,7 @@ private[hoconfmt] object IncludeMasking {
     // hide a placeholder that starts inside it.
     @tailrec
     def present(from: Int, found: Set[Int]): Set[Int] =
-      if (!matcher.find(from)) found
+      if (!findNext(rendered, PlaceholderField, matcher, from)) found
       else {
         val index = matcher.group(1)
         present(matcher.start + 1, if (index == matcher.group(2)) found ++ indexOf(matcher) else found)
@@ -232,6 +232,19 @@ private[hoconfmt] object IncludeMasking {
   private val GuardOnItsOwnLine = Pattern.compile(s"""\\n[ \\t]*$guardField""")
   private val GuardInline       = Pattern.compile(s""",?[ \\t]*$guardField""")
 
+  /** A match can start only at the literal prefix or its preceding quote. Skipping the
+    * intervening text avoids the optional-quote regex trying every position on Scala Native.
+    * Never look back before `from`: overlapping scans may already have rejected that quote.
+    */
+  private def findNext(text: String, pattern: Pattern, matcher: Matcher, from: Int): Boolean = {
+    if (pattern ne PlaceholderField) matcher.find(from)
+    else {
+      val at    = text.indexOf(PlaceholderPrefix, from)
+      val start = if (at > from && text.charAt(at - 1) == '"') at - 1 else at
+      at >= 0 && matcher.find(start)
+    }
+  }
+
   /** Rewrites every match `replacement` accepts, leaving the rest verbatim.
     *
     * A rejected match is not consumed: the search resumes one character past its start, as a
@@ -245,7 +258,7 @@ private[hoconfmt] object IncludeMasking {
     val out        = new StringBuilder
     var copiedUpTo = 0
     var from       = 0
-    while (matcher.find(from))
+    while (findNext(text, pattern, matcher, from))
       replacement(matcher) match {
         case Some(next) =>
           val _ = out.append(text.substring(copiedUpTo, matcher.start)).append(next)

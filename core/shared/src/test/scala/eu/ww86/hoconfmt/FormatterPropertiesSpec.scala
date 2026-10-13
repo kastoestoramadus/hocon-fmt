@@ -33,6 +33,20 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   override def scalaCheckTestParameters = super.scalaCheckTestParameters
     .withMinSuccessfulTests(sys.props.get("hocon.properties").map(_.toInt).getOrElse(1000))
 
+  property("placeholder scan preserves byte-identical output and refusals, in every option combination") {
+    forAll(Gen.oneOf(documents(includes = true), documentsWithConcatenations)) { doc =>
+      allOptions.foreach { options =>
+        val before = PlaceholderFieldOldFormatter.format(doc.text, options)
+        val after  = HoconFormatter.format(doc.text, options)
+        assertEquals(
+          after.map(_.getBytes(java.nio.charset.StandardCharsets.UTF_8).toList),
+          before.map(_.getBytes(java.nio.charset.StandardCharsets.UTF_8).toList),
+          doc.text
+        )
+      }
+    }
+  }
+
   property("nested include-bearing inputs always yield a verdict with a reason on refusal") {
     forAll(Gen.choose(1, 160)) { depth =>
       val source = "include \"missing.conf\"\n" + "a {" * depth + "x=1" + "}" * depth
