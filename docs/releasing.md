@@ -12,7 +12,9 @@ writes or breaks a file. The dated JVM measurement and corpus caveat are in
 The workflow implements this scope: wave 1 builds and signs the sbt artifacts and both
 standalone plugins, stages the sbt and Maven deployments in Central Portal, and publishes the
 Gradle plugin when its Portal credentials are configured. A missing Plugin Portal key or
-secret skips that upload with a message; it does not skip building or signing the plugin.
+secret in wave 1 skips that upload with a warning annotation and a job-summary entry before
+Central uploads; it does not skip building or signing the plugin. On a real wave-2 tag, either
+missing credential fails the job before any registry upload. Dry runs need neither credential.
 Nothing has been released yet. Central setup is recorded below; Plugin Portal account and
 namespace setup remain owner tasks. The `Release` workflow has not been exercised with real
 secrets.
@@ -188,8 +190,9 @@ does not hold the secrets for the default six hours.
    and runs Gradle `-PreleaseSigning check publishToMavenLocal` against a private Maven repository.
    No Central or Plugin Portal upload occurs, even when a tag is selected and all secrets exist.
    The real signing passphrase is checked here; registry credentials are not validated by this run.
-3. Push a tag `v<version>`. The secret-free `version` job rejects inconsistent wave-1 versions
-   before the `central` job requests environment approval. The approved job builds and signs all
+3. Push a tag `v<version>` on main's history. The secret-free `version` job fetches main and
+   rejects a tag outside its history or inconsistent versions for the selected wave before the
+   `central` job requests environment approval. The approved job builds and signs all
    wave-1 artifacts, then uploads two Central deployments (sbt and Maven) and submits the Gradle
    plugin if both Portal credentials exist. A skipped Portal upload means the first-release
    scope is still incomplete: finish Portal setup before announcing v0.1.0.
