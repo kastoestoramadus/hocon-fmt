@@ -777,8 +777,9 @@ lazy val javaApi = guardPublish(
     .dependsOn(coreJVM)
 )
 
-// Wave 1 is what the first release uploads: the JVM artifacts — the core, the CLI, the Java API
+// The sbt portion of wave 1 uploads the JVM artifacts — the core, the CLI, the Java API
 // and the sbt plugin, with the cats adapter the CLI's POM names, so the set can be resolved whole.
+// The standalone Maven and Gradle plugins also ship in wave 1; both resolve the Java API.
 // Wave 2 adds the JS and Native artifacts and the zio adapter.
 val releaseProjectIds =
   Seq(
@@ -793,14 +794,20 @@ val releaseProjectIds =
 // the Java API in its `BuildInfo` (the coordinates it resolves at task time), which is a setting
 // dependency, not `dependsOn`, so the plugin's POM and `buildDependencies` both miss it.
 val releaseRuntimeDependencies: Map[String, Seq[String]] =
-  Map(sbtPlugin.id -> Seq(javaApi.id))
+  Map(
+    sbtPlugin.id    -> Seq(javaApi.id),
+    "maven-plugin"  -> Seq(javaApi.id),
+    "gradle-plugin" -> Seq(javaApi.id)
+  )
 
 ThisBuild / checkReleaseSet := {
   val inSet = releaseProjectIds.toSet
   val needs = buildDependencies.value.classpathTransitive.map { case (from, to) =>
     from.project -> to.map(_.project)
   }
-  val missing = releaseProjectIds.sorted
+  // Standalone plugins are uploaded by Maven and Gradle, but their runtime dependencies must
+  // already be in the sbt deployment too: neither plugin upload bundles the Java API.
+  val missing = (releaseProjectIds ++ releaseRuntimeDependencies.keys).distinct.sorted
     .flatMap { id =>
       (needs.getOrElse(id, Nil) ++ releaseRuntimeDependencies.getOrElse(id, Nil)).distinct
         .filterNot(inSet)

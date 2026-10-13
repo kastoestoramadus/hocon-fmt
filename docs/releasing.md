@@ -9,27 +9,28 @@ The list has not been reviewed by hand yet; the second release tightens it. Refu
 writes or breaks a file. The dated JVM measurement and corpus caveat are in
 [limitations](limitations.md#refusals-in-v010).
 
-**Publishing still needs to catch up with this scope.** The workflow's existing wave-1 path
-only uploads the sbt-built JVM artifacts. Before tagging v0.1.0, move the Maven signing and
-upload steps into wave 1, include its version in the first-wave version check, and complete
-Gradle Plugin Portal setup and publishing. Keep Native, npm and PyPI jobs for later. The
-wave mechanics below describe the current implementation, not a completed v0.1.0 pipeline.
-Nothing has been released yet: Maven Central is set up (below), the other registries are still
-to do, and the `Release` workflow has never run.
+The workflow implements this scope: wave 1 builds and signs the sbt artifacts and both
+standalone plugins, stages the sbt and Maven deployments in Central Portal, and publishes the
+Gradle plugin when its Portal credentials are configured. A missing Plugin Portal key or
+secret skips that upload with a message; it does not skip building or signing the plugin.
+Nothing has been released yet. Central setup is recorded below; Plugin Portal account and
+namespace setup remain owner tasks. The `Release` workflow has not been exercised with real
+secrets.
 
 The `Release` workflow reads one switch, the repository variable `RELEASE_WAVE` (Settings →
-Secrets and variables → Actions → Variables): unset or `1` ships wave 1, `2` ships everything.
+Secrets and variables → Actions → Variables): unset or `1` ships wave 1, `2` enables the later jobs.
 The wave-2 jobs stay in the workflow, skipped; a wave-2 release sets the variable, makes its
 release, and can leave it set afterwards.
 
 **Currently automated in wave 1**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
-`hocon-fmt-cli_3`, `hocon-fmt-java-api` and `sbt-hocon-fmt`. `sbt publishRelease` uploads exactly
-those, and `sbt test` fails if that set ever stops being closed under what a consumer of it needs:
-the projects the POMs name, and the Java API the sbt plugin resolves at run time by the coordinates
-in its `BuildInfo`. The table records the intended release scope; Maven and Gradle are not yet
-automated in wave 1.
+`hocon-fmt-cli_3`, `hocon-fmt-java-api`, `sbt-hocon-fmt`, `hocon-fmt-maven-plugin` and the Gradle
+plugin `eu.ww86.hocon-fmt` (implementation plus plugin marker). `sbt publishRelease` uploads the
+five sbt artifacts; Maven's release profile uploads its own signed Central bundle, and Gradle's
+`publishPlugins` uploads to Plugin Portal. `sbt test` fails if the sbt set stops being closed
+under the POM dependencies and the Java API required at run time by all three build-tool plugins.
+The Portal upload remains conditional on the owner supplying its credentials.
 
-| artifact | planned wave | built by | published to | users get it through |
+| artifact | wave | built by | published to | users get it through |
 |---|---|---|---|---|
 | `hocon-fmt-core_3`, `hocon-fmt-core_sjs1_3`, `hocon-fmt-core_native0.5_3` | 1 (JVM), 2 (JS, Native) | sbt | Maven Central | the pure formatter on every platform |
 | `hocon-fmt-cats_3`, `hocon-fmt-cats_sjs1_3`, `hocon-fmt-cats_native0.5_3` | 1 (JVM), 2 (JS, Native) | sbt | Maven Central | cats-effect file operations on every platform |
@@ -38,7 +39,7 @@ automated in wave 1.
 | `hocon-fmt-java-api` | 1 | sbt | Maven Central | a library dependency for Java and Kotlin callers |
 | `sbt-hocon-fmt` | 1 (sbt 1.x); sbt 2 later | sbt | Maven Central | `addSbtPlugin` |
 | `hocon-fmt-maven-plugin` | 1 | `maven-plugin/` | Maven Central | `<plugin>` |
-| `mill-hocon-fmt_mill1_3` | on hold | `mill-plugin/` | Maven Central | `//| mvnDeps` |
+| `mill-hocon-fmt_mill1_3` | 2 (on hold) | `mill-plugin/` | Maven Central | `//| mvnDeps` |
 | `eu.ww86.hocon-fmt` | 1 | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
 | native binaries, `hocon-fmt.js` | 2 | `Release` workflow | GitHub release | a download; the playground |
 | wheels carrying the native binary | 2 | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
@@ -50,8 +51,8 @@ The names are free on every registry (checked 2026-09-26).
 
 ## One-time setup
 
-Accounts and secrets only you can create; each section ends with the code this repository still
-needs, which is a pull request of its own.
+Accounts and secrets only the owner can create. Wave-1 publishing code is in place; later
+registries still need the code listed below.
 
 ### Maven Central
 
@@ -73,27 +74,38 @@ Done; recorded here so it can be redone. Artifacts are published under the group
 4. The repository secrets are `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `PGP_SECRET` and
    `PGP_PASSPHRASE`.
 
-The `central` job in `release.yml` does the rest, per wave. A tag in wave 1 imports the key,
-signs the wave-1 artifacts (`signRelease`) and uploads the sbt deployment; the Maven signing
-check and the Maven and Mill uploads are wave-2 steps, skipped until `RELEASE_WAVE=2`. sbt-ci-release is not used: it publishes without
-a pause and takes the version from tags, where this repository sets it by hand. Instead, sbt's own
-Central Portal support (`publishRelease`, which signs and calls `sonaUpload`), the `release`
-profile of `maven-plugin/pom.xml` (`central-publishing-maven-plugin` with `autoPublish` off) and
-`mill.javalib.SonatypeCentralPublishModule/publishAll --shouldRelease false` each leave their
-deployment in the portal, validated, until someone clicks Publish under Publish → Deployments in the portal.
+The `central` job in `release.yml` imports the key and signs all wave-1 artifacts before any
+upload. sbt's Central Portal support (`publishRelease`, which signs and calls `sonaUpload`) and
+the Maven `release` profile (`central-publishing-maven-plugin` 0.11.0, `autoPublish=false`,
+`waitUntil=validated`) stage two deployments. The Maven extension assembles the signed artifacts,
+POM, sources, javadocs and checksums into a ZIP with Maven repository layout; `deploy` uploads
+that bundle using the `central` server token, rather than deploying to a Maven repository URL.
+See [Sonatype's Maven publishing guide](https://central.sonatype.org/publish/publish-portal-maven/).
+Both deployments await a Publish click under Publish → Deployments. The core and Java API are
+also published to a private local Maven repository so plugin builds work before Central has
+the first version. Mill's upload stays disabled even in wave 2 until its Scala version catches up.
 
 ### Gradle Plugin Portal
 
-1. Sign in to [plugins.gradle.org](https://plugins.gradle.org) with GitHub. The portal only takes
-   new plugins under a namespace it can verify. The plugin id is `eu.ww86.hocon-fmt`; if the portal
-   will not verify that domain, it falls back to `io.github.kastoestoramadus.hocon-fmt`, which
-   signing in with GitHub verifies, and the id changes in `gradle-plugin/`, the README and
-   [usage](usage.md).
-2. Copy the API key and secret from your profile into the secrets `GRADLE_PUBLISH_KEY` and
-   `GRADLE_PUBLISH_SECRET`.
+1. Create a [Plugin Portal account](https://plugins.gradle.org) linked to the owner's GitHub
+   account. Keep the plugin id `eu.ww86.hocon-fmt` and group `eu.ww86`: for this domain namespace,
+   the Portal requires proof of ownership of `ww86.eu` using a DNS TXT record. Follow the record
+   instructions supplied by Portal staff; Central's namespace verification is separate. The
+   initial plugin submission also receives manual review. If the Portal rejects the id, stop
+   and ask the owner to decide; changing the id or group is not automatic.
+2. Generate a Portal API key and secret in the account profile and add the GitHub Actions
+   secrets `GRADLE_PUBLISH_KEY` and `GRADLE_PUBLISH_SECRET`, preferably in the `release`
+   environment. These are the environment variable names supported by Gradle's publishing plugin.
+3. Run the workflow's default dry run with the existing signing secrets before tagging. Portal
+   credentials are optional for that run; when either is missing, the upload step prints why
+   it skipped. The dry run builds and signs the implementation JAR, sources, javadocs and POM,
+   Gradle metadata and plugin marker POM into private Maven Local, without contacting the Portal.
 
-Code still needed: the `com.gradle.plugin-publish` plugin, with the website, VCS URL and tags it
-requires, and `./gradlew publishPlugins` in the release job.
+The build applies `com.gradle.plugin-publish` 2.2.1, declares website, VCS URL, tags and tested
+configuration-cache support, and uses the imported GnuPG key when `-PreleaseSigning` is present.
+A non-dry version tag invokes `publishPlugins` only when both Portal secrets are present. Portal
+upload is a publication submission, with initial review; it has no Central-style Publish click.
+See [Gradle's publishing and namespace requirements](https://plugins.gradle.org/docs/publish-plugin).
 
 ### PyPI: the pre-commit hooks' binaries
 
@@ -134,16 +146,21 @@ creating, moving or deleting `v*` tags for everyone but admins, so a contributor
 cannot push the tag. The `central` job runs in the repository environment `release`, which requires
 the owner as reviewer, so a tag push or a manual run of that job waits for an explicit approval
 (Settings → Environments → release). Last, the upload only stages a deployment: nothing is public
-until the Publish click in the portal (sbt's `sonaUpload` is `USER_MANAGED`). A manual run signs
-and uploads nothing, but it reads the secrets, so it needs the approval too.
+until the Publish click in the portal (sbt's `sonaUpload` is `USER_MANAGED`).
+A manual run defaults to `dry_run: true`, signs
+and uploads nothing, but it reads the signing secrets, so it needs the approval too. Selecting
+a branch never uploads; selecting a version tag only uploads if `dry_run` is explicitly disabled.
+The Gradle upload shares this environment gate but submits directly to Plugin Portal;
+it does not wait for a Central Publish click.
 
 What this does not cover yet: the four secrets (`PGP_SECRET`, `PGP_PASSPHRASE`,
 `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`) are still repository secrets, and the environment gates
 only a job that declares it. Anyone with write access to the repository can read repository
 secrets from another workflow on a branch of their own, with no approval. The next step, which
 the owner does in Settings once this change is on `main`, in this order: move the four secrets into
-the `release` environment, then limit its deployment policy to `main` and `v*` tags. Not before
-the merge: until `central` on `main` declares the environment, it would lose access to the secrets.
+the `release` environment, then limit its deployment policy to `main` and `v*` tags.
+Put the two new Gradle Portal secrets in that environment too. The existing `central` job
+already declares it, so the same approval covers both registries.
 
 If a run fails after the upload: a portal deployment is only staged until Publish, so nothing is
 public. A re-run stages a new deployment, so drop the stale one in Publish → Deployments first.
@@ -152,7 +169,7 @@ defect needs a new patch version. Expect the environment approval to be asked ag
 (expected, not verified on GitHub). The `central` job times out after 30 minutes, so a hung upload
 does not hold the secrets for the default six hours.
 
-## Current workflow runbook (align with v0.1.0 scope before tagging)
+## Workflow runbook
 
 1. Set the version in the six places that carry it: `build.sbt` (`ThisBuild / version`),
    `gradle-plugin/build.gradle.kts` (`version`), `java-api/build.gradle.kts` (`version`),
@@ -162,31 +179,31 @@ does not hold the secrets for the default six hours.
    and zio platform artifacts and the Java API also inherit that version. `signRelease` and
    `publishRelease` name the wave-1 projects directly (`releaseProjectIds` in `build.sbt`), and
    `sbt test` fails when that set stops being closed under its dependencies.
-   A wave-1 tag commits only two of the six: `build.sbt`, which every sbt artifact takes its
-   version from, and `java-api/build.gradle.kts`, whose Gradle build resolves the wave-1 artifacts
-   for its tests (`scripts/check-release-version.sh` checks just those unless `RELEASE_WAVE=2`).
-   The other four may trail until their wave ships.
-2. Run the `Release` workflow by hand first (Actions → Release → Run workflow). It builds and
-   signs what the wave ships without releasing anything, which is how to find out the run works.
-   Its `central` job also signs with the real key and passphrase, uploading nothing: the
-   passphrase is checked there, because a typo cannot be seen from outside. In wave 1 `signRelease`
-   touches the wave-1 artifacts on the machine that runs it and needs `PGP_PASSPHRASE` to sign.
-3. Push a tag `v<version>`. The `version` job runs `scripts/check-release-version.sh <version>`
-   first, needs no secrets and no approval, and stops the `central` job (the wave-2 `native`, `npm` and `web`
-   jobs still run) if a place the wave touches disagrees with the tag; only then does the `central` job ask for approval (below). A wave-1 tag signs the sbt artifacts
-   and uploads the sbt deployment to Central, and stops there. A wave-2 tag (`RELEASE_WAVE=2`)
-   also links native binaries for Linux (x86_64, aarch64) and macOS (aarch64), smoke-tests them,
-   wraps each in a wheel, packs the npm package, builds the web script, and attaches all of it to
-   a GitHub release.
-4. Publish, in dependency order:
-   - Maven Central, first: the Gradle and Maven plugins resolve the Java API, and the core through
-     it, from there, while the Mill and sbt plugins resolve the core. A wave-1 tag leaves one
-     deployment in the portal (sbt); a wave-2 tag three (sbt, Maven, Mill). Look each over in
-     Publish → Deployments, then publish the sbt one first: it carries the wave-1 JVM artifacts
-     (core, cats, cli, the Java API and the sbt plugin). A release cannot be undone.
-   - The Gradle Plugin Portal (v0.1.0, once publishing is aligned).
-   - PyPI and npm, before announcing the tag (wave 2): the hooks at that tag pin those exact
-     versions.
+   The wave-1 version check covers four files: `build.sbt`, `java-api/build.gradle.kts`,
+   `gradle-plugin/build.gradle.kts` and both versions in `maven-plugin/pom.xml`. Mill and hook
+   pins may trail until wave 2; `RELEASE_WAVE=2` checks all six locations.
+2. Run the `Release` workflow by hand first (Actions → Release → Run workflow), leave
+   `dry_run` checked (the default), and keep `RELEASE_WAVE` unset or `1` for v0.1.0. Approve the
+   `release` environment. It builds and signs the five sbt artifacts, runs Maven `-Prelease verify`,
+   and runs Gradle `-PreleaseSigning check publishToMavenLocal` against a private Maven repository.
+   No Central or Plugin Portal upload occurs, even when a tag is selected and all secrets exist.
+   The real signing passphrase is checked here; registry credentials are not validated by this run.
+3. Push a tag `v<version>`. The secret-free `version` job rejects inconsistent wave-1 versions
+   before the `central` job requests environment approval. The approved job builds and signs all
+   wave-1 artifacts, then uploads two Central deployments (sbt and Maven) and submits the Gradle
+   plugin if both Portal credentials exist. A skipped Portal upload means the first-release
+   scope is still incomplete: finish Portal setup before announcing v0.1.0.
+   A wave-2 tag (`RELEASE_WAVE=2`) also links and smoke-tests the native binaries, builds their
+   wheels, packs npm, builds the web script, and attaches them to a GitHub release. Mill stays disabled.
+4. Publish and verify:
+   - In Central Publish → Deployments, inspect both deployments and publish the sbt one first:
+     it carries core, cats, CLI, Java API and sbt 1.x plugin. Then publish the Maven plugin.
+     A release cannot be undone. The sbt, Maven and Gradle plugins resolve the Java API and core
+     from Central, so wait for those artifacts to be available before testing or announcing plugins.
+   - Check Plugin Portal's initial-review status for `eu.ww86.hocon-fmt` and finish any requested
+     namespace verification. The workflow submission may precede Central publication; consumer
+     tests must wait for Central dependencies and Portal approval.
+   - Publish PyPI and npm before announcing a wave-2 tag: the hooks pin those exact versions.
 5. Try every channel the wave shipped as a user would (below).
 6. After publishing, open a follow-up PR setting the development version to
    `0.1.1-SNAPSHOT` after `0.1.0` (or the next planned version after later releases).
@@ -262,9 +279,8 @@ Three scratch consumer builds resolved from it alone, with no Maven Local or Ivy
   `hocon-fmt-cats_3` fails, which is why the adapter is in the set.
 
 Still to verify, and only with the real secrets: `signRelease` (it reaches `gpg` and fails without
-`PGP_PASSPHRASE`; the `central` job is where it runs) and `sonaUpload`. The Maven and Mill steps of
-the current workflow are still gated for wave 2; Maven must move to wave 1 for the updated
-v0.1.0 scope, while Mill remains deferred. The user-facing text of the release is
+`PGP_PASSPHRASE`; the `central` job is where it runs) and `sonaUpload`. The current workflow also signs Maven and Gradle in wave 1; those signing paths and registry
+uploads still need the real-secret trial. Mill remains deferred. The user-facing text of the release is
 [plans/release-notes-0.1.0.md](plans/release-notes-0.1.0.md).
 
 ## Trying a release

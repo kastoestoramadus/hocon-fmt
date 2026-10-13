@@ -1,22 +1,19 @@
 name: Release
 
-# A version tag publishes what the wave ships to Maven Central, and — in wave 2 — builds the
-# native binaries, their wheels, the npm package and the web script and attaches them to a GitHub
-# release. Run by hand, it builds and signs the same artifacts without releasing anything, which
-# is how to try the wave before tagging. Every Central deployment waits for a click on Publish;
-# the Gradle Plugin Portal, PyPI and npm are not automated here yet.
-#
-# How much a run ships is one switch, the repository variable RELEASE_WAVE (Settings → Secrets
-# and variables → Actions → Variables): unset or 1 ships wave 1 only — the JVM artifacts sbt
-# publishes: core, cats, cli, the Java API and the sbt plugin, this repository's first publish —
-# and 2 turns the wave-2 jobs and uploads below back on. A repository variable, and not a
-# workflow_dispatch input, because it must gate tag pushes, where no input exists; and not a
-# single env at the top, because a job-level `if` cannot read a workflow-level `env`, while it
-# reads `vars`.
+# Wave 1 signs and uploads the JVM artifacts, sbt 1.x and Maven plugins to Central Portal
+# (awaiting the owner's Publish click), and the Gradle plugin to the Plugin Portal when its
+# credentials exist. Manual runs default to a dry run: build and sign, upload nothing.
+# RELEASE_WAVE unset or 1 selects wave 1; 2 enables the later jobs. A repository variable
+# gates tag pushes too, where workflow_dispatch inputs do not exist.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and sign without any uploads (disable only on a version tag)
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -104,7 +101,7 @@ jobs:
 
   # Wave 2: attaching the wave-2 artifacts to the GitHub release the tag names.
   release:
-    if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
+    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && vars.RELEASE_WAVE == '2'
     # central is where the version and signing checks run; a tag they reject must not ship a release.
     needs: [native, npm, web, central]
     runs-on: ubuntu-latest
@@ -130,12 +127,10 @@ jobs:
           RELEASE_WAVE: ${{ vars.RELEASE_WAVE || '1' }}
         run: scripts/check-release-version.sh "${GITHUB_REF_NAME#v}"
 
-  # Signs and, on a tag, uploads what the current wave publishes. Run by hand it only proves the
-  # signing key and its passphrase work, and uploads nothing; a tag goes on to upload, and each
-  # deployment is left in the portal, validated, until someone clicks Publish. Wave 1 is the sbt
-  # deployment alone; the Maven signing check and the Maven and Mill uploads wait for
-  # RELEASE_WAVE=2, since their builds resolve the core from the local repositories sbt fills
-  # here, where it is not on Central until the first deployment is published.
+  # All wave-1 builds and signing checks run before uploads. The private Maven repository
+  # supplies the Java API and core before their first Central deployment is published.
+  # Maven uses the existing Central Portal extension to produce a repository-layout bundle,
+  # not a plain Maven deploy endpoint. Both Central deployments await manual publication.
   #
   # `environment: release` makes every run that reads the secrets, a tag push or a manual run,
   # wait for the owner's approval (Settings → Environments → release).
@@ -145,6 +140,9 @@ jobs:
     # A hung upload must not hold the secrets for the default six hours.
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    env:
+      SBT_OPTS: -Xmx3g
+      MAVEN_REPO_LOCAL: ${{ github.workspace }}/m2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -157,26 +155,41 @@ jobs:
         env:
           PGP_SECRET: ${{ secrets.PGP_SECRET }}
         run: printf '%s' "$PGP_SECRET" | base64 -d | gpg --batch --import
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the wave-1 dependencies locally
+        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" coreJVM/publishM2 javaApi/publishM2
       - name: Signing check, sbt
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: sbt signRelease && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
+        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" signRelease && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
       - name: Signing check, Maven
-        if: vars.RELEASE_WAVE == '2'
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
         run: |
-          sbt coreJVM/publishM2 javaApi/publishM2
-          (cd maven-plugin && ./mvnw -B -Prelease -DskipTests -Dinvoker.skip verify && ls target/*.asc)
+          cd maven-plugin
+          ./mvnw -B -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -Prelease verify
+          ls target/*.asc
+      - name: Build and sign, Gradle
+        working-directory: gradle-plugin
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: ./gradlew --no-daemon --no-configuration-cache -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -PreleaseSigning check publishToMavenLocal
+      - name: Upload mode
+        env:
+          CAN_UPLOAD: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run }}
+        run: |
+          if [ "$CAN_UPLOAD" != true ]; then
+            echo "Dry run: all wave-1 artifacts built and signed; no registry uploads."
+          fi
       - name: Upload, sbt
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: sbt publishRelease
+        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" publishRelease
       - name: Upload, Maven
-        if: startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -190,7 +203,22 @@ jobs:
             <password>${env.SONATYPE_PASSWORD}</password>
           </server></servers></settings>
           XML
-          cd maven-plugin && ./mvnw -B -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
+          cd maven-plugin && ./mvnw -B -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
+      - name: Upload, Gradle (or explain why skipped)
+        env:
+          CAN_UPLOAD: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run }}
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        working-directory: gradle-plugin
+        run: |
+          if [ -z "$GRADLE_PUBLISH_KEY" ] || [ -z "$GRADLE_PUBLISH_SECRET" ]; then
+            echo "Skipping Plugin Portal upload: GRADLE_PUBLISH_KEY and GRADLE_PUBLISH_SECRET are both required."
+          elif [ "$CAN_UPLOAD" != true ]; then
+            echo "Skipping Plugin Portal upload: dry run (credentials are not used)."
+          else
+            ./gradlew --no-daemon --no-configuration-cache -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -PreleaseSigning publishPlugins
+          fi
       # On hold until Mill supports Scala 3.9 (see docs/releasing.md); `false &&` keeps the step and its secrets wiring.
       - name: Upload, Mill
         if: false && startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
