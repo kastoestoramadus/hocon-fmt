@@ -14,7 +14,10 @@ class NestingDepthSpec extends munit.FunSuite {
     depth   <- List(limit - 1, limit)
   } {
     test(s"$depth nested objects format with include=$include") {
-      assert(HoconFormatter.format(objects(depth, include)).isRight)
+      // Two fields keep parents explicit, avoiding sconfig's JS long-dotted-path refusal.
+      val source    = objects(depth, include).replace("a {", "a { sibling=0, ")
+      val formatted = HoconFormatter.format(source)
+      assert(formatted.isRight, formatted.toString)
     }
   }
 
