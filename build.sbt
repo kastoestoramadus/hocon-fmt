@@ -405,6 +405,8 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     // The shipped binary is optimised; tests link in debug mode, which is several times faster.
     Compile / nativeConfig ~= {
       _.withBaseName("hocon-fmt").withMode(Mode.releaseFast).withLTO(LTO.thin)
+        // Mitigate intermittent collector crashes by avoiding collections on small CLI workloads.
+        .withCompileOptions(_ ++ Seq("-DGC_INITIAL_HEAP_SIZE=512m"))
     },
     Test / nativeConfig ~= { _.withMode(Mode.debug).withLTO(LTO.none) }
   )
