@@ -1,8 +1,8 @@
 # hocon-fmt
 
 A formatter for [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md) configuration
-files: a command line tool (native binary, Node, JVM), pre-commit hooks, and plugins for sbt,
-Gradle, Maven and Mill, all running one Scala 3 core.
+files: plugins for sbt, Gradle and Maven and a command line tool, all running one Scala 3 core.
+Native binaries, npm and PyPI packages, pre-commit hooks, and Mill and sbt 2 plugins follow later.
 
 ```
 $ cat application.conf
@@ -57,7 +57,7 @@ with the formatter version and a minimal example.
 | channel | |
 |---|---|
 | ZIO library | `hocon-fmt-zio`: typed refusals, file formatting and streamed checks; JVM / Native, text on Scala.js |
-| command line | `hocon-fmt [--check] [--separator =|:] <file>...`: `pipx install hocon-fmt` (native), `npx hocon-fmt` (Node), binaries on GitHub releases |
+| command line | `hocon-fmt [--check] [--separator =|:] <file>...`: run from a checkout with `sbt "cliJVM/run <args>"` at v0.1.0; native binaries, `pipx` and `npx` packages follow in wave 2 |
 | pre-commit | hooks `hocon-fmt` and `hocon-fmt-check` from this repository, running the native binary. The hooks ship in wave 2: they pin PyPI and npm versions published only then |
 | sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
 | Gradle | `id("eu.ww86.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
