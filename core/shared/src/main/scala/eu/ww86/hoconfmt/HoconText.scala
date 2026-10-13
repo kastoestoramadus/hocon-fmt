@@ -26,6 +26,8 @@ private[hoconfmt] object HoconText {
       else if (text.startsWith("\"\"\"", index)) scan(endOfTripleQuoted(text, index + 3), depth)
       else if (text.charAt(index) == '"') scan(endOfQuoted(text, index + 1), depth)
       else if (text.charAt(index) == '#' || text.startsWith("//", index)) scan(endOfLine(text, index), depth)
+      // `${x}` and `${?x}` open no object: a file that nests exactly to the limit may use them.
+      else if (text.startsWith("${", index)) scan(endOfSubstitution(text, index + 2), depth)
       else {
         text.charAt(index) match {
           case '{' | '[' =>
@@ -97,6 +99,18 @@ private[hoconfmt] object HoconText {
         case '"'  => i + 1
         case '\n' => i
         case _    => endOfQuoted(text, i + 1)
+      }
+
+  // The path of a substitution may hold quoted keys, so a `}` inside quotes does not close it.
+  @tailrec
+  private def endOfSubstitution(text: String, i: Int): Int =
+    if (i >= text.length) text.length
+    else
+      text.charAt(i) match {
+        case '"'  => endOfSubstitution(text, endOfQuoted(text, i + 1))
+        case '}'  => i + 1
+        case '\n' => i
+        case _    => endOfSubstitution(text, i + 1)
       }
 
   private def endOfLine(text: String, from: Int): Int = {
