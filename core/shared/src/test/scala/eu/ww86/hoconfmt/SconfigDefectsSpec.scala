@@ -25,6 +25,11 @@ import org.ekrich.config.ConfigRenderOptions
   */
 class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
 
+  test("library: 10000 nested objects parse and render without exhausting the stack") {
+    val source = "a {" * 10000 + "x=1" + "}" * 10000
+    assert(source.parsedConfig.root.render(HoconFormatter.renderOptions).nonEmpty)
+  }
+
   /** The resolved value, independent of how it is rendered. Used to prove that a plain-language
     * equivalent really is equivalent, instead of assuming it.
     */
