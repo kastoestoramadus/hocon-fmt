@@ -53,7 +53,7 @@ class UseItSpec extends munit.FunSuite {
     expected.foreach(label =>
       assertEquals(
         named(container, label).getAttribute("aria-pressed").asInstanceOf[String],
-        if (label == "CLI native") "true" else "false"
+        if (label == "sbt") "true" else "false"
       )
     )
     val _ = named(container, "sbt").fire("click")
@@ -94,6 +94,19 @@ class UseItSpec extends munit.FunSuite {
     assert(!container.textContent.asInstanceOf[String].contains("Dependencies are fixed"))
     val _ = root.unmount()
   }
+  test("the wave-2 command line channels say they are not published yet; sbt is the default") {
+    val later  = "Not published at v0.1.0: this channel ships in wave 2. Until then run the JVM CLI from a checkout."
+    val native = installed("#use-it-native")
+    val root   = render(native.asInstanceOf[dom.Element], UseIt())
+    assert(native.textContent.asInstanceOf[String].contains(later))
+    val _      = root.unmount()
+    val npm    = installed("#use-it-npm")
+    val second = render(npm.asInstanceOf[dom.Element], UseIt())
+    assert(npm.textContent.asInstanceOf[String].contains(later))
+    val _ = second.unmount()
+    assertEquals(UseIt.fromHash(""), "sbt")
+  }
+
   test("the pre-commit tab carries the wave-2 note, in the docs' words") {
     val container = installed("#use-it-pre-commit")
     val root      = render(container.asInstanceOf[dom.Element], UseIt())
