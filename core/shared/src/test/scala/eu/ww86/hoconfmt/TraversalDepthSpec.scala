@@ -9,16 +9,19 @@ class TraversalDepthSpec extends munit.FunSuite {
 
   def nested(depth: Int): String = "a {" * depth + "x=1" + "}" * depth
 
-  test("a thousand nested objects produce a report or a reason, never an exception") {
-    DuplicateReport.findings(nested(1000)) match {
+  // 80 is the guard's limit: deeper input never reaches the traversal these specs are about.
+  val depth = 80
+
+  test("the deepest accepted nesting produces a report or a reason, never an exception") {
+    DuplicateReport.findings(nested(depth)) match {
       case Right(found)  => assertEquals(found, Nil)
-      case Left(refusal) => assert(refusal.reason.nonEmpty)
+      case Left(refusal) => assert(!refusal.reason.contains("maximum depth"), refusal.reason)
     }
   }
 
-  test("a thousand nested objects beside an include produce a normal verdict") {
-    Verdict.of("include \"missing.conf\"\n" + nested(1000)) match {
-      case Verdict.Refused(refusal)      => assert(refusal.reason.nonEmpty)
+  test("the deepest accepted nesting beside an include produces a normal verdict") {
+    Verdict.of("include \"missing.conf\"\n" + nested(depth)) match {
+      case Verdict.Refused(refusal)      => assert(!refusal.reason.contains("maximum depth"), refusal.reason)
       case Verdict.NeedsFormatting(text) => assert(text.contains("include \"missing.conf\""))
       case Verdict.AlreadyFormatted      => ()
     }

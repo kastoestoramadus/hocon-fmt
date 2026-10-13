@@ -12,18 +12,28 @@ class TraversalStackSpec extends munit.FunSuite {
     task.get()
   }
 
-  test("the corpus shape completes duplicate analysis on a one MiB stack") {
-    val source = "a {" * 1000 + "x=1" + "}" * 1000
+  // The guard refuses past 80 levels, so the public entry points reach the traversal only up to
+  // there; the outline is the entry below the guard and takes the depth the guard would stop.
+  test("the deepest accepted nesting completes duplicate analysis on a one MiB stack") {
+    val source = "a {" * 80 + "x=1" + "}" * 80
     onSmallStack(DuplicateReport.findings(source)) match {
       case Right(found)  => assertEquals(found, Nil)
-      case Left(refusal) => assert(refusal.reason.nonEmpty)
+      case Left(refusal) => fail(refusal.reason)
     }
   }
 
-  test("the include-shadow boundary returns a verdict on a one MiB stack") {
-    val source = "include \"missing.conf\"\n" + "a {" * 1000 + "x=1" + "}" * 1000
+  test("the outline walk of a thousand nested objects completes on a one MiB stack") {
+    val source = "a {" * 1000 + "x=1" + "}" * 1000
+    onSmallStack(DuplicateReport.outline(source)) match {
+      case Right(outline) => assert(outline.definitions.nonEmpty)
+      case Left(refusal)  => fail(refusal.reason)
+    }
+  }
+
+  test("the include-shadow boundary returns a verdict at the deepest accepted nesting on a one MiB stack") {
+    val source = "include \"missing.conf\"\n" + "a {" * 80 + "x=1" + "}" * 80
     onSmallStack(Verdict.of(source)) match {
-      case Verdict.Refused(refusal)      => assert(refusal.reason.nonEmpty)
+      case Verdict.Refused(refusal)      => assert(!refusal.reason.contains("maximum depth"), refusal.reason)
       case Verdict.NeedsFormatting(text) => assert(text.nonEmpty)
       case Verdict.AlreadyFormatted      => ()
     }
