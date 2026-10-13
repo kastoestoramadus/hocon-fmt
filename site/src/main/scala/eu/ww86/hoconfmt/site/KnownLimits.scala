@@ -17,11 +17,11 @@ object KnownLimits {
           "sconfig mis-renders some inputs — an env override like ",
           code("host = ${?HOST}"),
           ", or an object concatenated with a substitution — so the formatter refuses rather than ",
-          "write them; the fixes are proposed upstream, most merged and awaiting a release."
+          "write them. The playground's fork formats some of these inputs; the JVM core uses released sconfig 2.0.0."
         ),
         li(
-          "A comment that ends up attached to no field — every banner header above a blank line — ",
-          "is refused rather than dropped. The most common real-world refusal."
+          "Leading banner headers are preserved verbatim. Detached comments elsewhere can still be refused ",
+          "rather than dropped; the playground's fork keeps more of them."
         ),
         li(
           "Formatting normalises spelling on purpose: ",

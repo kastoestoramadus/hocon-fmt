@@ -6,7 +6,7 @@ package eu.ww86.hoconfmt
   * UPSTREAM-SCONFIG: delete with the seam once ekrich/sconfig releases the option.
   */
 object Variant {
-  private val fork = "the fork's base renders this where released sconfig 1.12.4 breaks (unmerged, quoted keys)"
+  private val fork = "the fork's base renders this where released sconfig 2.0.0 breaks (unmerged, quoted keys)"
 
   val ledger: Map[String, String] = Map(
     "showcase/03-dev-prod"                                                               -> fork,

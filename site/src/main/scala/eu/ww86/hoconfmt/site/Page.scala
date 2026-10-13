@@ -3,8 +3,8 @@ package eu.ww86.hoconfmt.site
 import com.raquo.laminar.api.L.*
 
 /** The whole page, in the owner's order: what the formatter is in one line and three bullets with
-  * a quick start, the playground, how to use it, the known limits, and — collapsed by default —
-  * the work upstream.
+  * a quick start, the playground, the release scope, how to use it, refusals and known limits,
+  * and — collapsed by default — the work upstream.
   */
 object Page {
 
@@ -19,22 +19,57 @@ object Page {
         ul(
           cls := "tldr",
           li("A file it cannot format is refused, never corrupted: it is left byte for byte as it was."),
-          li("One core in every channel: CLI, pre-commit, sbt, Gradle, Maven, Mill, npm, Python, the Java API."),
+          li("The first release covers the JVM core and sbt 1.x, Gradle and Maven plugins."),
           li(a(href := "#playground", "Try it below"), ": the playground runs in your browser.")
         ),
         pre(
           cls := "quick-start",
           code(
-            """pipx install hocon-fmt                # the native binary, from the Python wheel
-              |hocon-fmt --check application.conf    # report; without --check it rewrites""".stripMargin
+            """# from a checkout; check writes nothing
+              |sbt "cliJVM/run --check application.conf"""".stripMargin
           )
         )
       ),
       Playground(),
+      releaseScope(),
       UseIt(),
+      releaseRefusals(),
       KnownLimits(),
       ContributionsView(),
       pageFooter()
+    )
+
+  private def releaseScope(): HtmlElement =
+    sectionTag(
+      idAttr := "release-scope",
+      cls    := "release-scope",
+      h2("What v0.1.0 covers"),
+      p(
+        "The first release is the JVM core and the sbt 1.x, Gradle and Maven plugins. ",
+        "Native binaries, npm, PyPI, Mill and sbt 2 plugins follow later."
+      )
+    )
+
+  private def releaseRefusals(): HtmlElement =
+    sectionTag(
+      idAttr := "release-refusals",
+      cls    := "release-refusals",
+      h2("Refusals in this release"),
+      p(
+        "v0.1.0 ships with the current refusal list: files the formatter cannot prove safe are refused. ",
+        "A JVM corpus check measured on 2026-10-13 refused 310 of 1,257 files (24.7%). ",
+        "The corpus includes parser test fixtures and non-HOCON .conf files; this is not a production prevalence estimate. ",
+        "The refusal list has not been reviewed by hand yet; the second release tightens it."
+      ),
+      p(
+        "For example, ",
+        code("""include "defaults.conf", zone = "us""""),
+        " is refused because formatting would move the include across the field, which can change which value wins. ",
+        "The playground shows “Left unchanged” with the reason; file runs report the refusal and leave the file byte for byte as it was. ",
+        "Refusal never writes or breaks a file. See ",
+        a(href := Status.limitationsPage, "docs/limitations.md"),
+        "."
+      )
     )
 
   /** The build's mark in the corner: what was deployed and when, from the build rather than the

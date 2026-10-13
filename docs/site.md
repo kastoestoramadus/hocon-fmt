@@ -25,7 +25,7 @@ needs, the way `web` does.
 
 ## The page
 
-One page, five parts, all rendered by Laminar into `#root`. The order is the owner's: what
+One page, seven parts, all rendered by Laminar into `#root`. The order is the owner's: what
 already works and how to use it first; the work behind it last, and collapsed.
 
 1. **One line, the promise**: the header — a formatter for HOCON configuration files that
@@ -35,7 +35,7 @@ already works and how to use it first; the work behind it last, and collapsed.
    line), "Already formatted", or "Left unchanged" with the refusal, one sentence per refusal
    kind, and a link into [limitations](limitations.md). The privacy promise heads the section,
    stated as the page behaves: nothing pasted leaves the browser; the only network requests are
-   the read-only GitHub lookups of part five. Example buttons come from
+   the read-only GitHub lookups of the upstream section. Example buttons come from
    `examples/showcase/NN-slug/` in directory order, using `title` and `shows` from
    `example.conf`. The sbt generator embeds the same data that core’s `ExamplesSpec`
    pins on JVM, Scala.js and Native. `examples/catalogue/` also supplies tested fixtures and
@@ -51,15 +51,22 @@ already works and how to use it first; the work behind it last, and collapsed.
    Formatted preserves includes and optional substitutions; Resolved previews only
    local values, with includes unloaded and environment variables unset. Resolution
    errors are shown in the output pane; refused inputs stay untouched in both tabs.
-3. **Use it**: install and one usage line per channel that exists today — command line (native
+3. **What v0.1.0 covers**: the JVM core and the sbt 1.x, Gradle and Maven plugins. Native
+   binaries, npm, PyPI, Mill and sbt 2 plugins follow later.
+4. **Use it**: install and one usage line per channel that exists today — command line (native
    binary from the Python wheel, npm package, JVM build), pre-commit hooks, sbt, Gradle, Maven
    and Mill plugins, and the Java API — each with a snippet copied from
    [usage](usage.md), then the choices a repository can make (`.hocon-fmt.conf`, the separator,
    the duplicate report) in a few lines.
-4. **Known limits**: five bullets — the refused defect inputs, the lost detached comments, the
-   intentional normalisations, the refused `.json`/`.properties` names, and what the duplicate
+5. **Refusals in this release**: the current refusal list ships as it is, without a hand review;
+   the second release tightens it. The dated JVM corpus measurement is 310 of 1,257 files
+   (24.7%, rounded), including parser test fixtures and non-HOCON `.conf` files, not a production
+   prevalence estimate. A moved-include example explains the refusal and the unchanged file.
+   See [limitations](limitations.md#refusals-in-v010) for the measurement source.
+6. **Known limits**: five bullets — the refused defect inputs, preserved headers and remaining
+   detached comments, intentional normalisations, the refused `.json`/`.properties` names, and what the duplicate
    report does not claim — each backed by [limitations](limitations.md).
-5. **The work upstream**: a `<details>` collapsed by default, its summary one sentence. Inside:
+7. **The work upstream**: a `<details>` collapsed by default, its summary one sentence. Inside:
    the author's pull requests on sconfig and lightbend/config, grouped by library and theme,
    each with its state, and the defect table tying every refusal of [limitations](limitations.md)
    to the pull requests that aim to fix it. The refresh starts on mount even closed, so the
@@ -183,7 +190,7 @@ sha pinned in `scripts/fetch-sconfig-fork.sh`. It carries `setKeepDetachedCommen
 ([ekrich/sconfig#646](https://github.com/ekrich/sconfig/issues/646), draft
 [#647](https://github.com/ekrich/sconfig/pull/647)), so the page keeps a comment above a blank
 line, and the base of that branch (sconfig main) also fixes some merge renderings released
-sconfig 1.12.4 gets wrong. A muted line under the playground says so. Everything published, the
+sconfig 2.0.0 gets wrong. A muted line under the playground says so. Everything published, the
 command line and the plugins, uses released sconfig unchanged.
 
 - `scripts/fetch-sconfig-fork.sh` clones the fork at the pinned sha into

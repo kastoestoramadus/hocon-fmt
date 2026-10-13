@@ -79,7 +79,7 @@ object UseIt {
           )
         }
       },
-      p(cls := "muted", "Coordinates describe the first release; until then, run from a checkout."),
+      p(cls := "muted", "Some channels follow v0.1.0; until their artifacts are published, run from a checkout."),
       h3("Configure"),
       p(
         "The command line takes its style from ",

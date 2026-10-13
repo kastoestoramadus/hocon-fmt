@@ -170,12 +170,28 @@ class ComponentSpec extends munit.FunSuite {
 
   // --- the page --------------------------------------------------------------------------------
 
-  test("the page's sections come in the owner's order: playground, use it, limits, upstream") {
+  test("the page shows release scope and refusals before the limits and upstream work") {
     val github    = Github()
     val container = install(github)
     val root      = mount(container)(Page())
     val sections  = children(find(container, "page")).map(idOf).filter(_.nonEmpty)
-    assertEquals(sections, List("playground", "use-it", "limits", "contributions"))
+    assertEquals(sections, List("playground", "release-scope", "use-it", "release-refusals", "limits", "contributions"))
+    val scope = find(container, "release-scope").textContent.asInstanceOf[String]
+    assert(scope.contains("What v0.1.0 covers"), scope)
+    assert(scope.contains("JVM core") && scope.contains("sbt 1.x, Gradle and Maven"), scope)
+    assert(scope.contains("Native binaries, npm, PyPI, Mill and sbt 2 plugins follow later"), scope)
+    val refusals = find(container, "release-refusals")
+    val prose    = refusals.textContent.asInstanceOf[String]
+    assert(prose.contains("310 of 1,257 files (24.7%)"), prose)
+    assert(prose.contains("parser test fixtures") && prose.contains("not a production prevalence estimate"), prose)
+    assert(prose.contains("not been reviewed by hand") && prose.contains("second release"), prose)
+    assert(prose.contains("include \"defaults.conf\", zone = \"us\""), prose)
+    assert(prose.contains("Left unchanged") && prose.contains("byte for byte"), prose)
+    val links = refusals
+      .findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
+      .asInstanceOf[js.Array[js.Dynamic]]
+      .toList
+    assert(links.exists(_.getAttribute("href").asInstanceOf[String] == Status.limitationsPage))
     val _ = root.unmount()
   }
 
@@ -223,8 +239,8 @@ class ComponentSpec extends munit.FunSuite {
       "and the playground is a real section to land on"
     )
     val quickStart = find(container, "quick-start").textContent.asInstanceOf[String]
-    assert(quickStart.contains("pipx install hocon-fmt"), quickStart)
-    assert(quickStart.contains("hocon-fmt --check"), quickStart)
+    assert(quickStart.contains("cliJVM/run --check application.conf"), quickStart)
+    assert(quickStart.contains("# from a checkout"), quickStart)
     val _ = root.unmount()
   }
 
