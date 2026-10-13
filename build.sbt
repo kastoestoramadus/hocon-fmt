@@ -1,7 +1,7 @@
 import scala.scalanative.build.{LTO, Mode}
 
 val scala3  = "3.9.0"
-val sconfig = "1.12.4"
+val sconfig = "2.0.0"
 val munit   = "1.2.4"
 // UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
 // Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
