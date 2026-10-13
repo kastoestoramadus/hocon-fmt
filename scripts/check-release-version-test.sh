@@ -57,8 +57,25 @@ fresh "$good"; write_tree
 expect_run 'wave 1 passes when all six places agree' 0 '-' \
   "$tree/scripts/check-release-version.sh" "$good"
 
-fresh "$good"; gradle_v=$stale mill_v=$stale maven_v=$stale hooks_v=$stale; write_tree
+fresh "$good"; mill_v=$stale hooks_v=$stale; write_tree
 expect_run 'wave 1 tolerates stale wave-2 places' 0 '-' \
+  "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; gradle_v=$stale; write_tree
+expect_run 'wave 1 fails on a Gradle plugin mismatch' 1 '^gradle-plugin/build\.gradle\.kts:' \
+  "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; maven_v=$stale; write_tree
+expect_run 'wave 1 fails on a Maven plugin mismatch' 1 '^maven-plugin/pom\.xml:' \
+  "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; write_tree
+put maven-plugin/pom.xml "<version>$good</version>\n<version>$stale</version>"
+expect_run 'wave 1 fails on a Maven Java API dependency mismatch' 1 '^maven-plugin/pom\.xml:' \
+  "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; drop=maven-plugin/pom.xml; write_tree; drop=""
+expect_run 'wave 1 fails when the Maven plugin POM is missing' 1 '^maven-plugin/pom\.xml:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; sbt_v=$stale; write_tree
