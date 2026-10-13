@@ -79,12 +79,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
             git(tree, 'commit', '--allow-empty', '-m', 'unmerged topic')
             topic = git(tree, 'rev-parse', 'HEAD')
             target = {'current': main, 'historical': annotated, 'topic': topic,
-                      'fetch-failure': main}[scenario]
+                      'fetch-failure': main, 'branch': topic}[scenario]
             # A stale origin/main must be refreshed, and an unavailable origin must fail closed.
             git(tree, 'update-ref', 'refs/remotes/origin/main', base)
             if scenario == 'fetch-failure':
                 git(tree, 'remote', 'set-url', 'origin', str(root / 'missing.git'))
-            result = run_shell(source, tree, GITHUB_SHA=target)
+            result = run_shell(source, tree, GITHUB_SHA=target,
+                               GITHUB_REF='refs/heads/topic' if scenario == 'branch'
+                               else 'refs/tags/v1.2.3')
             print(f'ancestry {scenario}: exit {result.returncode}; '
                   f'{result.stdout.strip()} {result.stderr.strip()}', flush=True)
             return result
@@ -92,9 +94,23 @@ class ReleaseWorkflowTest(unittest.TestCase):
     def test_ancestry_wiring(self):
         checkout = next(s for s in steps('version') if 'uses: actions/checkout@' in s)
         self.assertIn('fetch-depth: 0', checkout)
-        self.assertIn("if: startsWith(github.ref, 'refs/tags/v')",
-                      step('version', "Tag is on main's history"))
         self.assertIn('needs: version', job('central'))
+
+    def test_guards_cannot_be_skipped_or_ignored(self):
+        for name, title in (('version', "Tag is on main's history"),
+                            ('central', 'Upload mode')):
+            source = step(name, title)
+            for key in ('if', 'continue-on-error'):
+                with self.subTest(job=name, key=key):
+                    self.assertNotRegex(source, re.compile(rf'^        {key}:', re.M))
+            ordered = steps(name)
+            # Local publishing is preparation; registry/artifact upload steps must follow guards.
+            for upload in ordered:
+                if re.search(r'^      - name: Upload,|uses: actions/upload-artifact@', upload, re.M):
+                    self.assertLess(ordered.index(source), ordered.index(upload))
+
+    def test_branch_dry_run_skips_tag_ancestry(self):
+        self.assertEqual(self.ancestry('branch').returncode, 0)
 
     def test_current_main_tag_passes(self):
         self.assertEqual(self.ancestry('current').returncode, 0)
@@ -184,9 +200,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
         ):
             self.assertIn(f'{name}: ${{{{ {expression} }}}}', preflight)
         ordered = steps('central')
-        # Check order as well as membership; disabled Mill is ignored because it cannot upload.
+        # Check order as well as membership, including Mill so enabling it stays guarded.
         uploads = [step('central', name) for name in (
-            'Upload, sbt', 'Upload, Maven', 'Upload, Gradle (or explain why skipped)')]
+            'Upload, sbt', 'Upload, Maven', 'Upload, Gradle (or explain why skipped)',
+            'Upload, Mill')]
         for upload in uploads:
             self.assertLess(ordered.index(preflight), ordered.index(upload))
         self.assertIn(f'if: {UPLOAD_CONDITION}', uploads[0])
