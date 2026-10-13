@@ -28,6 +28,17 @@ the include across the field, potentially changing which value wins. The playgro
 “Left unchanged” with the reason; file runs report the refusal and leave the original bytes
 untouched. The full reproduction is under [moved includes](#sconfig-defects-the-formatter-refuses).
 
+## Comment order on repeated keys
+
+When a key appears more than once, plain sconfig 2.0.0 merges the objects and gathers their
+comments above the merged key in reverse order. The comment check compares which comments are
+present, not their order, so such a file is accepted. For example, `# first`, `a { x = 1 }`,
+`# second`, `a { y = 2 }`, `# third`, `a { z = 3 }` formats to `# third`, `# second`, `# first`,
+then one `a` with `x`, `y` and `z`. No comment is lost; they stay in the file, only their order
+changes, and a marker comment may end up away from the lines it bracketed. This hits a small share
+of the files that format today. It is not refused in v0.1.0; the second release is expected to
+refuse or preserve it.
+
 ## sconfig defects the formatter refuses
 
 The refused defects below are reproduced with a bare sconfig parse-render round trip, with no

@@ -24,6 +24,10 @@ object KnownLimits {
           "rather than dropped; the playground's fork keeps more of them."
         ),
         li(
+          "When a key repeats, sconfig merges the objects and may reverse the order of their comments. ",
+          "No comment is lost, but the order is not checked, so such a file is formatted, not refused."
+        ),
+        li(
           "Formatting normalises spelling on purpose: ",
           code("//"),
           " comments become ",
