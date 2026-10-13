@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
+/** The include-mask scan is ours; corpus configs exercise it without upstream parsing. */
 class PlaceholderFieldCorpusSpec extends munit.FunSuite with PlaceholderFieldDifferentialChecks {
   val root = List(new File("."), new File("../.."))
     .find(f => new File(f, "build.sbt").isFile)

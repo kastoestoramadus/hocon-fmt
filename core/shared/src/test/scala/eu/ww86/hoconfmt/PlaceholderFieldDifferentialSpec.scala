@@ -92,6 +92,7 @@ trait PlaceholderFieldDifferentialChecks extends munit.Assertions {
   }
 }
 
+/** The include-mask scan is ours; the oracle isolates it from upstream parsing. */
 class PlaceholderFieldDifferentialSpec extends munit.FunSuite with PlaceholderFieldDifferentialChecks {
   test("placeholder finding agrees with the old scan on adversarial UTF-16 and overlapping fields") {
     val inputs = PlaceholderFieldDifferentialInputs.adversarial
