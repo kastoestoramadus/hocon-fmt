@@ -1,4 +1,4 @@
-# 2026-10-13 — — — Stack-safe duplicate reporting
+# 2026-10-13 — [#118](https://github.com/kastoestoramadus/hocon-fmt/pull/118) — Stack-safe duplicate reporting
 
 **Change:** Duplicate-report syntax and predicate walks and include-shadow value walks use explicit pending lists or tail recursion. A thousand nested objects now formats on the default JVM stack; input beyond the remaining parser or renderer stack capacity is refused as `NotHocon` with an explicit capacity reason. The existing verdict types and integrations remain sufficient.
 
