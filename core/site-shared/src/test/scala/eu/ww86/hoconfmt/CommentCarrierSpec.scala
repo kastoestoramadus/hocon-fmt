@@ -1,5 +1,7 @@
 package eu.ww86.hoconfmt
 
+import scala.scalajs.js
+
 import org.ekrich.config.{ConfigFactory, ConfigObject}
 
 class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
@@ -20,9 +22,45 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     ExampleData.all.filter(_.siteNow.nonEmpty).foreach { e =>
       assert(Variant.differs(e.id), e.id)
       assertEquals(e.siteNow, Some("formatted"), e.id)
-      assertEquals(stable(e.input), e.expected("site-default"), e.id)
+      val actual = stable(e.input)
+      val update = js.Dynamic.global.process.env.selectDynamic("UPDATE_GOLDEN")
+      if (js.typeOf(update) == "string" && (update.toString == "1" || update.toString == "true")) {
+        val path = s"examples/${e.id}/expected/site-default.conf"
+        val _    = js.Dynamic.global.require("fs").writeFileSync(path, actual, "utf8")
+        println(s"UPDATE_GOLDEN: wrote $path")
+      } else {
+        assertEquals(actual, e.expected("site-default"), e.id)
+      }
       println(s"${e.id}: published=${e.now}; playground=${e.siteNow.getOrElse("")}")
     }
+  }
+
+  test("same-line includes keep their order with the fork") {
+    val expected = Map(
+      "a field after the include on its line"               -> "include \"defaults.conf\"\nzone = us\n",
+      "a field after the include in an object"              -> "app {\n  include \"defaults.conf\"\n  zone = us\n}\n",
+      "fields on both sides of the include on its line"     -> "a = 1\ninclude \"defaults.conf\"\nb = 2\n",
+      "a function-form include followed by a field"         -> "include required(file(\"defaults.conf\"))\nzone = us\n",
+      "two includes on one line"                            -> "include \"a.conf\"\ninclude \"b.conf\"\n",
+      "a field after the include, in an object in an array" -> "arr = [\n  {\n    include \"f.conf\"\n    a = 2\n  }\n]\n"
+    )
+    val cases = new IncludeOrderSpec().moved.filter((name, _) => Variant.differs(s"includeOrder: $name"))
+    assertEquals(cases.keySet, expected.keySet)
+    cases.foreach { case (name, (raw, _)) =>
+      assertEquals(stable(raw), expected(name), name)
+    }
+  }
+
+  test("an appended field keeps its comment once with the fork") {
+    List("# c\na += 2", "o {\n  # c\n  a += 2\n}").foreach { raw =>
+      val out = stable(raw)
+      assertEquals(out.linesIterator.count(_.trim == "# c"), 1)
+      assert(out.indexOf("# c") < out.indexOf("2"), out)
+    }
+  }
+
+  test("overflowing numbers refuse with the fork") {
+    assertEquals(HoconFormatter.format("a = 1e400"), Left(Refusal.UnstableOutput))
   }
 
   test("the option is on") {
@@ -35,7 +73,7 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("the comment cases of the ledger now format") {
-    assertEquals(Variant.ledger.size, 17)
+    assertEquals(Variant.ledger.size, 27)
     List("catalogue/detached-header-comment", "catalogue/trailing-comment-in-object").foreach { id =>
       Verdict.of(example(id).input) match {
         case Verdict.Refused(refusal) => fail(s"$id: ${refusal.reason}")

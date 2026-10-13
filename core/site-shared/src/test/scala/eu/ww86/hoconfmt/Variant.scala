@@ -9,6 +9,16 @@ object Variant {
   private val fork = "the fork's base renders this where released sconfig 2.0.0 breaks (unmerged, quoted keys)"
 
   val ledger: Map[String, String] = Map(
+    "catalogue/include-sharing-a-line"                                                   -> "#645 preserves same-line field order",
+    "includeOrder: a field after the include on its line"                                -> "#645 preserves same-line field order",
+    "includeOrder: a field after the include in an object"                               -> "#645 preserves same-line field order",
+    "includeOrder: fields on both sides of the include on its line"                      -> "#645 preserves same-line field order",
+    "includeOrder: a function-form include followed by a field"                          -> "#645 preserves same-line field order",
+    "includeOrder: two includes on one line"                                             -> "#645 preserves same-line field order",
+    "includeOrder: a field after the include, in an object in an array"                  -> "#645 preserves same-line field order",
+    "duplicatedComment: on an appended field"                                            -> "#601 renders the appended comment once",
+    "duplicatedComment: on an appended field, in an object"                              -> "#601 renders the appended comment once",
+    "numeric: Infinity"                                                                  -> "#634 changes overflowing-number rendering; the fixed-point guard refuses",
     "showcase/03-dev-prod"                                                               -> fork,
     "showcase/04-library-file"                                                           -> "the detached licence header is kept",
     "catalogue/detached-array-comment"                                                   -> "the detached array-element comment is kept",
