@@ -77,7 +77,8 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   def withSubstitution(depth: Int, field: String): String =
-    "a {" * depth + "x=1\n" + field + "\n" + "}" * depth
+    // A sibling per level keeps parents explicit, avoiding sconfig's JS long-dotted-path refusal.
+    "a { s=0\n" * depth + "x=1\n" + field + "\n" + "}" * depth
 
   for ((name, field) <- substitutions) {
     test(s"a $name substitution is not nesting: $limit levels format, one more refuses") {
@@ -100,7 +101,7 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   test("a substitution with a substitution-like brace inside a string or comment is still skipped") {
-    val source = "a {" * limit + "x=\"${\"\ny=${z} # ${\n" + "}" * limit
+    val source = "a { s=0\n" * limit + "x=\"${\"\ny=${z} # ${\n" + "}" * limit
     assert(HoconFormatter.format(source).isRight)
   }
 
