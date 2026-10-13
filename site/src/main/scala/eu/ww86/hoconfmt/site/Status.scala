@@ -7,13 +7,15 @@ import eu.ww86.hoconfmt.{Refusal, Verdict}
   */
 enum RefusalKind derives CanEqual {
 
-  case NotHocon, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, ShadowedByInclude, ReservedName,
+  case NotHocon, NestingTooDeep, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude, ShadowedByInclude,
+    ReservedName,
     UnstableOutput, NotUtf8
 
   /** The name the `web` script publishes in its JavaScript API, which `HoconFormatterJsSpec`
     * pins there; the defect table lists refusals by it, and `ContributionsSpec` pins the set.
     */
   def name: String = this match {
+    case NestingTooDeep    => "nestingTooDeep"
     case NotHocon          => "notHocon"
     case OtherFormat       => "otherFormat"
     case BrokenOutput      => "brokenOutput"
@@ -30,6 +32,7 @@ enum RefusalKind derives CanEqual {
 object RefusalKind {
   def of(refusal: Refusal): RefusalKind = refusal match {
     case Refusal.NotUtf8                    => RefusalKind.NotUtf8
+    case Refusal.NestingTooDeep(_)          => RefusalKind.NestingTooDeep
     case Refusal.NotHocon(_)                => RefusalKind.NotHocon
     case Refusal.OtherFormat(_)             => RefusalKind.OtherFormat
     case Refusal.BrokenOutput(_)            => RefusalKind.BrokenOutput
@@ -79,8 +82,9 @@ object Status {
   }
 
   private def explanation(kind: RefusalKind): String = kind match {
-    case RefusalKind.NotHocon    => "The parser cannot read this text as HOCON. Check the syntax at the location below."
-    case RefusalKind.OtherFormat =>
+    case RefusalKind.NotHocon       => "The parser cannot read this text as HOCON. Check the syntax at the location below."
+    case RefusalKind.NestingTooDeep => "The text exceeds the nesting limit checked before parsing on every platform."
+    case RefusalKind.OtherFormat    =>
       "The file name specifies another format. This formatter writes HOCON only."
     case RefusalKind.BrokenOutput =>
       "Formatting would produce text that the parser cannot read back."
@@ -98,6 +102,7 @@ object Status {
   }
 
   private def learnMore(kind: RefusalKind): Option[String] = kind match {
+    case RefusalKind.NestingTooDeep                                                => Some(s"$limitationsPage#excessive-nesting")
     case RefusalKind.NotUtf8                                                       => None
     case RefusalKind.NotHocon | RefusalKind.OtherFormat | RefusalKind.ReservedName => Some(limitationsPage)
     case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude | RefusalKind.MovedInclude |

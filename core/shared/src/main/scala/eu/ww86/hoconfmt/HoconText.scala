@@ -15,6 +15,29 @@ private[hoconfmt] object HoconText {
   /** `text.substring(start, end)`; code is whatever no span covers. */
   final case class Span(kind: Kind, start: Int, end: Int)
 
+  // Ten times the deepest explicit nesting in the 1,257-file corpus; see limitations.md.
+  val MaxNestingDepth = 80
+
+  /** Stop before the parser or include passes can spend resources on unbounded nesting. */
+  def checkNesting(text: String): Either[Refusal, Unit] = {
+    @tailrec
+    def scan(index: Int, depth: Int): Either[Refusal, Unit] =
+      if (index >= text.length) Right(())
+      else if (text.startsWith("\"\"\"", index)) scan(endOfTripleQuoted(text, index + 3), depth)
+      else if (text.charAt(index) == '"') scan(endOfQuoted(text, index + 1), depth)
+      else if (text.charAt(index) == '#' || text.startsWith("//", index)) scan(endOfLine(text, index), depth)
+      else {
+        text.charAt(index) match {
+          case '{' | '[' =>
+            if (depth == MaxNestingDepth) Left(Refusal.NestingTooDeep(MaxNestingDepth))
+            else scan(index + 1, depth + 1)
+          case '}' | ']' => scan(index + 1, math.max(0, depth - 1))
+          case _         => scan(index + 1, depth)
+        }
+      }
+    scan(0, 0)
+  }
+
   def spans(text: String): Vector[Span] = {
     @tailrec
     def scan(i: Int, found: Vector[Span]): Vector[Span] =

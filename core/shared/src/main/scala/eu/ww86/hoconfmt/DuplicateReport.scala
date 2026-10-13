@@ -84,7 +84,7 @@ object DuplicateReport {
     findings(source, Some(origin))
 
   private def findings(source: String, origin: Option[String]): Either[Refusal, List[Finding]] =
-    try document(source, origin).map(tree => report(defined(tree)))
+    try HoconText.checkNesting(source).flatMap(_ => document(source, origin).map(tree => report(defined(tree))))
     catch {
       case _: StackOverflowError => Left(HoconFormatter.stackCapacityRefusal)
     }

@@ -39,6 +39,10 @@ follows and the mismatches left open: [naming](naming.md).
 
 ## The pipeline
 
+A lexical [depth check](limitations.md#excessive-nesting) runs before this pipeline and before
+duplicate analysis: more than 80 brace/bracket levels in code refuses as `NestingTooDeep`,
+with the same limit on every platform. Strings and comments do not consume the budget.
+
 1. A [preserved preamble](#the-preserved-preamble) is taken first: the leading block of comments
    and blank lines is kept verbatim and stands in for the parse as blank lines, one per line, so
    every line number stays the file's own and the block is put back in front of the formatted body.

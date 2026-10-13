@@ -59,6 +59,7 @@ class ContributionsSpec extends munit.FunSuite {
       Set(
         "notUtf8",
         "notHocon",
+        "nestingTooDeep",
         "otherFormat",
         "brokenOutput",
         "lostComment",

@@ -66,7 +66,7 @@ object HoconFormatter {
     Refusal.NotHocon("input nesting exceeds available stack capacity")
 
   private def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] =
-    try formatChecked(source, origin, options)
+    try HoconText.checkNesting(source).flatMap(_ => formatChecked(source, origin, options))
     catch {
       case _: StackOverflowError => Left(stackCapacityRefusal)
     }

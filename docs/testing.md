@@ -12,6 +12,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
 | `PreambleSpec` | `core/default-shared` | the [preserved preamble](limitations.md#the-preserved-preamble) on the published core: the rule's boundary cases, the verbatim header, and that a refusal from the body still names the file's own lines; the page's fork keeps the same comments through its carrier, pinned in `CommentCarrierSpec` |
+| `NestingDepthSpec` | `core/shared` | the 80-level lexical resource limit: boundary objects/arrays with and without includes, strings/comments ignored, and early refusal before duplicate parsing |
 | `DuplicateReportSpec` | `core/shared` | the duplicate report: replaced definitions and ancestor barriers, independent array scopes, and resolution showing which values survive |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |
@@ -128,8 +129,8 @@ in core test and site Scala data; tests and the site use it without runtime file
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
 `target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
 Verdicts are `formatted`, `already-formatted` (only for now or pending), or
-`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `other-format`, `broken-output`,
-`lost-comment`, `lost-include`, `moved-include`, and `unstable-output`. The generator embeds the
+`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `nesting-too-deep`, `other-format`, `broken-output`,
+`lost-comment`, `lost-include`, `moved-include`, `shadowed-by-include`, `reserved-name`, and `unstable-output`. The generator embeds the
 kinds it
 accepts as `ExampleData.kinds`, and `ExamplesSpec` maps every `Refusal` case through an
 exhaustive `kindOf` and requires the result to be exactly that set, so the next `Refusal`

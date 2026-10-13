@@ -28,6 +28,27 @@ the include across the field, potentially changing which value wins. The playgro
 “Left unchanged” with the reason; file runs report the refusal and leave the original bytes
 untouched. The full reproduction is under [moved includes](#sconfig-defects-the-formatter-refuses).
 
+## Excessive nesting
+
+`Refusal.NestingTooDeep(80)` leaves input with more than **80 simultaneous opening `{` or `[`
+delimiters in code** unchanged, with the reason `input nesting exceeds the maximum depth of 80`.
+The pre-check runs before include masking, parsing, rendering and duplicate analysis on JVM,
+Scala.js and Scala Native. It uses constant space, stops at the first excess opening delimiter,
+and does not depend on catching a stack error. Objects and arrays share the budget, including an
+explicit root object; siblings do not accumulate depth. Strings (ordinary, escaped and
+triple-quoted) and `#` / `//` comments are ignored. This is a lexical resource limit, not a syntax
+validator or a bound on the object tree implied by dotted keys.
+
+The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
+1,257-file corpus of 24 public repositories: **8**, including Akka's
+`akka-cluster-sharding/src/main/resources/reference.conf` at
+`164b3c6615b0ac1957c4ef13b0cff6e2a43a79c0`. All 1,255 UTF-8 inputs were scanned; the other two
+already refuse as `NotUtf8`. The scan counted peak brace/bracket depth outside strings and
+comments, in source order. Eighty gives substantial headroom for real files while bounding the
+recursive parser and the include-aware passes before deeply nested input can consume minutes
+and gigabytes. The bare sconfig 10,000-object JVM stack failure is pinned separately as a
+`library:` case in `SconfigDefectsSpec`.
+
 ## sconfig defects the formatter refuses
 
 The refused defects below are reproduced with a bare sconfig parse-render round trip, with no
@@ -37,8 +58,9 @@ writes the file. The same defect suite also tracks the accepted numeric limitati
 Each has a **failing** test in `SconfigDefectsSpec` asserting what sconfig ought to produce. The
 plain-equivalent cases first assert that both forms resolve to the same value; the numeric cases
 compare string conversion or value type before and after rendering. A failure therefore prints a diff ready to paste into an upstream issue. Run them with
-`sbt libraryDefects`, on all three platforms: 28 failures on the JVM and Native, 29 on Scala.js
-in `SconfigDefectsSpec` (plus the separate JVM detached-comment guard).
+`sbt libraryDefects`, on all three platforms (plus the separate JVM detached-comment guard).
+The 10,000-level library reproduction added for the depth guard was run only on the JVM;
+Native deep-input reproductions require a process timeout and memory cap.
 When a sconfig release fixes one, its test turns green: update the corresponding refusal or
 numeric output pin and the entry here. The numeric cases below remain accepted. sconfig 2.0.0
 was tried on 2026-09-25: the regular suites pass on it, and the defects then known remain.

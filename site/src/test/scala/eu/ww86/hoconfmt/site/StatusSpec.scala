@@ -82,6 +82,7 @@ class StatusSpec extends munit.FunSuite {
   }
 
   private def refusalOf(kind: RefusalKind): eu.ww86.hoconfmt.Refusal = kind match {
+    case RefusalKind.NestingTooDeep    => eu.ww86.hoconfmt.Refusal.NestingTooDeep(80)
     case RefusalKind.NotHocon          => eu.ww86.hoconfmt.Refusal.NotHocon("no")
     case RefusalKind.OtherFormat       => eu.ww86.hoconfmt.Refusal.OtherFormat("JSON")
     case RefusalKind.BrokenOutput      => eu.ww86.hoconfmt.Refusal.BrokenOutput("no")
