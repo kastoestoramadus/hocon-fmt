@@ -6,6 +6,14 @@ class NestingDepthSpec extends munit.FunSuite {
   val limit  = 80
   val reason = s"input nesting exceeds the maximum depth of $limit"
 
+  val substitutions = List(
+    "plain"            -> "y=${z}",
+    "optional"         -> "y=${?z}",
+    "quoted key"       -> "y=${\"a.b\"}",
+    "quoted brace key" -> "y=${\"a{\".b}",
+    "concatenation"    -> "y=a ${x} b ${?w}"
+  )
+
   def objects(depth: Int, include: Boolean): String =
     "a {" * depth + (if (include) "include \"missing.conf\"\nx=1" else "x=1") + "}" * depth
 
@@ -66,6 +74,34 @@ class NestingDepthSpec extends munit.FunSuite {
 
   test("duplicate analysis refuses excessive nesting before its document parse") {
     assertEquals(DuplicateReport.findings(objects(limit + 1, include = true)).left.map(_.reason), Left(reason))
+  }
+
+  def withSubstitution(depth: Int, field: String): String =
+    "a {" * depth + "x=1\n" + field + "\n" + "}" * depth
+
+  for ((name, field) <- substitutions) {
+    test(s"a $name substitution is not nesting: $limit levels format, one more refuses") {
+      val formatted = HoconFormatter.format(withSubstitution(limit, field))
+      assert(formatted.isRight, formatted.toString)
+      assertEquals(
+        HoconFormatter.format(withSubstitution(limit + 1, field)).left.map(_.reason),
+        Left(reason)
+      )
+    }
+  }
+
+  test("a substitution at any level leaves the depth count unchanged") {
+    def at(level: Int, depth: Int): String =
+      (1 to depth).map(i => "a {" + (if (i == level) "y=${z}\n" else "")).mkString + "x=1" + "}" * depth
+    for (level <- 1 to limit) {
+      assertEquals(HoconText.checkNesting(at(level, limit)), Right(()), s"level $level")
+      assert(HoconText.checkNesting(at(level, limit + 1)).isLeft, s"level $level")
+    }
+  }
+
+  test("a substitution with a substitution-like brace inside a string or comment is still skipped") {
+    val source = "a {" * limit + "x=\"${\"\ny=${z} # ${\n" + "}" * limit
+    assert(HoconFormatter.format(source).isRight)
   }
 
   test("10000 nested objects refuse before parsing, with and without an include") {
