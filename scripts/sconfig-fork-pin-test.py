@@ -36,7 +36,7 @@ class SconfigForkPinTest(unittest.TestCase):
     def test_build_version_matches_reviewed_tag(self):
         versions = re.findall(r'^val sconfigFork = "([^"]+)"$', self.build, re.M)
         self.assertEqual(versions, [f'2.1.0-hocon-fmt-{self.sha[:10]}'])
-        self.assertRegex(self.build, r'^val sconfig = "2\.0\.0"',)
+        self.assertRegex(self.build, r'(?m)^val sconfig = "2\.0\.0"',)
 
     def test_documented_sha_matches_reviewed_tag(self):
         pins = re.findall(r'Pinned fork commit: `([0-9a-f]{40})`', self.docs)
