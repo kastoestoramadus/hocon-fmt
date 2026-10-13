@@ -11,6 +11,7 @@ object UseIt {
   // The same sentence heads the Mill section of docs/usage.md and the Mill row of the README.
   val millNote =
     "Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9."
+  val laterNote = "Not published at v0.1.0: this channel ships in wave 2. Until then run the JVM CLI from a checkout."
   final case class Integration(id: String, title: String, module: Option[String] = None)
   val integrations = List(
     Integration("native", "CLI native"),
@@ -29,7 +30,7 @@ object UseIt {
   )
 
   def fromHash(hash: String): String =
-    integrations.find(i => hash == s"#use-it-${i.id}").fold("native")(_.id)
+    integrations.find(i => hash == s"#use-it-${i.id}").fold("sbt")(_.id)
 
   def apply(): HtmlElement = {
     val selected = Var(fromHash(dom.window.location.hash))
@@ -65,6 +66,7 @@ object UseIt {
                 pre(code(UseItExamples.commands.getOrElse(id, ""))),
                 if (id == "pre-commit") p(wave2Note) else emptyNode,
                 if (id == "mill") p(millNote) else emptyNode,
+                if (id == "native" || id == "npm") p(laterNote) else emptyNode,
                 p(UseItExamples.actions.getOrElse(id, Nil).map(command => code(command + " "))),
 
                 p(
@@ -79,7 +81,10 @@ object UseIt {
           )
         }
       },
-      p(cls := "muted", "Some channels follow v0.1.0; until their artifacts are published, run from a checkout."),
+      p(
+        cls := "muted",
+        "v0.1.0 publishes the JVM core and the sbt 1.x, Gradle and Maven plugins. Native binaries, npm, PyPI (pre-commit hooks), Mill and sbt 2 follow later; until their artifacts are published, run from a checkout."
+      ),
       h3("Configure"),
       p(
         "The command line takes its style from ",
