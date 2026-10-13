@@ -28,26 +28,16 @@ the include across the field, potentially changing which value wins. The playgro
 “Left unchanged” with the reason; file runs report the refusal and leave the original bytes
 untouched. The full reproduction is under [moved includes](#sconfig-defects-the-formatter-refuses).
 
-## Excessive nesting
+## Comment order on repeated keys
 
-`Refusal.NestingTooDeep(80)` leaves input with more than **80 simultaneous opening `{` or `[`
-delimiters in code** unchanged, with the reason `input nesting exceeds the maximum depth of 80`.
-The pre-check runs before include masking, parsing, rendering and duplicate analysis on JVM,
-Scala.js and Scala Native. It uses constant space, stops at the first excess opening delimiter,
-and does not depend on catching a stack error. Objects and arrays share the budget, including an
-explicit root object; siblings do not accumulate depth. Strings (ordinary, escaped and
-triple-quoted) and `#` / `//` comments are ignored. This is a lexical resource limit, not a syntax
-validator or a bound on the object tree implied by dotted keys.
-
-The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
-1,257-file corpus of 24 public repositories: **8**, including Akka's
-`akka-cluster-sharding/src/main/resources/reference.conf` at
-`164b3c6615b0ac1957c4ef13b0cff6e2a43a79c0`. All 1,255 UTF-8 inputs were scanned; the other two
-already refuse as `NotUtf8`. The scan counted peak brace/bracket depth outside strings and
-comments, in source order. Eighty gives substantial headroom for real files while bounding the
-recursive parser and the include-aware passes before deeply nested input can consume minutes
-and gigabytes. The bare sconfig 10,000-object JVM stack failure is pinned separately as a
-`library:` case in `SconfigDefectsSpec`.
+When a key appears more than once, plain sconfig 2.0.0 merges the objects and gathers their
+comments above the merged key in reverse order. The comment check compares which comments are
+present, not their order, so such a file is accepted. For example, `# first`, `a { x = 1 }`,
+`# second`, `a { y = 2 }`, `# third`, `a { z = 3 }` formats to `# third`, `# second`, `# first`,
+then one `a` with `x`, `y` and `z`. No comment is lost; they stay in the file, only their order
+changes, and a marker comment may end up away from the lines it bracketed. This hits a small share
+of the files that format today. It is not refused in v0.1.0; the second release is expected to
+refuse or preserve it.
 
 ## sconfig defects the formatter refuses
 
@@ -115,6 +105,27 @@ dropped:
   The project page's playground runs on a sconfig fork that keeps them and masks the rest, see
   below; the investigation is in
   [investigations/blank-line-comments.md](investigations/blank-line-comments.md).
+
+## Excessive nesting
+
+`Refusal.NestingTooDeep(80)` leaves input with more than **80 simultaneous opening `{` or `[`
+delimiters in code** unchanged, with the reason `input nesting exceeds the maximum depth of 80`.
+The pre-check runs before include masking, parsing, rendering and duplicate analysis on JVM,
+Scala.js and Scala Native. It uses constant space, stops at the first excess opening delimiter,
+and does not depend on catching a stack error. Objects and arrays share the budget, including an
+explicit root object; siblings do not accumulate depth. Strings (ordinary, escaped and
+triple-quoted) and `#` / `//` comments are ignored. This is a lexical resource limit, not a syntax
+validator or a bound on the object tree implied by dotted keys.
+
+The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
+1,257-file corpus of 24 public repositories: **8**, including Akka's
+`akka-cluster-sharding/src/main/resources/reference.conf` at
+`164b3c6615b0ac1957c4ef13b0cff6e2a43a79c0`. All 1,255 UTF-8 inputs were scanned; the other two
+already refuse as `NotUtf8`. The scan counted peak brace/bracket depth outside strings and
+comments, in source order. Eighty gives substantial headroom for real files while bounding the
+recursive parser and the include-aware passes before deeply nested input can consume minutes
+and gigabytes. The bare sconfig 10,000-object JVM stack failure is pinned separately as a
+`library:` case in `SconfigDefectsSpec`.
 
 ## The preserved preamble
 
