@@ -279,6 +279,10 @@ releases the option.
 
 ## Platforms
 
+The shipped Scala Native CLI starts with a 512m heap to mitigate intermittent collector crashes;
+[the improvement log](improvement-log/2026-10-13-native-initial-heap.md) records the remaining defect
+and the checks to repeat on upgrades.
+
 - **Regular expressions** must work on three engines. Scala Native runs `java.util.regex` on RE2:
   no lookaround, backreferences, possessive quantifiers or `\G` `\R` `\Z`. Scala.js translates to
   JavaScript's engine at ES2015, which has no multiline `^`. Hence `\binclude` rather than

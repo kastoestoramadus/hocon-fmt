@@ -271,6 +271,8 @@ jobs:
       # The smoke step release.yml runs against the binary the acceptance suite has just linked.
       - name: Release smoke test
         run: scripts/release-smoke-test.sh
+      - name: Native CLI stress test
+        run: scripts/native-stress.sh cli/.native/target/scala-3.9.0/hocon-fmt 100 100
 
   # Report-only: shared runners are too noisy to fail a build on. main keeps the history in
   # refs/notes/benchmarks; a pull request is compared against it in the job summary.
