@@ -3,6 +3,7 @@ package eu.ww86.hoconfmt
 import org.ekrich.config.impl.*
 import org.ekrich.config.parser.{ConfigDocumentFactory, ConfigNode}
 
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
@@ -83,7 +84,10 @@ object DuplicateReport {
     findings(source, Some(origin))
 
   private def findings(source: String, origin: Option[String]): Either[Refusal, List[Finding]] =
-    document(source, origin).map(tree => report(defined(tree)))
+    try document(source, origin).map(tree => report(defined(tree)))
+    catch {
+      case _: StackOverflowError => Left(HoconFormatter.stackCapacityRefusal)
+    }
 
   private def document(source: String, origin: Option[String]): Either[Refusal, ConfigNodeRoot] = {
     val options = origin.fold(HoconFormatter.parseOptions)(HoconFormatter.parseOptions.setOriginDescription)
@@ -149,7 +153,7 @@ object DuplicateReport {
   private val emptyOutline = Outline(Vector.empty, Vector.empty)
 
   private def outlineOf(tree: ConfigNodeRoot): Outline =
-    walk(tree, Nil, 1, emptyOutline, Nil, positionsTrusted = true)._2
+    walk(List(Visit(tree, Nil, Nil, positionsTrusted = true)), 1, emptyOutline)
 
   private def defined(tree: ConfigNodeRoot): Vector[Definition] =
     outlineOf(tree).definitions
@@ -166,70 +170,43 @@ object DuplicateReport {
     * nothing in the tree to tell that it is not the piece's own, so nothing inside a concatenation
     * is read off it.
     */
-  private def walk(
+  private case class Visit(
       node: ConfigNode,
       at: List[KeyPath.Segment],
-      line: Int,
-      found: Outline,
       arrayScope: List[Int],
       positionsTrusted: Boolean
-  ): (Int, Outline) =
-    node match {
-      case field: ConfigNodeField => walkField(field, at, line, found, arrayScope, positionsTrusted)
-      // The definition offset identifies each array with fields uniquely; empty arrays have no
-      // descendants to compare. Nesting keeps even arrays starting at the same offset apart.
-      case array: ConfigNodeArray =>
-        walkItems(
-          array.children.asScala.toList,
-          at,
-          line,
-          found,
-          0,
-          arrayScope :+ found.definitions.size,
-          positionsTrusted
-        )
-      case concat: ConfigNodeConcatenation =>
-        walkAll(concat.children.asScala.toList, at, line, found, arrayScope, positionsTrusted = false)
-      case complex: ConfigNodeComplexValue =>
-        walkAll(complex.children.asScala.toList, at, line, found, arrayScope, positionsTrusted)
-      case _ => (line + newlines(node.render), found)
-    }
+  )
 
-  private def walkAll(
-      children: List[ConfigNode],
-      at: List[KeyPath.Segment],
-      line: Int,
-      found: Outline,
-      arrayScope: List[Int],
-      positionsTrusted: Boolean
-  ): (Int, Outline) =
-    children.foldLeft((line, found)) { case ((current, acc), child) =>
-      walk(child, at, current, acc, arrayScope, positionsTrusted)
-    }
-
-  /** The objects in an array are reached by their position, which is part of where their fields
-    * stand: the same key in two elements is not two definitions of one path.
-    */
-  private def walkItems(
-      children: List[ConfigNode],
-      at: List[KeyPath.Segment],
-      line: Int,
-      found: Outline,
-      index: Int,
-      arrayScope: List[Int],
-      positionsTrusted: Boolean
-  ): (Int, Outline) =
-    children
-      .foldLeft((line, found, index)) { case ((current, acc, next), child) =>
-        child match {
-          case value: AbstractConfigNodeValue =>
-            val (after, outline) =
-              walk(value, at :+ KeyPath.Segment.Index(next), current, acc, arrayScope, positionsTrusted)
-            (after, outline, next + 1)
-          case other => (current + newlines(other.render), acc, next)
-        }
+  // Pending visits retain source order and each child's scope without a call frame per level.
+  @tailrec
+  private def walk(pending: List[Visit], line: Int, found: Outline): Outline = pending match {
+    case Nil                                                   => found
+    case Visit(node, at, arrayScope, positionsTrusted) :: rest =>
+      node match {
+        case field: ConfigNodeField =>
+          val (children, contents) = walkField(field, at, line, found, arrayScope, positionsTrusted)
+          walk(children ::: rest, line, contents)
+        // The definition offset identifies arrays with fields uniquely; nesting distinguishes
+        // arrays starting at the same offset. Empty arrays have no descendants to compare.
+        case array: ConfigNodeArray =>
+          val scope         = arrayScope :+ found.definitions.size
+          val (_, reversed) = array.children.asScala.foldLeft((0, List.empty[Visit])) { case ((index, visits), child) =>
+            child match {
+              case value: AbstractConfigNodeValue =>
+                (index + 1, Visit(value, at :+ KeyPath.Segment.Index(index), scope, positionsTrusted) :: visits)
+              case other => (index, Visit(other, at, scope, positionsTrusted) :: visits)
+            }
+          }
+          walk(reversed.reverse ::: rest, line, found)
+        case concat: ConfigNodeConcatenation =>
+          val children = concat.children.asScala.toList.map(Visit(_, at, arrayScope, positionsTrusted = false))
+          walk(children ::: rest, line, found)
+        case complex: ConfigNodeComplexValue =>
+          val children = complex.children.asScala.toList.map(Visit(_, at, arrayScope, positionsTrusted))
+          walk(children ::: rest, line, found)
+        case _ => walk(rest, line + newlines(node.render), found)
       }
-      .match { case (end, outline, _) => (end, outline) }
+  }
 
   private def walkField(
       field: ConfigNodeField,
@@ -238,7 +215,7 @@ object DuplicateReport {
       found: Outline,
       arrayScope: List[Int],
       positionsTrusted: Boolean
-  ): (Int, Outline) = {
+  ): (List[Visit], Outline) = {
     val segments = pathOf(field.path)
     val path     = at ++ segments
     // Every field leaves one definition of its own behind, so the count of what stands in `found`
@@ -263,12 +240,11 @@ object DuplicateReport {
         found.addAll(implicitObjects(at, segments, line, position, holds, arrayScope, positionsTrusted)).add(own)
       }
     // The path and the separator only advance the line; the value may hold fields of its own.
-    field.children.asScala.toList.foldLeft((line, contents)) { case ((current, acc), child) =>
-      child match {
-        case value: AbstractConfigNodeValue => walk(value, path, current, acc, arrayScope, positionsTrusted)
-        case other                          => (current + newlines(other.render), acc)
-      }
+    val children = field.children.asScala.toList.collect {
+      case value: AbstractConfigNodeValue      => Visit(value, path, arrayScope, positionsTrusted)
+      case other if newlines(other.render) > 0 => Visit(other, path, arrayScope, positionsTrusted)
     }
+    (children, contents)
   }
 
   /** The masked form of an include directive is a field whose key and value spell the placeholder
@@ -376,36 +352,58 @@ object DuplicateReport {
     case _            => ""
   }
 
-  private def objectValued(value: ConfigNode): Boolean = value match {
-    case _: ConfigNodeObject => true
-    // An object written beside another merges with it rather than replacing it.
-    case concat: ConfigNodeConcatenation => concat.children.asScala.exists(objectValued)
-    case _                               => false
+  private def objectValued(value: ConfigNode): Boolean = {
+    @tailrec
+    def loop(pending: List[ConfigNode]): Boolean = pending match {
+      case Nil                        => false
+      case (_: ConfigNodeObject) :: _ => true
+      // An object written beside another merges with it rather than replacing it.
+      case (concat: ConfigNodeConcatenation) :: rest => loop(concat.children.asScala.toList ::: rest)
+      case _ :: rest                                 => loop(rest)
+    }
+    value match {
+      case _: ConfigNodeObject        => true
+      case _: ConfigNodeConcatenation => loop(List(value))
+      case _                          => false
+    }
   }
 
   /** Whether an object value holds no value inside it. Such a value adds nothing to a merge, so
     * replacing a value that is not an object is the only work it does.
     */
-  private def writesNothing(value: ConfigNode): Boolean = value match {
-    case objectValue: ConfigNodeObject =>
-      objectValue.children.asScala.forall {
-        case field: ConfigNodeField => writesNothing(field.value)
-        case _                      => true
-      }
-    // An object written beside another merges with it, so a concatentation writes nothing when
-    // none of its parts does.
-    case concat: ConfigNodeConcatenation =>
-      concat.children.asScala.forall {
-        case part: AbstractConfigNodeValue => writesNothing(part)
-        case _                             => true
-      }
-    case _ => false
+  private def writesNothing(value: ConfigNode): Boolean = {
+    @tailrec
+    def loop(pending: List[ConfigNode]): Boolean = pending match {
+      case Nil                                     => true
+      case (objectValue: ConfigNodeObject) :: rest =>
+        val fields = objectValue.children.asScala.toList.collect { case field: ConfigNodeField => field.value }
+        loop(fields ::: rest)
+      // An object concatenation writes nothing only when none of its parts does.
+      case (concat: ConfigNodeConcatenation) :: rest =>
+        val parts = concat.children.asScala.toList.collect { case part: AbstractConfigNodeValue => part }
+        loop(parts ::: rest)
+      case _ => false
+    }
+    value match {
+      case _: ConfigNodeObject | _: ConfigNodeConcatenation => loop(List(value))
+      case _                                                => false
+    }
   }
 
-  private def holdsSubstitution(node: ConfigNode): Boolean = node match {
-    case simple: ConfigNodeSimpleValue   => Tokens.isSubstitution(simple.token)
-    case complex: ConfigNodeComplexValue => complex.children.asScala.exists(holdsSubstitution)
-    case _                               => false
+  private def holdsSubstitution(node: ConfigNode): Boolean = {
+    @tailrec
+    def loop(pending: List[ConfigNode]): Boolean = pending match {
+      case Nil                                     => false
+      case (simple: ConfigNodeSimpleValue) :: rest =>
+        if (Tokens.isSubstitution(simple.token)) true else loop(rest)
+      case (complex: ConfigNodeComplexValue) :: rest => loop(complex.children.asScala.toList ::: rest)
+      case _ :: rest                                 => loop(rest)
+    }
+    node match {
+      case simple: ConfigNodeSimpleValue => Tokens.isSubstitution(simple.token)
+      case _: ConfigNodeComplexValue     => loop(List(node))
+      case _                             => false
+    }
   }
 
   private def newlines(text: String): Int = text.count(_ == '\n')

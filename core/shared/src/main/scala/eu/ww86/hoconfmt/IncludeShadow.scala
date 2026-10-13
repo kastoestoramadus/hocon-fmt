@@ -3,6 +3,7 @@ package eu.ww86.hoconfmt
 import org.ekrich.config.{ConfigList, ConfigObject, ConfigValue}
 
 import scala.jdk.CollectionConverters.*
+import scala.annotation.tailrec
 import scala.util.Try
 
 /** Finds the definitions whose dropping would let an include's contents through.
@@ -83,23 +84,25 @@ private[hoconfmt] object IncludeShadow {
     * only by standing at the very top, where no include can stand before it. Objects, arrays and
     * values all carry theirs.
     */
-  private def keptValues(root: ConfigObject): Set[(KeyPath, Int)] =
-    root.entrySet.asScala.iterator
-      .flatMap(entry => valuesAt(List(KeyPath.Segment.Name(entry.getKey)), entry.getValue))
-      .toSet
-
-  private def valuesAt(path: List[KeyPath.Segment], value: ConfigValue): Set[(KeyPath, Int)] = value match {
-    case objectValue: ConfigObject =>
-      objectValue.entrySet.asScala.iterator
-        .flatMap(entry => valuesAt(path :+ KeyPath.Segment.Name(entry.getKey), entry.getValue))
-        .toSet
-        .incl(KeyPath(path) -> objectValue.origin.lineNumber)
-    case list: ConfigList =>
-      list.asScala.iterator.zipWithIndex
-        .flatMap { case (item, at) => valuesAt(path :+ KeyPath.Segment.Index(at), item) }
-        .toSet
-        .incl(KeyPath(path) -> list.origin.lineNumber)
-    case leaf => Set(KeyPath(path) -> leaf.origin.lineNumber)
+  private def keptValues(root: ConfigObject): Set[(KeyPath, Int)] = {
+    @tailrec
+    def loop(pending: List[(List[KeyPath.Segment], ConfigValue)], kept: Set[(KeyPath, Int)]): Set[(KeyPath, Int)] =
+      pending match {
+        case Nil                   => kept
+        case (path, value) :: rest =>
+          val children = value match {
+            case objectValue: ConfigObject =>
+              objectValue.entrySet.asScala.toList.map(entry =>
+                (path :+ KeyPath.Segment.Name(entry.getKey), entry.getValue)
+              )
+            case list: ConfigList =>
+              list.asScala.toList.zipWithIndex.map { case (item, at) => (path :+ KeyPath.Segment.Index(at), item) }
+            case _ => Nil
+          }
+          loop(children ::: rest, kept.incl(KeyPath(path) -> value.origin.lineNumber))
+      }
+    val children = root.entrySet.asScala.toList.map(entry => (List(KeyPath.Segment.Name(entry.getKey)), entry.getValue))
+    loop(children, Set.empty)
   }
 
   /** Whether the merge kept the definition: a value stands at its path on its line, and no later
@@ -414,18 +417,27 @@ private[hoconfmt] object IncludeShadow {
       case _                     => false
     }
 
+  @tailrec
   private def valueAt(value: ConfigValue, segments: List[KeyPath.Segment]): Option[ConfigValue] =
     segments match {
       case Nil                                => Some(value)
       case KeyPath.Segment.Name(name) :: rest =>
         value match {
-          case objectValue: ConfigObject => Option(objectValue.get(name)).flatMap(valueAt(_, rest))
-          case _                         => None
+          case objectValue: ConfigObject =>
+            Option(objectValue.get(name)) match {
+              case Some(next) => valueAt(next, rest)
+              case None       => None
+            }
+          case _ => None
         }
       case KeyPath.Segment.Index(at) :: rest =>
         value match {
-          case list: ConfigList => list.asScala.lift(at).flatMap(valueAt(_, rest))
-          case _                => None
+          case list: ConfigList =>
+            list.asScala.lift(at) match {
+              case Some(next) => valueAt(next, rest)
+              case None       => None
+            }
+          case _ => None
         }
     }
 
