@@ -1,1 +1,1 @@
-libraryDependencies += "org.ekrich" %% "sconfig" % "1.12.4"
+libraryDependencies += "org.ekrich" %% "sconfig" % "2.0.0"
