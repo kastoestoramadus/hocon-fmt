@@ -57,6 +57,7 @@ object JsonReport {
 
   private def kind(refusal: Refusal): String = refusal match {
     case Refusal.NotUtf8                    => "NotUtf8"
+    case Refusal.NestingTooDeep(_)          => "NestingTooDeep"
     case Refusal.NotHocon(_)                => "NotHocon"
     case Refusal.OtherFormat(_)             => "OtherFormat"
     case Refusal.BrokenOutput(_)            => "BrokenOutput"

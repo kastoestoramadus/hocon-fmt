@@ -12,7 +12,7 @@ sbt test                  # core + cli on JVM, Scala.js, Scala Native, web, and 
 sbt coverageJvm           # statement and branch coverage on the JVM (reports under */target/scala-*/scoverage-report; not a gate)
 sbt crossCompile          # compile every platform's tests; needs neither Node nor clang
 sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
-sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 28 (JVM, Native), 29 (JS);
+sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 29 (JVM), 30 (JS), 28 (Native);
                           # then KeepDetachedCommentsGuardSpec (JVM): red until released sconfig has the option
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt coreJVM/publishM2 javaApi/publishM2  # needed before the Gradle and Maven builds

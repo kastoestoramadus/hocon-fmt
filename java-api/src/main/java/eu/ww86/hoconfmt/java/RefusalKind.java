@@ -10,6 +10,8 @@ public enum RefusalKind {
     NotUtf8,
     /** The input is not HOCON that sconfig can read. */
     NotHocon,
+    /** The input exceeds the platform-independent lexical nesting limit. */
+    NestingTooDeep,
     /** The file is named as a format of its own that Lightbend's loader also reads. */
     OtherFormat,
     /** Output cannot be read back safely, including after UTF-8 encoding. */
@@ -42,6 +44,7 @@ public enum RefusalKind {
         return switch (refusal.productPrefix()) {
             case "NotUtf8" -> NotUtf8;
             case "NotHocon" -> NotHocon;
+            case "NestingTooDeep" -> NestingTooDeep;
             case "OtherFormat" -> OtherFormat;
             case "BrokenOutput" -> BrokenOutput;
             case "LostComment" -> LostComment;

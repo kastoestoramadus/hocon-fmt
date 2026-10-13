@@ -48,6 +48,7 @@ object HoconFormatterJs {
   /** Part of the API: a page may explain each refusal in its own words. */
   def nameOf(refusal: Refusal): String = refusal match {
     case Refusal.NotUtf8                    => "notUtf8"
+    case Refusal.NestingTooDeep(_)          => "nestingTooDeep"
     case Refusal.NotHocon(_)                => "notHocon"
     case Refusal.OtherFormat(_)             => "otherFormat"
     case Refusal.BrokenOutput(_)            => "brokenOutput"

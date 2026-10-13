@@ -58,6 +58,20 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  property("format never throws at any generated nesting depth") {
+    val depths = Gen.frequency(1 -> Gen.choose(0, 80), 4 -> Gen.choose(81, 10000))
+    forAll(depths, Gen.oneOf(false, true), Gen.oneOf(false, true)) { (depth, arrays, include) =>
+      val body =
+        if (arrays) "a=" + "[" * depth + "1" + "]" * depth
+        else "a {" * depth + "x=1" + "}" * depth
+      val source = (if (include) "include \"missing.conf\"\n" else "") + body
+      HoconFormatter.format(source) match {
+        case Left(refusal) => assert(refusal.reason.nonEmpty)
+        case Right(text)   => assert(text.nonEmpty)
+      }
+    }
+  }
+
   property("failure policies preserve the formatting verdict for every input") {
     val strict = FormatOptions
       .parse("fail-on-refusal = true\nfail-on-duplicates = true", "policy.conf")

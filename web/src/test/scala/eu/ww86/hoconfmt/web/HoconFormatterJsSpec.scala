@@ -66,6 +66,7 @@ class HoconFormatterJsSpec extends munit.FunSuite {
 
   test("every refusal has a name a page can branch on") {
     val names = Map(
+      Refusal.NestingTooDeep(80)           -> "nestingTooDeep",
       Refusal.NotUtf8                      -> "notUtf8",
       Refusal.NotHocon("")                 -> "notHocon",
       Refusal.OtherFormat("JSON")          -> "otherFormat",

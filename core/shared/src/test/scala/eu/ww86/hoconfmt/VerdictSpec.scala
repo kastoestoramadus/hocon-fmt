@@ -113,6 +113,7 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
     val refusals = List(
       Refusal.NotUtf8,
       Refusal.NotHocon("detail"),
+      Refusal.NestingTooDeep(80),
       Refusal.OtherFormat("JSON"),
       Refusal.BrokenOutput("detail"),
       Refusal.LostComment("detail"),

@@ -22,6 +22,7 @@ object ExampleGenerator {
       Set(
         "not-utf8",
         "not-hocon",
+        "nesting-too-deep",
         "other-format",
         "broken-output",
         "lost-comment",
