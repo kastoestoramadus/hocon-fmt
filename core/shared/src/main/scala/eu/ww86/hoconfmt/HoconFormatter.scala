@@ -60,7 +60,18 @@ object HoconFormatter {
   def format(source: String, origin: String, options: FormatOptions): Either[Refusal, String] =
     formatWith(source, Some(origin), options)
 
-  private def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
+  // sconfig's parser and renderer still recurse. Input beyond their capacity is unreadable
+  // here; NonFatal (and Try) deliberately excludes this recoverable traversal failure.
+  private[hoconfmt] def stackCapacityRefusal: Refusal =
+    Refusal.NotHocon("input nesting exceeds available stack capacity")
+
+  private def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] =
+    try formatChecked(source, origin, options)
+    catch {
+      case _: StackOverflowError => Left(stackCapacityRefusal)
+    }
+
+  private def formatChecked(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     val read  = reading(source)
     for {
