@@ -38,7 +38,7 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 
 | suite (where) | cases | class | notes |
 |---|---:|---|---|
-| `SconfigDefectsSpec` (core/shared) | 29 | SCONFIG | bare round trip; 28 red on JVM/Native, 29 on JS with 1.12.4; earlier main measurements predate the six numeric cases |
+| `SconfigDefectsSpec` (core/shared) | 29 | SCONFIG | bare round trip; 28 red on JVM/Native, 29 on JS with sconfig 2.0.0; earlier main measurements predate the six numeric cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
 | `HoconSpecCoverageSpec` (core/shared) | 30 | 17 SCONFIG / 13 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 13 MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
@@ -151,7 +151,7 @@ green, and the full `coreJVM` run on main fails exactly where a release will for
 | `CommentCarrierSpec` (154), `Variant` ledger (41), `KeepDetachedCommentsGuardSpec` (27) | 18 ledger entries to keep in step with the examples | `#647` | same | delete with the seam — step 4 |
 | Refusal paths for library defects: `BrokenOutput`, `UnstableOutput`, `LostComment` checks and their docs | stays as the safety net; the red list above is what would shrink | `#598`/`#600`/`#605`/`#647` | one release at a time | the checks never go: a release only stops them firing for the retired cases; update `limitations.md`, the red list and the examples' `upstream` notes |
 | `MovedInclude`/`LostInclude` guards, `IncludeMasking` (327 + 101 lines) | ours, kept forever: include handling is ours by the division of labour | [Java #733] relates, no fix | — | none |
-| Pinned `sconfig = "1.12.4"` in `build.sbt` | one line, plus the artifact set | releases v2.0.0 and later | each release | bump; a release containing `#598`/`#605` also drops the refusals named above |
+| Pinned `sconfig = "2.0.0"` in `build.sbt` | one line, plus the artifact set | releases after v2.0.0 | each release | bump; a release containing `#598`/`#605` also drops the refusals named above |
 | Documented normalisations (`//`→`#`, flattening, canonical numbers, LF/no BOM, inline comments moving) | none: renderer behaviour we ask for | none | — | never; they are the pinned style |
 
 [#733]: https://github.com/lightbend/config/issues/733

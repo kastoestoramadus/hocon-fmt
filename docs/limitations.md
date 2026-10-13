@@ -386,10 +386,10 @@ include that reaches one of these is reported and left alone.
 
 ## Speed
 
-sconfig's parser is about 27 times slower on Scala Native than on the JVM, and its renderer is the
-slow part on Scala.js. A service's `application.conf` formats in about 1 ms on Native, well under
-the process start-up; a generated 330 KB file takes about 2 s there against 0.1 s on the JVM.
-Current numbers: `scripts/bench.py report`.
+The pinned sconfig 2.0.0 dropped the exception-based loop control of 1.12.4, which cost about
+2.3 us per `break` on Scala Native. Native `format` takes about 0.8 ms for a typical file (1.12.4:
+3.6 ms) and about 0.55 s for a generated 330 KB file (1.12.4: 2.0 s; the JVM takes 0.1 s). Its
+renderer is still the slow part on Scala.js. Current numbers: `scripts/bench.py report`.
 
 ## What depending on sconfig means for your files
 
