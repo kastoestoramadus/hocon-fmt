@@ -2,12 +2,9 @@
 # Fails unless every place that carries the version holds $1, so a tag cannot release a build that
 # still says -SNAPSHOT or names another version in one of its plugins. See docs/releasing.md.
 #
-# RELEASE_WAVE narrows the check to the places the publishing wave touches. The first publish
-# ships the sbt-built JVM artifacts only (wave 1), whose versions build.sbt carries and
-# java-api/build.gradle.kts repeats for the same artifact's Gradle build; the other four places
-# may still hold what pre-release iterations left. RELEASE_WAVE=2, the full release, checks all
-# six again. release.yml passes its repository variable through; by hand the default is wave 1,
-# what a tag runs today.
+# Wave 1 checks the sbt artifacts, the Java API's Gradle build, and both standalone plugins.
+# Wave 2 also checks Mill and the pre-commit hooks. release.yml passes its repository variable;
+# by hand the default is wave 1. All six version locations are listed in docs/releasing.md.
 set -euo pipefail
 
 version="$1"
@@ -42,10 +39,11 @@ expect() { # file, pattern, minimum matches
 expect build.sbt                 "^ThisBuild / version +:= \"$re\"$" 1
 expect java-api/build.gradle.kts "^version = \"$re\"$"               1
 
+expect gradle-plugin/build.gradle.kts "^version = \"$re\"$"      1
+expect maven-plugin/pom.xml           "<version>$re</version>"   2
+
 if [ "$wave" = 2 ]; then
-  expect gradle-plugin/build.gradle.kts "^version = \"$re\"$"      1
   expect mill-plugin/build.mill         "formatterVersion = \"$re\"$" 1
-  expect maven-plugin/pom.xml           "<version>$re</version>"   2
   expect .pre-commit-hooks.yaml         "hocon-fmt(==|@)$re\""     4
 fi
 

@@ -1,8 +1,8 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.plugin.compatibility.compatibility
 
 plugins {
-    `java-gradle-plugin`
-    `maven-publish`
+    id("com.gradle.plugin-publish") version "2.2.1"
 }
 
 group = "eu.ww86"
@@ -22,10 +22,18 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 gradlePlugin {
+    website = "https://github.com/kastoestoramadus/hocon-fmt"
+    vcsUrl = "https://github.com/kastoestoramadus/hocon-fmt"
     plugins {
         create("hoconFormatter") {
             id = "eu.ww86.hocon-fmt"
             implementationClass = "eu.ww86.hoconfmt.gradle.HoconFormatterPlugin"
+            tags = listOf("hocon", "formatting", "code-quality")
+            compatibility {
+                features {
+                    configurationCache = true
+                }
+            }
             displayName = "HOCON formatter"
             description = "Formats HOCON configuration files, or checks that they are formatted."
         }
@@ -68,5 +76,18 @@ tasks.processResources {
     inputs.property("coordinates", coordinates)
     filesMatching("**/formatter.properties") {
         expand("coordinates" to coordinates)
+    }
+}
+
+// The release workflow imports the key into GnuPG. Local checks and Maven Local publication
+// need no signing key; release builds explicitly opt in, including dry runs.
+if (providers.gradleProperty("releaseSigning").isPresent) {
+    apply(plugin = "signing")
+    providers.environmentVariable("PGP_PASSPHRASE").orNull?.let {
+        extra["signing.gnupg.passphrase"] = it
+    }
+    configure<SigningExtension> {
+        useGpgCmd()
+        sign(publishing.publications)
     }
 }
