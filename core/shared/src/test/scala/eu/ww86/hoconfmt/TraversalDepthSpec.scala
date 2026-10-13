@@ -1,6 +1,11 @@
 package eu.ww86.hoconfmt
 
+import scala.concurrent.duration.*
+
 class TraversalDepthSpec extends munit.FunSuite {
+
+  // Native debug retains the report's deep-path comparison cost; this checks stack safety.
+  override def munitTimeout: Duration = 2.minutes
 
   def nested(depth: Int): String = "a {" * depth + "x=1" + "}" * depth
 
