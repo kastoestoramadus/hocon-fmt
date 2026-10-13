@@ -81,6 +81,8 @@ jobs:
         run: scripts/check-release-version-test.sh
       - name: Release preflight rejects unsafe tags and incomplete wave-2 uploads
         run: python3 scripts/release-workflow-test.py
+      - name: Check the site fork pin
+        run: python3 scripts/sconfig-fork-pin-test.py
       - name: The classifiers still answer as the gates assume
         run: scripts/changes-classifiers-test.sh
       - name: The citation checker still tells a claim from a title
