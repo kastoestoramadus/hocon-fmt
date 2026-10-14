@@ -165,6 +165,32 @@ class ReleaseGuardMutationTest(unittest.TestCase):
                 self.assertTrue(release_guard_errors(workflow),
                                 f'unguarded registry publisher: {command}')
 
+    def test_backslash_continued_publishers_are_flagged(self):
+        # A trailing backslash continues the shell line; the parsed run string keeps it
+        # as a newline, so a publisher past it must still be matched, in YAML block
+        # scalars (`run: |`) as in one-line scalars.
+        commands = (
+            ('sbt -Dmaven.repo.local=m2 coreJVM/publishSigned', 'sonaUpload'),
+            ('./mvnw -B -Prelease', 'deploy'),
+            ('./gradlew --no-daemon', 'publishPlugins'),
+            ('./mill -k', 'mill.javalib.SonatypeCentralPublishModule/publishAll'),
+            ('gh release', 'create v1.2.3 --generate-notes dist/*'),
+            ('gh release', 'upload v1.2.3 hocon-fmt-linux-x86_64'),
+            ('npm', 'publish cli/.js/target/npm-package'),
+            ('pnpm', 'publish cli/.js/target/npm-package'),
+            ('yarn npm', 'publish cli/.js/target/npm-package'),
+            ('twine', 'upload dist/*'),
+            ('uv', 'publish --token fixture'),
+        )
+        for head, tail in commands:
+            with self.subTest(head=head, tail=tail):
+                run = yaml.safe_load(f'run: |\n  {head} \\\n    {tail}\n')['run']
+                self.assertIn('\\\n', run)
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': run})
+                self.assertTrue(release_guard_errors(workflow),
+                                f'continued publisher missed: {head} \\\n    {tail}')
+
     def test_new_jobs_and_global_secrets_are_checked(self):
         workflow = self.workflow()
         workflow['jobs']['new-channel'] = {'steps': [{'run': 'gh release create v1.2.3'}]}
