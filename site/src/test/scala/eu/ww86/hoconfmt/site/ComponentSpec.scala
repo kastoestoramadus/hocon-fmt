@@ -429,9 +429,9 @@ class ComponentSpec extends munit.FunSuite {
     val container = install(Github())
     val root      = mount(container)(Playground())
     val cases     = List(
-      (2, "600", "awaiting a release; #600 open"),
+      (2, "600", "in sconfig 2.1.0; #600 open"),
       (3, "647", "Open draft, awaiting the maintainer"),
-      (10, "598", "merged upstream, awaiting a release")
+      (10, "598", "Our fix is in sconfig 2.1.0")
     )
     cases
       .foldLeft(Future.successful(())) { case (done, (index, fix, state)) =>
