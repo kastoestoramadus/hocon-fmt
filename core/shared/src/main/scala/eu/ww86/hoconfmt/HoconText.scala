@@ -44,16 +44,24 @@ private[hoconfmt] object HoconText {
     // adjacent quoted and unquoted pieces into one element (`"a"."b"` and `"a""b"` differ),
     // so a quoted piece begins a new segment only where an element can begin. Whitespace ends
     // nothing but the line: `a . b` is two elements, `a b` one, and `a.\nb` does not parse.
-    // The state is three flags, plus the enclosing key paths as a stack with their running sum,
-    // over the same walk the depth check does: a `{` makes the path just written the enclosing
-    // one for everything inside, a `[` adds no segments, and a `}` or `]` takes the innermost
-    // back out (an unbalanced closer takes nothing out, like the depth it never opened). A
+    // The state is three flags, the count of the path last written and still without its value
+    // (`pending`), and the enclosing key paths as a stack with their running sum, over the same
+    // walk the depth check does: a `{` makes the path just written the enclosing one for
+    // everything inside, a `[` adds no segments of its own but passes the pending path to the
+    // objects of its elements (the report reaches `k[0].f`), and a `}` or `]` takes the
+    // innermost back out (an unbalanced closer takes nothing out, like the depth it never
+    // opened). The separator does not spend the written path: it moves it to `pending`, and the
+    // value's spelling decides when it is used — across blanks, a newline, a comment or a
+    // substitution the value may still begin with `{` or `[` (`a.b.c =\n{ ... }` parses, and
+    // `k = ${x} { ... }` is an object concatenation), while a word or a quote is a value that is
+    // not an object and takes the count away; a `,` and a closer end the statement. A
     // substitution is skipped whole and can stand in no key path.
     @tailrec
     def scan(
         index: Int,
         depth: Int,
         segments: Int,
+        pending: Int,
         enclosing: List[Int],
         flat: Int,
         atKeyStart: Boolean,
@@ -68,6 +76,7 @@ private[hoconfmt] object HoconText {
           endOfTripleQuoted(text, index + 3),
           depth,
           beginElement(segments, atKeyStart, afterDot),
+          pending = 0,
           enclosing,
           flat,
           atKeyStart = false,
@@ -78,19 +87,21 @@ private[hoconfmt] object HoconText {
           endOfQuoted(text, index + 1),
           depth,
           beginElement(segments, atKeyStart, afterDot),
+          pending = 0,
           enclosing,
           flat,
           atKeyStart = false,
           afterDot = false
         )
       else if (text.charAt(index) == '#' || text.startsWith("//", index))
-        scan(endOfLine(text, index), depth, segments, enclosing, flat, atKeyStart, afterDot)
+        scan(endOfLine(text, index), depth, segments, pending, enclosing, flat, atKeyStart, afterDot)
       // `${x}` and `${?x}` open no object: a file that nests exactly to the limit may use them.
       else if (text.startsWith("${", index))
         scan(
           endOfSubstitution(text, index + 2),
           depth,
           segments = 0,
+          pending,
           enclosing,
           flat,
           atKeyStart = false,
@@ -100,19 +111,34 @@ private[hoconfmt] object HoconText {
         text.charAt(index) match {
           case '{' =>
             if (depth == MaxNestingDepth) Left(Refusal.NestingTooDeep(MaxNestingDepth))
-            else
+            else {
+              val enclosingPath = if (segments > 0) segments else pending
               scan(
                 index + 1,
                 depth + 1,
                 segments = 0,
-                segments :: enclosing,
-                flat + segments,
+                pending = 0,
+                enclosingPath :: enclosing,
+                flat + enclosingPath,
                 atKeyStart = true,
                 afterDot = false
               )
+            }
           case '[' =>
             if (depth == MaxNestingDepth) Left(Refusal.NestingTooDeep(MaxNestingDepth))
-            else scan(index + 1, depth + 1, segments = 0, 0 :: enclosing, flat, atKeyStart = false, afterDot = false)
+            else {
+              val enclosingPath = if (segments > 0) segments else pending
+              scan(
+                index + 1,
+                depth + 1,
+                segments = 0,
+                pending = 0,
+                enclosingPath :: enclosing,
+                flat + enclosingPath,
+                atKeyStart = false,
+                afterDot = false
+              )
+            }
           case '}' | ']' =>
             enclosing match {
               case head :: rest =>
@@ -120,6 +146,7 @@ private[hoconfmt] object HoconText {
                   index + 1,
                   math.max(0, depth - 1),
                   segments = 0,
+                  pending = 0,
                   rest,
                   flat - head,
                   atKeyStart = false,
@@ -130,26 +157,45 @@ private[hoconfmt] object HoconText {
                   index + 1,
                   math.max(0, depth - 1),
                   segments = 0,
+                  pending = 0,
                   enclosing,
                   flat,
                   atKeyStart = false,
                   afterDot = false
                 )
             }
-          // The value follows: the path, `+=` included, is whole.
+          // The value follows: the path just written, `+=` included, is whole, and stays pending
+          // until the value says whether it is an object. A second path cannot be written before
+          // the value, so a separator with a count in hand starts one; `+=` arrives here twice
+          // and the `=` of it finds nothing new to move.
           case '=' | ':' | '+' =>
-            scan(index + 1, depth, segments = 0, enclosing, flat, atKeyStart = false, afterDot = false)
-          case ','  => scan(index + 1, depth, segments = 0, enclosing, flat, atKeyStart = true, afterDot = false)
-          case '\n' => scan(index + 1, depth, segments = 0, enclosing, flat, atKeyStart = true, afterDot = false)
+            scan(
+              index + 1,
+              depth,
+              segments = 0,
+              pending = if (segments > 0) segments else pending,
+              enclosing,
+              flat,
+              atKeyStart = false,
+              afterDot = false
+            )
+          case ',' =>
+            scan(index + 1, depth, segments = 0, pending = 0, enclosing, flat, atKeyStart = true, afterDot = false)
+          case '\n' =>
+            scan(index + 1, depth, segments = 0, pending, enclosing, flat, atKeyStart = true, afterDot = false)
           // A dot ends an element; the next piece or word begins one. A leading dot belongs to
           // no path and changes nothing.
-          case '.' => scan(index + 1, depth, segments, enclosing, flat, atKeyStart = false, afterDot = segments > 0)
+          case '.' =>
+            scan(index + 1, depth, segments, pending, enclosing, flat, atKeyStart = false, afterDot = segments > 0)
           // Whitespace keeps the run: `a . b` and `a b` are one path expression either way.
-          case ' ' | '\t' | '\r' | '\u000C' => scan(index + 1, depth, segments, enclosing, flat, atKeyStart, afterDot)
-          case _                            =>
+          case ' ' | '\t' | '\r' | '\u000C' =>
+            scan(index + 1, depth, segments, pending, enclosing, flat, atKeyStart, afterDot)
+          case _ =>
+            // A word is a key, which takes the count of the path it begins, or the start of a
+            // value that is not an object, which takes the pending count away.
             if (atKeyStart || afterDot)
-              scan(index + 1, depth, segments + 1, enclosing, flat, atKeyStart = false, afterDot = false)
-            else scan(index + 1, depth, segments, enclosing, flat, atKeyStart = false, afterDot = false)
+              scan(index + 1, depth, segments + 1, pending = 0, enclosing, flat, atKeyStart = false, afterDot = false)
+            else scan(index + 1, depth, segments, pending = 0, enclosing, flat, atKeyStart = false, afterDot = false)
         }
       }
 
@@ -158,7 +204,7 @@ private[hoconfmt] object HoconText {
     def beginElement(segments: Int, atKeyStart: Boolean, afterDot: Boolean): Int =
       if (atKeyStart || afterDot) segments + 1 else segments
 
-    scan(0, 0, segments = 0, enclosing = Nil, flat = 0, atKeyStart = true, afterDot = false)
+    scan(0, 0, segments = 0, pending = 0, enclosing = Nil, flat = 0, atKeyStart = true, afterDot = false)
   }
 
   def spans(text: String): Vector[Span] = {
