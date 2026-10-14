@@ -485,10 +485,11 @@ which sbt 2 requires of a task whose result holds a file, and the sbt 2 flavour 
 scripted suites, `sbt-hocon-fmt2` (`sbt sbt2PluginTest`), mirroring the sbt 1.x ones.
 
 One override needs the sbt 2 spelling: the `hoconFormatSources` example above loads on sbt 1
-only. sbt 2 refuses to cache a task whose result holds files, and Scala 3 wants the `()` on
-`get`, so on sbt 2 write the example as
-`hoconFormatSources := Def.uncached((baseDirectory.value / "conf" ** "*.conf").get())`; the sbt 1
-form fails to load ("File and Path are not valid output types for a cached task").
+only, and on sbt 2 it fails twice. As written, Scala 3 rejects the missing call parentheses
+("method get in class PathFinder must be called with () argument"); add the `()` and sbt 2
+refuses to cache the task ("java.io.File and Path are not valid output types for a cached
+task"). The form that loads is
+`hoconFormatSources := Def.uncached((baseDirectory.value / "conf" ** "*.conf").get())`.
 
 ## Gradle
 
