@@ -167,26 +167,29 @@ report and 36 s through the command line — refused, but only after the report 
 command line examines every file; 40 levels (4,800 segments) took 224 s (measured 2026-10-14 by an
 independent review). The same scan now counts the flattened path: a `{` makes the key path just
 written the enclosing one for every definition inside, a `}` takes it back out, and a definition
-whose flattened path passes **720 segments** — six written maxima — is refused with the same
-`PathTooDeep` reason naming 720. The 20-level file above is now refused by the scan in
-milliseconds, before anything is parsed; a file at the limit itself needs about 2 s through the
-command line (720 flattened segments measured 2.0 s end to end, 2,400 about 36 s before the
-bound), most of it JVM start-up. The corpus is unaffected: its deepest flattened path measured 12
-segments, and the 1,257-file corpus's verdicts are unchanged by the bound.
+whose flattened path passes **360 segments** — three written maxima — is refused with the same
+`PathTooDeep` reason naming 360. The 20-level file above is now refused by the scan in
+milliseconds, before anything is parsed. A file at the limit itself costs the duplicate report
+about 0.1 s per call on the JVM and about 1.2 s per call on the Native binary (measured
+2026-10-14 in-process, three rounds: 88–185 ms JVM, 1,207–1,268 ms Native, for 7 × 45, 2 × 120 and
+4 × 72 segment shapes); a shape at 720 flattened segments is refused in under a millisecond on
+both. The bound was 720 until 2026-10-14: at that limit the Native report took about 9 s per
+call, which is why the limit was halved. The corpus is unaffected: its deepest flattened path
+measured 12 segments, and the 1,257-file corpus's verdicts are unchanged by the bound.
 
 What the flattened bound does not change: the report's total work still grows with the number of
-definitions, as every pass over a file does. A file of many definitions at the limit — fifty
-120-segment leaves under a 600-segment enclosing chain, 38 KB — spends about 16 s in the report,
-each leaf inheriting the enclosing segments; within the bound, shortening the paths is what
-shortens the run.
+definitions, as every pass over a file does. Each definition inherits the enclosing segments, so
+a file of many definitions under one long enclosing path costs more than a file of few, even when
+every definition sits within the bound; within the bound, shortening the paths is what shortens
+the run.
 
 The written limit is ten times the longest dotted key path measured across the 34,644 files of the
 corpus scanned on 2026-10-14, sources included — 11 segments, in a test source of the
 apache-pekko-connectors repository — and the repository's own `.conf` files reach 3; the flattened
-limit of 720 is sixty times the deepest flattened path the corpus reaches (12) and eight times the
+limit of 360 is thirty times the deepest flattened path the corpus reaches (12) and four times the
 generous joint bound of its two recorded maxima (depth 8 times path 11). Longer paths can still be
 formatted by splitting the definition (`a.b.c = 1` for `a { b.c = 1 }`), which the flattened bound
-carries up to the same 720 segments — past about 2,400 the split form was refused as
+carries up to the same 360 segments — past about 2,400 the split form was refused as
 `not valid HOCON: input nesting exceeds available stack capacity` even before this bound existed. A
 path of 33 or more segments does not even parse on Scala.js today (see the
 [library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches

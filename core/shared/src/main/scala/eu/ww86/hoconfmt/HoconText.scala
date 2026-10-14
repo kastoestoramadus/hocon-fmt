@@ -29,10 +29,10 @@ private[hoconfmt] object HoconText {
   // `at ++ segments`) — and the written-line limit above sees one statement, so nesting
   // re-created the length from short lines: a 20-level chain of 120-segment paths (2,401
   // flattened segments, 16.8 KB) spent 34 seconds in the report and 36 through the command line.
-  // Six written maxima held the worst at-limit file at 2 seconds through the command line
-  // (measured 2026-10-14); the corpus's deepest flattened path is 12 (1,257-file subset). See
-  // limitations.md.
-  val MaxFlattenedPathSegments = 720
+  // Three written maxima hold the worst at-limit file well under the time bound on every
+  // platform, Scala Native included (measured 2026-10-14, see limitations.md); the corpus's
+  // deepest flattened path is 12 (1,257-file subset).
+  val MaxFlattenedPathSegments = 360
 
   /** Stop before the parser or include passes can spend resources on unbounded nesting, and
     * before the duplicate report can spend them on an unbounded dotted key path, written on one
