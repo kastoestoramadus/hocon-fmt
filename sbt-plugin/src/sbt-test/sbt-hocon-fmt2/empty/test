@@ -1,0 +1,3 @@
+# A build with no HOCON files at all: both tasks succeed and touch nothing.
+> hoconFormat
+> hoconFormatCheck

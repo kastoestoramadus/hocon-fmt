@@ -1,0 +1,27 @@
+> hoconFormat
+$ must-mirror src/main/resources/app.conf expected.conf
+> assertFixtureBytes
+> assertWarning
+$ copy-file input.conf src/main/resources/app.conf
+> set hoconFailOnDuplicates := Some(true)
+-> hoconFormat
+$ copy-file input.conf src/main/resources/app.conf
+> set hoconFailOnDuplicates := Some(false)
+> set hoconSeparator := Some("=")
+> set hoconDoubleIndent := Some(true)
+> set hoconSimplifyNestedObjects := Some(false)
+> hoconFormat
+$ must-mirror src/main/resources/app.conf override.conf
+> set hoconSeparator := None
+> set hoconDoubleIndent := None
+> set hoconSimplifyNestedObjects := None
+> prepareAlias
+> hoconFormat
+> assertAliasStyle
+
+# A rejected separator names the setting and the value, even when the value would break the
+# document the settings are parsed from.
+> set hoconSeparator := Some("x")
+> assertBadSeparator x
+> set hoconSeparator := Some("a\nb")
+> assertBadSeparator a\nb
