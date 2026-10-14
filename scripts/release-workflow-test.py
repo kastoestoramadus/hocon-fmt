@@ -134,7 +134,13 @@ class ReleaseGuardMutationTest(unittest.TestCase):
         for command in ('sbt sonaUpload', './mvnw -Prelease deploy',
                         './gradlew publishPlugins',
                         './mill mill.javalib.SonatypeCentralPublishModule/publishAll',
-                        'gh release create v1.2.3'):
+                        'gh release create v1.2.3',
+                        'npm publish cli/.js/target/npm-package',
+                        'pnpm publish cli/.js/target/npm-package',
+                        'yarn npm publish cli/.js/target/npm-package',
+                        'twine upload dist/*',
+                        'uv publish --token fixture',
+                        'gh release upload v1.2.3 hocon-fmt-linux-x86_64'):
             for condition in (None, '!inputs.dry_run', "startsWith(github.ref, 'refs/tags/v')"):
                 with self.subTest(command=command, condition=condition):
                     workflow = self.workflow()
@@ -145,6 +151,16 @@ class ReleaseGuardMutationTest(unittest.TestCase):
                     self.assertTrue(release_guard_errors(workflow), f'unguarded new step: {command}')
                     source['if'] = UPLOAD_CONDITION
                     self.assertEqual(release_guard_errors(workflow), [])
+
+    def test_registry_publishers_are_pinned_in_unguarded_jobs(self):
+        # A job with no secrets and an unguarded if must still pin a bare registry publisher.
+        for command in ('npm publish', 'pnpm publish', 'yarn npm publish',
+                        'twine upload dist/*', 'uv publish', 'gh release upload v1.2.3 out'):
+            with self.subTest(command=command):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': command})
+                self.assertTrue(release_guard_errors(workflow),
+                                f'unguarded registry publisher: {command}')
 
     def test_new_jobs_and_global_secrets_are_checked(self):
         workflow = self.workflow()
