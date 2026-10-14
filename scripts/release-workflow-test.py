@@ -28,7 +28,9 @@ def release_guard_errors(workflow):
     publish_commands = re.compile(
         r'\bsonaUpload\b|\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b|'
         r'\b(?:gradle|gradlew)\b[^\n]*\bpublishPlugins\b|'
-        r'\bmill\b[^\n]*\bpublishAll\b|\bgh\s+release\s+create\b'
+        r'\bmill\b[^\n]*\bpublishAll\b|'
+        r'\bnpm\s+publish\b|\bpnpm\s+publish\b|\byarn\s+npm\s+publish\b|'
+        r'\btwine\s+upload\b|\buv\s+publish\b|\bgh\s+release\s+(?:create|upload)\b'
     )
 
     def guarded(condition):
@@ -64,7 +66,8 @@ def release_guard_errors(workflow):
             errors.append('release: job if must require a version tag and !inputs.dry_run')
         for index, item in enumerate(source.get('steps', [])):
             # publishSigned stages locally; sonaUpload sends that staging repository remotely.
-            # publishM2, publishLocal, publishToMavenLocal and artifact builds are also dry-run work.
+            # publishM2, publishLocal, publishToMavenLocal, npm pack and artifact builds
+            # are also dry-run work.
             if publish_commands.search(item.get('run', '')):
                 # A job condition gates all its steps, including `gh release create`.
                 if not (guarded(source.get('if')) or guarded(item.get('if'))):
