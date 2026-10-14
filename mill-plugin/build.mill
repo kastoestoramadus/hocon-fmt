@@ -4,22 +4,27 @@ package build
 
 import mill.*, scalalib.*, publish.*
 
-// A plugin runs on the Mill that loads it, so it is compiled against the oldest Mill it supports:
-// 1.1.4, the first on Scala 3.8.2. Sharing the Scala of its host lets the plugin call the core
-// directly, where the sbt plugin needs an isolated class loader. The core is built with 3.9.0,
-// whose TASTy a Mill on 3.8.x cannot read: see the Mill paragraph in docs/architecture.md.
+// Compile for the oldest supported host; the formatter's Scala is resolved only at task time.
 object `package` extends ScalaModule, PublishModule {
   def millVersion      = "1.1.4"
   def formatterVersion = "0.1.0"
 
-  def scalaVersion   = "3.9.0"
+  def scalaVersion   = "3.8.2"
   def platformSuffix = "_mill1"
   def artifactName   = "mill-hocon-fmt"
 
   def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:$millVersion")
-  def mvnDeps        = Seq(mvn"eu.ww86::hocon-fmt-core:$formatterVersion")
 
-  // The suffix names the Mill the plugin runs on; the core is an ordinary Scala 3 library.
+  def generatedSources = Task {
+    val source = Task.dest / "FormatterArtifact.scala"
+    os.write.over(source,
+      s"""package eu.ww86.hoconfmt.mill
+         |private[mill] object FormatterArtifact { val version = "$formatterVersion" }
+         |""".stripMargin)
+    super.generatedSources() :+ PathRef(source)
+  }
+
+  // Mill libraries use the ordinary Scala suffix, rather than the plugin platform suffix.
   protected def resolvedDepsWarnNonPlatform = Task { false }
 
   // As in build.sbt: the repository's brace rule is a compile error here too, and the nested
@@ -40,7 +45,7 @@ object `package` extends ScalaModule, PublishModule {
     def munitVersion = "1.2.4"
     def mvnDeps      = Seq(mvn"com.lihaoyi::mill-testkit:$millVersion")
     def forkEnv = Task {
-      // ivy2Local holds the core until it is on Maven Central: `sbt coreJVM/publishLocal`.
+      // Local publication supplies the Java API and core until they are on Maven Central.
       val repositories = Seq(
         publishLocalTestRepo().path.toNIO.toUri.toASCIIString,
         Task.env.getOrElse("COURSIER_REPOSITORIES", "ivy2Local|central")

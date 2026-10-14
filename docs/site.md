@@ -193,9 +193,13 @@ line, and the base of that branch (sconfig main) also fixes some merge rendering
 sconfig 2.0.0 gets wrong. A muted line under the playground says so. Everything published, the
 command line and the plugins, uses released sconfig unchanged.
 
+Pinned fork commit: `727eb3074aac668362b51aa576e4c3db367f88bb`, tagged
+`fork-main-727eb3074a` in `kastoestoramadus/sHOCON`. The local artifact is
+`2.1.0-hocon-fmt-727eb3074a`; the published core stays on sconfig 2.0.0.
+
 - `scripts/fetch-sconfig-fork.sh` clones the fork at the pinned sha into
   `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes the Scala.js artifact for Scala 3.9.0 to
-  the local Ivy repository as `2.0.0-hocon-fmt-<sha10>`. Run it once per sha, before `sbt test`;
+  the local Ivy repository as `2.1.0-hocon-fmt-<sha10>`. Run it once per sha, before `sbt test`;
   CI and the Pages workflow run it first and cache `~/.ivy2/local/org.ekrich` by the script's hash.
   An sbt source dependency is impossible (the fork builds with sbt 2), and JitPack and GitHub
   Packages cannot serve it without auth or an sbt 2 build.
@@ -204,6 +208,21 @@ command line and the plugins, uses released sconfig unchanged.
   `sbt test` rather than leaving the site untested.
 - The fork's build needs sbt-scalajs 1.22, so the whole build moved there from 1.20.1; its artifact
   carries Scala.js IR 1.22, which 1.20 cannot link.
+
+### Moving the fork pin
+
+1. Verify the reviewed tag with `git ls-remote https://github.com/kastoestoramadus/sHOCON.git refs/tags/fork-main-727eb3074a`.
+2. Change `SHA` in `scripts/fetch-sconfig-fork.sh`, its base `VERSION` if needed, and
+   `sconfigFork` in `build.sbt` to `<base>-hocon-fmt-<first ten SHA characters>`.
+   Update the pinned commit and tag above and in `scripts/sconfig-fork-pin-test.py`.
+   Keep `++3.9.0!`: the fork's sbt 2 build must publish for the page's Scala version.
+3. Run `python3 scripts/sconfig-fork-pin-test.py`, then build the Scala.js fork:
+   `JVM_OPTS="-Xmx3g -Dmaven.repo.local=/absolute/task/m2-fork" scripts/fetch-sconfig-fork.sh`.
+   The script publishes to `~/.ivy2/local/org.ekrich/sconfig_sjs1_3/<version>`; it has
+   no private Ivy home option. No binary belongs in this repository.
+4. With one sbt JVM at a time, run `sbt -J-Xmx3g -Dmaven.repo.local=/absolute/task/m2 site/test site/build scalafmtCheckAll crossCompile coreJVM/test coreSite/test`.
+   Regenerate changed page expectations using the golden workflow in [testing](testing.md#shared-examples),
+   review every changed line against the fork fixes, and keep published-core fixtures unchanged.
 
 ## Returning to upstream sconfig
 

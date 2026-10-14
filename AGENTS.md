@@ -18,7 +18,7 @@ sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
 sbt sbt2PluginTest        # the same plugin under sbt 2.0.10, scripted (slow)
 sbt coreJVM/publishM2 javaApi/publishM2  # needed before the Gradle and Maven builds
 sbt javaApi/publishM2     # needed before the java-api tests: the contract suite loads this jar
-sbt coreJVM/publishLocal  # needed before the Mill build
+sbt coreJVM/publishLocal javaApi/publishLocal  # needed before the Mill build
 (cd gradle-plugin && ./gradlew check)
 (cd java-api && ./gradlew check)
 (cd maven-plugin && ./mvnw verify)
@@ -68,9 +68,9 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
   output check parses the *masked* text: sconfig cannot parse an `include` on Scala.js, so do not
   simplify it to parse the finished text.
 - **`core` depends on sconfig only.** The plugins load it into sbt, Gradle and Maven; effects and
-  libraries belong in `cats` and `cli`. The sbt, Gradle and Maven plugins use the Java API;
-  sbt reads its verdict records reflectively across an isolated class loader. Mill runs Scala 3,
-  and its plugin matches on `Verdict`.
+  libraries belong in `cats` and `cli`. All JVM plugins use the Java API. sbt and Mill read its
+  records reflectively through isolated loaders; never import core Scala types into either plugin.
+  Mill isolation is enforced by `HoconFormatterModuleSpec` and the real Mill integration suite.
 - **Do not "fix" the intentional normalisations** (`//` to `#`, `:` to `=` by default, flattened paths, …)
   listed in [docs/limitations.md](docs/limitations.md).
 <!-- UPSTREAM-SCONFIG: delete this rule and the `coreSite` mention under Layout when the fork goes; docs/site.md has the steps. -->

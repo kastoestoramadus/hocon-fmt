@@ -121,6 +121,37 @@ class FormatOptionsSpec extends munit.FunSuite {
     )
   }
 
+  test("style nesting just below and at the limit still validates option names") {
+    List(79, 80).foreach { depth =>
+      val text = "style {" * depth + "x=1" + "}" * depth
+      assertEquals(FormatOptions.parse(text, "team.conf"), Left("team.conf: unknown option: style"))
+    }
+  }
+
+  test("style nesting over the limit returns a named option error before parsing") {
+    List(81, 10000).foreach { depth =>
+      val text = "style {" * depth + "x=1" + "}" * depth
+      assertEquals(
+        FormatOptions.parse(text, "team.conf"),
+        Left("team.conf: input nesting exceeds the maximum depth of 80")
+      )
+    }
+  }
+
+  List("separator", "fail-on-refusal").foreach { key =>
+    List(999, 2999, 9999).foreach { segments =>
+      test(s"a style dotted path under $key with $segments segments returns a named single-line error") {
+        val text   = key + ".a" * segments + " = 1"
+        val result = FormatOptions.parse(text, "team.conf")
+        assert(
+          result.left.exists(message =>
+            message.startsWith("team.conf: ") && !message.contains('\n') && !message.contains('\r')
+          )
+        )
+      }
+    }
+  }
+
   test("a config file that is not HOCON is an error naming the file") {
     assert(
       FormatOptions.parse("[[", "team.conf").fold(message => message.startsWith("team.conf:"), _ => false),
