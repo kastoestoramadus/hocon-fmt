@@ -5,7 +5,7 @@ val sconfig = "2.0.0"
 val munit   = "1.2.4"
 // UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
 // Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
-val sconfigFork = "2.0.0-hocon-fmt-efb66e0131"
+val sconfigFork = "2.1.0-hocon-fmt-727eb3074a"
 val osLib       = "0.11.8"
 val sjavatime   = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.

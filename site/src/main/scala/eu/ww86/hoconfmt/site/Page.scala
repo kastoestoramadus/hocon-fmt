@@ -64,8 +64,9 @@ object Page {
       p(
         "For example, ",
         code("""include "defaults.conf", zone = "us""""),
-        " is refused because formatting would move the include across the field, which can change which value wins. ",
-        "The playground shows “Left unchanged” with the reason; file runs report the refusal and leave the file byte for byte as it was. ",
+        " is an include and a field sharing one line. ",
+        "The command line refuses this input because rendering could move the include across the field and change which value wins; the file stays byte for byte as it was. ",
+        "The playground formats this input in the same order using its sconfig fork. ",
         "Refusal never writes or breaks a file. See ",
         a(href := Status.limitationsPage, "docs/limitations.md"),
         "."

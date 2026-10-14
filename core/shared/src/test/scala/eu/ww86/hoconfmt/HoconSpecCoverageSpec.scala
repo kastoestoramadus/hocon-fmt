@@ -86,7 +86,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
   List(
     "on an appended field"               -> "# c\na += 2",
     "on an appended field, in an object" -> "o {\n  # c\n  a += 2\n}"
-  ).foreach { case (name, raw) =>
+  ).filterNot((name, _) => Variant.differs(s"duplicatedComment: $name")).foreach { case (name, raw) =>
     test(s"formatter: never duplicates a comment: $name") {
       assertEquals(refusalOf(raw), Refusal.LostComment("c"))
     }

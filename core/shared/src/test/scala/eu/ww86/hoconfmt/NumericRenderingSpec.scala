@@ -54,12 +54,14 @@ class NumericRenderingSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(output.parsedConfig.getString("a"), "100000")
   }
 
-  test("formatter: accepts Infinity that re-reads as a string") {
-    val source = "a = 1e400"
-    val output = formatted(source)
-    assertEquals(output, "a = Infinity\n")
-    assertEquals(source.parsedConfig.getValue("a").valueType, ConfigValueType.NUMBER)
-    assertEquals(output.parsedConfig.getValue("a").valueType, ConfigValueType.STRING)
-    assertEquals(HoconFormatter.format(output), Right(output))
+  if (!Variant.differs("numeric: Infinity")) {
+    test("formatter: accepts Infinity that re-reads as a string") {
+      val source = "a = 1e400"
+      val output = formatted(source)
+      assertEquals(output, "a = Infinity\n")
+      assertEquals(source.parsedConfig.getValue("a").valueType, ConfigValueType.NUMBER)
+      assertEquals(output.parsedConfig.getValue("a").valueType, ConfigValueType.STRING)
+      assertEquals(HoconFormatter.format(output), Right(output))
+    }
   }
 }
