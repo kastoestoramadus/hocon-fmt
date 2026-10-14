@@ -263,16 +263,18 @@ class NestingDepthSpec extends munit.FunSuite {
   // every spelling, across a newline and a comment too, and `a.b.c[0].x` for the object inside an
   // array, siblings alike). Pinned at the boundary: 24 levels of 30 carry 721 flattened segments
   // and must refuse before the parser runs, 23 levels with a 30-segment leaf sit at 720 and must
-  // survive. The paths stay at 30 segments, which the library parses on Scala.js too.
+  // survive. The paths stay at 30 segments, which the library parses on Scala.js too, and a
+  // sibling per level keeps two fields in every object, so the render flattens nothing: one long
+  // dotted line in the output would not reparse there.
   def chainIn(spelling: String, levels: Int, segments: Int, leafSegments: Int): String = {
     val opener = spelling match {
-      case "brace"   => objectPath(segments) + " {\n"
-      case "eq"      => objectPath(segments) + " = {\n"
-      case "colon"   => objectPath(segments) + " : {\n"
-      case "append"  => objectPath(segments) + " += {\n"
-      case "blanks"  => objectPath(segments) + "  =  {\n"
-      case "newline" => objectPath(segments) + " =\n{\n"
-      case "array"   => objectPath(segments) + " = [{\n"
+      case "brace"   => objectPath(segments) + " { sibling = 0\n"
+      case "eq"      => objectPath(segments) + " = { sibling = 0\n"
+      case "colon"   => objectPath(segments) + " : { sibling = 0\n"
+      case "append"  => objectPath(segments) + " += { sibling = 0\n"
+      case "blanks"  => objectPath(segments) + "  =  { sibling = 0\n"
+      case "newline" => objectPath(segments) + " =\n{ sibling = 0\n"
+      case "array"   => objectPath(segments) + " = [{ sibling = 0\n"
     }
     val closer = if (spelling == "array") "}]\n" else "}\n"
     opener * levels
