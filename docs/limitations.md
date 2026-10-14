@@ -158,9 +158,9 @@ report spent 0.4 s at 500 segments, 2.8 s at 1,000 and 24 s at 2,000 on the JVM 
 itself the whole formatter, duplicate report included, needs milliseconds: a 120-segment path
 formats in about 2 ms warm, under 1 s through the command line, most of it JVM start-up.
 
-The limit is ten times the longest dotted key path measured across the corpus — 11 segments, in a
-test source of the apache-pekko-connectors repository — and the repository's own `.conf` files
-reach 3. Longer paths can still be formatted by splitting the definition (`a.b.c = 1` for
+The limit is ten times the longest dotted key path measured across the 34,644 files of the corpus
+scanned on 2026-10-14, sources included — 11 segments, in a test source of the apache-pekko-connectors
+repository — and the repository's own `.conf` files reach 3. Longer paths can still be formatted by splitting the definition (`a.b.c = 1` for
 `a { b.c = 1 }`); a path of 33 or more segments does not even parse on Scala.js today (see the
 [library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches
 shapes the library refuses anyway, until a Scala.js release carries the fix.
