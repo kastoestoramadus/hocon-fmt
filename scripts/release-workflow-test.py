@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Exercise release.yml itself, without secrets, registries or a GitHub runner.
 
-Extraction covers this workflow's job/step indentation and literal run blocks only;
-GitHub expression evaluation and environment approval remain runner responsibilities.
+Shell extraction covers this workflow's indentation and literal run blocks only.
+Publishing guards and secret placement are checked on parsed YAML; GitHub expression
+evaluation and environment approval remain runner responsibilities.
 """
 from copy import deepcopy
 import os
@@ -21,7 +22,55 @@ UPLOAD_CONDITION = "startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run"
 
 
 def release_guard_errors(workflow):
-    return []
+    errors = []
+    tag_guard = re.compile(r"startsWith\s*\(\s*github\.ref\s*,\s*['\"]refs/tags/v['\"]\s*\)")
+    dry_run_guard = re.compile(r'!\s*inputs\.dry_run\b')
+    publish_commands = re.compile(
+        r'\bsonaUpload\b|\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b|'
+        r'\b(?:gradle|gradlew)\b[^\n]*\bpublishPlugins\b|'
+        r'\bmill\b[^\n]*\bpublishAll\b|\bgh\s+release\s+create\b'
+    )
+
+    def guarded(condition):
+        condition = str(condition or '')
+        return bool(tag_guard.search(condition) and dry_run_guard.search(condition))
+
+    def strings(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                yield from strings(key)
+                yield from strings(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from strings(item)
+        elif isinstance(value, str):
+            yield value
+
+    def references_secrets(value):
+        return any(re.search(r'\bsecrets\s*(?:\.|\[)', s) for s in strings(value))
+
+    for key, value in workflow.items():
+        if key != 'jobs' and references_secrets(value):
+            errors.append(f'{key}: secrets must belong to a job with environment: release')
+    for name, source in workflow['jobs'].items():
+        environment = source.get('environment')
+        if isinstance(environment, dict):
+            environment = environment.get('name')
+        if name in ('central', 'release') and environment != 'release':
+            errors.append(f'{name}: requires environment: release')
+        if references_secrets(source) and environment != 'release':
+            errors.append(f'{name}: secrets require environment: release')
+        if name == 'release' and not guarded(source.get('if')):
+            errors.append('release: job if must require a version tag and !inputs.dry_run')
+        for index, item in enumerate(source.get('steps', [])):
+            # publishSigned stages locally; sonaUpload sends that staging repository remotely.
+            # publishM2, publishLocal, publishToMavenLocal and artifact builds are also dry-run work.
+            if publish_commands.search(item.get('run', '')):
+                # A job condition gates all its steps, including `gh release create`.
+                if not (guarded(source.get('if')) or guarded(item.get('if'))):
+                    label = item.get('name', f'step {index + 1}')
+                    errors.append(f'{name}/{label}: publishing if must require a version tag and !inputs.dry_run')
+    return errors
 
 
 class ReleaseGuardMutationTest(unittest.TestCase):
