@@ -2,7 +2,8 @@
 """Exercise release.yml itself, without secrets, registries or a GitHub runner.
 
 Shell extraction covers this workflow's indentation and literal run blocks only.
-Publishing guards and secret placement are checked on parsed YAML; GitHub expression
+Publishing guards, publisher commands and actions, id-token grants and secret
+placement are checked on parsed YAML; GitHub expression
 evaluation and environment approval remain runner responsibilities.
 """
 from copy import deepcopy
@@ -20,22 +21,75 @@ import yaml
 WORKFLOW = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
 UPLOAD_CONDITION = "startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run"
 
+# Denylist of known publisher actions; extend it when a new one appears — this is
+# not an exhaustive list, and a publisher action outside it is invisible here.
+# Verified to exist 2026-10-14 (gh api repos/<name>); create-release is archived
+# upstream but still ships in old workflows. No official Gradle publish action
+# exists (gradle/actions ships setup-gradle, dependency-submission and
+# wrapper-validation only), so that channel is a gradlew publishPlugins run step.
+PUBLISHER_ACTIONS = (
+    'pypa/gh-action-pypi-publish',
+    'softprops/action-gh-release',
+    'actions/create-release',
+    'ncipollo/release-action',
+    'JS-DevTools/npm-publish',
+    'docker/build-push-action',
+)
+
+
+def publisher_action(step):
+    name = str(step.get('uses') or '').split('@')[0].lower()
+    if name not in (action.lower() for action in PUBLISHER_ACTIONS):
+        return False
+    if name == 'docker/build-push-action':
+        with_ = step.get('with')
+        push = with_.get('push') if isinstance(with_, dict) else None
+        return str(push).lower() == 'true'
+    return True
+
+
+def joined_lines(text):
+    # A trailing backslash continues the shell line, and the parsed run string keeps
+    # it as a newline; join the pieces so a publisher regex sees one line.
+    return re.sub(r'\\\r?\n[ \t]*', ' ', text)
+
 
 def release_guard_errors(workflow):
     errors = []
     tag_guard = re.compile(r"startsWith\s*\(\s*github\.ref\s*,\s*['\"]refs/tags/v['\"]\s*\)")
     dry_run_guard = re.compile(r'!\s*inputs\.dry_run\b')
-    publish_commands = re.compile(
-        r'\bsonaUpload\b|\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b|'
-        r'\b(?:gradle|gradlew)\b[^\n]*\bpublishPlugins\b|'
-        r'\bmill\b[^\n]*\bpublishAll\b|'
-        r'\bnpm\s+publish\b|\bpnpm\s+publish\b|\byarn\s+npm\s+publish\b|'
-        r'\btwine\s+upload\b|\buv\s+publish\b|\bgh\s+release\s+(?:create|upload)\b'
-    )
+    # Textual denylist of publisher commands; extend it as new shapes appear.
+    # npm/pnpm/yarn/sbt tolerate flags between tool and verb; gh api and curl count
+    # only when the same line also POSTs to a releases URL or a registry host
+    # (registry.npmjs.org, upload.pypi.org, central.sonatype.com, plugins.gradle.org).
+    publish_commands = re.compile('|'.join((
+        r'\bsonaUpload\b',
+        r'\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b',
+        r'\b(?:gradle|gradlew)\b[^\n]*\bpublishPlugins\b',
+        r'\bmill\b[^\n]*\bpublishAll\b',
+        r'\bnpm\b[^\n]*\bpublish\b',
+        r'\bpnpm\b[^\n]*\bpublish\b',
+        r'\byarn\b[^\n]*\bpublish\b',
+        r'\btwine\s+upload\b',
+        r'\buv\s+publish\b',
+        r'\bgh\s+release\s+(?:create|upload|edit)\b',
+        r'\bgh\s+api\b(?=[^\n]*\s(?:-X|--method)\s*=?\s*POST\b)(?=[^\n]*\breleases\b)',
+        r'\bcurl\b(?=[^\n]*\s(?:-X|--request)\s*=?\s*POST\b)'
+        r'(?=[^\n]*\b(?:registry\.npmjs\.org|upload\.pypi\.org|central\.sonatype\.com|plugins\.gradle\.org)\b)',
+        r'\bdocker\s+push\b',
+        r'\bcargo\s+publish\b',
+        r'\bsbt\b[^\n]*\bpublish\b',
+        r'\bsbt\b[^\n]*\bci-release\b',
+    )))
 
     def guarded(condition):
         condition = str(condition or '')
         return bool(tag_guard.search(condition) and dry_run_guard.search(condition))
+
+    def grants_id_token(permissions):
+        if isinstance(permissions, str):
+            return permissions.lower() == 'write-all'
+        return isinstance(permissions, dict) and str(permissions.get('id-token', '')).lower() == 'write'
 
     def strings(value):
         if isinstance(value, dict):
@@ -54,6 +108,7 @@ def release_guard_errors(workflow):
     for key, value in workflow.items():
         if key != 'jobs' and references_secrets(value):
             errors.append(f'{key}: secrets must belong to a job with environment: release')
+    id_token_everywhere = grants_id_token(workflow.get('permissions'))
     for name, source in workflow['jobs'].items():
         environment = source.get('environment')
         if isinstance(environment, dict):
@@ -64,15 +119,29 @@ def release_guard_errors(workflow):
             errors.append(f'{name}: secrets require environment: release')
         if name == 'release' and not guarded(source.get('if')):
             errors.append('release: job if must require a version tag and !inputs.dry_run')
+        # A publisher needing no secret (trusted publishing via OIDC) bypasses the
+        # secrets rule, so the permission itself is pinned: id-token: write belongs
+        # only on a job whose own if the release guards protect.
+        if (id_token_everywhere or grants_id_token(source.get('permissions'))) \
+                and not guarded(source.get('if')):
+            errors.append(f'{name}: id-token: write requires a version tag and !inputs.dry_run on the job')
         for index, item in enumerate(source.get('steps', [])):
             # publishSigned stages locally; sonaUpload sends that staging repository remotely.
             # publishM2, publishLocal, publishToMavenLocal, npm pack and artifact builds
             # are also dry-run work.
-            if publish_commands.search(item.get('run', '')):
+            if publish_commands.search(joined_lines(item.get('run', ''))):
                 # A job condition gates all its steps, including `gh release create`.
                 if not (guarded(source.get('if')) or guarded(item.get('if'))):
                     label = item.get('name', f'step {index + 1}')
                     errors.append(f'{name}/{label}: publishing if must require a version tag and !inputs.dry_run')
+            if publisher_action(item):
+                # Trusted publishing needs no secret, so the secrets rule cannot
+                # pin the job; require the release environment beside the guards.
+                label = item.get('name', f'step {index + 1}')
+                if not (guarded(source.get('if')) or guarded(item.get('if'))):
+                    errors.append(f'{name}/{label}: publishing action if must require a version tag and !inputs.dry_run')
+                if environment != 'release':
+                    errors.append(f'{name}/{label}: publishing action requires environment: release')
     return errors
 
 
@@ -164,6 +233,120 @@ class ReleaseGuardMutationTest(unittest.TestCase):
                 workflow['jobs']['web']['steps'].append({'run': command})
                 self.assertTrue(release_guard_errors(workflow),
                                 f'unguarded registry publisher: {command}')
+
+    def test_backslash_continued_publishers_are_flagged(self):
+        # A trailing backslash continues the shell line; the parsed run string keeps it
+        # as a newline, so a publisher past it must still be matched, in YAML block
+        # scalars (`run: |`) as in one-line scalars.
+        commands = (
+            ('sbt -Dmaven.repo.local=m2 coreJVM/publishSigned', 'sonaUpload'),
+            ('./mvnw -B -Prelease', 'deploy'),
+            ('./gradlew --no-daemon', 'publishPlugins'),
+            ('./mill -k', 'mill.javalib.SonatypeCentralPublishModule/publishAll'),
+            ('gh release', 'create v1.2.3 --generate-notes dist/*'),
+            ('gh release', 'upload v1.2.3 hocon-fmt-linux-x86_64'),
+            ('npm', 'publish cli/.js/target/npm-package'),
+            ('pnpm', 'publish cli/.js/target/npm-package'),
+            ('yarn npm', 'publish cli/.js/target/npm-package'),
+            ('twine', 'upload dist/*'),
+            ('uv', 'publish --token fixture'),
+        )
+        for head, tail in commands:
+            with self.subTest(head=head, tail=tail):
+                run = yaml.safe_load(f'run: |\n  {head} \\\n    {tail}\n')['run']
+                self.assertIn('\\\n', run)
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': run})
+                self.assertTrue(release_guard_errors(workflow),
+                                f'continued publisher missed: {head} \\\n    {tail}')
+
+    def test_publisher_actions_require_the_release_guards(self):
+        # A publish reached through `uses:` never touches a run line, so the command
+        # list cannot see it. The denylist is extend-on-sight, not exhaustive; every
+        # listed action must clear the same tag/dry-run guards as a run step.
+        actions = (
+            {'uses': 'pypa/gh-action-pypi-publish@release/v1'},
+            {'uses': 'softprops/action-gh-release@v2'},
+            {'uses': 'actions/create-release@v1'},
+            {'uses': 'ncipollo/release-action@v1'},
+            {'uses': 'JS-DevTools/npm-publish@v3'},
+            {'uses': 'docker/build-push-action@v6', 'with': {'push': True}},
+        )
+        for action in actions:
+            with self.subTest(uses=action['uses']):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append(dict(action))
+                self.assertTrue(release_guard_errors(workflow),
+                                f'unguarded publisher action: {action["uses"]}')
+
+    def test_publisher_action_guards_have_their_shapes(self):
+        # build-push-action publishes only with push: true; the allowed shape is a
+        # guarded step in a job with the release environment.
+        workflow = self.workflow()
+        workflow['jobs']['web']['steps'].append(
+            {'uses': 'docker/build-push-action@v6', 'with': {'push': False}})
+        self.assertEqual(release_guard_errors(workflow), [])
+        workflow = self.workflow()
+        workflow['jobs']['central']['steps'].append(
+            {'uses': 'pypa/gh-action-pypi-publish@release/v1'})
+        self.assertTrue(release_guard_errors(workflow), 'guardless publisher step in central')
+        workflow['jobs']['central']['steps'][-1]['if'] = UPLOAD_CONDITION
+        self.assertEqual(release_guard_errors(workflow), [])
+        workflow = self.workflow()
+        workflow['jobs']['web']['steps'].append(
+            {'uses': 'pypa/gh-action-pypi-publish@release/v1', 'if': UPLOAD_CONDITION})
+        self.assertTrue(release_guard_errors(workflow), 'publisher action without the release environment')
+        workflow = self.workflow()
+        workflow['jobs']['release']['steps'].append({'uses': 'softprops/action-gh-release@v2'})
+        self.assertEqual(release_guard_errors(workflow), [])
+
+    def test_more_publisher_forms_are_flagged(self):
+        # Flags may sit between the tool and its verb, other verbs publish too
+        # (release edit, POST to a releases URL or a registry host, docker push,
+        # sbt publish/ci-release, cargo publish).
+        for command in ('npm --access public publish',
+                        'npm -w cli publish',
+                        'pnpm --filter cli publish',
+                        'yarn publish',
+                        'gh release edit v1.2.3 --draft=false',
+                        'gh api --method POST repos/o/r/releases -f tag_name=v1.2.3',
+                        'gh api repos/o/r/releases -X POST',
+                        'curl -fsS -X POST https://registry.npmjs.org/-/user/token',
+                        'curl --request POST https://upload.pypi.org/legacy/ -u user:token',
+                        'curl -X POST https://central.sonatype.com/api/v1/publisher/upload',
+                        'curl -X POST https://plugins.gradle.org/m2/eu/ww86/1.2.3',
+                        'docker push eu.ww86/hocon-fmt:1.2.3',
+                        'cargo publish --allow-dirty',
+                        'sbt +publish',
+                        'sbt ci-release'):
+            with self.subTest(command=command):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': command})
+                self.assertTrue(release_guard_errors(workflow),
+                                f'unguarded publisher form: {command}')
+
+    def test_reads_and_non_registry_posts_stay_free(self):
+        for command in ('curl -fsSL https://registry.npmjs.org/hocon-fmt',
+                        'curl -X POST https://example.invalid/upload',
+                        'gh api repos/o/r/releases',
+                        'cargo build --release',
+                        'sbt publishLocal'):
+            with self.subTest(command=command):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': command})
+                self.assertEqual(release_guard_errors(workflow), [])
+
+    def test_id_token_write_stays_on_guarded_jobs(self):
+        # A publisher needing no secret (trusted publishing via OIDC) bypasses the
+        # secrets rule, so its permission is the thing to pin: id-token: write
+        # belongs only on the job the release guards protect.
+        workflow = self.workflow()
+        workflow['jobs']['version']['permissions'] = {'id-token': 'write'}
+        self.assertTrue(release_guard_errors(workflow), 'unguarded job with id-token: write')
+        workflow['jobs']['release']['permissions']['id-token'] = 'write'
+        self.assertTrue(release_guard_errors(workflow), 'unguarded job still grants the token')
+        workflow['jobs']['version']['permissions'] = {'id-token': 'read'}
+        self.assertEqual(release_guard_errors(workflow), [])
 
     def test_new_jobs_and_global_secrets_are_checked(self):
         workflow = self.workflow()
