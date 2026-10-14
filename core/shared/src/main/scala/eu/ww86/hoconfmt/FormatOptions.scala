@@ -4,6 +4,7 @@ import org.ekrich.config.{Config, ConfigFactory}
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import scala.util.control.NonFatal
 
 /** Which token sits between a key and its value in the output. */
 enum Separator derives CanEqual {
@@ -41,10 +42,14 @@ object FormatOptions {
     * naming the file and the key — never silently ignored.
     */
   def parse(text: String, file: String): Either[String, FormatOptions] =
-    HoconText.checkNesting(text).left.map(reason => s"$file: ${reason.reason}").flatMap { _ =>
-      Try(ConfigFactory.parseString(text)).toEither.left
-        .map(e => s"$file: ${Option(e.getMessage).getOrElse(e.toString)}")
-        .flatMap(fromConfig(_, file))
+    try {
+      HoconText.checkNesting(text).left.map(reason => s"$file: ${reason.reason}").flatMap { _ =>
+        fromConfig(ConfigFactory.parseString(text), file)
+      }
+    } catch {
+      // Dotted keys bypass the delimiter limit and can exhaust the stack while reporting a bad value.
+      case _: StackOverflowError => Left(s"$file: input nesting exceeds available stack capacity")
+      case NonFatal(e)           => Left(s"$file: ${oneLine(Option(e.getMessage).getOrElse(e.toString))}")
     }
 
   /** Reads the options from an already parsed config, under the file's name for errors. */
