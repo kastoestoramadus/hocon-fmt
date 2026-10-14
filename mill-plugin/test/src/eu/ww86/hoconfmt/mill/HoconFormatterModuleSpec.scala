@@ -53,6 +53,41 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     lazy val millDiscover = Discover[this.type]
   }
 
+  test("Java API adapter formats a file and then passes check") {
+    withFiles(project, "resources/adapter.conf" -> text("a=1\n")) { run =>
+      assert(run.eval(project.hoconFormat()).isRight, run.log)
+      assertEquals(read(project, "resources/adapter.conf"), "a = 1\n")
+      assert(run.eval(project.hoconFormatCheck()).isRight, run.log)
+    }
+  }
+
+  test("Java API adapter check fails without writing an unformatted file") {
+    withFiles(project, "resources/adapter.conf" -> text("a=1\n")) { run =>
+      assert(failure(run.eval(project.hoconFormatCheck())).contains("1 HOCON files are not formatted"))
+      assertEquals(read(project, "resources/adapter.conf"), "a=1\n")
+    }
+  }
+
+  test("Java API adapter refuses invalid bytes without writing or failing either command") {
+    val bytes = Array[Byte](0xff.toByte)
+    withFiles(project, "resources/adapter.conf" -> bytes) { run =>
+      val before = os.mtime(project.moduleDir / "resources" / "adapter.conf")
+      assert(run.eval(project.hoconFormat()).isRight, run.log)
+      assert(run.eval(project.hoconFormatCheck()).isRight, run.log)
+      assertEquals(readBytes(project, "resources/adapter.conf").toSeq, bytes.toSeq)
+      assertEquals(os.mtime(project.moduleDir / "resources" / "adapter.conf"), before)
+      assert(run.log.contains("Leaving resources/adapter.conf unchanged"), run.log)
+    }
+  }
+
+  test("plugin classpath exposes neither core Scala classes nor the worker Java API") {
+    val loader = classOf[HoconFormatterModule].getClassLoader
+    Seq("eu.ww86.hoconfmt.Verdict", "eu.ww86.hoconfmt.HoconFormatter$", "eu.ww86.hoconfmt.java.HoconFmt")
+      .foreach { name =>
+        intercept[ClassNotFoundException] { Class.forName(name, false, loader) }
+      }
+  }
+
   test("selected other formats fail strict commands and preserve default success") {
     withFiles(otherFormats, "data.json" -> text("a = 1\n"), "app.properties" -> text("a = 1\n")) { run =>
       assert(run.eval(otherFormats.hoconFormat()).isRight)
