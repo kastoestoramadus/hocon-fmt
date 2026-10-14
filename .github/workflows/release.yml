@@ -294,7 +294,7 @@ jobs:
           echo '| Target | Result |' >> "$GITHUB_STEP_SUMMARY"
           echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
           echo "| gradle-plugin | uploaded |" >> "$GITHUB_STEP_SUMMARY"
-      # Keep the upload wiring for the day Mill supports the core's Scala version.
+      # Mill publishing is wave 2 and held on purpose (docs/releasing.md); `false &&` keeps the step and its secrets wiring.
       - name: Upload, Mill
         if: false && startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && contains(needs.version.outputs.selected, 'mill-plugin')
         env:
@@ -303,7 +303,7 @@ jobs:
           MILL_PGP_SECRET_BASE64: ${{ secrets.PGP_SECRET }}
           MILL_PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
         run: |
-          sbt coreJVM/publishLocal
+          sbt coreJVM/publishLocal javaApi/publishLocal
           cd mill-plugin && ./mill mill.javalib.SonatypeCentralPublishModule/publishAll --publishArtifacts __.publishArtifacts --shouldRelease false
 
   native:
