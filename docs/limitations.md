@@ -124,7 +124,8 @@ option validation and diagnostic rendering, also catches stack exhaustion and re
 style-file paths such as `separator` or `fail-on-refusal` followed by 2,999 `.a` segments and
 `= 1`; shorter paths may instead return a normal invalid-value error. Dotted paths have no
 fixed segment limit, and the stack threshold depends on the runtime. Scala.js may reject them
-earlier because of the parser defect documented below.
+earlier because of the parser defect documented below. The dotted-path cases were run on the JVM
+only; Scala.js and Scala Native were not run against them.
 
 A single-line dotted path of 2,000 or more segments (`a.a.a. ... = 1`) is not nesting to the scan and
 can take tens of seconds when formatting source files on the JVM (23 s at 2,000, 65 s at
