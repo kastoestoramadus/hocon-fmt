@@ -3,6 +3,15 @@ TaskKey[Unit]("assertUntouched") := {
     .sameElements(IO.readBytes(baseDirectory.value / "original.conf")))
 }
 
+// `must-mirror` compares decoded lines, so it cannot see a non-UTF-8 byte replaced by U+FFFD.
+InputKey[Unit]("assertSameBytes") := {
+  val Seq(actual, expected) = Def.spaceDelimited("<file> <file>").parsed.runtimeChecked
+  assert(
+    IO.readBytes(baseDirectory.value / actual).sameElements(IO.readBytes(baseDirectory.value / expected)),
+    s"$actual no longer has the bytes of $expected"
+  )
+}
+
 TaskKey[Unit]("assertArtifactHome") := {
   val expected = file(sys.props("hocon.fmt.scripted.ivy.home")).getCanonicalFile
   // sbt 2's ivyHome is a String; sbt 1's is a File.
