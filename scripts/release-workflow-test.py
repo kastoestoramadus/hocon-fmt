@@ -21,6 +21,12 @@ WORKFLOW = (Path(__file__).resolve().parent.parent / '.github/workflows/release.
 UPLOAD_CONDITION = "startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run"
 
 
+def joined_lines(text):
+    # A trailing backslash continues the shell line, and the parsed run string keeps
+    # it as a newline; join the pieces so a publisher regex sees one line.
+    return re.sub(r'\\\r?\n[ \t]*', ' ', text)
+
+
 def release_guard_errors(workflow):
     errors = []
     tag_guard = re.compile(r"startsWith\s*\(\s*github\.ref\s*,\s*['\"]refs/tags/v['\"]\s*\)")
@@ -68,7 +74,7 @@ def release_guard_errors(workflow):
             # publishSigned stages locally; sonaUpload sends that staging repository remotely.
             # publishM2, publishLocal, publishToMavenLocal, npm pack and artifact builds
             # are also dry-run work.
-            if publish_commands.search(item.get('run', '')):
+            if publish_commands.search(joined_lines(item.get('run', ''))):
                 # A job condition gates all its steps, including `gh release create`.
                 if not (guarded(source.get('if')) or guarded(item.get('if'))):
                     label = item.get('name', f'step {index + 1}')
