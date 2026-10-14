@@ -20,6 +20,32 @@ import yaml
 WORKFLOW = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
 UPLOAD_CONDITION = "startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run"
 
+# Denylist of known publisher actions; extend it when a new one appears — this is
+# not an exhaustive list, and a publisher action outside it is invisible here.
+# Verified to exist 2026-10-14 (gh api repos/<name>); create-release is archived
+# upstream but still ships in old workflows. No official Gradle publish action
+# exists (gradle/actions ships setup-gradle, dependency-submission and
+# wrapper-validation only), so that channel is a gradlew publishPlugins run step.
+PUBLISHER_ACTIONS = (
+    'pypa/gh-action-pypi-publish',
+    'softprops/action-gh-release',
+    'actions/create-release',
+    'ncipollo/release-action',
+    'JS-DevTools/npm-publish',
+    'docker/build-push-action',
+)
+
+
+def publisher_action(step):
+    name = str(step.get('uses') or '').split('@')[0].lower()
+    if name not in (action.lower() for action in PUBLISHER_ACTIONS):
+        return False
+    if name == 'docker/build-push-action':
+        with_ = step.get('with')
+        push = with_.get('push') if isinstance(with_, dict) else None
+        return str(push).lower() == 'true'
+    return True
+
 
 def joined_lines(text):
     # A trailing backslash continues the shell line, and the parsed run string keeps
@@ -79,6 +105,14 @@ def release_guard_errors(workflow):
                 if not (guarded(source.get('if')) or guarded(item.get('if'))):
                     label = item.get('name', f'step {index + 1}')
                     errors.append(f'{name}/{label}: publishing if must require a version tag and !inputs.dry_run')
+            if publisher_action(item):
+                # Trusted publishing needs no secret, so the secrets rule cannot
+                # pin the job; require the release environment beside the guards.
+                label = item.get('name', f'step {index + 1}')
+                if not (guarded(source.get('if')) or guarded(item.get('if'))):
+                    errors.append(f'{name}/{label}: publishing action if must require a version tag and !inputs.dry_run')
+                if environment != 'release':
+                    errors.append(f'{name}/{label}: publishing action requires environment: release')
     return errors
 
 
