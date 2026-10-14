@@ -197,6 +197,46 @@ class ReleaseGuardMutationTest(unittest.TestCase):
                 self.assertTrue(release_guard_errors(workflow),
                                 f'continued publisher missed: {head} \\\n    {tail}')
 
+    def test_publisher_actions_require_the_release_guards(self):
+        # A publish reached through `uses:` never touches a run line, so the command
+        # list cannot see it. The denylist is extend-on-sight, not exhaustive; every
+        # listed action must clear the same tag/dry-run guards as a run step.
+        actions = (
+            {'uses': 'pypa/gh-action-pypi-publish@release/v1'},
+            {'uses': 'softprops/action-gh-release@v2'},
+            {'uses': 'actions/create-release@v1'},
+            {'uses': 'ncipollo/release-action@v1'},
+            {'uses': 'JS-DevTools/npm-publish@v3'},
+            {'uses': 'docker/build-push-action@v6', 'with': {'push': True}},
+        )
+        for action in actions:
+            with self.subTest(uses=action['uses']):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append(dict(action))
+                self.assertTrue(release_guard_errors(workflow),
+                                f'unguarded publisher action: {action["uses"]}')
+
+    def test_publisher_action_guards_have_their_shapes(self):
+        # build-push-action publishes only with push: true; the allowed shape is a
+        # guarded step in a job with the release environment.
+        workflow = self.workflow()
+        workflow['jobs']['web']['steps'].append(
+            {'uses': 'docker/build-push-action@v6', 'with': {'push': False}})
+        self.assertEqual(release_guard_errors(workflow), [])
+        workflow = self.workflow()
+        workflow['jobs']['central']['steps'].append(
+            {'uses': 'pypa/gh-action-pypi-publish@release/v1'})
+        self.assertTrue(release_guard_errors(workflow), 'guardless publisher step in central')
+        workflow['jobs']['central']['steps'][-1]['if'] = UPLOAD_CONDITION
+        self.assertEqual(release_guard_errors(workflow), [])
+        workflow = self.workflow()
+        workflow['jobs']['web']['steps'].append(
+            {'uses': 'pypa/gh-action-pypi-publish@release/v1', 'if': UPLOAD_CONDITION})
+        self.assertTrue(release_guard_errors(workflow), 'publisher action without the release environment')
+        workflow = self.workflow()
+        workflow['jobs']['release']['steps'].append({'uses': 'softprops/action-gh-release@v2'})
+        self.assertEqual(release_guard_errors(workflow), [])
+
     def test_new_jobs_and_global_secrets_are_checked(self):
         workflow = self.workflow()
         workflow['jobs']['new-channel'] = {'steps': [{'run': 'gh release create v1.2.3'}]}
