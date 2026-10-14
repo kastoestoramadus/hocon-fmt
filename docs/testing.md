@@ -56,7 +56,7 @@ an appended field twice, which eight corpus files would have been written with (
 
 ## Benchmarks
 
-`bench` times each phase (mask, parse, render, unmask, the whole format) on five generated
+`bench` times each phase (mask, parse, render, unmask, the whole format) on six generated
 scenarios on the JVM, Scala.js and Scala Native. `scripts/bench.py run` adds the CLI's start-up per
 build and attaches the results to HEAD in `refs/notes/benchmarks`, keeping three runs per commit
 and thirty commits; `scripts/bench.py report` prints the medians per commit and flags a slowdown
