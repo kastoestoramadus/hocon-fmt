@@ -20,6 +20,12 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   val PlaceholderKey = "__INCLUDE_(\\d+)".r
   val GuardKey       = "__INCLUDE_GUARD_\\d+".r
 
+  // The duplicate report was cubic in a dotted path's segments before the guard: a 10 KB file
+  // (`a.a.a. ... = 1` with 2,000 segments) spent 24 seconds in it, through the command line on
+  // every run. Whatever the length, the verdict and the report must come back without throwing
+  // and in bounded time; the generous bound leaves slow CI machines out of the question.
+  val pathTimeBoundMs = 10000L
+
   /** Every combination the options can be set to. */
   val allOptions: List[FormatOptions] =
     for {
@@ -69,6 +75,32 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
         case Left(refusal) => assert(refusal.reason.nonEmpty)
         case Right(text)   => assert(text.nonEmpty)
       }
+    }
+  }
+
+  property("no dotted key path length throws or exceeds a time bound") {
+    forAll(Gen.choose(1, 3000)) { segments =>
+      val source      = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
+      val withInclude = "include \"missing.conf\"\n" + source
+      def bound[R](name: String)(run: => R): R = {
+        val start  = System.nanoTime()
+        val result = run
+        val millis = (System.nanoTime() - start) / 1e6
+        assert(millis < pathTimeBoundMs, s"$segments segments: $name took $millis ms")
+        result
+      }
+      bound("verdict")(Verdict.of(source)) match {
+        case Verdict.Refused(refusal) => assert(refusal.reason.nonEmpty)
+        case _                        => ()
+      }
+      bound("duplicate report")(DuplicateReport.findings(source)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+      bound("duplicate report with an include")(DuplicateReport.findings(withInclude)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
     }
   }
 
