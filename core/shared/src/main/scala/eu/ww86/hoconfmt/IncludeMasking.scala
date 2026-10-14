@@ -71,14 +71,22 @@ private[hoconfmt] object IncludeMasking {
       // An index we never handed out belongs to the user's own text: leave it untouched.
       Option.when(sameIndex)(indexOf(field)).flatten.flatMap(originals.get)
     }
-    // Own-line first: it consumes the newline and indentation, which the inline pattern leaves
-    // behind. The other order turns every guard on its own line into a blank one. sconfig may
-    // render a guard on the very first line, with no newline before it, so one is lent for the
-    // pass; a multiline `^` would do instead, but Scala.js supports it only from ES2018.
-    val ours                     = originals.keySet
-    def dropOurs(guard: Matcher) = Option.when(indexOf(guard).exists(ours))("")
-    val withoutOwnLineGuards     = replaceEachMatch("\n" + restored, GuardOnItsOwnLine)(dropOurs).drop(1)
-    replaceEachMatch(withoutOwnLineGuards, GuardInline)(dropOurs)
+    // Both guard patterns must find the literal prefix, so a rendering without it cannot lose a
+    // guard: both passes are skipped, and with them the optional quote trying every position on
+    // Scala Native. Own-line first: it consumes the newline and indentation, which the inline
+    // pattern leaves behind. The other order turns every guard on its own line into a blank one.
+    // sconfig may render a guard on the very first line, with no newline before it, so one is
+    // lent for the pass; a multiline `^` would do instead, but Scala.js supports it only from
+    // ES2018.
+    val withoutGuards =
+      if (restored.indexOf(GuardPrefix) < 0) restored
+      else {
+        val ours                     = originals.keySet
+        def dropOurs(guard: Matcher) = Option.when(indexOf(guard).exists(ours))("")
+        val withoutOwnLineGuards     = replaceEachMatch("\n" + restored, GuardOnItsOwnLine)(dropOurs).drop(1)
+        replaceEachMatch(withoutOwnLineGuards, GuardInline)(dropOurs)
+      }
+    withoutGuards
   }
 
   /** A cheap source check also protects comments, which are outside the parsed value tree.
