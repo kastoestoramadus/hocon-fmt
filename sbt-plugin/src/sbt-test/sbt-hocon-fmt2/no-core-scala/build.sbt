@@ -1,9 +1,11 @@
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets.UTF_8
-import eu.ww86.hoconfmt.sbt.{IsolatedFormatter, Verdict}
+import eu.ww86.hoconfmt.sbt.{HoconFormatterPlugin, IsolatedFormatter, Verdict}
 
-TaskKey[Unit]("assertWorkerIsolation") := {
-  val classpath = TaskKey[Seq[File]]("hoconFormatterClasspath").value
+// Def.uncached: the worker classpath holds files, which sbt 2 refuses to cache, so the task
+// reading it must not be cached either.
+TaskKey[Unit]("assertWorkerIsolation") := Def.uncached {
+  val classpath = HoconFormatterPlugin.hoconFormatterClasspath.value
   def jarNamed(prefix: String) = classpath.exists(_.getName.stripSuffix(".jar").startsWith(prefix))
   assert(jarNamed("hocon-fmt-java-api"),
     s"worker must resolve java-api: ${classpath.mkString(", ")}")

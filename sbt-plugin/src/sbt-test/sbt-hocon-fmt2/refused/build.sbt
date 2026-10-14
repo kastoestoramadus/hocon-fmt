@@ -1,6 +1,6 @@
 // sbt keeps the log of each task's last run, which lets the script check what a task reported.
 InputKey[Unit]("assertWarnedOnce") := {
-  val task +: fragments = Def.spaceDelimited("<task> <fragment>...").parsed
+  val task +: fragments = Def.spaceDelimited("<task> <fragment>...").parsed.runtimeChecked
   val lines = IO.readLines(target.value / "streams" / "_global" / task / "_global" / "streams" / "out")
   fragments.foreach { fragment =>
     val mentions = lines.filter(line => line.contains(fragment) && line.contains("Leaving "))
@@ -13,7 +13,7 @@ InputKey[Unit]("assertWarnedOnce") := {
 
 // `must-mirror` compares decoded lines, so it cannot see a non-UTF-8 byte replaced by U+FFFD.
 InputKey[Unit]("assertSameBytes") := {
-  val Seq(actual, expected) = Def.spaceDelimited("<file> <file>").parsed
+  val Seq(actual, expected) = Def.spaceDelimited("<file> <file>").parsed.runtimeChecked
   assert(
     IO.readBytes(baseDirectory.value / actual).sameElements(IO.readBytes(baseDirectory.value / expected)),
     s"$actual no longer has the bytes of $expected"

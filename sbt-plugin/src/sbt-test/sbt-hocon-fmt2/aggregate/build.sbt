@@ -7,7 +7,7 @@ lazy val root = (project in file(".")).aggregate(a, b)
 
 // sbt keeps the log of each task's last run, which lets the script check what a task reported.
 InputKey[Unit]("assertWarnedOnce") := {
-  val task +: fragments = Def.spaceDelimited("<task> <fragment>...").parsed
+  val task +: fragments = Def.spaceDelimited("<task> <fragment>...").parsed.runtimeChecked
   val lines = IO.readLines(target.value / "streams" / "_global" / task / "_global" / "streams" / "out")
   fragments.foreach { fragment =>
     val mentions = lines.filter(_.contains(fragment))
@@ -19,16 +19,24 @@ InputKey[Unit]("assertWarnedOnce") := {
 }
 
 // A file whose projects set different options must fail the task, naming both projects.
-TaskKey[Unit]("assertSharedFileConflict") := {
+// Def.uncached: the task reads a Result, which sbt 2 refuses to cache.
+TaskKey[Unit]("assertSharedFileConflict") := Def.uncached {
   val message = hoconFormatCheck.result.value match {
-    case Inc(incomplete) => failedMessage(incomplete)
-    case Value(_) =>
+    case sbt.Result.Inc(incomplete) => failedMessage(incomplete)
+    case sbt.Result.Value(_) =>
       sys.error("expected hoconFormatCheck to refuse a shared file whose projects set different options")
   }
   Seq("projects a and b", "separator = :", "shared.conf").foreach { fragment =>
     assert(message.contains(fragment), s"expected the conflict to name $fragment, got: $message")
   }
 }
+
+// Both assertions are about the check that covers a and b, which only the root's does; in a or b
+// the check sees one owner per file and no conflict to name. sbt 1 runs each assertion at the
+// root alone, while sbt 2 acts a task in every project that defines it, so both are pinned to the
+// root the way hoconFormatCheck itself is.
+InputKey[Unit]("assertWarnedOnce") / aggregate        := false
+TaskKey[Unit]("assertSharedFileConflict") / aggregate := false
 
 // The message sbt recorded for a failed task, with the cause chain unwrapped.
 def failedMessage(incomplete: sbt.Incomplete): String = {

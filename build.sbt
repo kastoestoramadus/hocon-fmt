@@ -749,6 +749,12 @@ lazy val sbtPlugin = guardPublish(
           case _      => "2.0.10"
         }
       },
+      // The sbt 2 flavour's DottyDoc crashes reading the lmcoursier types the task plumbing
+      // names (their TASTy carries the dataclass macro); that flavour ships no javadoc yet.
+      Compile / doc / sources := {
+        if (scalaBinaryVersion.value == "2.12") (Compile / doc / sources).value
+        else Seq.empty
+      },
       // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
       buildInfoPackage := "eu.ww86.hoconfmt.sbt",
       buildInfoObject  := "FormatterArtifact",

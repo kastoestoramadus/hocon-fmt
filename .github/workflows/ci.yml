@@ -145,6 +145,21 @@ jobs:
       - name: Scripted tests
         run: sbt sbtPluginTest
 
+  sbt2-plugin:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - name: Scripted tests under sbt 2
+        run: sbt sbt2PluginTest
+
   gradle-plugin:
     needs: changes
     if: needs.changes.outputs.code == 'true'
