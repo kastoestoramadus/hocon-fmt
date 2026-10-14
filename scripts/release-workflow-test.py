@@ -58,7 +58,7 @@ class ReleaseGuardMutationTest(unittest.TestCase):
                     workflow = self.workflow()
                     source = workflow['jobs'][name]
                     if environment is None:
-                        del source['environment']
+                        source.pop('environment', None)
                     else:
                         source['environment'] = environment
                     self.assertTrue(release_guard_errors(workflow), f'{name} lost release environment')
@@ -94,6 +94,21 @@ class ReleaseGuardMutationTest(unittest.TestCase):
                         source['if'] = condition
                     workflow['jobs']['central']['steps'].append(source)
                     self.assertTrue(release_guard_errors(workflow), f'unguarded new step: {command}')
+                    source['if'] = UPLOAD_CONDITION
+                    self.assertEqual(release_guard_errors(workflow), [])
+
+    def test_new_jobs_and_global_secrets_are_checked(self):
+        workflow = self.workflow()
+        workflow['jobs']['new-channel'] = {'steps': [{'run': 'gh release create v1.2.3'}]}
+        self.assertTrue(release_guard_errors(workflow))
+        workflow['jobs']['new-channel']['if'] = UPLOAD_CONDITION
+        self.assertEqual(release_guard_errors(workflow), [])
+        workflow['jobs']['new-channel']['env'] = {'TOKEN': '${{ secrets.TOKEN }}'}
+        self.assertTrue(release_guard_errors(workflow))
+        workflow['jobs']['new-channel']['environment'] = 'release'
+        self.assertEqual(release_guard_errors(workflow), [])
+        workflow['env'] = {'TOKEN': '${{ secrets.TOKEN }}'}
+        self.assertTrue(release_guard_errors(workflow))
 
     def test_local_staging_and_job_guarded_release_are_allowed(self):
         workflow = self.workflow()
