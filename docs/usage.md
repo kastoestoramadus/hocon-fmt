@@ -148,8 +148,14 @@ simplify-nested-objects = true
 
 Precedence is **flag > config file > default**, field by field: a flag left off leaves the file
 in charge of that one choice. An unknown key or a mistyped value is an error naming the file and
-the key, and the run stops with exit 2 before any file is touched. `--stdin` applies the flags
-but does no lookup, keeping the promise that `--stdin-filename` reads nothing.
+the key, and the run stops with exit 2 before any file is touched. A style file exceeding the
+[80-level nesting limit](limitations.md#excessive-nesting) also stops the run with exit 2 and a
+single-line error naming the file. Dotted style-file paths are outside that lexical limit;
+if parsing or reporting their invalid values exhausts the stack, the run likewise exits 2
+with `<file>: input nesting exceeds available stack capacity`, before touching selected files
+(checked on the JVM; see [limitations](limitations.md#excessive-nesting) for the platforms not run).
+`--stdin` applies the flags but does no lookup, keeping the
+promise that `--stdin-filename` reads nothing.
 
 ```sh
 hocon-fmt --separator : application.conf   # one file, the : spelling

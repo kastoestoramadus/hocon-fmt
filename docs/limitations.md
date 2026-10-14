@@ -117,10 +117,19 @@ explicit root object; siblings do not accumulate depth. Strings (ordinary, escap
 triple-quoted), `#` / `//` comments and the `${...}` of a substitution are ignored. This is a
 lexical resource limit, not a syntax validator or a bound on the object tree implied by dotted keys.
 
-Two paths stay outside the guard. A style file (`.hocon-fmt.conf`) nested 10,000 levels deep ends in
-a `StackOverflowError` and exit 1, not the exit 2 that usage.md documents for config problems. A
-single-line dotted path of 2,000 or more segments (`a.a.a. ... = 1`) is not nesting to the scan and
-takes tens of seconds (23 s at 2,000, 65 s at 3,000, over two minutes at 5,000).
+Style files (`.hocon-fmt.conf`) use the same pre-check and return a configuration error naming
+the file; the CLI exits 2 before touching selected files. The entire style parse, including
+option validation and diagnostic rendering, also catches stack exhaustion and returns
+`<file>: input nesting exceeds available stack capacity` on one line. This covers dotted
+style-file paths such as `separator` or `fail-on-refusal` followed by 2,999 `.a` segments and
+`= 1`; shorter paths may instead return a normal invalid-value error. Dotted paths have no
+fixed segment limit, and the stack threshold depends on the runtime. Scala.js may reject them
+earlier because of the parser defect documented below. The dotted-path cases were run on the JVM
+only; Scala.js and Scala Native were not run against them.
+
+A single-line dotted path of 2,000 or more segments (`a.a.a. ... = 1`) is not nesting to the scan and
+can take tens of seconds when formatting source files on the JVM (23 s at 2,000, 65 s at
+3,000, over two minutes at 5,000). Those timings do not measure style-file parsing.
 
 The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
 1,257-file corpus of 24 public repositories: **8**, including Akka's
