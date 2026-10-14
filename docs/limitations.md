@@ -436,9 +436,8 @@ include that reaches one of these is reported and left alone.
   the file or its directory is not writable — the formatted text is written in place.** That keeps
   the inode, but not the crash-atomicity of a rename: the write truncates first, so an interrupted
   one can leave a partial file (a killed run on an unwritable directory left a 7.4 MB file empty).
-  The Mill plugin always writes in place — a deliberate simplification, since the other plugins
-  get a staged replacement from the Java API, and Mill needs none of that boundary. If the window
-  matters to you, open an issue: we would gladly hear of a better solution.
+  All JVM plugins use the Java API's staged replacement with the same in-place fallback. If the
+  window matters to you, open an issue: we would gladly hear of a better solution.
   [Usage](usage.md) has the full write contract.
 
 ## Speed

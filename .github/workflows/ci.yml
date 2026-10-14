@@ -211,10 +211,8 @@ jobs:
         working-directory: maven-plugin
         run: ./mvnw -B verify
 
-  # On hold until Mill supports Scala 3.9: Mill 1.1.x runs on 3.8 and cannot read the core's 3.9 TASTy,
-  # so the integration tests fail. Still run, so the day Mill moves shows as green, but not blocking.
+  # The host-compatible adapter keeps the formatter's newer Scala behind the Java API loader.
   mill-plugin:
-    continue-on-error: true
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
@@ -226,15 +224,14 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      # The plugin resolves the core from the local Ivy repository until it is on Maven Central.
-      - name: Publish the core locally
-        run: sbt coreJVM/publishLocal
-      # On hold until Mill supports Scala 3.9: a step that continues on error leaves the job, and so
-      # the check run and the status rollup, green while the integration tests are red.
+      # The isolated worker resolves the API and core from Ivy until they are on Maven Central.
+      - name: Publish the formatter locally
+        run: sbt -J-Xmx3g coreJVM/publishLocal javaApi/publishLocal
       - name: Unit and integration tests
-        continue-on-error: true
         working-directory: mill-plugin
-        run: ./mill --ticker false __.testForked
+        env:
+          JAVA_TOOL_OPTIONS: -Xmx2g
+        run: ./mill --no-server --ticker false --jobs 1 __.testForked
 
   pre-commit:
     needs: changes

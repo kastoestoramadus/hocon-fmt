@@ -310,7 +310,7 @@ println(shape)
 ```
 
 `check` judges text or bytes, `checkFile` a path, `formatFile` rewrites a file only when the
-formatted text differs — Gradle, Maven and sbt use this same file operation — and
+formatted text differs — Gradle, Maven, sbt and Mill use this same file operation — and
 `formatOrThrow` raises the core's
 `FormatRefusedException` for callers that prefer an exception. Both compilers hold the caller to
 the full set: the Kotlin `when` above is value-used with no `else`, and a Java 21 `switch` needs
@@ -327,7 +327,7 @@ retains the inode but cannot offer crash-atomicity. A staging failure leaves the
 and removes the temporary file; an unsupported atomic move is an I/O error. Refused and already
 formatted files retain both their bytes and modification time. Atomic replacement leaves other
 hard links on the old content; an in-place write updates them too. Serialise calls and avoid
-concurrent edits to the same file. Mill continues to write in place through its core integration.
+concurrent edits to the same file. Mill uses this same Java API write operation through an isolated loader.
 
 sbt builds and publishes the artifact (`eu.ww86:hocon-fmt-java-api`, no `_3` suffix — it is plain
 Java) over the same sources the standalone Gradle build in `java-api/` tests: `sbt javaApi/publishM2`
@@ -488,7 +488,8 @@ API, and the core comes with it, so naming the core alone would leave the worker
 
 ## Mill
 
-**Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9.**
+**Second-wave plugin: tested on Mill 1.1.4 and 1.1.10; excluded from the first publish selection.**
+The plugin loads the Java API and its Scala runtime separately, so Mill 1.1.x never reads core's Scala 3.9 TASTy.
 
 ```scala
 //| mvnDeps:

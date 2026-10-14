@@ -41,13 +41,14 @@ The Portal upload remains conditional on the owner supplying its credentials.
 | `hocon-fmt-java-api` | 1 | sbt | Maven Central | a library dependency for Java and Kotlin callers |
 | `sbt-hocon-fmt` | 1 (sbt 1.x); sbt 2 later | sbt | Maven Central | `addSbtPlugin` |
 | `hocon-fmt-maven-plugin` | 1 | `maven-plugin/` | Maven Central | `<plugin>` |
-| `mill-hocon-fmt_mill1_3` | 2 (on hold) | `mill-plugin/` | Maven Central | `//| mvnDeps` |
+| `mill-hocon-fmt_mill1_3` | 2 | `mill-plugin/` | Maven Central | `//| mvnDeps` |
 | `eu.ww86.hocon-fmt` | 1 | `gradle-plugin/` | Gradle Plugin Portal | `plugins { id(...) }` |
 | native binaries, `hocon-fmt.js` | 2 | `Release` workflow | GitHub release | a download; the playground |
 | wheels carrying the native binary | 2 | `Release` workflow | PyPI | the pre-commit hooks, `pipx install` |
 | npm package carrying the Node build | 2 | `Release` workflow | npm | the `-node` pre-commit hooks, `npx` |
 
-Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9. Its upload step in `release.yml` is disabled.
+The Mill adapter is tested on Mill 1.1.4 and 1.1.10 through an isolated Java API loader. It remains
+a second-wave artifact; its upload step in `release.yml` is disabled.
 
 The names are free on every registry (checked 2026-09-26).
 
