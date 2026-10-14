@@ -2,7 +2,8 @@
 
 A formatter for [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md) configuration
 files: plugins for sbt, Gradle and Maven and a command line tool, all running one Scala 3 core.
-Native binaries, npm and PyPI packages, pre-commit hooks, and Mill and sbt 2 plugins follow later.
+Native binaries, npm and PyPI packages, pre-commit hooks and a Mill plugin follow later; the sbt
+plugin is cross-built for sbt 2 as well.
 
 ```
 $ cat application.conf
@@ -25,8 +26,9 @@ app {
 
 ## What v0.1.0 covers
 
-The first release is the JVM core and the sbt 1.x, Gradle and Maven plugins. Native binaries,
-npm, PyPI, Mill and sbt 2 plugins follow later. v0.1.0 ships with the current refusal list:
+The first release is the JVM core and the sbt 1.x, Gradle and Maven plugins, with the same sbt
+plugin cross-built for sbt 2. Native binaries, npm, PyPI and Mill follow later. v0.1.0 ships
+with the current refusal list:
 files the formatter cannot prove safe are refused. A JVM corpus check measured on 2026-10-13
 refused 310 of 1,257 files (24.7%); the corpus includes parser test fixtures and non-HOCON
 `.conf` files, so this is not a production prevalence estimate. The refusal list has not been
@@ -59,7 +61,7 @@ with the formatter version and a minimal example.
 | ZIO library | `hocon-fmt-zio`: typed refusals, file formatting and streamed checks; JVM / Native, text on Scala.js |
 | command line | `hocon-fmt [--check] [--separator =|:] <file>...`: run from a checkout with `sbt "cliJVM/run <args>"` at v0.1.0; native binaries, `pipx` and `npx` packages follow in wave 2 |
 | pre-commit | hooks `hocon-fmt` and `hocon-fmt-check` from this repository, running the native binary. The hooks ship in wave 2: they pin PyPI and npm versions published only then |
-| sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
+| sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck`; cross-built for sbt 2 as well, same coordinates |
 | Gradle | `id("eu.ww86.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
 | Maven | `hocon-fmt-maven-plugin`, goals `format` / `check` (bound to `verify`) |
 | Mill | on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9. Planned: `eu.ww86::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |

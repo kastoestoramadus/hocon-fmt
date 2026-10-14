@@ -464,8 +464,18 @@ hoconFormatSources := (baseDirectory.value / "conf" ** "*.conf").get
 ```
 
 The plugin resolves `eu.ww86:hocon-fmt-java-api` and its transitive core in an isolated
-class loader, apart from sbt's Scala 2.12 runtime. It sends the original bytes to the API;
+class loader, apart from the build's own Scala runtime. It sends the original bytes to the API;
 invalid UTF-8 and other refused files are reported and left untouched.
+
+### sbt 2
+
+The same artifact cross-builds for sbt 2: `addSbtPlugin` above also resolves the `_sbt2_3`
+flavour of the release, and the keys and behaviour are the same. sbt 2 loads plugins with Scala
+3.8, so nothing of this plugin links against the core's Scala 3.9: the formatter is still
+resolved at run time and loaded in a class loader whose parent is the JDK's, and neither the
+build's Scala library nor sbt's own is on the worker classpath. Tasks are declared `uncached`,
+which sbt 2 requires of a task whose result holds a file, and the sbt 2 flavour has its own
+scripted suites, `sbt-hocon-fmt2` (`sbt sbt2PluginTest`), mirroring the sbt 1.x ones.
 
 ## Gradle
 
