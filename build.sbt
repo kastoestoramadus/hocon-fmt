@@ -704,24 +704,51 @@ lazy val benchNative = bench.native
   * isolated class loader, the way sbt-scalafmt runs scalafmt. Its behaviour is covered by the
   * scripted tests in `sbt-plugin/src/sbt-test`, run with `sbtPluginTest`: each starts a fresh
   * sbt, which is too slow for the `test` sequence.
+  *
+  * The same sources cross-build the sbt 2 plugin: sbt 2 loads plugins with Scala 3, and the
+  * Scala 3 flavour of this project targets sbt 2.0.x. Switching with `++3.8.4` also switches
+  * `pluginCrossBuild / sbtVersion`, `scriptedSbt` and the scalac options; the per-host task
+  * plumbing lives in `sbt-plugin/src/main/scala-2.12` and `scala-3`. The sbt 2 suites in
+  * `sbt-test/sbt-hocon-fmt2` run with `sbt2PluginTest`, under sbt 2.0.10 itself.
   */
 lazy val sbtPlugin = guardPublish(
   project
     .in(file("sbt-plugin"))
     .enablePlugins(SbtPlugin, BuildInfoPlugin)
     .settings(
-      name         := "sbt-hocon-fmt",
-      scalaVersion := "2.12.21",
-      // ThisBuild's options are Scala 3's; the same checks, as far as 2.12 has them.
-      scalacOptions := Seq(
-        "-deprecation",
-        "-feature",
-        "-unchecked",
-        "-Xfatal-warnings",
-        "-Xlint",
-        "-Ywarn-unused",
-        "-Ywarn-value-discard"
-      ),
+      name                          := "sbt-hocon-fmt",
+      scalaVersion                  := "2.12.21",
+      crossScalaVersions            := Seq("2.12.21", "3.8.4"),
+      pluginCrossBuild / sbtVersion := {
+        scalaBinaryVersion.value match {
+          case "2.12" => sbtVersion.value
+          case _      => "2.0.10"
+        }
+      },
+      // ThisBuild's options are Scala 3's; the same checks, as far as each flavour has them.
+      scalacOptions := {
+        scalaBinaryVersion.value match {
+          case "2.12" =>
+            Seq(
+              "-deprecation",
+              "-feature",
+              "-unchecked",
+              "-Xfatal-warnings",
+              "-Xlint",
+              "-Ywarn-unused",
+              "-Ywarn-value-discard"
+            )
+          case _ =>
+            Seq("-deprecation", "-feature", "-unchecked", "-Werror", "-no-indent", "-Wunused:all")
+        }
+      },
+      // Scripted tests of the sbt 2 flavour must run under sbt 2 itself.
+      scriptedSbt := {
+        scalaBinaryVersion.value match {
+          case "2.12" => sbtVersion.value
+          case _      => "2.0.10"
+        }
+      },
       // The coordinates the plugin resolves the formatter by, so the two are released in lockstep.
       buildInfoPackage := "eu.ww86.hoconfmt.sbt",
       buildInfoObject  := "FormatterArtifact",
@@ -744,7 +771,10 @@ lazy val sbtPlugin = guardPublish(
     )
 )
 
-addCommandAlias("sbtPluginTest", "sbtPlugin/scripted")
+// Each alias runs only its own suite group: plain `scripted` would run both under the current
+// flavour's sbt version, and the sbt 2 suites are written for sbt 2.
+addCommandAlias("sbtPluginTest", "sbtPlugin/scripted sbt-hocon-fmt/*")
+addCommandAlias("sbt2PluginTest", "++3.8.4 sbtPlugin/scripted sbt-hocon-fmt2/*")
 
 /** The Java and Kotlin API over the core: static methods returning the mirrored `Verdict` records,
   * the boundary the Gradle and Maven plugins are written against and the one the sbt plugin loads
