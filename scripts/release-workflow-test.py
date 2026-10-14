@@ -98,7 +98,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_guards_cannot_be_skipped_or_ignored(self):
         for name, title in (('version', "Tag is on main's history"),
-                            ('central', 'Upload mode')):
+                            ('central', 'Preflight')):
             source = step(name, title)
             for key in ('if', 'continue-on-error'):
                 with self.subTest(job=name, key=key):
@@ -126,108 +126,226 @@ class ReleaseWorkflowTest(unittest.TestCase):
     def test_failed_main_fetch_fails(self):
         self.assertNotEqual(self.ancestry('fetch-failure').returncode, 0)
 
-    def preflight(self, wave, upload, key, secret):
+    targets = ('core', 'sbt-plugin', 'maven-plugin', 'gradle-plugin',
+               'mill-plugin', 'native', 'npm', 'pypi')
+    default_targets = 'core,sbt-plugin,maven-plugin,gradle-plugin'
+    credentials = ('SONATYPE_USERNAME', 'SONATYPE_PASSWORD', 'PGP_SECRET',
+                   'PGP_PASSPHRASE', 'GRADLE_PUBLISH_KEY', 'GRADLE_PUBLISH_SECRET', 'GH_TOKEN')
+
+    def selection(self, event='push', variable='', selected=()):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            summary = root / 'summary'
-            marker = root / 'uploads'
+            output, summary = root / 'output', root / 'summary'
+            output.touch()
             summary.touch()
-            result = run_shell(step('central', 'Upload mode'), root,
-                               RELEASE_WAVE=wave, CAN_UPLOAD=upload,
-                               GRADLE_PUBLISH_KEY=key, GRADLE_PUBLISH_SECRET=secret,
-                               GITHUB_STEP_SUMMARY=str(summary))
-            # Execute the next upload only if the runner would continue after the preflight.
-            if result.returncode == 0 and upload == 'true':
-                stub = root / 'sbt'
-                stub.write_text('#!/bin/bash\necho sbt-upload >> "$UPLOAD_MARKER"\n')
-                stub.chmod(0o755)
-                run = run_shell(step('central', 'Upload, sbt'), root,
-                                PATH=f'{root}:{os.environ["PATH"]}',
-                                MAVEN_REPO_LOCAL=str(root / 'm2'), UPLOAD_MARKER=str(marker))
-                self.assertEqual(run.returncode, 0, run.stderr)
-            print(f'preflight wave={wave or "unset"} upload={upload} '
-                  f'key={bool(key)} secret={bool(secret)}: exit {result.returncode}; '
-                  f'{result.stdout.strip()}; summary={summary.read_text().strip()}; '
-                  f'upload={marker.exists()}', flush=True)
-            return result, summary.read_text(), marker.exists()
+            env = {f'INPUT_{t.upper().replace("-", "_")}': str(t in selected).lower()
+                   for t in self.targets}
+            result = run_shell(step('version', 'Select targets'), root, **env,
+                               GITHUB_EVENT_NAME=event, RELEASE_TARGETS=variable,
+                               GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary))
+            return result, output.read_text(), summary.read_text()
 
-    def test_wave1_missing_credentials_warn_and_continue(self):
-        for wave in ('', '1'):
-            for key, secret in (('', ''), ('fixture-key', ''), ('', 'fixture-secret')):
-                with self.subTest(wave=wave, key=bool(key), secret=bool(secret)):
-                    result, summary, uploaded = self.preflight(wave, 'true', key, secret)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertIn('::warning::', result.stdout)
-                    self.assertIn('Plugin Portal', summary)
-                    self.assertTrue(uploaded)
-
-    def test_wave2_missing_credentials_fail_before_upload(self):
-        for key, secret in (('', ''), ('fixture-key', ''), ('', 'fixture-secret')):
-            with self.subTest(key=bool(key), secret=bool(secret)):
-                result, summary, uploaded = self.preflight('2', 'true', key, secret)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn('::error::', result.stdout)
-                self.assertIn('Plugin Portal', summary)
-                self.assertFalse(uploaded)
-
-    def test_dry_runs_allow_missing_credentials(self):
-        for wave in ('1', '2'):
-            for key, secret in (('', ''), ('fixture-key', 'fixture-secret')):
-                result, summary, uploaded = self.preflight(wave, 'false', key, secret)
+    def test_tag_selection_default_and_subsets(self):
+        for variable, expected in (('', self.default_targets), ('native', 'native'),
+                                   (' maven-plugin,core,core ', 'core,maven-plugin'),
+                                   ('npm,pypi', 'npm,pypi')):
+            with self.subTest(variable=variable):
+                result, output, summary = self.selection(variable=variable)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn('Dry run:', result.stdout)
-                self.assertNotIn('::warning::', result.stdout)
-                self.assertNotIn('::error::', result.stdout)
-                self.assertEqual(summary, '')
-                self.assertFalse(uploaded)
+                self.assertIn(f'selected={expected}\n', output)
+                self.assertIn(expected, summary)
 
-    def test_complete_credentials_allow_upload(self):
-        for wave in ('1', '2'):
-            result, summary, uploaded = self.preflight(wave, 'true', 'fixture-key', 'fixture-secret')
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertNotIn('::warning::', result.stdout)
-            self.assertNotIn('::error::', result.stdout)
-            self.assertEqual(summary, '')
-            self.assertTrue(uploaded)
+    def test_dispatch_selection_ignores_repository_variable(self):
+        for selected in (('core',), ('native', 'gradle-plugin'), tuple(self.default_targets.split(','))):
+            with self.subTest(selected=selected):
+                result, output, _ = self.selection('workflow_dispatch', 'unknown', selected)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected = ','.join(t for t in self.targets if t in selected)
+                self.assertIn(f'selected={expected}\n', output)
 
-    def test_preflight_wiring_and_order(self):
-        preflight = step('central', 'Upload mode')
-        for name, expression in (
-            ('CAN_UPLOAD', UPLOAD_CONDITION),
-            ('RELEASE_WAVE', "vars.RELEASE_WAVE || '1'"),
-            ('GRADLE_PUBLISH_KEY', 'secrets.GRADLE_PUBLISH_KEY'),
-            ('GRADLE_PUBLISH_SECRET', 'secrets.GRADLE_PUBLISH_SECRET'),
-        ):
-            self.assertIn(f'{name}: ${{{{ {expression} }}}}', preflight)
-        ordered = steps('central')
-        # Check order as well as membership, including Mill so enabling it stays guarded.
-        uploads = [step('central', name) for name in (
-            'Upload, sbt', 'Upload, Maven', 'Upload, Gradle (or explain why skipped)',
-            'Upload, Mill')]
-        for upload in uploads:
-            self.assertLess(ordered.index(preflight), ordered.index(upload))
-        self.assertIn(f'if: {UPLOAD_CONDITION}', uploads[0])
-        self.assertIn(f'if: {UPLOAD_CONDITION}', uploads[1])
-        self.assertIn(f'CAN_UPLOAD: ${{{{ {UPLOAD_CONDITION} }}}}', uploads[2])
+    def test_selection_unknown_names_fail(self):
+        for variable in ('banana', 'core,banana', 'CORE', 'core;echo unsafe'):
+            with self.subTest(variable=variable):
+                result, output, _ = self.selection(variable=variable)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('Unknown release target', result.stdout)
+                self.assertNotIn('selected=', output)
+
+    def test_selection_empty_fails(self):
+        for event, variable in (('push', ' '), ('push', ','), ('push', 'core,'),
+                                ('workflow_dispatch', '')):
+            with self.subTest(event=event, variable=variable):
+                result, output, _ = self.selection(event, variable)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn('selected=', output)
+
+    def test_selection_wiring_and_defaults(self):
+        source = step('version', 'Select targets')
+        self.assertIn('RELEASE_TARGETS: ${{ vars.RELEASE_TARGETS }}', source)
+        self.assertIn('selected: ${{ steps.targets.outputs.selected }}', job('version'))
+        self.assertNotIn('secrets.', job('version'))
+        self.assertLess(steps('version').index(source), 1)
+        for target in self.targets:
+            default = 'true' if target in self.default_targets.split(',') else 'false'
+            self.assertRegex(WORKFLOW, rf'      {target}:\n        description: [^\n]+\n'
+                                      rf'        type: boolean\n        default: {default}')
+            expression = f'inputs.{target}' if '-' not in target else f"inputs['{target}']"
+            name = target.upper().replace('-', '_')
+            self.assertIn(f'INPUT_{name}: ${{{{ {expression} }}}}', source)
         self.assertRegex(WORKFLOW, r'dry_run:\n(?:.*\n)*?        default: true')
 
-    def test_gradle_upload_and_skip_shell(self):
-        for upload, key, secret, expected in (
-            ('true', '', '', False), ('true', 'fixture-key', '', False),
-            ('true', '', 'fixture-secret', False),
-            ('false', 'fixture-key', 'fixture-secret', False),
-            ('true', 'fixture-key', 'fixture-secret', True),
-        ):
+    def preflight(self, selected, upload='true', missing=(), central=False):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            summary, marker, calls = root / 'summary', root / 'uploads', root / 'curl-calls'
+            summary.touch()
+            stub = root / 'curl'
+            stub.write_text('#!/bin/bash\necho "$*" >> "$CURL_CALLS"\nexit "$CENTRAL_EXIT"\n')
+            stub.chmod(0o755)
+            env = {c: '' if c in missing else 'fixture' for c in self.credentials}
+            result = run_shell(step('central', 'Preflight'), root, **env,
+                               SELECTED_TARGETS=selected, CAN_UPLOAD=upload, VERSION='1.2.3',
+                               PATH=f'{root}:{os.environ["PATH"]}', CENTRAL_EXIT='0' if central else '22',
+                               CURL_CALLS=str(calls), GITHUB_STEP_SUMMARY=str(summary))
+            # A failing guard must stop the runner before the first registry upload.
+            if result.returncode == 0 and upload == 'true' and 'core' in selected.split(','):
+                sbt = root / 'sbt'
+                sbt.write_text('#!/bin/bash\necho "$*" >> "$UPLOAD_MARKER"\n')
+                sbt.chmod(0o755)
+                run = run_shell(step('central', 'Upload, sbt'), root,
+                                SELECTED_TARGETS=selected, PATH=f'{root}:{os.environ["PATH"]}',
+                                MAVEN_REPO_LOCAL=str(root / 'm2'), UPLOAD_MARKER=str(marker))
+                self.assertEqual(run.returncode, 0, run.stderr)
+            print(f'preflight selected={selected} upload={upload} missing={missing}: '
+                  f'exit {result.returncode}; {result.stdout.strip()}; upload={marker.exists()}', flush=True)
+            return result, summary.read_text(), marker.exists(), calls.read_text() if calls.exists() else ''
+
+    def test_selected_missing_credentials_fail_before_upload(self):
+        for target in ('core', 'sbt-plugin', 'maven-plugin', 'gradle-plugin', 'native'):
+            required = ('GH_TOKEN',) if target == 'native' else self.credentials[:4]
+            if target == 'gradle-plugin':
+                required = ('PGP_SECRET', 'PGP_PASSPHRASE', 'GRADLE_PUBLISH_KEY', 'GRADLE_PUBLISH_SECRET')
+            for credential in required:
+                with self.subTest(target=target, credential=credential):
+                    selected = target if target == 'core' else f'core,{target}'
+                    result, summary, uploaded, _ = self.preflight(selected, missing=(credential,))
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(credential, result.stdout)
+                    self.assertIn('::error::', result.stdout)
+                    self.assertIn(credential, summary)
+                    self.assertFalse(uploaded)
+
+    def test_unavailable_targets_fail_before_upload(self):
+        for target in ('mill-plugin', 'npm', 'pypi'):
+            with self.subTest(target=target):
+                result, summary, uploaded, _ = self.preflight(f'core,{target}')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(target, result.stdout)
+                self.assertIn('not enabled', summary)
+                self.assertFalse(uploaded)
+
+    def test_not_selected_needs_no_credentials(self):
+        for selected, needed in (('native', ('GH_TOKEN',)),
+                                  ('core', self.credentials[:4]),
+                                  ('gradle-plugin', ('PGP_SECRET', 'PGP_PASSPHRASE',
+                                                     'GRADLE_PUBLISH_KEY', 'GRADLE_PUBLISH_SECRET'))):
+            with self.subTest(selected=selected):
+                result, _, _, _ = self.preflight(selected,
+                                                missing=tuple(c for c in self.credentials if c not in needed),
+                                                central=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_plugins_require_core_or_visible_central_artifacts(self):
+        for target in ('sbt-plugin', 'maven-plugin', 'gradle-plugin'):
+            with self.subTest(target=target):
+                result, _, uploaded, calls = self.preflight(target)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('select core', result.stdout)
+                self.assertIn('1.2.3', result.stdout)
+                self.assertFalse(uploaded)
+                self.assertIn('https://repo.maven.apache.org/maven2/eu/ww86/', calls)
+                result, _, _, calls = self.preflight(target, central=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('hocon-fmt-core_3/1.2.3/hocon-fmt-core_3-1.2.3.pom', calls)
+                self.assertIn('hocon-fmt-java-api/1.2.3/hocon-fmt-java-api-1.2.3.pom', calls)
+                result, _, _, calls = self.preflight(f'core,{target}')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(calls, '')
+
+    def test_dry_run_reports_dependency_and_needs_no_upload_credentials(self):
+        result, summary, uploaded, calls = self.preflight('gradle-plugin', 'false',
+                                                        ('SONATYPE_USERNAME', 'SONATYPE_PASSWORD',
+                                                         'GRADLE_PUBLISH_KEY', 'GRADLE_PUBLISH_SECRET'))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Dry run:', summary)
+        self.assertFalse(uploaded)
+        self.assertEqual(calls, '')
+
+    def test_dry_run_still_requires_signing_credentials(self):
+        result, _, uploaded, _ = self.preflight('core', 'false', ('PGP_SECRET',))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(uploaded)
+
+    def test_preflight_wiring_and_order(self):
+        preflight = step('central', 'Preflight')
+        self.assertIn(f'CAN_UPLOAD: ${{{{ {UPLOAD_CONDITION} }}}}', job('central'))
+        self.assertIn('SELECTED_TARGETS: ${{ needs.version.outputs.selected }}', job('central'))
+        for credential in self.credentials:
+            expression = 'github.token' if credential == 'GH_TOKEN' else f'secrets.{credential}'
+            self.assertIn(f'{credential}: ${{{{ {expression} }}}}', preflight)
+        ordered = steps('central')
+        self.assertLess(ordered.index(preflight), ordered.index(step('central', 'Import the signing key')))
+        for title in ('Upload, sbt', 'Upload, Maven', 'Upload, Gradle', 'Upload, Mill'):
+            self.assertLess(ordered.index(preflight), ordered.index(step('central', title)))
+        for name in ('native', 'npm', 'web'):
+            self.assertIn('needs: [version, central]', job(name))
+        self.assertIn('needs: [version, native, web, central]', job('release'))
+
+    def test_sbt_upload_selection_shell(self):
+        for selected, expected in (('core', ('coreJVM', 'catsJVM', 'cliJVM', 'javaApi')),
+                                   ('sbt-plugin', ('sbtPlugin',)),
+                                   ('core,sbt-plugin', ('coreJVM', 'catsJVM', 'cliJVM', 'javaApi', 'sbtPlugin'))):
             with tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
-                stub = root / 'gradlew'
-                stub.write_text('#!/bin/bash\necho STUB-publishPlugins\n')
+                stub = root / 'sbt'
+                stub.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
                 stub.chmod(0o755)
-                result = run_shell(step('central', 'Upload, Gradle (or explain why skipped)'),
-                                   root, CAN_UPLOAD=upload, GRADLE_PUBLISH_KEY=key,
-                                   GRADLE_PUBLISH_SECRET=secret, MAVEN_REPO_LOCAL=str(root / 'm2'))
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual('STUB-publishPlugins' in result.stdout, expected)
+                for title, task in (('Signing check, sbt', 'publishSigned'), ('Upload, sbt', 'publishSigned')):
+                    result = run_shell(step('central', title), root, SELECTED_TARGETS=selected,
+                                       PATH=f'{root}:{os.environ["PATH"]}', MAVEN_REPO_LOCAL=str(root / 'm2'))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    actual = re.findall(r'([A-Za-z]+)/(?:publishSigned)', result.stdout)
+                    self.assertEqual(actual, list(expected))
+                    self.assertEqual('sonaUpload' in result.stdout, title == 'Upload, sbt')
+
+    def test_target_conditions_use_one_selection_output(self):
+        self.assertEqual(WORKFLOW.count('vars.RELEASE_TARGETS'), 1)
+        for name in ('native', 'npm', 'web', 'release'):
+            self.assertIn('needs.version.outputs.selected', job(name))
+        for title, target in (('Signing check, Maven', 'maven-plugin'),
+                              ('Build and sign, Gradle', 'gradle-plugin'),
+                              ('Upload, Maven', 'maven-plugin'), ('Upload, Gradle', 'gradle-plugin')):
+            source = step('central', title)
+            self.assertIn('needs.version.outputs.selected', source)
+            self.assertIn(f"'{target}'", source)
+        self.assertIn('if: false &&', step('central', 'Upload, Mill'))
+
+    def test_summary_reports_selection_skips_dry_runs_and_uploads(self):
+        result, summary, _, _ = self.preflight('core', 'false')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('core | dry run', summary)
+        for target in self.targets[1:]:
+            self.assertIn(f'{target} | skipped (not selected)', summary)
+        for title in ('Upload, sbt', 'Upload, Maven', 'Upload, Gradle'):
+            self.assertIn('uploaded', shell(step('central', title)))
+        self.assertIn('native | uploaded', shell(step('release', 'Attach to the release')))
+
+    def test_obsolete_wave_variable_is_removed_everywhere(self):
+        root = Path(__file__).resolve().parent.parent
+        files = subprocess.check_output(['git', '-C', str(root), 'ls-files'], text=True).splitlines()
+        obsolete = 'RELEASE_' + 'WAVE'
+        matches = [name for name in files if obsolete.encode() in (root / name).read_bytes()]
+        self.assertEqual(matches, [])
 
     def test_only_release_has_contents_write(self):
         self.assertRegex(WORKFLOW, re.compile(r'^permissions:\n  contents: read\n', re.M))
