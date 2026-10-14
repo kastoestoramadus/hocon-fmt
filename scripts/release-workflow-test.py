@@ -271,6 +271,54 @@ class ReleaseGuardMutationTest(unittest.TestCase):
         workflow['jobs']['release']['steps'].append({'uses': 'softprops/action-gh-release@v2'})
         self.assertEqual(release_guard_errors(workflow), [])
 
+    def test_more_publisher_forms_are_flagged(self):
+        # Flags may sit between the tool and its verb, other verbs publish too
+        # (release edit, POST to a releases URL or a registry host, docker push,
+        # sbt publish/ci-release, cargo publish).
+        for command in ('npm --access public publish',
+                        'npm -w cli publish',
+                        'pnpm --filter cli publish',
+                        'yarn publish',
+                        'gh release edit v1.2.3 --draft=false',
+                        'gh api --method POST repos/o/r/releases -f tag_name=v1.2.3',
+                        'gh api repos/o/r/releases -X POST',
+                        'curl -fsS -X POST https://registry.npmjs.org/-/user/token',
+                        'curl --request POST https://upload.pypi.org/legacy/ -u user:token',
+                        'curl -X POST https://central.sonatype.com/api/v1/publisher/upload',
+                        'curl -X POST https://plugins.gradle.org/m2/eu/ww86/1.2.3',
+                        'docker push eu.ww86/hocon-fmt:1.2.3',
+                        'cargo publish --allow-dirty',
+                        'sbt +publish',
+                        'sbt ci-release'):
+            with self.subTest(command=command):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': command})
+                self.assertTrue(release_guard_errors(workflow),
+                                f'unguarded publisher form: {command}')
+
+    def test_reads_and_non_registry_posts_stay_free(self):
+        for command in ('curl -fsSL https://registry.npmjs.org/hocon-fmt',
+                        'curl -X POST https://example.invalid/upload',
+                        'gh api repos/o/r/releases',
+                        'cargo build --release',
+                        'sbt publishLocal'):
+            with self.subTest(command=command):
+                workflow = self.workflow()
+                workflow['jobs']['web']['steps'].append({'run': command})
+                self.assertEqual(release_guard_errors(workflow), [])
+
+    def test_id_token_write_stays_on_guarded_jobs(self):
+        # A publisher needing no secret (trusted publishing via OIDC) bypasses the
+        # secrets rule, so its permission is the thing to pin: id-token: write
+        # belongs only on the job the release guards protect.
+        workflow = self.workflow()
+        workflow['jobs']['version']['permissions'] = {'id-token': 'write'}
+        self.assertTrue(release_guard_errors(workflow), 'unguarded job with id-token: write')
+        workflow['jobs']['release']['permissions']['id-token'] = 'write'
+        self.assertTrue(release_guard_errors(workflow), 'unguarded job still grants the token')
+        workflow['jobs']['version']['permissions'] = {'id-token': 'read'}
+        self.assertEqual(release_guard_errors(workflow), [])
+
     def test_new_jobs_and_global_secrets_are_checked(self):
         workflow = self.workflow()
         workflow['jobs']['new-channel'] = {'steps': [{'run': 'gh release create v1.2.3'}]}
