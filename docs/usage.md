@@ -475,8 +475,9 @@ invalid UTF-8 and other refused files are reported and left untouched.
 
 ### sbt 2
 
-The same artifact cross-builds for sbt 2: `addSbtPlugin` above also resolves the `_sbt2_3`
-flavour of the release, and the keys and behaviour are the same. sbt 2 loads plugins with Scala
+The same artifact cross-builds for sbt 2 (built and tested in CI; the release workflow publishes
+only the sbt 1 flavour for now, so the `_sbt2_3` flavour is not on Maven Central yet and
+`addSbtPlugin` resolves it only once it is published). The keys and behaviour are the same. sbt 2 loads plugins with Scala
 3.8, so nothing of this plugin links against the core's Scala 3.9: the formatter is still
 resolved at run time and loaded in a class loader whose parent is the JDK's, and neither the
 build's Scala library nor sbt's own is on the worker classpath. Tasks are declared `uncached`,
