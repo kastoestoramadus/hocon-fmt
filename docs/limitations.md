@@ -158,10 +158,20 @@ report spent 0.4 s at 500 segments, 2.8 s at 1,000 and 24 s at 2,000 on the JVM 
 itself the whole formatter, duplicate report included, needs milliseconds: a 120-segment path
 formats in about 2 ms warm, under 1 s through the command line, most of it JVM start-up.
 
+**What the limit does not bound.** The report's cost follows the *flattened* path, that is the
+segments of every enclosing object plus the written ones, while the scan counts one written line
+(siblings do not accumulate). Nesting re-creates a long flattened path from short lines: a file of
+20 nested levels, each a 120-segment path (2,400 flattened segments, 16.8 KB), took 34 s in the
+duplicate report and 36 s through the command line; 40 levels (4,800 segments, 36 KB) took 224 s
+(measured 2026-10-14 by an independent review, JVM, in-process). The depth limit of 80 does not
+close this, so a hand-written file can still hang a run. Files in the corpus are unaffected (maximum
+depth 8, maximum path 11). Closing it means bounding the flattened path, a follow-up.
+
 The limit is ten times the longest dotted key path measured across the 34,644 files of the corpus
 scanned on 2026-10-14, sources included — 11 segments, in a test source of the apache-pekko-connectors
 repository — and the repository's own `.conf` files reach 3. Longer paths can still be formatted by splitting the definition (`a.b.c = 1` for
-`a { b.c = 1 }`); a path of 33 or more segments does not even parse on Scala.js today (see the
+`a { b.c = 1 }`), up to roughly 1,200 flattened segments: at about 2,400 the split form is refused as
+`not valid HOCON: input nesting exceeds available stack capacity`. A path of 33 or more segments does not even parse on Scala.js today (see the
 [library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches
 shapes the library refuses anyway, until a Scala.js release carries the fix.
 
