@@ -80,8 +80,8 @@ object DefectTable {
     DefectRow(
       "an include on a line shared with a field: `include \"x.conf\", zone = \"us\"`",
       RefusalKind.MovedInclude,
-      Nil,
-      "no pull request: fields on one line share a line number and an origin has no column, so the order would have to come from the parse sequence"
+      List(PrLink(Sconfig, 645)),
+      "the playground's fork carries #645; the published core stays on released sconfig and refuses the input until a release carries it"
     ),
     DefectRow(
       "`a : ${b}` with `b : ${a}`",
