@@ -5,10 +5,16 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 import mill.*
 import mill.api.{Discover, ExecResult}
 import mill.testkit.{TestRootModule, UnitTester}
+import mill.scalalib.ScalaModule
 
 class HoconFormatterModuleSpec extends munit.FunSuite {
 
   object project extends TestRootModule, HoconFormatterModule {
+    lazy val millDiscover = Discover[this.type]
+  }
+
+  object scalaProject extends TestRootModule, ScalaModule, HoconFormatterModule {
+    def scalaVersion = "3.8.2"
     lazy val millDiscover = Discover[this.type]
   }
 
@@ -77,6 +83,18 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       assertEquals(readBytes(project, "resources/adapter.conf").toSeq, bytes.toSeq)
       assertEquals(os.mtime(project.moduleDir / "resources" / "adapter.conf"), before)
       assert(run.log.contains("Leaving resources/adapter.conf unchanged"), run.log)
+    }
+  }
+
+  test("Scala consumer version does not override the formatter runtime") {
+    withFiles(scalaProject, "resources/adapter.conf" -> text("a=1\n")) { run =>
+      val classpath = run.eval(scalaProject.hoconFormatterClasspath).fold(
+        error => fail(error.toString), _.value.map(_.path.last)
+      )
+      assert(classpath.contains("scala-library-3.9.0.jar"), classpath.mkString("\n"))
+      assert(!classpath.contains("scala-library-3.8.2.jar"), classpath.mkString("\n"))
+      assert(run.eval(scalaProject.hoconFormat()).isRight, run.log)
+      assertEquals(read(scalaProject, "resources/adapter.conf"), "a = 1\n")
     }
   }
 
