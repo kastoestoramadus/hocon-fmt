@@ -1,6 +1,6 @@
-# 2026-10-14 — choose release targets explicitly
+# 2026-10-14 — #129 — choose release targets explicitly
 
-Q26 replaces decision 61: the owner chooses channels, and a missing selected credential fails
+**Change:** Q26 replaces decision 61: the owner chooses channels, and a missing selected credential fails
 before any upload rather than silently dropping the Gradle submission. Dispatch checkboxes and
 `RELEASE_TARGETS` on tags feed one canonical selection in the secret-free version job. The shared
 preflight checks credentials and core/Java API visibility on Central for a plugin-only upload.
