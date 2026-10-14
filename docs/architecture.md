@@ -20,7 +20,7 @@ around it in `HoconFormatter`.
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
 | `coreSite` | the core's sources against a sconfig fork that keeps detached comments, with the real `CommentCarrier`; not published | Scala.js | the fork |
 | `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling `coreSite` directly; see [site](site.md) | Scala.js | coreSite |
-| `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | java-api, at run time |
+| `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x and sbt 2, one cross-built source tree | JVM, Scala 2.12 and 3.8.4 | java-api, at run time |
 | `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | java-api, at run time |
 | `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | java-api |
 | `mill-plugin` | `hoconFormat`, `hoconFormatCheck` for Mill 1.1.4 and later; standalone Mill build | JVM, Scala 3.8.2 | java-api, at run time |
@@ -314,6 +314,13 @@ A formatter written in Scala 3 has to reach hosts that are not:
   reads its record accessors reflectively and reads the refusal kind through JDK `Enum.name()`.
   Original bytes cross the loader so invalid
   UTF-8 stays a refusal. An unknown verdict or an exception fails the task.
+- **sbt 2** loads plugins with Scala 3.8.4, which cannot read the core's Scala 3.9 TASTy, so the
+  same boundary is used from the same source tree: the `sbt-plugin` project cross-builds both
+  flavours (`sbt-hocon-fmt_2.12_1.0` and `sbt-hocon-fmt_sbt2_3`), and only the task plumbing
+  differs per host, in `src/main/scala-2.12` and `scala-3` — sbt 1's
+  `CoursierDependencyResolution.retrieve` against sbt 2's `moduleDescriptor` and `update`, and
+  `Def.uncached`, which sbt 2 requires of a task whose result holds a file. Scripted suites run
+  each flavour against its own host (`sbtPluginTest`, `sbt2PluginTest`).
 - **Gradle** compiles against the Java API but does not ship it: `eu.ww86:hocon-fmt-java-api` (the
   core comes transitively) is resolved through a `hoconFormatter` configuration in the consumer's
   build and runs in a Worker API class loader, so a Scala 3 library never lands on a buildscript
