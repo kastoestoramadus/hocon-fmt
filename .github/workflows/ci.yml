@@ -79,6 +79,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: The version guard checks selected targets
         run: scripts/check-release-version-test.sh
+      - name: Install the release workflow YAML parser
+        run: python3 -m pip install PyYAML==6.0.1
       - name: Release preflight rejects unsafe tags and incomplete selected uploads
         run: python3 scripts/release-workflow-test.py
       - name: The classifiers still answer as the gates assume

@@ -4,6 +4,7 @@
 Extraction covers this workflow's job/step indentation and literal run blocks only;
 GitHub expression evaluation and environment approval remain runner responsibilities.
 """
+from copy import deepcopy
 import os
 from pathlib import Path
 import re
@@ -12,9 +13,93 @@ import tempfile
 import textwrap
 import unittest
 
+import yaml
+
 
 WORKFLOW = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
 UPLOAD_CONDITION = "startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run"
+
+
+def release_guard_errors(workflow):
+    return []
+
+
+class ReleaseGuardMutationTest(unittest.TestCase):
+    def workflow(self):
+        return deepcopy(yaml.safe_load(WORKFLOW))
+
+    def publishing_step(self, workflow, title):
+        return next(s for s in workflow['jobs']['central']['steps'] if s.get('name') == title)
+
+    def test_workflow_keeps_release_guards(self):
+        self.assertEqual(release_guard_errors(self.workflow()), [])
+
+    def test_upload_steps_reject_missing_dry_run_or_tag_guard(self):
+        for title in ('Upload, sbt', 'Upload, Maven', 'Upload, Gradle', 'Upload, Mill'):
+            for guard in ("startsWith(github.ref, 'refs/tags/v')", '!inputs.dry_run'):
+                with self.subTest(step=title, removed=guard):
+                    workflow = self.workflow()
+                    source = self.publishing_step(workflow, title)
+                    source['if'] = source['if'].replace(guard + ' && ', '')
+                    self.assertTrue(release_guard_errors(workflow), f'{title} lost {guard}')
+
+    def test_release_job_rejects_missing_dry_run_or_tag_guard(self):
+        for guard in ("startsWith(github.ref, 'refs/tags/v')", '!inputs.dry_run'):
+            with self.subTest(removed=guard):
+                workflow = self.workflow()
+                source = workflow['jobs']['release']
+                source['if'] = source['if'].replace(guard + ' && ', '')
+                self.assertTrue(release_guard_errors(workflow), f'release job lost {guard}')
+
+    def test_release_jobs_require_the_release_environment(self):
+        for name in ('central', 'release'):
+            for environment in (None, 'other', {'name': 'other'}):
+                with self.subTest(job=name, environment=environment):
+                    workflow = self.workflow()
+                    source = workflow['jobs'][name]
+                    if environment is None:
+                        del source['environment']
+                    else:
+                        source['environment'] = environment
+                    self.assertTrue(release_guard_errors(workflow), f'{name} lost release environment')
+
+    def test_environment_mapping_is_supported(self):
+        workflow = self.workflow()
+        for name in ('central', 'release'):
+            workflow['jobs'][name]['environment'] = {'name': 'release'}
+        self.assertEqual(release_guard_errors(workflow), [])
+
+    def test_secrets_require_a_release_environment_in_any_job(self):
+        for reference in ('${{ secrets.NEW_TOKEN }}', "${{ secrets['NEW_TOKEN'] }}"):
+            for location in ('env', 'steps'):
+                with self.subTest(reference=reference, location=location):
+                    workflow = self.workflow()
+                    source = workflow['jobs']['version']
+                    if location == 'env':
+                        source['env'] = {'TOKEN': reference}
+                    else:
+                        source['steps'].append({'run': 'echo fixture', 'env': {'TOKEN': reference}})
+                    self.assertTrue(release_guard_errors(workflow), 'secret outside release environment')
+
+    def test_new_publish_steps_are_checked_without_names(self):
+        for command in ('sbt sonaUpload', './mvnw -Prelease deploy',
+                        './gradlew publishPlugins',
+                        './mill mill.javalib.SonatypeCentralPublishModule/publishAll',
+                        'gh release create v1.2.3'):
+            for condition in (None, '!inputs.dry_run', "startsWith(github.ref, 'refs/tags/v')"):
+                with self.subTest(command=command, condition=condition):
+                    workflow = self.workflow()
+                    source = {'run': command}
+                    if condition is not None:
+                        source['if'] = condition
+                    workflow['jobs']['central']['steps'].append(source)
+                    self.assertTrue(release_guard_errors(workflow), f'unguarded new step: {command}')
+
+    def test_local_staging_and_job_guarded_release_are_allowed(self):
+        workflow = self.workflow()
+        workflow['jobs']['central']['steps'].append({'run': 'sbt coreJVM/publishSigned'})
+        workflow['jobs']['release']['steps'].append({'run': 'gh release create v1.2.3'})
+        self.assertEqual(release_guard_errors(workflow), [])
 
 
 def job(name):
