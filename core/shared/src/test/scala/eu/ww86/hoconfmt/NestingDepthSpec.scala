@@ -9,6 +9,14 @@ class NestingDepthSpec extends munit.FunSuite {
   val pathLimit  = 120
   val pathReason = s"input dotted key paths exceed the maximum of $pathLimit segments"
 
+  // The flattened path — the segments of every enclosing object plus the written ones — is what
+  // the duplicate report's cost follows, so nesting re-creates from short lines what the
+  // written-line limit above caps (a 20-level chain of 120-segment paths spent 34 seconds in the
+  // report). The scan counts it: a `{` adds the key path just written to what every definition
+  // inside inherits, and a `}` takes it back out. Pinned in the section at the bottom.
+  val flatLimit  = 720
+  val flatReason = s"input dotted key paths exceed the maximum of $flatLimit segments"
+
   def dotted(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
 
   // The library cannot parse a path of 33 or more elements on Scala.js yet
@@ -181,5 +189,71 @@ class NestingDepthSpec extends munit.FunSuite {
   test("sibling dotted paths do not accumulate") {
     val source = (1 to 300).map(i => s"a$i.b = $i").mkString("\n") + "\n"
     assert(HoconFormatter.format(source).isRight)
+  }
+
+  // --- Flattened dotted key paths -------------------------------------------------
+  //
+  // The scan counts the flattened path: a `{` adds the key path just written to what every
+  // definition inside inherits, and a `}` takes it back out.
+
+  def objectPath(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".")
+  def leafPath(segments: Int): String   = (1 to segments).map(i => s"l$i").mkString(".")
+
+  /** `levels` nested objects, each reached by a dotted key path of `segments` segments, with a
+    * leaf of `leafSegments` segments inside the deepest one (`0` writes the one-segment
+    * `leaf = 1`). The deepest definition's flattened path is
+    * `levels * segments + max(leafSegments, 1)`. A sibling per level keeps two fields in every
+    * object, so the render flattens nothing: one long dotted line in the output would not
+    * reparse on Scala.js.
+    */
+  def chain(levels: Int, segments: Int, leafSegments: Int): String =
+    (objectPath(segments) + " { sibling = 0\n") * levels
+      + (if (leafSegments == 0) "leaf = 1\n" else leafPath(leafSegments) + " = 1\n")
+      + "}\n" * levels
+
+  test("a chain at the flattened limit formats, one segment more refuses") {
+    assert(HoconFormatter.format(chain(23, 30, 30)).isRight) // 23*30 + 30 = 720
+    assertEquals(
+      HoconFormatter.format(chain(24, 30, 0)).left.map(_.reason), // 24*30 + 1 = 721
+      Left(flatReason)
+    )
+    Verdict.of(chain(24, 30, 0)) match {
+      case Verdict.Refused(refusal) => assertEquals(refusal.reason, flatReason)
+      case other                    => fail(s"expected a refused verdict, got $other")
+    }
+  }
+
+  test("a 20-level chain of maximal written paths refuses with the flattened reason") {
+    assertEquals(HoconFormatter.format(chain(20, 120, 0)).left.map(_.reason), Left(flatReason))
+  }
+
+  test("duplicate analysis refuses a flattened path over the limit before its document parse") {
+    assertEquals(DuplicateReport.findings(chain(24, 30, 0)).left.map(_.reason), Left(flatReason))
+  }
+
+  test("the written-line limit still refuses first inside nesting") {
+    // A 121-segment line inside a 120-segment object carries both counts over their limits;
+    // the line cap names its own limit, not the flattened one.
+    val source = objectPath(120) + " {\n" + leafPath(121) + " = 1\n}\n"
+    assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(pathReason))
+  }
+
+  test("closing an object takes its key path back out of the flattened count") {
+    // 100 independent chains reach 11 flattened segments each; a `}` that failed to subtract
+    // would pile them up and refuse the file around the 72nd line.
+    val source = (1 to 100).map(i => s"${objectPath(9)} { leaf = $i }\n").mkString
+    assert(HoconFormatter.format(source).isRight)
+  }
+
+  test("siblings inherit the enclosing path once, not once per sibling") {
+    // Seven leaves inside a 711-segment chain sit at 712..718 flattened segments, still under
+    // the limit; a scan that re-added the enclosing path per sibling would refuse them.
+    assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
+    val source = (objectPath(79) + " {\n") * 9 + (1 to 7).map(i => s"leaf$i = $i\n").mkString + "}\n" * 9
+    assert(HoconFormatter.format(source).isRight)
+  }
+
+  test("the corpus-maximum shape, depth 8 and path 11, formats") {
+    assert(HoconFormatter.format(chain(8, 11, 0)).isRight) // 89 flattened segments
   }
 }

@@ -118,6 +118,45 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // Nesting writes in the flattened path what the single-line generator above cannot: every
+  // enclosing object's key path adds its segments to every definition inside it, and that
+  // flattened count is what the report's cost follows (a 20-level chain of 120-segment paths
+  // spent 34 seconds in the report while every written line stayed under the limit; see
+  // limitations.md). The generator mixes ordinary chains with ones past every limit, so both
+  // the refusal and the surviving shapes are exercised.
+  property("no nested dotted path throws or exceeds a time bound") {
+    val nesting = Gen.frequency(
+      4 -> Gen.zip(Gen.choose(1, 6), Gen.choose(1, 20)),
+      1 -> Gen.zip(Gen.choose(1, 40), Gen.choose(1, 120))
+    )
+    def path(segments: Int): String               = (1 to segments).map(i => s"k$i").mkString(".")
+    def chain(levels: Int, segments: Int): String =
+      (path(segments) + " {\n") * levels + path(segments) + " = 1\n" + "}\n" * levels
+    forAll(nesting) { case (levels, segments) =>
+      val source                               = chain(levels, segments)
+      val withInclude                          = "include \"missing.conf\"\n" + source
+      def bound[R](name: String)(run: => R): R = {
+        val start  = System.nanoTime()
+        val result = TimeoutGuard.within(pathTimeBoundMs)(run)
+        val millis = (System.nanoTime() - start) / 1e6
+        assert(millis < pathTimeBoundMs, s"$levels levels of $segments segments: $name took $millis ms")
+        result
+      }
+      bound("verdict")(Verdict.of(source)) match {
+        case Verdict.Refused(refusal) => assert(refusal.reason.nonEmpty)
+        case _                        => ()
+      }
+      bound("duplicate report")(DuplicateReport.findings(source)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+      bound("duplicate report with an include")(DuplicateReport.findings(withInclude)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+    }
+  }
+
   property("failure policies preserve the formatting verdict for every input") {
     val strict = FormatOptions
       .parse("fail-on-refusal = true\nfail-on-duplicates = true", "policy.conf")
