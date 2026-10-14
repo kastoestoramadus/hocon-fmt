@@ -2,7 +2,8 @@
 """Exercise release.yml itself, without secrets, registries or a GitHub runner.
 
 Shell extraction covers this workflow's indentation and literal run blocks only.
-Publishing guards and secret placement are checked on parsed YAML; GitHub expression
+Publishing guards, publisher commands and actions, id-token grants and secret
+placement are checked on parsed YAML; GitHub expression
 evaluation and environment approval remain runner responsibilities.
 """
 from copy import deepcopy
@@ -57,17 +58,38 @@ def release_guard_errors(workflow):
     errors = []
     tag_guard = re.compile(r"startsWith\s*\(\s*github\.ref\s*,\s*['\"]refs/tags/v['\"]\s*\)")
     dry_run_guard = re.compile(r'!\s*inputs\.dry_run\b')
-    publish_commands = re.compile(
-        r'\bsonaUpload\b|\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b|'
-        r'\b(?:gradle|gradlew)\b[^\n]*\bpublishPlugins\b|'
-        r'\bmill\b[^\n]*\bpublishAll\b|'
-        r'\bnpm\s+publish\b|\bpnpm\s+publish\b|\byarn\s+npm\s+publish\b|'
-        r'\btwine\s+upload\b|\buv\s+publish\b|\bgh\s+release\s+(?:create|upload)\b'
-    )
+    # Textual denylist of publisher commands; extend it as new shapes appear.
+    # npm/pnpm/yarn/sbt tolerate flags between tool and verb; gh api and curl count
+    # only when the same line also POSTs to a releases URL or a registry host
+    # (registry.npmjs.org, upload.pypi.org, central.sonatype.com, plugins.gradle.org).
+    publish_commands = re.compile('|'.join((
+        r'\bsonaUpload\b',
+        r'\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b',
+        r'\b(?:gradle|gradlew)\b[^\n]*\bpublishPlugins\b',
+        r'\bmill\b[^\n]*\bpublishAll\b',
+        r'\bnpm\b[^\n]*\bpublish\b',
+        r'\bpnpm\b[^\n]*\bpublish\b',
+        r'\byarn\b[^\n]*\bpublish\b',
+        r'\btwine\s+upload\b',
+        r'\buv\s+publish\b',
+        r'\bgh\s+release\s+(?:create|upload|edit)\b',
+        r'\bgh\s+api\b(?=[^\n]*\s(?:-X|--method)\s*=?\s*POST\b)(?=[^\n]*\breleases\b)',
+        r'\bcurl\b(?=[^\n]*\s(?:-X|--request)\s*=?\s*POST\b)'
+        r'(?=[^\n]*\b(?:registry\.npmjs\.org|upload\.pypi\.org|central\.sonatype\.com|plugins\.gradle\.org)\b)',
+        r'\bdocker\s+push\b',
+        r'\bcargo\s+publish\b',
+        r'\bsbt\b[^\n]*\bpublish\b',
+        r'\bsbt\b[^\n]*\bci-release\b',
+    )))
 
     def guarded(condition):
         condition = str(condition or '')
         return bool(tag_guard.search(condition) and dry_run_guard.search(condition))
+
+    def grants_id_token(permissions):
+        if isinstance(permissions, str):
+            return permissions.lower() == 'write-all'
+        return isinstance(permissions, dict) and str(permissions.get('id-token', '')).lower() == 'write'
 
     def strings(value):
         if isinstance(value, dict):
@@ -86,6 +108,7 @@ def release_guard_errors(workflow):
     for key, value in workflow.items():
         if key != 'jobs' and references_secrets(value):
             errors.append(f'{key}: secrets must belong to a job with environment: release')
+    id_token_everywhere = grants_id_token(workflow.get('permissions'))
     for name, source in workflow['jobs'].items():
         environment = source.get('environment')
         if isinstance(environment, dict):
@@ -96,6 +119,12 @@ def release_guard_errors(workflow):
             errors.append(f'{name}: secrets require environment: release')
         if name == 'release' and not guarded(source.get('if')):
             errors.append('release: job if must require a version tag and !inputs.dry_run')
+        # A publisher needing no secret (trusted publishing via OIDC) bypasses the
+        # secrets rule, so the permission itself is pinned: id-token: write belongs
+        # only on a job whose own if the release guards protect.
+        if (id_token_everywhere or grants_id_token(source.get('permissions'))) \
+                and not guarded(source.get('if')):
+            errors.append(f'{name}: id-token: write requires a version tag and !inputs.dry_run on the job')
         for index, item in enumerate(source.get('steps', [])):
             # publishSigned stages locally; sonaUpload sends that staging repository remotely.
             # publishM2, publishLocal, publishToMavenLocal, npm pack and artifact builds
