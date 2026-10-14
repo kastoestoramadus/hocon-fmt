@@ -200,13 +200,16 @@ class ReleaseWorkflowTest(unittest.TestCase):
             summary, marker, calls = root / 'summary', root / 'uploads', root / 'curl-calls'
             summary.touch()
             stub = root / 'curl'
-            stub.write_text('#!/bin/bash\necho "$*" >> "$CURL_CALLS"\nexit "$CENTRAL_EXIT"\n')
+            stub.write_text('#!/bin/bash\necho "$*" >> "$CURL_CALLS"\n'
+                            'if [[ "$*" == *"$MISSING_ARTIFACT"* ]] && [ -n "$MISSING_ARTIFACT" ]; then exit 22; fi\n'
+                            'exit "$CENTRAL_EXIT"\n')
             stub.chmod(0o755)
             env = {c: '' if c in missing else 'fixture' for c in self.credentials}
             result = run_shell(step('central', 'Preflight'), root, **env,
                                SELECTED_TARGETS=selected, CAN_UPLOAD=upload, VERSION='1.2.3',
                                PATH=f'{root}:{os.environ["PATH"]}', CENTRAL_EXIT='0' if central else '22',
-                               CURL_CALLS=str(calls), GITHUB_STEP_SUMMARY=str(summary))
+                               CURL_CALLS=str(calls), MISSING_ARTIFACT='hocon-fmt-java-api' if central == 'api-missing' else '',
+                               GITHUB_STEP_SUMMARY=str(summary))
             # A failing guard must stop the runner before the first registry upload.
             if result.returncode == 0 and upload == 'true' and 'core' in selected.split(','):
                 sbt = root / 'sbt'
@@ -214,7 +217,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 sbt.chmod(0o755)
                 run = run_shell(step('central', 'Upload, sbt'), root,
                                 SELECTED_TARGETS=selected, PATH=f'{root}:{os.environ["PATH"]}',
-                                MAVEN_REPO_LOCAL=str(root / 'm2'), UPLOAD_MARKER=str(marker))
+                                MAVEN_REPO_LOCAL=str(root / 'm2'), UPLOAD_MARKER=str(marker),
+                                GITHUB_STEP_SUMMARY=str(summary))
                 self.assertEqual(run.returncode, 0, run.stderr)
             print(f'preflight selected={selected} upload={upload} missing={missing}: '
                   f'exit {result.returncode}; {result.stdout.strip()}; upload={marker.exists()}', flush=True)
@@ -272,6 +276,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(calls, '')
 
+    def test_plugins_reject_missing_java_api_even_when_core_visible(self):
+        result, _, uploaded, calls = self.preflight('maven-plugin', central='api-missing')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('hocon-fmt-java-api 1.2.3', result.stdout)
+        self.assertIn('hocon-fmt-core_3', calls)
+        self.assertIn('hocon-fmt-java-api', calls)
+        self.assertFalse(uploaded)
+
     def test_dry_run_reports_dependency_and_needs_no_upload_credentials(self):
         result, summary, uploaded, calls = self.preflight('gradle-plugin', 'false',
                                                         ('SONATYPE_USERNAME', 'SONATYPE_PASSWORD',
@@ -312,7 +324,8 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 stub.chmod(0o755)
                 for title, task in (('Signing check, sbt', 'publishSigned'), ('Upload, sbt', 'publishSigned')):
                     result = run_shell(step('central', title), root, SELECTED_TARGETS=selected,
-                                       PATH=f'{root}:{os.environ["PATH"]}', MAVEN_REPO_LOCAL=str(root / 'm2'))
+                                       PATH=f'{root}:{os.environ["PATH"]}', MAVEN_REPO_LOCAL=str(root / 'm2'),
+                                       GITHUB_STEP_SUMMARY=str(root / 'summary'))
                     self.assertEqual(result.returncode, 0, result.stderr)
                     actual = re.findall(r'([A-Za-z]+)/(?:publishSigned)', result.stdout)
                     self.assertEqual(actual, list(expected))

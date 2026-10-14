@@ -102,6 +102,18 @@ fresh "$good"; write_tree
 expect_run 'an unknown target fails loudly' 2 'Unknown release target' \
   env RELEASE_TARGETS=banana "$tree/scripts/check-release-version.sh" "$good"
 
+fresh "$good"; gradle_v=$stale maven_v=$stale mill_v=$stale hooks_v=$stale; write_tree
+expect_run 'core-only ignores unselected channel versions' 0 '-' \
+  env RELEASE_TARGETS=core "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; api_v=$stale gradle_v=$stale maven_v=$stale mill_v=$stale hooks_v=$stale; write_tree
+expect_run 'native-only ignores all independent channel versions' 0 '-' \
+  env RELEASE_TARGETS=native "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; mill_v=$stale hooks_v=$stale; write_tree
+expect_run 'a selected Mill plugin version is checked' 1 '^mill-plugin/build\.mill:' \
+  env RELEASE_TARGETS=mill-plugin "$tree/scripts/check-release-version.sh" "$good"
+
 if [ "$failed" -eq 0 ]; then
   echo 'check-release-version: every case passes'
 else
