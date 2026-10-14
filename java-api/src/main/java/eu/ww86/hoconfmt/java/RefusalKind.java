@@ -12,6 +12,8 @@ public enum RefusalKind {
     NotHocon,
     /** The input exceeds the platform-independent lexical nesting limit. */
     NestingTooDeep,
+    /** The input's longest dotted key path exceeds the platform-independent segment limit. */
+    PathTooDeep,
     /** The file is named as a format of its own that Lightbend's loader also reads. */
     OtherFormat,
     /** Output cannot be read back safely, including after UTF-8 encoding. */
@@ -45,6 +47,7 @@ public enum RefusalKind {
             case "NotUtf8" -> NotUtf8;
             case "NotHocon" -> NotHocon;
             case "NestingTooDeep" -> NestingTooDeep;
+            case "PathTooDeep" -> PathTooDeep;
             case "OtherFormat" -> OtherFormat;
             case "BrokenOutput" -> BrokenOutput;
             case "LostComment" -> LostComment;

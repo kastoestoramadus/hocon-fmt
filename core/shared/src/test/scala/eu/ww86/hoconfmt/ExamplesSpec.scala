@@ -9,6 +9,7 @@ class ExamplesSpec extends munit.FunSuite {
   def kindOf(refusal: Refusal): String = refusal match {
     case Refusal.NotUtf8                    => "not-utf8"
     case Refusal.NestingTooDeep(_)          => "nesting-too-deep"
+    case Refusal.PathTooDeep(_)             => "path-too-deep"
     case Refusal.NotHocon(_)                => "not-hocon"
     case Refusal.OtherFormat(_)             => "other-format"
     case Refusal.BrokenOutput(_)            => "broken-output"
@@ -51,6 +52,7 @@ class ExamplesSpec extends munit.FunSuite {
       Refusal.NotUtf8,
       Refusal.NotHocon("detail"),
       Refusal.NestingTooDeep(80),
+      Refusal.PathTooDeep(120),
       Refusal.OtherFormat("JSON"),
       Refusal.BrokenOutput("detail"),
       Refusal.LostComment("# gone"),

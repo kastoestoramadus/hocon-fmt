@@ -117,10 +117,36 @@ explicit root object; siblings do not accumulate depth. Strings (ordinary, escap
 triple-quoted), `#` / `//` comments and the `${...}` of a substitution are ignored. This is a
 lexical resource limit, not a syntax validator or a bound on the object tree implied by dotted keys.
 
-Two paths stay outside the guard. A style file (`.hocon-fmt.conf`) nested 10,000 levels deep ends in
-a `StackOverflowError` and exit 1, not the exit 2 that usage.md documents for config problems. A
-single-line dotted path of 2,000 or more segments (`a.a.a. ... = 1`) is not nesting to the scan and
-takes tens of seconds (23 s at 2,000, 65 s at 3,000, over two minutes at 5,000).
+One path stays outside the guard: a style file (`.hocon-fmt.conf`) nested 10,000 levels deep ends in
+a `StackOverflowError` and exit 1, not the exit 2 that usage.md documents for config problems.
+
+## Long dotted key paths
+
+`Refusal.PathTooDeep(120)` leaves input whose **longest dotted key path exceeds 120 segments**
+unchanged, with the reason `input dotted key paths exceed the maximum of 120 segments`. The same
+early scan that bounds nesting counts the segments of a key path — the `a.b.c` of `a.b.c = 1` is
+three — and refuses before include masking, parsing, rendering and duplicate analysis, on JVM,
+Scala.js and Scala Native. A path's segments are counted the way sconfig splits them: at unquoted
+dots, with adjacent quoted and unquoted pieces joining into one element (`"a"."b"` is two, `"a""b"`
+is one), so dots inside a quoted key, a quoted value or an include target are never segments, and
+`a . b` is two while `a b` is one. Key paths in `${...}` substitutions are skipped with the rest of
+the substitution; siblings do not accumulate.
+
+The bound exists because the duplicate report's work on a definition grows with the cube of its
+path's segments (every prefix of every path is paired against the definitions), and the command
+line runs that report on every file it examines. Bare sconfig is fast on the same input — a
+2,000-segment `a.a.a. ... = 1` parses, renders and reparses in about 60 ms — but the duplicate
+report spent 0.4 s at 500 segments, 2.8 s at 1,000 and 24 s at 2,000 on the JVM (measured
+2026-10-14, warm in-process), so a 10 KB file could hang a run for tens of seconds. At the limit
+itself the whole formatter, duplicate report included, needs milliseconds: a 120-segment path
+formats in about 2 ms warm, under 1 s through the command line, most of it JVM start-up.
+
+The limit is ten times the longest dotted key path measured across the corpus — 11 segments, in a
+test source of the apache-pekko-connectors repository — and the repository's own `.conf` files
+reach 3. Longer paths can still be formatted by splitting the definition (`a.b.c = 1` for
+`a { b.c = 1 }`); a path of 33 or more segments does not even parse on Scala.js today (see the
+[library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches
+shapes the library refuses anyway, until a Scala.js release carries the fix.
 
 The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
 1,257-file corpus of 24 public repositories: **8**, including Akka's

@@ -23,6 +23,7 @@ object ExampleGenerator {
         "not-utf8",
         "not-hocon",
         "nesting-too-deep",
+        "path-too-deep",
         "other-format",
         "broken-output",
         "lost-comment",

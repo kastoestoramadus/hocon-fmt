@@ -18,26 +18,79 @@ private[hoconfmt] object HoconText {
   // Ten times the deepest explicit nesting in the 1,257-file corpus; see limitations.md.
   val MaxNestingDepth = 80
 
-  /** Stop before the parser or include passes can spend resources on unbounded nesting. */
+  // Ten times the longest dotted key path in the same corpus (11 segments), rounded up. The
+  // duplicate report's work on a definition grows with the cube of its path's segments, so a
+  // single-line `a.a.a. ... = 1` spent 24 seconds in it at 2,000 segments; see limitations.md.
+  val MaxPathSegments = 120
+
+  /** Stop before the parser or include passes can spend resources on unbounded nesting, and
+    * before the duplicate report can spend them on an unbounded dotted key path.
+    */
   def checkNesting(text: String): Either[Refusal, Unit] = {
+    // A key path runs from where a field can begin — the file, `{`, `,` or a newline — to the
+    // `=`, `:` or `{` of its value. sconfig splits it into elements at unquoted dots and joins
+    // adjacent quoted and unquoted pieces into one element (`"a"."b"` and `"a""b"` differ),
+    // so a quoted piece begins a new segment only where an element can begin. Whitespace ends
+    // nothing but the line: `a . b` is two elements, `a b` one, and `a.\nb` does not parse.
+    // The state is three flags over the same walk the depth check does; a substitution is
+    // skipped whole and can stand in no key path.
     @tailrec
-    def scan(index: Int, depth: Int): Either[Refusal, Unit] =
-      if (index >= text.length) Right(())
-      else if (text.startsWith("\"\"\"", index)) scan(endOfTripleQuoted(text, index + 3), depth)
-      else if (text.charAt(index) == '"') scan(endOfQuoted(text, index + 1), depth)
-      else if (text.charAt(index) == '#' || text.startsWith("//", index)) scan(endOfLine(text, index), depth)
+    def scan(index: Int, depth: Int, segments: Int, atKeyStart: Boolean, afterDot: Boolean): Either[Refusal, Unit] =
+      if (segments > MaxPathSegments) Left(Refusal.PathTooDeep(MaxPathSegments))
+      else if (index >= text.length) Right(())
+      else if (text.startsWith("\"\"\"", index))
+        scan(
+          endOfTripleQuoted(text, index + 3),
+          depth,
+          beginElement(segments, atKeyStart, afterDot),
+          atKeyStart = false,
+          afterDot = false
+        )
+      else if (text.charAt(index) == '"')
+        scan(
+          endOfQuoted(text, index + 1),
+          depth,
+          beginElement(segments, atKeyStart, afterDot),
+          atKeyStart = false,
+          afterDot = false
+        )
+      else if (text.charAt(index) == '#' || text.startsWith("//", index))
+        scan(endOfLine(text, index), depth, segments, atKeyStart, afterDot)
       // `${x}` and `${?x}` open no object: a file that nests exactly to the limit may use them.
-      else if (text.startsWith("${", index)) scan(endOfSubstitution(text, index + 2), depth)
+      else if (text.startsWith("${", index))
+        scan(endOfSubstitution(text, index + 2), depth, segments = 0, atKeyStart = false, afterDot = false)
       else {
         text.charAt(index) match {
-          case '{' | '[' =>
+          case '{' =>
             if (depth == MaxNestingDepth) Left(Refusal.NestingTooDeep(MaxNestingDepth))
-            else scan(index + 1, depth + 1)
-          case '}' | ']' => scan(index + 1, math.max(0, depth - 1))
-          case _         => scan(index + 1, depth)
+            else scan(index + 1, depth + 1, segments = 0, atKeyStart = true, afterDot = false)
+          case '[' =>
+            if (depth == MaxNestingDepth) Left(Refusal.NestingTooDeep(MaxNestingDepth))
+            else scan(index + 1, depth + 1, segments = 0, atKeyStart = false, afterDot = false)
+          case '}' | ']' =>
+            scan(index + 1, math.max(0, depth - 1), segments = 0, atKeyStart = false, afterDot = false)
+          // The value follows: the path, `+=` included, is whole.
+          case '=' | ':' | '+' =>
+            scan(index + 1, depth, segments = 0, atKeyStart = false, afterDot = false)
+          case ','  => scan(index + 1, depth, segments = 0, atKeyStart = true, afterDot = false)
+          case '\n' => scan(index + 1, depth, segments = 0, atKeyStart = true, afterDot = false)
+          // A dot ends an element; the next piece or word begins one. A leading dot belongs to
+          // no path and changes nothing.
+          case '.' => scan(index + 1, depth, segments, atKeyStart = false, afterDot = segments > 0)
+          // Whitespace keeps the run: `a . b` and `a b` are one path expression either way.
+          case ' ' | '\t' | '\r' | '\u000C' => scan(index + 1, depth, segments, atKeyStart, afterDot)
+          case _                            =>
+            if (atKeyStart || afterDot) scan(index + 1, depth, segments + 1, atKeyStart = false, afterDot = false)
+            else scan(index + 1, depth, segments, atKeyStart = false, afterDot = false)
         }
       }
-    scan(0, 0)
+
+    // A quoted piece begins a segment where an element can begin: at the start of a key path or
+    // right after a dot. Beside another piece it joins that element.
+    def beginElement(segments: Int, atKeyStart: Boolean, afterDot: Boolean): Int =
+      if (atKeyStart || afterDot) segments + 1 else segments
+
+    scan(0, 0, segments = 0, atKeyStart = true, afterDot = false)
   }
 
   def spans(text: String): Vector[Span] = {

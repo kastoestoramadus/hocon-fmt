@@ -80,8 +80,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
 
   property("no dotted key path length throws or exceeds a time bound") {
     forAll(Gen.choose(1, 3000)) { segments =>
-      val source      = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
-      val withInclude = "include \"missing.conf\"\n" + source
+      val source                               = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
+      val withInclude                          = "include \"missing.conf\"\n" + source
       def bound[R](name: String)(run: => R): R = {
         val start  = System.nanoTime()
         val result = run
