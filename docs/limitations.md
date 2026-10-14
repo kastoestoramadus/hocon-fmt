@@ -24,9 +24,9 @@ CLI verdicts, not a measurement of the fork-backed playground. The measurement a
 files are recorded in [the improvement log](improvement-log/2026-10-13-release-scope-and-refusals.md).
 
 For example, `include "defaults.conf", zone = "us"` is refused when formatting would move
-the include across the field, potentially changing which value wins. The playground shows
-“Left unchanged” with the reason; file runs report the refusal and leave the original bytes
-untouched. The full reproduction is under [moved includes](#sconfig-defects-the-formatter-refuses).
+the include across the field, potentially changing which value wins. File runs report the refusal and leave the original bytes
+untouched. The playground uses a fork with the same-line ordering fix and formats this input
+with the include still before `zone`. The full reproduction is under [moved includes](#sconfig-defects-the-formatter-refuses).
 
 ## Comment order on repeated keys
 
@@ -117,8 +117,25 @@ explicit root object; siblings do not accumulate depth. Strings (ordinary, escap
 triple-quoted), `#` / `//` comments and the `${...}` of a substitution are ignored. This is a
 lexical resource limit, not a syntax validator or a bound on the object tree implied by dotted keys.
 
-One path stays outside the guard: a style file (`.hocon-fmt.conf`) nested 10,000 levels deep ends in
-a `StackOverflowError` and exit 1, not the exit 2 that usage.md documents for config problems.
+The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
+1,257-file corpus of 24 public repositories: **8**, including Akka's
+`akka-cluster-sharding/src/main/resources/reference.conf` at
+`164b3c6615b0ac1957c4ef13b0cff6e2a43a79c0`. All 1,255 UTF-8 inputs were scanned; the other two
+already refuse as `NotUtf8`. The scan counted peak brace/bracket depth outside strings and
+comments, in source order. Eighty gives substantial headroom for real files while bounding the
+recursive parser and the include-aware passes before deeply nested input can consume minutes
+and gigabytes. The bare sconfig 10,000-object JVM stack failure is pinned separately as a
+`library:` case in `SconfigDefectsSpec`.
+
+Style files (`.hocon-fmt.conf`) use the same pre-checks and return a configuration error naming
+the file; the CLI exits 2 before touching selected files. A style file's dotted key path longer than
+120 segments is refused by the guard in the next section, with `<file>: input dotted key paths
+exceed the maximum of 120 segments`. The entire style parse, including option validation and
+diagnostic rendering, also catches stack exhaustion and returns `<file>: input nesting exceeds
+available stack capacity` on one line. The `FormatOptionsSpec` cases for dotted style paths of 999,
+2,999 and 9,999 segments accept any single-line named error, so they pass whichever check fires
+first. The stack threshold depends on the runtime. The dotted-path cases were run on the JVM only;
+Scala.js and Scala Native were not run against them.
 
 ## Long dotted key paths
 
@@ -147,16 +164,6 @@ reach 3. Longer paths can still be formatted by splitting the definition (`a.b.c
 `a { b.c = 1 }`); a path of 33 or more segments does not even parse on Scala.js today (see the
 [library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches
 shapes the library refuses anyway, until a Scala.js release carries the fix.
-
-The limit is ten times the deepest explicit nesting measured on 2026-10-13 in the documented
-1,257-file corpus of 24 public repositories: **8**, including Akka's
-`akka-cluster-sharding/src/main/resources/reference.conf` at
-`164b3c6615b0ac1957c4ef13b0cff6e2a43a79c0`. All 1,255 UTF-8 inputs were scanned; the other two
-already refuse as `NotUtf8`. The scan counted peak brace/bracket depth outside strings and
-comments, in source order. Eighty gives substantial headroom for real files while bounding the
-recursive parser and the include-aware passes before deeply nested input can consume minutes
-and gigabytes. The bare sconfig 10,000-object JVM stack failure is pinned separately as a
-`library:` case in `SconfigDefectsSpec`.
 
 ## The preserved preamble
 
@@ -245,9 +252,9 @@ Moved across a field (`Refusal.MovedInclude`):
   `keepOriginOrder` sorts by the line a field starts on, an origin has no column, and fields on
   one line come out in no defined order (`z = 1, y = 2, x = 3` renders `x`, `y`, `z`). The include
   is masked as a field, so it moves like one; here it lands after `zone`, and since a later
-  definition wins, `zone` then resolves to the included file's value instead of `us`. No open
-  sconfig pull request orders same-line fields: the origin-line ones cannot, with no column to
-  go by, so the fix would be to order by parse sequence.
+  definition wins, `zone` then resolves to the included file's value instead of `us`. The page
+  fork includes the parse-sequence ordering fix (#645), so this same-line input formats there;
+  the published core stays on 2.0.0 and refuses it.
 - **A key defined again after the include**: `a.b = 1`, the include, `a.c = 2`. Repeated keys are
   rendered once, where the first appeared, so `a.c` would move before the include.
 
@@ -462,9 +469,8 @@ include that reaches one of these is reported and left alone.
   the file or its directory is not writable — the formatted text is written in place.** That keeps
   the inode, but not the crash-atomicity of a rename: the write truncates first, so an interrupted
   one can leave a partial file (a killed run on an unwritable directory left a 7.4 MB file empty).
-  The Mill plugin always writes in place — a deliberate simplification, since the other plugins
-  get a staged replacement from the Java API, and Mill needs none of that boundary. If the window
-  matters to you, open an issue: we would gladly hear of a better solution.
+  All JVM plugins use the Java API's staged replacement with the same in-place fallback. If the
+  window matters to you, open an issue: we would gladly hear of a better solution.
   [Usage](usage.md) has the full write contract.
 
 ## Speed

@@ -9,4 +9,4 @@ and the version and dependency-closure guards include both standalone plugins.
 must create a Plugin Portal account and API key, supply its two secrets, and prove ownership of
 `ww86.eu` for `eu.ww86.hocon-fmt` when the Portal requests it. Confirm initial Portal approval,
 then publish both Central deployments in dependency order. Registry uploads and the real signing
-key are unverified locally. Mill remains disabled and later channels require `RELEASE_WAVE=2`.
+key are unverified locally. Mill remains disabled and later channels require the former wave-2 switch.

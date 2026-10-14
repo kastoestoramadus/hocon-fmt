@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs scripts/check-release-version.sh against fixture trees, not this checkout, so the wave
-# split it enforces is exercised whatever versions the working tree itself carries. The cases
-# mirror release.yml: RELEASE_WAVE unset is a wave-1 tag, RELEASE_WAVE=2 the full-release check.
+# Runs scripts/check-release-version.sh against fixture trees, not this checkout, so the selection
+# contract it enforces is exercised whatever versions the working tree itself carries. The cases
+# mirror release.yml: default targets cover JVM plugins; selecting hooks checks their pins.
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
@@ -54,53 +54,65 @@ good=1.2.3
 stale=0.1.0-SNAPSHOT
 
 fresh "$good"; write_tree
-expect_run 'wave 1 passes when all six places agree' 0 '-' \
+expect_run 'default targets passes when all six places agree' 0 '-' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; mill_v=$stale hooks_v=$stale; write_tree
-expect_run 'wave 1 tolerates stale wave-2 places' 0 '-' \
+expect_run 'default targets tolerates stale unselected places' 0 '-' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; gradle_v=$stale; write_tree
-expect_run 'wave 1 fails on a Gradle plugin mismatch' 1 '^gradle-plugin/build\.gradle\.kts:' \
+expect_run 'default targets fails on a Gradle plugin mismatch' 1 '^gradle-plugin/build\.gradle\.kts:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; maven_v=$stale; write_tree
-expect_run 'wave 1 fails on a Maven plugin mismatch' 1 '^maven-plugin/pom\.xml:' \
+expect_run 'default targets fails on a Maven plugin mismatch' 1 '^maven-plugin/pom\.xml:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; write_tree
 put maven-plugin/pom.xml "<version>$good</version>\n<version>$stale</version>"
-expect_run 'wave 1 fails on a Maven Java API dependency mismatch' 1 '^maven-plugin/pom\.xml:' \
+expect_run 'default targets fails on a Maven Java API dependency mismatch' 1 '^maven-plugin/pom\.xml:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; drop=maven-plugin/pom.xml; write_tree; drop=""
-expect_run 'wave 1 fails when the Maven plugin POM is missing' 1 '^maven-plugin/pom\.xml:' \
+expect_run 'default targets fails when the Maven plugin POM is missing' 1 '^maven-plugin/pom\.xml:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; sbt_v=$stale; write_tree
-expect_run 'wave 1 fails on a build.sbt mismatch' 1 '^build\.sbt:' \
+expect_run 'default targets fails on a build.sbt mismatch' 1 '^build\.sbt:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; drop=java-api/build.gradle.kts; write_tree; drop=""
-expect_run 'wave 1 fails when a place it checks is missing' 1 '^java-api/build\.gradle\.kts:' \
+expect_run 'default targets fails when a place it checks is missing' 1 '^java-api/build\.gradle\.kts:' \
   "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; write_tree
-expect_run 'wave 2 passes when all six places agree' 0 '-' \
-  env RELEASE_WAVE=2 "$tree/scripts/check-release-version.sh" "$good"
+expect_run 'all targets passes when all six places agree' 0 '-' \
+  env RELEASE_TARGETS=core,sbt-plugin,maven-plugin,gradle-plugin,mill-plugin,native,npm,pypi "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; drop=mill-plugin/build.mill; write_tree; drop=""
-expect_run 'wave 2 fails when a place it checks is missing' 1 '^mill-plugin/build\.mill:' \
-  env RELEASE_WAVE=2 "$tree/scripts/check-release-version.sh" "$good"
+expect_run 'all targets fails when a place it checks is missing' 1 '^mill-plugin/build\.mill:' \
+  env RELEASE_TARGETS=core,sbt-plugin,maven-plugin,gradle-plugin,mill-plugin,native,npm,pypi "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; hooks_v=$stale; write_tree
-expect_run 'wave 2 still fails on stale hook pins' 1 '^\.pre-commit-hooks\.yaml:' \
-  env RELEASE_WAVE=2 "$tree/scripts/check-release-version.sh" "$good"
+expect_run 'all targets still fails on stale hook pins' 1 '^\.pre-commit-hooks\.yaml:' \
+  env RELEASE_TARGETS=core,sbt-plugin,maven-plugin,gradle-plugin,mill-plugin,native,npm,pypi "$tree/scripts/check-release-version.sh" "$good"
 
 fresh "$good"; write_tree
-expect_run 'an unknown wave fails loudly' 2 'RELEASE_WAVE' \
-  env RELEASE_WAVE=banana "$tree/scripts/check-release-version.sh" "$good"
+expect_run 'an unknown target fails loudly' 2 'Unknown release target' \
+  env RELEASE_TARGETS=banana "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; gradle_v=$stale maven_v=$stale mill_v=$stale hooks_v=$stale; write_tree
+expect_run 'core-only ignores unselected channel versions' 0 '-' \
+  env RELEASE_TARGETS=core "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; api_v=$stale gradle_v=$stale maven_v=$stale mill_v=$stale hooks_v=$stale; write_tree
+expect_run 'native-only ignores all independent channel versions' 0 '-' \
+  env RELEASE_TARGETS=native "$tree/scripts/check-release-version.sh" "$good"
+
+fresh "$good"; mill_v=$stale hooks_v=$stale; write_tree
+expect_run 'a selected Mill plugin version is checked' 1 '^mill-plugin/build\.mill:' \
+  env RELEASE_TARGETS=mill-plugin "$tree/scripts/check-release-version.sh" "$good"
 
 if [ "$failed" -eq 0 ]; then
   echo 'check-release-version: every case passes'

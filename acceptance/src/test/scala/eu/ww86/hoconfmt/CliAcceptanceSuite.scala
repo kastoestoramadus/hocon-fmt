@@ -102,6 +102,25 @@ class CliAcceptanceSuite extends munit.FunSuite {
       assertEquals(os.read(dir / "app.conf"), "a=1\n")
     }
 
+    test(s"[$runtime] a deeply nested style file exits 2 with one diagnostic and no writes") {
+      val dir = os.temp.dir()
+      try {
+        os.write(dir / "app.conf", "a=1\n")
+        os.write(dir / ".hocon-fmt.conf", "a {" * 10000 + "x=1" + "}" * 10000)
+        List(Seq.empty[String], Seq("--config", ".hocon-fmt.conf")).foreach { args =>
+          val result = os.proc(cli, args, "app.conf").call(cwd = dir, stderr = os.Pipe, check = false)
+          assertEquals(result.exitCode, 2)
+          assertEquals(result.out.text(), "")
+          val lines = own(result.err.text()).linesIterator.toList
+          assertEquals(lines.size, 1)
+          assert(lines.head.endsWith(".hocon-fmt.conf: input nesting exceeds the maximum depth of 80"), lines)
+          assertEquals(os.read(dir / "app.conf"), "a=1\n")
+        }
+      } finally {
+        os.remove.all(dir)
+      }
+    }
+
     test(s"[$runtime] report output failures preserve exits and cannot overwrite refused input") {
       val dir = os.temp.dir()
       os.write(dir / "data.json", "a = 1\n")

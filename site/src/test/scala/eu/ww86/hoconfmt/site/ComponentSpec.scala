@@ -186,7 +186,12 @@ class ComponentSpec extends munit.FunSuite {
     assert(prose.contains("parser test fixtures") && prose.contains("not a production prevalence estimate"), prose)
     assert(prose.contains("not been reviewed by hand") && prose.contains("second release"), prose)
     assert(prose.contains("include \"defaults.conf\", zone = \"us\""), prose)
-    assert(prose.contains("Left unchanged") && prose.contains("byte for byte"), prose)
+    assert(prose.contains("The command line refuses this input") && prose.contains("byte for byte"), prose)
+    assert(prose.contains("The playground formats this input in the same order"), prose)
+    assertEquals(
+      formatted("include \"defaults.conf\", zone = \"us\""),
+      "include \"defaults.conf\"\nzone = us\n"
+    )
     val links = refusals
       .findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
       .asInstanceOf[js.Array[js.Dynamic]]

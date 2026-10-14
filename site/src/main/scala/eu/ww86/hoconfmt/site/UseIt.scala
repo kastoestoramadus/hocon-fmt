@@ -8,9 +8,9 @@ object UseIt {
   // The hooks pin PyPI and npm versions wave 1 does not publish; the same sentence heads the
   // pre-commit section of docs/usage.md.
   val wave2Note = "The hooks ship in wave 2: they pin PyPI and npm versions published only then."
-  // The same sentence heads the Mill section of docs/usage.md and the Mill row of the README.
+  // Keep the publication status consistent with the Mill section of docs/usage.md.
   val millNote =
-    "Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9."
+    "Second-wave plugin: tested on Mill 1.1.4 and 1.1.10; excluded from the first publish selection."
   val laterNote = "Not published at v0.1.0: this channel ships in wave 2. Until then run the JVM CLI from a checkout."
   final case class Integration(id: String, title: String, module: Option[String] = None)
   val integrations = List(

@@ -150,7 +150,11 @@ inputs, metadata, and expected output; the generator never derives the target.
 Fork differences with pinned page output declare `now-site: formatted` and carry
 `expected/site-default.conf`. The published suites still assert `now`; the fork's
 `Variant.ledger` routes these inputs to `CommentCarrierSpec`, which asserts `now-site`
-and the exact fork output for showcase and catalogue fixtures. `target` is always authored
+and the exact fork output for showcase and catalogue fixtures. Regenerate only these page goldens
+with `UPDATE_GOLDEN=1 sbt "coreSite/testOnly eu.ww86.hoconfmt.CommentCarrierSpec"`,
+then read the diff and rerun without `UPDATE_GOLDEN`. This runs the actual Scala.js fork and
+writes only `expected/site-default.conf`; it cannot rewrite published-core expectations.
+`target` is always authored
 independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
 
 An upstream gap (`now != target`, except the formatter’s own same-line include

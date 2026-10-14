@@ -64,6 +64,20 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  property("style parsing never throws at any generated nesting depth") {
+    val depths = Gen.frequency(1 -> Gen.choose(0, 80), 4 -> Gen.choose(81, 10000))
+    forAll(depths, Gen.oneOf("object", "array", "dotted"), Gen.oneOf("separator", "fail-on-refusal")) {
+      (depth, shape, key) =>
+        val text = shape match {
+          case "object" => "style=" + "{a=" * depth + "1" + "}" * depth
+          case "array"  => "style=" + "[" * depth + "1" + "]" * depth
+          case _        => key + ".a" * depth + " = 1"
+        }
+        val result = FormatOptions.parse(text, "team.conf")
+        assert(result.left.exists(_.startsWith("team.conf: ")), s"depth $depth: $result")
+    }
+  }
+
   property("format never throws at any generated nesting depth") {
     val depths = Gen.frequency(1 -> Gen.choose(0, 80), 4 -> Gen.choose(81, 10000))
     forAll(depths, Gen.oneOf(false, true), Gen.oneOf(false, true)) { (depth, arrays, include) =>

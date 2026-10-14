@@ -23,7 +23,7 @@ around it in `HoconFormatter`.
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x | JVM, Scala 2.12 | java-api, at run time |
 | `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | java-api, at run time |
 | `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | java-api |
-| `mill-plugin` | `hoconFormat`, `hoconFormatCheck` for Mill 1.1.4 and later; standalone Mill build | JVM, Scala 3 | core |
+| `mill-plugin` | `hoconFormat`, `hoconFormatCheck` for Mill 1.1.4 and later; standalone Mill build | JVM, Scala 3.8.2 | java-api, at run time |
 | `npm/` | template of the npm package that wraps the Node build of the CLI | Node | cli |
 | `python/` | builds the wheel that carries the native binary, for the pre-commit hooks | | cli |
 | `bench` | times each formatter phase; see [testing](testing.md#benchmarks) | JVM, Scala.js, Scala Native | core |
@@ -149,8 +149,7 @@ verdict, findings and any report failure of one read to the CLI, and its `write`
 as `format` does. A failed document parse or an unsupported document tree produces a warning that the
 duplicate report could not run, rather than an empty successful report. The Java API mirrors options, findings and report failures in JDK records. Its `inspectFile`
 reads original bytes once, reports duplicates from those bytes and writes only a `NeedsFormatting`
-verdict. sbt reads these records reflectively; Gradle and Maven call them directly. Mill stays on
-core and reads and writes at its own edge. All four apply the file's effective duplicate and
+verdict. sbt and Mill read these records reflectively; Gradle and Maven call them directly. All four apply the file's effective duplicate and
 refusal policies. `fail-on-refusal` is false by default; when enabled it makes a refused selected
 file fail either task, with no write. Java
 `Inspection.failsOnRefusal` exposes this per-file decision across the isolated sbt loader too.
@@ -163,7 +162,7 @@ including under the compatibility default, and clearing one policy does not clea
 
 `ConfigLookup` contains the pure lookup decision: a config wins even in a directory holding `.git`,
 otherwise `.git` stops the walk, otherwise the parent is next. Filesystem existence probes, parent
-paths, strict UTF-8 reads and error effects stay in CLI, Java API and Mill. `StyleOverrides` and
+paths, strict UTF-8 reads and error effects stay in CLI and Java API. `StyleOverrides` and
 `FormatOptions.parse` are pure core values shared by these integrations; core still depends only
 on sconfig. Gradle includes ancestor configs in task inputs and defers discovery of their paths
 through a provider to preserve configuration-cache reuse.
@@ -333,15 +332,19 @@ Gradle build in `java-api/` tests, and a contract suite in that build loads the 
 the way the sbt plugin does: a `URLClassLoader` over the platform loader, reached reflectively,
 since the two loaders hold distinct classes under equal names and only values cross.
 
-**Mill plugin on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9.** Until then `mill-plugin/` is kept but not released, and its CI job does not block. Designed for
-Mill 1.1.4 and later, it is a Scala 3 trait that depends on the core and matches on `Verdict` directly.
+**Mill** compiles its `HoconFormatterModule` trait for the host's Scala 3.8.2 and Mill 1.1.4.
+At task time it resolves `eu.ww86:hocon-fmt-java-api` and its transitive dependencies separately
+from the module's classpath and Scala version forcing. A platform-parent `URLClassLoader` owns the formatter's Scala 3.9
+runtime; only JDK values cross through reflective `inspectFile` calls. The loader closes after
+each command. Mill's compiler sees neither core nor Java API classes. Unit tests and real Mill
+1.1.4 / 1.1.10 builds enforce the boundary. The plugin remains in the second publish wave.
 
 The cats and ZIO writers encode once and verify that decoding the bytes gives the original text
 before creating a staged file or truncating the target. Both write paths use those verified bytes,
 so a direct write cannot silently substitute an unencodable character. The Java API's
 `Files.writeString` also reports encoding failures rather than substituting characters.
 
-The Java API owns file writes for Gradle, Maven and sbt. `formatFile` resolves the real path before
+The Java API owns file writes for Gradle, Maven, sbt and Mill. `formatFile` resolves the real path before
 reading and stages complete UTF-8 output in the target directory. A pure JDK helper reads the unix
 owner, group and twelve mode bits, adopts them on staging (mode last because chown can clear
 setuid/setgid), then reads them back. Only a verified identity and writable target and parent
@@ -349,5 +352,5 @@ permit atomic replacement. Otherwise it writes in place, retaining the inode and
 crash-atomicity; staging or atomic-move errors leave the original intact and clean up staging.
 Refusals and already formatted files cause no write, including no modification-time change.
 Symlinks survive; other hard links retain old content after replacement and share new content
-with the in-place fallback. Mill stays on core and writes in place. The cats and ZIO adapters keep
+with the in-place fallback. The cats and ZIO adapters keep
 their effect-specific, cross-platform implementations of the same replacement rule.
