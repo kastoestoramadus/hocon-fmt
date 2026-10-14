@@ -41,7 +41,8 @@ follows and the mismatches left open: [naming](naming.md).
 
 A lexical [depth check](limitations.md#excessive-nesting) runs before this pipeline and before
 duplicate analysis: more than 80 brace/bracket levels in code refuses as `NestingTooDeep`, and
-the same scan refuses a dotted key path longer than 120 segments as
+the same scan refuses a dotted key path longer than 120 segments, or one past 720 segments once
+the enclosing objects' paths are added, as
 [`PathTooDeep`](limitations.md#long-dotted-key-paths), with the same limits on every platform.
 Strings and comments do not consume either budget.
 
