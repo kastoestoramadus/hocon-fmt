@@ -77,9 +77,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: The version guard still splits the waves
+      - name: The version guard checks selected targets
         run: scripts/check-release-version-test.sh
-      - name: Release preflight rejects unsafe tags and incomplete wave-2 uploads
+      - name: Release preflight rejects unsafe tags and incomplete selected uploads
         run: python3 scripts/release-workflow-test.py
       - name: The classifiers still answer as the gates assume
         run: scripts/changes-classifiers-test.sh
