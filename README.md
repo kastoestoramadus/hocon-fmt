@@ -62,7 +62,7 @@ with the formatter version and a minimal example.
 | sbt | `addSbtPlugin("eu.ww86" % "sbt-hocon-fmt" % "0.1.0")`, then `hoconFormat` / `hoconFormatCheck` |
 | Gradle | `id("eu.ww86.hocon-fmt")`, then `hoconFormat` / `hoconFormatCheck` (part of `check`) |
 | Maven | `hocon-fmt-maven-plugin`, goals `format` / `check` (bound to `verify`) |
-| Mill | on hold: Mill 1.1.x runs on Scala 3.8, which cannot read this build's Scala 3.9 output (TASTy 28.9 against 28.8); it returns when Mill moves to 3.9. Planned: `eu.ww86::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |
+| Mill | second wave: tested on Mill 1.1.4 and 1.1.10 through an isolated Java API loader. `eu.ww86::mill-hocon-fmt`, trait `HoconFormatterModule`, then `__.hoconFormat` / `__.hoconFormatCheck` |
 
 Configuration for each: [usage](docs/usage.md). A browser build for web pages is on its way:
 see [playground](docs/playground.md).
@@ -149,7 +149,8 @@ or `/path/to/hocon-fmt/maven-plugin/mvnw` in place of `mvn`.
 </plugin>
 ```
 
-**Mill**: `(cd mill-plugin && ./mill publishLocal)`, then copy the launcher `mill-plugin/mill` into
+**Mill**: `sbt coreJVM/publishLocal javaApi/publishLocal`, then
+`(cd mill-plugin && ./mill publishLocal)`. Copy the launcher `mill-plugin/mill` into
 a build with `app/resources/application.conf`, and run `./mill __.hoconFormatCheck` and
 `./mill __.hoconFormat`.
 
