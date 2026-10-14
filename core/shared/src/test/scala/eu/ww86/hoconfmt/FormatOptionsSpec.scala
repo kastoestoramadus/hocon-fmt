@@ -138,6 +138,20 @@ class FormatOptionsSpec extends munit.FunSuite {
     }
   }
 
+  List("separator", "fail-on-refusal").foreach { key =>
+    List(999, 2999, 9999).foreach { segments =>
+      test(s"a style dotted path under $key with $segments segments returns a named single-line error") {
+        val text   = key + ".a" * segments + " = 1"
+        val result = FormatOptions.parse(text, "team.conf")
+        assert(
+          result.left.exists(message =>
+            message.startsWith("team.conf: ") && !message.contains('\n') && !message.contains('\r')
+          )
+        )
+      }
+    }
+  }
+
   test("a config file that is not HOCON is an error naming the file") {
     assert(
       FormatOptions.parse("[[", "team.conf").fold(message => message.startsWith("team.conf:"), _ => false),
