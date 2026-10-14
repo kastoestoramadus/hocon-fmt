@@ -14,7 +14,7 @@ class NestingDepthSpec extends munit.FunSuite {
   // written-line limit above caps (a 20-level chain of 120-segment paths spent 34 seconds in the
   // report). The scan counts it: a `{` adds the key path just written to what every definition
   // inside inherits, and a `}` takes it back out. Pinned in the section at the bottom.
-  val flatLimit  = 720
+  val flatLimit  = 360
   val flatReason = s"input dotted key paths exceed the maximum of $flatLimit segments"
 
   def dotted(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
@@ -212,12 +212,12 @@ class NestingDepthSpec extends munit.FunSuite {
       + "}\n" * levels
 
   test("a chain at the flattened limit formats, one segment more refuses") {
-    assert(HoconFormatter.format(chain(23, 30, 30)).isRight) // 23*30 + 30 = 720
+    assert(HoconFormatter.format(chain(11, 30, 30)).isRight) // 11*30 + 30 = 360
     assertEquals(
-      HoconFormatter.format(chain(24, 30, 0)).left.map(_.reason), // 24*30 + 1 = 721
+      HoconFormatter.format(chain(12, 30, 0)).left.map(_.reason), // 12*30 + 1 = 361
       Left(flatReason)
     )
-    Verdict.of(chain(24, 30, 0)) match {
+    Verdict.of(chain(12, 30, 0)) match {
       case Verdict.Refused(refusal) => assertEquals(refusal.reason, flatReason)
       case other                    => fail(s"expected a refused verdict, got $other")
     }
@@ -227,8 +227,12 @@ class NestingDepthSpec extends munit.FunSuite {
     assertEquals(HoconFormatter.format(chain(20, 120, 0)).left.map(_.reason), Left(flatReason))
   }
 
+  test("six 120-segment levels, 720 flattened segments, refuse with the flattened reason") {
+    assertEquals(HoconFormatter.format(chain(6, 120, 0)).left.map(_.reason), Left(flatReason)) // 6*120 + 1 = 721
+  }
+
   test("duplicate analysis refuses a flattened path over the limit before its document parse") {
-    assertEquals(DuplicateReport.findings(chain(24, 30, 0)).left.map(_.reason), Left(flatReason))
+    assertEquals(DuplicateReport.findings(chain(12, 30, 0)).left.map(_.reason), Left(flatReason))
   }
 
   test("the written-line limit still refuses first inside nesting") {
@@ -246,10 +250,10 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   test("siblings inherit the enclosing path once, not once per sibling") {
-    // Seven leaves inside a 711-segment chain sit at 712..718 flattened segments, still under
+    // Seven leaves inside a 316-segment chain sit at 317..323 flattened segments, still under
     // the limit; a scan that re-added the enclosing path per sibling would refuse them.
     assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
-    val source = (objectPath(79) + " {\n") * 9 + (1 to 7).map(i => s"leaf$i = $i\n").mkString + "}\n" * 9
+    val source = (objectPath(79) + " {\n") * 4 + (1 to 7).map(i => s"leaf$i = $i\n").mkString + "}\n" * 4
     assert(HoconFormatter.format(source).isRight)
   }
 
@@ -261,8 +265,8 @@ class NestingDepthSpec extends munit.FunSuite {
   // and the brace — `=`, `:`, `+=`, blanks, a newline, a comment — the object inside inherits the
   // path just written. That is what the duplicate report counts (probed on sconfig: `a.b.c.x` in
   // every spelling, across a newline and a comment too, and `a.b.c[0].x` for the object inside an
-  // array, siblings alike). Pinned at the boundary: 24 levels of 30 carry 721 flattened segments
-  // and must refuse before the parser runs, 23 levels with a 30-segment leaf sit at 720 and must
+  // array, siblings alike). Pinned at the boundary: 12 levels of 30 carry 361 flattened segments
+  // and must refuse before the parser runs, 11 levels with a 30-segment leaf sit at 360 and must
   // survive. The paths stay at 30 segments, which the library parses on Scala.js too, and a
   // sibling per level keeps two fields in every object, so the render flattens nothing: one long
   // dotted line in the output would not reparse there.
@@ -286,7 +290,7 @@ class NestingDepthSpec extends munit.FunSuite {
 
   for (spelling <- spellings) {
     test(s"a chain one over the flattened limit refuses in the `$spelling` spelling") {
-      val source = chainIn(spelling, 24, 30, 0) // 24*30 + 1 = 721
+      val source = chainIn(spelling, 12, 30, 0) // 12*30 + 1 = 361
       assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(flatReason))
       Verdict.of(source) match {
         case Verdict.Refused(refusal) => assertEquals(refusal.reason, flatReason)
@@ -299,13 +303,13 @@ class NestingDepthSpec extends munit.FunSuite {
     test(s"a chain at the flattened limit passes the scan in the `$spelling` spelling") {
       // The `+=` spelling reaches its own parser limit (nested `+=` is an sconfig limitation the
       // scan must not be blamed for), so the scan alone is asserted on every spelling.
-      assertEquals(HoconText.checkNesting(chainIn(spelling, 23, 30, 30)), Right(())) // 720
+      assertEquals(HoconText.checkNesting(chainIn(spelling, 11, 30, 30)), Right(())) // 360
     }
   }
 
   for (spelling <- List("brace", "eq", "colon", "blanks", "newline", "array")) {
     test(s"a chain at the flattened limit formats in the `$spelling` spelling") {
-      assert(HoconFormatter.format(chainIn(spelling, 23, 30, 30)).isRight)
+      assert(HoconFormatter.format(chainIn(spelling, 11, 30, 30)).isRight)
     }
   }
 
@@ -313,14 +317,14 @@ class NestingDepthSpec extends munit.FunSuite {
     test(
       s"duplicate analysis refuses a flattened path over the limit written with `$spelling` before its document parse"
     ) {
-      assertEquals(DuplicateReport.findings(chainIn(spelling, 24, 30, 0)).left.map(_.reason), Left(flatReason))
+      assertEquals(DuplicateReport.findings(chainIn(spelling, 12, 30, 0)).left.map(_.reason), Left(flatReason))
     }
   }
 
   test("a value that is not an object lends its path to no later brace") {
     // The count dies with the statement: after `x.y.z = 1`, a `{` must push nothing, or this
-    // at-limit shape would sit at 723 flattened segments and refuse.
-    assert(HoconFormatter.format("x.y.z = 1\n" + chain(23, 30, 30)).isRight)
-    assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(23, 30, 30)).isRight)
+    // at-limit shape would sit at 363 flattened segments and refuse.
+    assert(HoconFormatter.format("x.y.z = 1\n" + chain(11, 30, 30)).isRight)
+    assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(11, 30, 30)).isRight)
   }
 }

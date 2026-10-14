@@ -25,20 +25,25 @@ class FlattenedPathCostSpec extends munit.FunSuite {
 
   test("a 20-level chain of maximal written paths is refused within the time bound") {
     val source = chain(20, 120) // 2,401 flattened segments
-    assertEquals(TimeoutGuard.within(bound.toMillis)(Verdict.of(source)), Verdict.Refused(Refusal.PathTooDeep(720)))
-    assertEquals(TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source)), Left(Refusal.PathTooDeep(720)))
+    assertEquals(TimeoutGuard.within(bound.toMillis)(Verdict.of(source)), Verdict.Refused(Refusal.PathTooDeep(360)))
+    assertEquals(TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source)), Left(Refusal.PathTooDeep(360)))
   }
 
   test("a chain at the flattened limit formats within the time bound") {
-    val source = (objectPath(120) + " {\n") * 5 + objectPath(120) + " = 1\n" + "}\n" * 5 // 720 flattened
+    val source = (objectPath(120) + " {\n") * 2 + objectPath(120) + " = 1\n" + "}\n" * 2 // 360 flattened
     assert(TimeoutGuard.within(bound.toMillis)(HoconFormatter.format(source)).isRight)
+  }
+
+  test("six 120-segment levels, 720 flattened, are refused within the time bound") {
+    val source = (objectPath(120) + " {\n") * 5 + objectPath(120) + " = 1\n" + "}\n" * 5 // 720 flattened
+    assertEquals(TimeoutGuard.within(bound.toMillis)(Verdict.of(source)), Verdict.Refused(Refusal.PathTooDeep(360)))
   }
 
   // The value spelling changes nothing: after `=`, `:` or `+=` (and the blanks, the newline or the
   // `[` of an array element after them) the scan must still push the path just written at the
   // `{`. Before the scan carried the count across a separator, the 20-level `= {` shape below
   // passed the scan and burned 25 seconds in the duplicate report on a file the parser refuses
-  // for stack capacity, and the 721-segment shape formatted instead of refusing.
+  // for stack capacity, and the 361-segment shape formatted instead of refusing.
   def spelled(levels: Int, segments: Int, leafSegments: Int, spelling: String): String = {
     val opener = spelling match {
       case "eq"      => objectPath(segments) + " = {\n"
@@ -57,10 +62,10 @@ class FlattenedPathCostSpec extends munit.FunSuite {
   for (spelling <- List("eq", "colon", "append", "blanks", "newline", "array")) {
     test(s"a 20-level chain written with `$spelling` is refused within the time bound") {
       val source = spelled(20, 120, 0, spelling) // 2,401 flattened segments
-      assertEquals(TimeoutGuard.within(bound.toMillis)(Verdict.of(source)), Verdict.Refused(Refusal.PathTooDeep(720)))
+      assertEquals(TimeoutGuard.within(bound.toMillis)(Verdict.of(source)), Verdict.Refused(Refusal.PathTooDeep(360)))
       assertEquals(
         TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source)),
-        Left(Refusal.PathTooDeep(720))
+        Left(Refusal.PathTooDeep(360))
       )
     }
   }
@@ -69,13 +74,13 @@ class FlattenedPathCostSpec extends munit.FunSuite {
     test(s"a chain at the flattened limit written with `$spelling` formats within the time bound") {
       // The `+=` spelling is left out: nested `+=` is the parser's own limitation, not the
       // scan's, and its refusal says nothing about the bound.
-      val source = spelled(5, 120, 120, spelling) // 720 flattened segments
+      val source = spelled(2, 120, 120, spelling) // 360 flattened segments
       assert(TimeoutGuard.within(bound.toMillis)(HoconFormatter.format(source)).isRight)
     }
   }
 
   test("a scalar value lends its path to no later brace within the time bound") {
-    val source = "x.y.z = 1\n" + ((objectPath(120) + " {\n") * 5 + objectPath(120) + " = 1\n" + "}\n" * 5)
+    val source = "x.y.z = 1\n" + ((objectPath(120) + " {\n") * 2 + objectPath(120) + " = 1\n" + "}\n" * 2)
     assert(TimeoutGuard.within(bound.toMillis)(HoconFormatter.format(source)).isRight)
   }
 }
