@@ -118,6 +118,57 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // Nesting writes in the flattened path what the single-line generator above cannot: every
+  // enclosing object's key path adds its segments to every definition inside it, and that
+  // flattened count is what the report's cost follows (a 20-level chain of 120-segment paths
+  // spent 34 seconds in the report while every written line stayed under the limit; see
+  // limitations.md). The generator mixes ordinary chains with ones past every limit, so both
+  // the refusal and the surviving shapes are exercised. The value's spelling is part of the
+  // shape: the written path must survive `=`, `:`, `+=` and the blanks after it to the `{`,
+  // or a chain written that way slips past every bound. The boundary (360 flattened segments)
+  // gets its own share: levels times segments from 8 x 24 to 14 x 40 straddles it on both sides.
+  property("no nested dotted path throws or exceeds a time bound") {
+    val spelling = Gen.oneOf("brace", "eq", "colon", "append")
+    val nesting  = Gen.frequency(
+      4 -> Gen.zip(Gen.choose(1, 6), Gen.choose(1, 20), spelling),
+      2 -> Gen.zip(Gen.choose(8, 14), Gen.choose(24, 40), spelling),
+      1 -> Gen.zip(Gen.choose(1, 40), Gen.choose(1, 120), spelling)
+    )
+    def path(segments: Int): String                                 = (1 to segments).map(i => s"k$i").mkString(".")
+    def chain(levels: Int, segments: Int, spelling: String): String = {
+      val opener = spelling match {
+        case "brace"  => path(segments) + " {\n"
+        case "eq"     => path(segments) + " = {\n"
+        case "colon"  => path(segments) + " : {\n"
+        case "append" => path(segments) + " += {\n"
+      }
+      opener * levels + path(segments) + " = 1\n" + "}\n" * levels
+    }
+    forAll(nesting) { case (levels, segments, spelling) =>
+      val source                               = chain(levels, segments, spelling)
+      val withInclude                          = "include \"missing.conf\"\n" + source
+      def bound[R](name: String)(run: => R): R = {
+        val start  = System.nanoTime()
+        val result = TimeoutGuard.within(pathTimeBoundMs)(run)
+        val millis = (System.nanoTime() - start) / 1e6
+        assert(millis < pathTimeBoundMs, s"$levels levels of $segments segments ($spelling): $name took $millis ms")
+        result
+      }
+      bound("verdict")(Verdict.of(source)) match {
+        case Verdict.Refused(refusal) => assert(refusal.reason.nonEmpty)
+        case _                        => ()
+      }
+      bound("duplicate report")(DuplicateReport.findings(source)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+      bound("duplicate report with an include")(DuplicateReport.findings(withInclude)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+    }
+  }
+
   property("failure policies preserve the formatting verdict for every input") {
     val strict = FormatOptions
       .parse("fail-on-refusal = true\nfail-on-duplicates = true", "policy.conf")
