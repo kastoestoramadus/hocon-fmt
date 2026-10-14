@@ -1,10 +1,6 @@
 name: Release
 
-# Wave 1 signs and uploads the JVM artifacts, sbt 1.x and Maven plugins to Central Portal
-# (awaiting the owner's Publish click), and the Gradle plugin to the Plugin Portal when its
-# credentials exist. Manual runs default to a dry run: build and sign, upload nothing.
-# RELEASE_WAVE unset or 1 selects wave 1; 2 enables the later jobs. A repository variable
-# gates tag pushes too, where workflow_dispatch inputs do not exist.
+# The owner selects channels; dispatch defaults to building and signing without uploads.
 on:
   push:
     tags: ['v*']
@@ -14,16 +10,305 @@ on:
         description: Build and sign without any uploads (disable only on a version tag)
         type: boolean
         default: true
+      core:
+        description: Publish core
+        type: boolean
+        default: true
+      sbt-plugin:
+        description: Publish sbt-plugin
+        type: boolean
+        default: true
+      maven-plugin:
+        description: Publish maven-plugin
+        type: boolean
+        default: true
+      gradle-plugin:
+        description: Publish gradle-plugin
+        type: boolean
+        default: true
+      mill-plugin:
+        description: Publish mill-plugin
+        type: boolean
+        default: false
+      native:
+        description: Publish native
+        type: boolean
+        default: false
+      npm:
+        description: Publish npm
+        type: boolean
+        default: false
+      pypi:
+        description: Publish pypi
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  # Wave 2: the native binaries and the wheel each carries. A tag runs them once RELEASE_WAVE=2;
-  # the wheel behind the pre-commit hooks and the binary behind the GitHub release are wave-2
-  # channels (PyPI, the release attachments).
+  # Validate selection and ancestry before requesting the release environment's secrets.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      selected: ${{ steps.targets.outputs.selected }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Select targets
+        id: targets
+        env:
+          RELEASE_TARGETS: ${{ vars.RELEASE_TARGETS }}
+          INPUT_CORE: ${{ inputs.core }}
+          INPUT_SBT_PLUGIN: ${{ inputs['sbt-plugin'] }}
+          INPUT_MAVEN_PLUGIN: ${{ inputs['maven-plugin'] }}
+          INPUT_GRADLE_PLUGIN: ${{ inputs['gradle-plugin'] }}
+          INPUT_MILL_PLUGIN: ${{ inputs['mill-plugin'] }}
+          INPUT_NATIVE: ${{ inputs.native }}
+          INPUT_NPM: ${{ inputs.npm }}
+          INPUT_PYPI: ${{ inputs.pypi }}
+        run: |
+          set -euo pipefail
+          known=(core sbt-plugin maven-plugin gradle-plugin mill-plugin native npm pypi)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            raw=
+            for target in "${known[@]}"; do
+              input="INPUT_${target^^}"
+              input="${input//-/_}"
+              if [ "${!input}" = true ]; then raw="${raw:+$raw,}$target"; fi
+            done
+          else
+            raw="${RELEASE_TARGETS:-core,sbt-plugin,maven-plugin,gradle-plugin}"
+          fi
+          if [ -z "$raw" ]; then
+            echo "::error::Select at least one release target."
+            exit 1
+          fi
+          declare -A chosen=()
+          rest="$raw,"
+          while [[ "$rest" == *,* ]]; do
+            target=$(printf '%s' "${rest%%,*}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            rest="${rest#*,}"
+            case "$target" in
+              core|sbt-plugin|maven-plugin|gradle-plugin|mill-plugin|native|npm|pypi) chosen["$target"]=true ;;
+              '') echo "::error::Empty release target; select at least one target and remove empty list entries."; exit 1 ;;
+              *) echo "::error::Unknown release target: $target"; exit 1 ;;
+            esac
+          done
+          selected=
+          for target in "${known[@]}"; do
+            if [ "${chosen[$target]:-false}" = true ]; then selected="${selected:+$selected,}$target"; fi
+          done
+          echo "selected=$selected" >> "$GITHUB_OUTPUT"
+          echo "Selected targets: $selected" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Tag is on main's history
+        run: |
+          set -euo pipefail
+          # Branch dispatch builds a dry run without imposing release-tag ancestry.
+          case "$GITHUB_REF" in
+            refs/tags/v*) ;;
+            *) exit 0 ;;
+          esac
+          git fetch origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}^{commit}" origin/main; then
+            echo "::error::Release tag commit is not on main's history."
+            exit 1
+          fi
+      - name: Read version
+        id: version
+        run: |
+          version=$(sed -n 's/^ThisBuild \/ version *:= "\([^"]*\)"$/\1/p' build.sbt)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Tag matches the selected targets
+        env:
+          RELEASE_TARGETS: ${{ steps.targets.outputs.selected }}
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) scripts/check-release-version.sh "${GITHUB_REF_NAME#v}" ;;
+          esac
+
+  # One preflight gates every build and upload, including channels outside Central.
+  # Registry credentials are required for real uploads; signing is checked in dry runs too.
+  central:
+    needs: version
+    environment: release
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      SBT_OPTS: -Xmx3g
+      MAVEN_REPO_LOCAL: ${{ github.workspace }}/m2
+      SELECTED_TARGETS: ${{ needs.version.outputs.selected }}
+      VERSION: ${{ needs.version.outputs.version }}
+      CAN_UPLOAD: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run }}
+    steps:
+      - name: Preflight
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          selected() { [[ ",$SELECTED_TARGETS," == *",$1,"* ]]; }
+          fail() {
+            echo "::error::$1"
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
+          require() {
+            local name
+            for name in "$@"; do
+              [ -n "${!name}" ] || fail "Selected target $target requires $name; no uploads were started."
+            done
+          }
+          echo '| Target | Result |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          for target in core sbt-plugin maven-plugin gradle-plugin mill-plugin native npm pypi; do
+            if ! selected "$target"; then
+              echo "| $target | skipped (not selected) |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            case "$target" in
+              mill-plugin) fail "mill-plugin publishing is not enabled: Mill cannot read Scala 3.9 output. Deselect mill-plugin until the repository enables it." ;;
+              npm|pypi) fail "$target registry publishing is not enabled in this repository. Deselect $target until its publishing job and trusted publisher are configured." ;;
+              core|sbt-plugin|maven-plugin|gradle-plugin) require PGP_SECRET PGP_PASSPHRASE ;;
+            esac
+            if [ "$CAN_UPLOAD" = true ]; then
+              case "$target" in
+                core|sbt-plugin|maven-plugin) require SONATYPE_USERNAME SONATYPE_PASSWORD ;;
+                gradle-plugin) require GRADLE_PUBLISH_KEY GRADLE_PUBLISH_SECRET ;;
+                native) require GH_TOKEN ;;
+              esac
+              echo "| $target | awaiting upload |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| $target | dry run |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          if ! selected core && { selected sbt-plugin || selected maven-plugin || selected gradle-plugin; }; then
+            if [ "$CAN_UPLOAD" != true ]; then
+              echo "Dry run: plugin uploads require core and Java API $VERSION visible on Maven Central, or select core. No Central request was made." >> "$GITHUB_STEP_SUMMARY"
+            else
+              for artifact in hocon-fmt-core_3 hocon-fmt-java-api; do
+                url="https://repo.maven.apache.org/maven2/eu/ww86/$artifact/$VERSION/$artifact-$VERSION.pom"
+                curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 --output /dev/null "$url" ||
+                  fail "Plugins require $artifact $VERSION visible on Maven Central; select core or publish that version first. No uploads were started."
+              done
+            fi
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: sbt
+      - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+      - name: Import the signing key
+        if: contains(needs.version.outputs.selected, 'core') || contains(needs.version.outputs.selected, 'sbt-plugin') || contains(needs.version.outputs.selected, 'maven-plugin') || contains(needs.version.outputs.selected, 'gradle-plugin')
+        env:
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+        run: printf '%s' "$PGP_SECRET" | base64 -d | gpg --batch --import
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+        if: contains(needs.version.outputs.selected, 'gradle-plugin')
+      - name: Build the selected core dependencies locally
+        if: contains(needs.version.outputs.selected, 'core') && (contains(needs.version.outputs.selected, 'maven-plugin') || contains(needs.version.outputs.selected, 'gradle-plugin'))
+        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" coreJVM/publishM2 javaApi/publishM2
+      - name: Signing check, sbt
+        if: contains(needs.version.outputs.selected, 'core') || contains(needs.version.outputs.selected, 'sbt-plugin')
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          tasks=()
+          if [[ ",$SELECTED_TARGETS," == *",core,"* ]]; then
+            tasks+=(coreJVM/publishSigned catsJVM/publishSigned cliJVM/publishSigned javaApi/publishSigned)
+          fi
+          if [[ ",$SELECTED_TARGETS," == *",sbt-plugin,"* ]]; then tasks+=(sbtPlugin/publishSigned); fi
+          sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" "${tasks[@]}"
+      - name: Signing check, Maven
+        if: contains(needs.version.outputs.selected, 'maven-plugin')
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          cd maven-plugin
+          ./mvnw -B -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -Prelease verify
+          ls target/*.asc
+      - name: Build and sign, Gradle
+        if: contains(needs.version.outputs.selected, 'gradle-plugin')
+        working-directory: gradle-plugin
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: ./gradlew --no-daemon --no-configuration-cache -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -PreleaseSigning check publishToMavenLocal
+      - name: Upload, sbt
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && (contains(needs.version.outputs.selected, 'core') || contains(needs.version.outputs.selected, 'sbt-plugin'))
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          tasks=()
+          if [[ ",$SELECTED_TARGETS," == *",core,"* ]]; then
+            tasks+=(coreJVM/publishSigned catsJVM/publishSigned cliJVM/publishSigned javaApi/publishSigned)
+          fi
+          if [[ ",$SELECTED_TARGETS," == *",sbt-plugin,"* ]]; then tasks+=(sbtPlugin/publishSigned); fi
+          sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" "${tasks[@]}" sonaUpload
+          echo '| Target | Result |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          for target in core sbt-plugin; do
+            if [[ ",$SELECTED_TARGETS," == *",$target,"* ]]; then
+              echo "| $target | uploaded (Central deployment awaiting Publish) |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - name: Upload, Maven
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && contains(needs.version.outputs.selected, 'maven-plugin')
+        env:
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          # Quoted, so Maven and not the shell expands the variables.
+          cat > "$RUNNER_TEMP/settings.xml" <<'XML'
+          <settings><servers><server>
+            <id>central</id>
+            <username>${env.SONATYPE_USERNAME}</username>
+            <password>${env.SONATYPE_PASSWORD}</password>
+          </server></servers></settings>
+          XML
+          cd maven-plugin && ./mvnw -B -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
+          echo '| Target | Result |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          echo "| maven-plugin | uploaded (Central deployment awaiting Publish) |" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload, Gradle
+        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && contains(needs.version.outputs.selected, 'gradle-plugin')
+        env:
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        working-directory: gradle-plugin
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -PreleaseSigning publishPlugins
+          echo '| Target | Result |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          echo "| gradle-plugin | uploaded |" >> "$GITHUB_STEP_SUMMARY"
+      # Keep the upload wiring for the day Mill supports the core's Scala version.
+      - name: Upload, Mill
+        if: false && startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && contains(needs.version.outputs.selected, 'mill-plugin')
+        env:
+          MILL_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MILL_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MILL_PGP_SECRET_BASE64: ${{ secrets.PGP_SECRET }}
+          MILL_PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+        run: |
+          sbt coreJVM/publishLocal
+          cd mill-plugin && ./mill mill.javalib.SonatypeCentralPublishModule/publishAll --publishArtifacts __.publishArtifacts --shouldRelease false
+
   native:
-    if: vars.RELEASE_WAVE == '2'
+    needs: [version, central]
+    if: contains(needs.version.outputs.selected, 'native')
     name: native binary (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -32,6 +317,8 @@ jobs:
           - { os: ubuntu-latest,    target: linux-x86_64 }
           - { os: ubuntu-24.04-arm, target: linux-aarch64 }
           - { os: macos-latest,     target: macos-aarch64 }
+    env:
+      SBT_OPTS: -Xmx3g
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -51,6 +338,7 @@ jobs:
           "$binary" smoke.conf && [ "$(cat smoke.conf)" = "a = 1" ]
       # The wheel behind the pre-commit hooks; its platform tag comes from the binary itself.
       - name: Wheel
+        if: contains(needs.version.outputs.selected, 'pypi')
         run: python3 python/build_wheel.py --binary cli/.native/target/scala-3.9.0/hocon-fmt
       - run: mv cli/.native/target/scala-3.9.0/hocon-fmt "hocon-fmt-${{ matrix.target }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -60,9 +348,11 @@ jobs:
             hocon-fmt-${{ matrix.target }}
             hocon_fmt-*.whl
 
-  # Wave 2: the npm package for the Node pre-commit hooks.
   npm:
-    if: vars.RELEASE_WAVE == '2'
+    needs: [version, central]
+    if: contains(needs.version.outputs.selected, 'npm')
+    env:
+      SBT_OPTS: -Xmx3g
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -81,9 +371,11 @@ jobs:
           name: npm-package
           path: hocon-fmt-*.tgz
 
-  # Wave 2: the playground's script, fetched by release so a page pins the formatter it runs.
   web:
-    if: vars.RELEASE_WAVE == '2'
+    needs: [version, central]
+    if: contains(needs.version.outputs.selected, 'native')
+    env:
+      SBT_OPTS: -Xmx3g
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -99,13 +391,12 @@ jobs:
           name: web-script
           path: web/target/bundle/hocon-fmt.js
 
-  # Wave 2: attaching the wave-2 artifacts to the GitHub release the tag names.
   release:
+    environment: release
     permissions:
       contents: write
-    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && vars.RELEASE_WAVE == '2'
-    # central is where the version and signing checks run; a tag they reject must not ship a release.
-    needs: [native, npm, web, central]
+    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run && contains(needs.version.outputs.selected, 'native')
+    needs: [version, native, web, central]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -114,150 +405,8 @@ jobs:
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-fmt-* hocon_fmt-*.whl hocon-fmt.js
-
-  # Tag ancestry and version checks need no secrets, so they run without the environment
-  # below: an unmerged tag or one that disagrees with the files fails before anyone is asked
-  # to approve anything.
-  version:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 0
-      - name: Tag is on main's history
         run: |
-          set -euo pipefail
-          # Branch dispatch builds a dry run without imposing release-tag ancestry.
-          case "$GITHUB_REF" in
-            refs/tags/v*) ;;
-            *) exit 0 ;;
-          esac
-          git fetch origin +refs/heads/main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "${GITHUB_SHA}^{commit}" origin/main; then
-            echo "::error::Release tag commit is not on main's history."
-            exit 1
-          fi
-      - name: Tag matches the versions this wave publishes
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          RELEASE_WAVE: ${{ vars.RELEASE_WAVE || '1' }}
-        run: scripts/check-release-version.sh "${GITHUB_REF_NAME#v}"
-
-  # All wave-1 builds and signing checks run before uploads. The private Maven repository
-  # supplies the Java API and core before their first Central deployment is published.
-  # Maven uses the existing Central Portal extension to produce a repository-layout bundle,
-  # not a plain Maven deploy endpoint. Both Central deployments await manual publication.
-  #
-  # `environment: release` makes every run that reads the secrets, a tag push or a manual run,
-  # wait for the owner's approval (Settings → Environments → release).
-  central:
-    needs: version
-    environment: release
-    # A hung upload must not hold the secrets for the default six hours.
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    env:
-      SBT_OPTS: -Xmx3g
-      MAVEN_REPO_LOCAL: ${{ github.workspace }}/m2
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: sbt
-      - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
-      - name: Import the signing key
-        env:
-          PGP_SECRET: ${{ secrets.PGP_SECRET }}
-        run: printf '%s' "$PGP_SECRET" | base64 -d | gpg --batch --import
-      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-      - name: Build the wave-1 dependencies locally
-        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" coreJVM/publishM2 javaApi/publishM2
-      - name: Signing check, sbt
-        env:
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" signRelease && find . -name '*.asc' -not -path './node_modules/*' | grep -q .
-      - name: Signing check, Maven
-        env:
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: |
-          cd maven-plugin
-          ./mvnw -B -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -Prelease verify
-          ls target/*.asc
-      - name: Build and sign, Gradle
-        working-directory: gradle-plugin
-        env:
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: ./gradlew --no-daemon --no-configuration-cache -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -PreleaseSigning check publishToMavenLocal
-      - name: Upload mode
-        env:
-          CAN_UPLOAD: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run }}
-          RELEASE_WAVE: ${{ vars.RELEASE_WAVE || '1' }}
-          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
-          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
-        run: |
-          if [ "$CAN_UPLOAD" != true ]; then
-            echo "Dry run: all wave-1 artifacts built and signed; no registry uploads."
-          elif [ -z "$GRADLE_PUBLISH_KEY" ] || [ -z "$GRADLE_PUBLISH_SECRET" ]; then
-            if [ "$RELEASE_WAVE" = 2 ]; then
-              message="Wave 2 requires GRADLE_PUBLISH_KEY and GRADLE_PUBLISH_SECRET for Plugin Portal; no registry uploads were started."
-              echo "::error::$message"
-              echo "$message" >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            else
-              message="Wave 1: skipping Plugin Portal upload because GRADLE_PUBLISH_KEY or GRADLE_PUBLISH_SECRET is missing. Central uploads will continue."
-              echo "::warning::$message"
-              echo "$message" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          fi
-      - name: Upload, sbt
-        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: sbt -Dmaven.repo.local="$MAVEN_REPO_LOCAL" publishRelease
-      - name: Upload, Maven
-        if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: |
-          # Quoted, so Maven and not the shell expands the variables.
-          cat > "$RUNNER_TEMP/settings.xml" <<'XML'
-          <settings><servers><server>
-            <id>central</id>
-            <username>${env.SONATYPE_USERNAME}</username>
-            <password>${env.SONATYPE_PASSWORD}</password>
-          </server></servers></settings>
-          XML
-          cd maven-plugin && ./mvnw -B -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -s "$RUNNER_TEMP/settings.xml" -Prelease -DskipTests -Dinvoker.skip deploy
-      - name: Upload, Gradle (or explain why skipped)
-        env:
-          CAN_UPLOAD: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run }}
-          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
-          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
-          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        working-directory: gradle-plugin
-        run: |
-          if [ -z "$GRADLE_PUBLISH_KEY" ] || [ -z "$GRADLE_PUBLISH_SECRET" ]; then
-            echo "Skipping Plugin Portal upload: GRADLE_PUBLISH_KEY and GRADLE_PUBLISH_SECRET are both required."
-          elif [ "$CAN_UPLOAD" != true ]; then
-            echo "Skipping Plugin Portal upload: dry run (credentials are not used)."
-          else
-            ./gradlew --no-daemon --no-configuration-cache -Dmaven.repo.local="$MAVEN_REPO_LOCAL" -PreleaseSigning publishPlugins
-          fi
-      # On hold until Mill supports Scala 3.9 (see docs/releasing.md); `false &&` keeps the step and its secrets wiring.
-      - name: Upload, Mill
-        if: false && startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_WAVE == '2'
-        env:
-          MILL_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          MILL_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          MILL_PGP_SECRET_BASE64: ${{ secrets.PGP_SECRET }}
-          MILL_PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-        run: |
-          sbt coreJVM/publishLocal
-          cd mill-plugin && ./mill mill.javalib.SonatypeCentralPublishModule/publishAll --publishArtifacts __.publishArtifacts --shouldRelease false
+          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --generate-notes hocon-fmt-* hocon-fmt.js
+          echo '| Target | Result |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          echo '| native | uploaded |' >> "$GITHUB_STEP_SUMMARY"

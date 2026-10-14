@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
 # Fails unless every place that carries the version holds $1, so a tag cannot release a build that
 # still says -SNAPSHOT or names another version in one of its plugins. See docs/releasing.md.
-#
-# Wave 1 checks the sbt artifacts, the Java API's Gradle build, and both standalone plugins.
-# Wave 2 also checks Mill and the pre-commit hooks. release.yml passes its repository variable;
-# by hand the default is wave 1. All six version locations are listed in docs/releasing.md.
+# The workflow passes its canonical selection; by hand the JVM/plugin defaults apply.
 set -euo pipefail
 
 version="$1"
-wave="${RELEASE_WAVE:-1}"
+targets="${RELEASE_TARGETS:-core,sbt-plugin,maven-plugin,gradle-plugin}"
 re="${version//./\\.}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 status=0
 
-case "$wave" in
-  1 | 2) ;;
-  *) echo "RELEASE_WAVE must be 1 or 2, got '$wave'" >&2; exit 2 ;;
-esac
+selected() { [[ ",$targets," == *",$1,"* ]]; }
+IFS=',' read -ra names <<< "$targets"
+for name in "${names[@]}"; do
+  case "$name" in
+    core|sbt-plugin|maven-plugin|gradle-plugin|mill-plugin|native|npm|pypi) ;;
+    *) echo "Unknown release target: $name" >&2; exit 2 ;;
+  esac
+done
 
 expect() { # file, pattern, minimum matches
   local found
@@ -36,15 +37,26 @@ expect() { # file, pattern, minimum matches
   fi
 }
 
-expect build.sbt                 "^ThisBuild / version +:= \"$re\"$" 1
-expect java-api/build.gradle.kts "^version = \"$re\"$"               1
-
-expect gradle-plugin/build.gradle.kts "^version = \"$re\"$"      1
-expect maven-plugin/pom.xml           "<version>$re</version>"   2
-
-if [ "$wave" = 2 ]; then
-  expect mill-plugin/build.mill         "formatterVersion = \"$re\"$" 1
-  expect .pre-commit-hooks.yaml         "hocon-fmt(==|@)$re\""     4
+# Every target derives its package version from sbt; the Java API's independent build
+# needs to agree only when it is part of the selected core deployment.
+expect build.sbt "^ThisBuild / version +:= \"$re\"$" 1
+if selected core; then
+  expect java-api/build.gradle.kts "^version = \"$re\"$" 1
+fi
+if selected gradle-plugin; then
+  expect gradle-plugin/build.gradle.kts "^version = \"$re\"$" 1
+fi
+if selected maven-plugin; then
+  expect maven-plugin/pom.xml "<version>$re</version>" 2
+fi
+if selected mill-plugin; then
+  expect mill-plugin/build.mill "formatterVersion = \"$re\"$" 1
+fi
+if selected npm; then
+  expect .pre-commit-hooks.yaml "hocon-fmt@$re\"" 2
+fi
+if selected pypi; then
+  expect .pre-commit-hooks.yaml "hocon-fmt==$re\"" 2
 fi
 
 exit $status

@@ -9,28 +9,59 @@ The list has not been reviewed by hand yet; the second release tightens it. Refu
 writes or breaks a file. The dated JVM measurement and corpus caveat are in
 [limitations](limitations.md#refusals-in-v010).
 
-The workflow implements this scope: wave 1 builds and signs the sbt artifacts and both
-standalone plugins, stages the sbt and Maven deployments in Central Portal, and publishes the
-Gradle plugin when its Portal credentials are configured. A missing Plugin Portal key or
-secret in wave 1 skips that upload with a warning annotation and a job-summary entry before
-Central uploads; it does not skip building or signing the plugin. On a real wave-2 tag, either
-missing credential fails the job before any registry upload. Dry runs need neither credential.
-Nothing has been released yet. Central setup is recorded below; Plugin Portal account and
-namespace setup remain owner tasks. The `Release` workflow has not been exercised with real
-secrets.
+The owner chooses **what is published** (Q26, 2026-10-14), replacing decision 61's
+wave-based warn-and-skip policy. A selected target with missing credentials or prerequisites
+fails the shared preflight before the first upload. An unselected target is skipped and needs
+no credentials. Nothing has been released yet; real signing and registry uploads remain untested.
 
-The `Release` workflow reads one switch, the repository variable `RELEASE_WAVE` (Settings →
-Secrets and variables → Actions → Variables): unset or `1` ships wave 1, `2` enables the later jobs.
-The wave-2 jobs stay in the workflow, skipped; a wave-2 release sets the variable, makes its
-release, and can leave it set afterwards.
+`workflow_dispatch` offers a boolean for each target below. `core`, `sbt-plugin`, `maven-plugin`
+and `gradle-plugin` default to true; the others default to false. `dry_run` defaults to true:
+build and sign the selected channels, upload nothing. A branch dispatch never uploads, even
+with `dry_run=false`; an upload requires a version tag on main's history.
 
-**Currently automated in wave 1**: `hocon-fmt-core_3`, `hocon-fmt-cats_3` (the CLI's POM names it),
-`hocon-fmt-cli_3`, `hocon-fmt-java-api`, `sbt-hocon-fmt`, `hocon-fmt-maven-plugin` and the Gradle
-plugin `eu.ww86.hocon-fmt` (implementation plus plugin marker). `sbt publishRelease` uploads the
-five sbt artifacts; Maven's release profile uploads its own signed Central bundle, and Gradle's
-`publishPlugins` uploads to Plugin Portal. `sbt test` fails if the sbt set stops being closed
-under the POM dependencies and the Java API required at run time by all three build-tool plugins.
-The Portal upload remains conditional on the owner supplying its credentials.
+Tag pushes have no dispatch inputs. They read the repository variable `RELEASE_TARGETS`
+(Settings → Secrets and variables → Actions → Variables), a comma-separated list of target names.
+An unset or empty variable selects `core,sbt-plugin,maven-plugin,gradle-plugin`. Whitespace
+around names is trimmed and duplicates are removed in the order below. Unknown names, empty
+list entries, and a dispatch with every target unchecked fail before checkout, approval or upload.
+Tag pushes are real uploads, so verify this variable before pushing a tag.
+
+| target | publishes | requirements |
+| --- | --- | --- |
+| `core` | JVM core, cats adapter, CLI and Java API to Central Portal | Sonatype username/password and PGP secret/passphrase |
+| `sbt-plugin` | sbt 1.x plugin to Central Portal | Sonatype and PGP; selected core or the same core/Java API version visible on Central |
+| `maven-plugin` | Maven plugin to Central Portal | Sonatype and PGP; selected core or the same core/Java API version visible on Central |
+| `gradle-plugin` | Gradle plugin to Plugin Portal | PGP and both Gradle Portal credentials; selected core or the same core/Java API version visible on Central |
+| `mill-plugin` | on hold | refused until Mill supports the core's Scala version and the repository enables publishing |
+| `native` | native binaries and the existing web script on a GitHub release | workflow's GitHub token; no signing or registry secrets |
+| `npm` | on hold | refused until a registry publishing job and publisher setup are enabled |
+| `pypi` | on hold | refused until a registry publishing job and publisher setup are enabled |
+
+Selection is computed once in the secret-free `version` job, then every job uses its output.
+The shared preflight runs in `environment: release` before builds, signing and uploads;
+the GitHub release job uses that environment too. Registry credentials are optional in a dry run,
+but selected JVM channels still require the signing key and passphrase because they are signed.
+If a plugin is selected without `core`, a real run fetches the version's core and Java API POMs
+from Maven Central with read-only `curl` requests and fails if either is unavailable. A dry run
+only reports that requirement and makes no Central request. Selecting `core` supplies local
+build dependencies and stages its deployment; the owner still publishes that deployment before
+announcing the plugins. The job summaries list the selection, skipped targets, dry runs and each
+successful upload; Central uploads remain staged until the owner's Publish click.
+
+For a tag push publishing only the JVM artifacts, set `RELEASE_TARGETS` to `core` in repository
+variables, then push a version tag on main, for example `git push origin v0.1.0`. This uploads
+core, cats, CLI and Java API, and skips all plugins and later channels.
+
+For a manual dry run of core and the Maven plugin, select the branch in Actions → Release →
+Run workflow, leave `dry_run` checked, check `core` and `maven-plugin`, and uncheck every other
+target. Approve the `release` environment; both selected channels are built and signed and no
+upload occurs. A dispatch ignores `RELEASE_TARGETS` and uses only its checkboxes. To publish
+that subset, dispatch from `v0.1.0` and explicitly uncheck `dry_run` after the dry run succeeds.
+
+The sbt release set remains closed under its POM dependencies and the Java API used at run time
+by all three plugins (`sbt checkReleaseSet`). The workflow signs and uploads only the selected
+portion: four JVM projects for `core`, `sbtPlugin` for `sbt-plugin`, or both. The historical
+`signRelease` and `publishRelease` aliases still name the full default sbt set for manual use.
 
 | artifact | wave | built by | published to | users get it through |
 |---|---|---|---|---|
@@ -77,7 +108,7 @@ Done; recorded here so it can be redone. Artifacts are published under the group
 4. The repository secrets are `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `PGP_SECRET` and
    `PGP_PASSPHRASE`.
 
-The `central` job in `release.yml` imports the key and signs all wave-1 artifacts before any
+The `central` job in `release.yml` imports the key and signs every selected JVM artifact before any
 upload. sbt's Central Portal support (`publishRelease`, which signs and calls `sonaUpload`) and
 the Maven `release` profile (`central-publishing-maven-plugin` 0.11.0, `autoPublish=false`,
 `waitUntil=validated`) stage two deployments. The Maven extension assembles the signed artifacts,
@@ -86,7 +117,7 @@ that bundle using the `central` server token, rather than deploying to a Maven r
 See [Sonatype's Maven publishing guide](https://central.sonatype.org/publish/publish-portal-maven/).
 Both deployments await a Publish click under Publish → Deployments. The core and Java API are
 also published to a private local Maven repository so plugin builds work before Central has
-the first version. Mill's upload stays disabled even in wave 2 until its Scala version catches up.
+the first version. Selecting Mill fails preflight until its Scala version catches up and publishing is enabled.
 
 ### Gradle Plugin Portal
 
@@ -100,14 +131,14 @@ the first version. Mill's upload stays disabled even in wave 2 until its Scala v
    secrets `GRADLE_PUBLISH_KEY` and `GRADLE_PUBLISH_SECRET`, preferably in the `release`
    environment. These are the environment variable names supported by Gradle's publishing plugin.
 3. Run the workflow's default dry run with the existing signing secrets before tagging. Portal
-   credentials are optional for that run; when either is missing, the upload step prints why
-   it skipped. The dry run builds and signs the implementation JAR, sources, javadocs and POM,
-   Gradle metadata and plugin marker POM into private Maven Local, without contacting the Portal.
+   credentials are optional for that run; a real run selecting `gradle-plugin` requires both
+   credentials in the shared preflight. The dry run builds and signs the implementation JAR,
+   sources, javadocs and POM, Gradle metadata and plugin marker POM into private Maven Local, without contacting the Portal.
 
 The build applies `com.gradle.plugin-publish` 2.2.1, declares website, VCS URL, tags and tested
 configuration-cache support, and uses the imported GnuPG key when `-PreleaseSigning` is present.
-A non-dry version tag invokes `publishPlugins` only when both Portal secrets are present. Portal
-upload is a publication submission, with initial review; it has no Central-style Publish click.
+A non-dry version tag selecting `gradle-plugin` invokes `publishPlugins`; missing Portal secrets
+fail preflight before any channel uploads. Portal upload is a publication submission, with initial review; it has no Central-style Publish click.
 See [Gradle's publishing and namespace requirements](https://plugins.gradle.org/docs/publish-plugin).
 
 ### PyPI: the pre-commit hooks' binaries
@@ -182,33 +213,28 @@ does not hold the secrets for the default six hours.
    and zio platform artifacts and the Java API also inherit that version. `signRelease` and
    `publishRelease` name the wave-1 projects directly (`releaseProjectIds` in `build.sbt`), and
    `sbt test` fails when that set stops being closed under its dependencies.
-   The wave-1 version check covers four files: `build.sbt`, `java-api/build.gradle.kts`,
-   `gradle-plugin/build.gradle.kts` and both versions in `maven-plugin/pom.xml`. Mill and hook
-   pins may trail until wave 2; `RELEASE_WAVE=2` checks all six locations.
-2. Run the `Release` workflow by hand first (Actions → Release → Run workflow), leave
-   `dry_run` checked (the default), and keep `RELEASE_WAVE` unset or `1` for v0.1.0. Approve the
-   `release` environment. It builds and signs the five sbt artifacts, runs Maven `-Prelease verify`,
-   and runs Gradle `-PreleaseSigning check publishToMavenLocal` against a private Maven repository.
-   No Central or Plugin Portal upload occurs, even when a tag is selected and all secrets exist.
-   The real signing passphrase is checked here; registry credentials are not validated by this run.
-3. Push a tag `v<version>` on main's history. The secret-free `version` job fetches main and
-   rejects a tag outside its history or inconsistent versions for the selected wave before the
-   `central` job requests environment approval. The approved job builds and signs all
-   wave-1 artifacts, then uploads two Central deployments (sbt and Maven) and submits the Gradle
-   plugin if both Portal credentials exist. A skipped Portal upload means the first-release
-   scope is still incomplete: finish Portal setup before announcing v0.1.0.
-   A wave-2 tag (`RELEASE_WAVE=2`) also links and smoke-tests the native binaries, builds their
-   wheels, packs npm, builds the web script, and attaches them to a GitHub release. Mill stays disabled.
+   The version check always checks `build.sbt` and checks the other files for selected targets:
+   the Java API for `core`, Gradle and Maven for their plugins, Mill for its plugin, and only
+   the corresponding hook pins for npm or PyPI. Unselected channel versions may trail.
+2. Run a manual dry run first with the intended checkboxes. Approve the `release` environment.
+   Selected JVM targets are signed; npm, PyPI and Mill selections fail with their missing
+   prerequisites. No registry or GitHub release upload occurs in a dry run.
+3. Set `RELEASE_TARGETS` before a tag push, or dispatch on the tag with explicit checkboxes and
+   `dry_run=false`. The secret-free job rejects an unknown selection, a tag outside main's
+   history or inconsistent selected versions before environment approval. The shared preflight
+   then rejects missing selected credentials or unavailable plugin dependencies before uploads.
+   Only `native` creates a GitHub release; it has no dependency on an unselected npm job.
 4. Publish and verify:
-   - In Central Publish → Deployments, inspect both deployments and publish the sbt one first:
-     it carries core, cats, CLI, Java API and sbt 1.x plugin. Then publish the Maven plugin.
+   - In Central Publish → Deployments, inspect the selected deployments and publish the core deployment first:
+     it carries core, cats, CLI and Java API, plus sbt 1.x if selected. Then publish any plugin deployments.
      A release cannot be undone. The sbt, Maven and Gradle plugins resolve the Java API and core
      from Central, so wait for those artifacts to be available before testing or announcing plugins.
    - Check Plugin Portal's initial-review status for `eu.ww86.hocon-fmt` and finish any requested
      namespace verification. The workflow submission may precede Central publication; consumer
      tests must wait for Central dependencies and Portal approval.
-   - Publish PyPI and npm before announcing a wave-2 tag: the hooks pin those exact versions.
-5. Try every channel the wave shipped as a user would (below).
+   - Publish PyPI and npm before announcing the pre-commit hooks: their pins need those exact versions.
+     Their registry jobs are still disabled; choosing these targets currently fails preflight.
+5. Try every selected channel as a user would (below).
 6. After publishing, open a follow-up PR setting the development version to
    `0.1.1-SNAPSHOT` after `0.1.0` (or the next planned version after later releases).
    Update the build versions and checkout instructions together; keep the hook pins and
@@ -238,11 +264,11 @@ published, and nothing else about the hooks needs releasing. Users move to a new
 `pre-commit autoupdate`. The hooks install everything at install time, so they also run on
 pre-commit.ci.
 
-At a wave-1 tag the hooks do not install: their pins name PyPI and npm versions that wave never
+At a JVM-only tag the hooks do not install: their pins name PyPI and npm versions the selection never
 publishes, so the install of the hook environment fails — pip with `No matching distribution
 found for hocon-fmt==<version>`, npm with a 404 — and the repository is left untouched. v0.1.0
 users format through the JVM CLI and the sbt 1.x, Gradle and Maven plugins; the hooks are worth
-announcing only from the first wave-2 tag, whose pins are published.
+announcing only once both pinned registry packages are published.
 
 The wheels cover Linux x86_64 and aarch64 with glibc 2.34 or newer and macOS on Apple silicon.
 Anywhere else (Windows, Intel Macs, older Linux) pip finds no wheel, and the `-node` hooks are the
