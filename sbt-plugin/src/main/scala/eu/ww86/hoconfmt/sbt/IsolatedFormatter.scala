@@ -102,17 +102,27 @@ object IsolatedFormatter {
         new IsolatedFormatter(
           // `check` is overloaded between text and bytes; the worker sends the original bytes,
           // so invalid UTF-8 stays a refusal instead of a replacement character. The entry
-          // points are matched by parameter types because a wildcard type literal, the other
-          // way to write this, is spelled differently on the two hosts.
-          api.getMethods
-            .filter(m =>
-              m.getName == "check" && m.getParameterCount == 2 && m.getParameterTypes()(0) == classOf[Array[Byte]]
-            )
-            .head,
-          api.getMethods.filter(m => m.getName == "formatFile" && m.getParameterCount == 1).head,
-          api.getMethods.filter(m => m.getName == "inspectFile" && m.getParameterCount == 3).head
+          // points are matched by their exact parameter types because a wildcard type literal,
+          // the other way to write this, is spelled differently on the two hosts.
+          method(api, "check", classOf[Array[Byte]], classOf[String]),
+          method(api, "formatFile", classOf[Path]),
+          method(api, "inspectFile", classOf[Path], classOf[java.util.Map[AnyRef, AnyRef]], classOf[Boolean])
         )
       )
     } finally loader.close()
+  }
+
+  // The one public method with this name and exactly these parameter types. An arity or
+  // first-parameter match would let a future overload change which method runs; a rename would
+  // fail with no name. Both fail here instead, naming the signature the call site wants.
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
+  private def method(api: Class[?], name: String, types: Class[?]*): Method = {
+    val found = api.getMethods.filter(m => m.getName == name && m.getParameterTypes.toSeq == types)
+    if (found.size == 1) found.head
+    else
+      throw new IllegalStateException(
+        s"expected exactly one $name(${types.map(_.getName).mkString(", ")}) on ${api.getName}, " +
+          s"found ${found.size}: ${found.map(_.toString).mkString(", ")}"
+      )
   }
 }
