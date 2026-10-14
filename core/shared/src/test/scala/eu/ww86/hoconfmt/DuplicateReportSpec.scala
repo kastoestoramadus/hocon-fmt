@@ -175,6 +175,16 @@ class DuplicateReportSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(pathOf(source).rendered, "a[0].b")
   }
 
+  test("an array reached by a dotted path carries the whole path, its elements alike") {
+    // The flattened-path scan must not treat `a.b.c = [ { ... } ]` cheaper than the report does:
+    // the element stands at `a.b.c[0]`, the second one at `a.b.c[1]`.
+    val source = "a.b.c = [ { x = 1, x = 2 }, { x = 3, x = 4 } ]\n"
+    assertEquals(
+      report(source).map { case Finding.KeyDefinedAgain(keyPath, _, _) => keyPath.rendered },
+      List("a.b.c[0].x", "a.b.c[1].x")
+    )
+  }
+
   test("array values have independent element scopes, including concatenation and self-reference") {
     List(
       "a = [{b=1}] [{b=2}]",

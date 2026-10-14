@@ -256,4 +256,69 @@ class NestingDepthSpec extends munit.FunSuite {
   test("the corpus-maximum shape, depth 8 and path 11, formats") {
     assert(HoconFormatter.format(chain(8, 11, 0)).isRight) // 89 flattened segments
   }
+
+  // The spelling of the value does not matter to the scan: whatever stands between the key path
+  // and the brace — `=`, `:`, `+=`, blanks, a newline, a comment — the object inside inherits the
+  // path just written. That is what the duplicate report counts (probed on sconfig: `a.b.c.x` in
+  // every spelling, across a newline and a comment too, and `a.b.c[0].x` for the object inside an
+  // array, siblings alike). Pinned at the boundary: 24 levels of 30 carry 721 flattened segments
+  // and must refuse before the parser runs, 23 levels with a 30-segment leaf sit at 720 and must
+  // survive. The paths stay at 30 segments, which the library parses on Scala.js too.
+  def chainIn(spelling: String, levels: Int, segments: Int, leafSegments: Int): String = {
+    val opener = spelling match {
+      case "brace"   => objectPath(segments) + " {\n"
+      case "eq"      => objectPath(segments) + " = {\n"
+      case "colon"   => objectPath(segments) + " : {\n"
+      case "append"  => objectPath(segments) + " += {\n"
+      case "blanks"  => objectPath(segments) + "  =  {\n"
+      case "newline" => objectPath(segments) + " =\n{\n"
+      case "array"   => objectPath(segments) + " = [{\n"
+    }
+    val closer = if (spelling == "array") "}]\n" else "}\n"
+    opener * levels
+      + (if (leafSegments == 0) "leaf = 1\n" else leafPath(leafSegments) + " = 1\n")
+      + closer * levels
+  }
+
+  def spellings = List("brace", "eq", "colon", "append", "blanks", "newline", "array")
+
+  for (spelling <- spellings) {
+    test(s"a chain one over the flattened limit refuses in the `$spelling` spelling") {
+      val source = chainIn(spelling, 24, 30, 0) // 24*30 + 1 = 721
+      assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(flatReason))
+      Verdict.of(source) match {
+        case Verdict.Refused(refusal) => assertEquals(refusal.reason, flatReason)
+        case other                    => fail(s"expected a refused verdict, got $other")
+      }
+    }
+  }
+
+  for (spelling <- spellings) {
+    test(s"a chain at the flattened limit passes the scan in the `$spelling` spelling") {
+      // The `+=` spelling reaches its own parser limit (nested `+=` is an sconfig limitation the
+      // scan must not be blamed for), so the scan alone is asserted on every spelling.
+      assertEquals(HoconText.checkNesting(chainIn(spelling, 23, 30, 30)), Right(())) // 720
+    }
+  }
+
+  for (spelling <- List("brace", "eq", "colon", "blanks", "newline", "array")) {
+    test(s"a chain at the flattened limit formats in the `$spelling` spelling") {
+      assert(HoconFormatter.format(chainIn(spelling, 23, 30, 30)).isRight)
+    }
+  }
+
+  for (spelling <- List("eq", "colon", "append", "blanks", "newline", "array")) {
+    test(
+      s"duplicate analysis refuses a flattened path over the limit written with `$spelling` before its document parse"
+    ) {
+      assertEquals(DuplicateReport.findings(chainIn(spelling, 24, 30, 0)).left.map(_.reason), Left(flatReason))
+    }
+  }
+
+  test("a value that is not an object lends its path to no later brace") {
+    // The count dies with the statement: after `x.y.z = 1`, a `{` must push nothing, or this
+    // at-limit shape would sit at 723 flattened segments and refuse.
+    assert(HoconFormatter.format("x.y.z = 1\n" + chain(23, 30, 30)).isRight)
+    assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(23, 30, 30)).isRight)
+  }
 }
