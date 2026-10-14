@@ -6,6 +6,16 @@ class NestingDepthSpec extends munit.FunSuite {
   val limit  = 80
   val reason = s"input nesting exceeds the maximum depth of $limit"
 
+  val pathLimit  = 120
+  val pathReason = s"input dotted key paths exceed the maximum of $pathLimit segments"
+
+  def dotted(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
+
+  // The library cannot parse a path of 33 or more elements on Scala.js yet
+  // (scala-js/scala-js#5439, merged for 1.23.0, not released on 2026-10-14), so the
+  // just-under-the-limit shapes are refused there before our guard has any say.
+  val libraryParsesLongPaths = System.getProperty("java.vm.name", "") != "Scala.js"
+
   val substitutions = List(
     "plain"            -> "y=${z}",
     "optional"         -> "y=${?z}",
@@ -112,5 +122,64 @@ class NestingDepthSpec extends munit.FunSuite {
         case other                    => fail(s"expected a refused verdict, got $other")
       }
     }
+  }
+
+  // --- Long dotted key paths ------------------------------------------------------
+
+  test("a dotted path one under the limit formats, with and without an include") {
+    assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
+    List(false, true).foreach { include =>
+      val source = (if (include) "include \"missing.conf\"\n" else "") + dotted(pathLimit - 1)
+      assert(HoconFormatter.format(source).isRight, source.take(80))
+    }
+  }
+
+  for (include <- List(false, true)) {
+    test(s"a dotted path one over the limit refuses with include=$include") {
+      val source = (if (include) "include \"missing.conf\"\n" else "") + dotted(pathLimit + 1)
+      HoconFormatter.format(source) match {
+        case Left(refusal) => assertEquals(refusal.reason, pathReason)
+        case Right(_)      => fail("expected a dotted-path refusal")
+      }
+      Verdict.of(source) match {
+        case Verdict.Refused(refusal) => assertEquals(refusal.reason, pathReason)
+        case other                    => fail(s"expected a refused verdict, got $other")
+      }
+    }
+  }
+
+  test("duplicate analysis refuses a dotted path over the limit before its document parse") {
+    assertEquals(DuplicateReport.findings(dotted(pathLimit + 1)).left.map(_.reason), Left(pathReason))
+  }
+
+  test("whitespace around the dots still counts segments: at the limit formats, one more refuses") {
+    assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
+    def spaced(segments: Int): String = List.fill(segments)("a").mkString(" . ") + " = 1\n"
+    assert(HoconFormatter.format(spaced(pathLimit)).isRight)
+    assertEquals(HoconFormatter.format(spaced(pathLimit + 1)).left.map(_.reason), Left(pathReason))
+  }
+
+  test("dots inside one quoted key are one segment, however many") {
+    val source = "\"" + (1 to 300).map(i => s"k$i").mkString(".") + "\" = 1\n"
+    assert(HoconFormatter.format(source).isRight, source.take(80))
+  }
+
+  test("dots in a quoted value or an include target are not a key path") {
+    val dottedName = (1 to 300).map(i => s"k$i").mkString(".")
+    val value      = s"a = \"$dottedName\"\n"
+    val include    = s"include \"$dottedName.conf\"\nx = 1\n"
+    assert(HoconFormatter.format(value).isRight, value.take(80))
+    assert(HoconFormatter.format(include).isRight, include.take(80))
+  }
+
+  test("a key of many space-separated words is one segment, not one per word") {
+    assume(libraryParsesLongPaths, "Scala.js sconfig refuses this shape itself today")
+    val source = List.fill(150)("k").mkString(" ") + " = 1\n"
+    assert(HoconFormatter.format(source).isRight, source.take(80))
+  }
+
+  test("sibling dotted paths do not accumulate") {
+    val source = (1 to 300).map(i => s"a$i.b = $i").mkString("\n") + "\n"
+    assert(HoconFormatter.format(source).isRight)
   }
 }

@@ -129,7 +129,7 @@ in core test and site Scala data; tests and the site use it without runtime file
 `title`, `story` (two sentences using domain terms), `shows` (the button tooltip),
 `target` (the human-authored ideal verdict), `now` (today’s verdict), and `options: [default]`.
 Verdicts are `formatted`, `already-formatted` (only for now or pending), or
-`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `nesting-too-deep`, `other-format`, `broken-output`,
+`refused:<kind>`, with kinds `not-utf8`, `not-hocon`, `nesting-too-deep`, `path-too-deep`, `other-format`, `broken-output`,
 `lost-comment`, `lost-include`, `moved-include`, `shadowed-by-include`, `reserved-name`, and `unstable-output`. The generator embeds the
 kinds it
 accepts as `ExampleData.kinds`, and `ExamplesSpec` maps every `Refusal` case through an
