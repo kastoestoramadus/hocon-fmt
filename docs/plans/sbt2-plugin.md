@@ -4,6 +4,30 @@ A second sbt plugin, for sbt 2.x, calling `core` in process (owner decision), be
 wave-1 plugin for sbt 1.x. A spike (sbt 2.0.10, caches under the task dir) proved the route on
 2026-10-09; every number below is from that run.
 
+## Route change (2026-10-14)
+
+The spike's premise no longer holds: `core` is on Scala 3.9.0, whose TASTy 28.9 sbt 2.0.10's
+compiler (Scala 3.8.4) refuses. A 3.8.4 build depending on `eu.ww86:hocon-fmt-core_3` fails with
+*"Forward incompatible TASTy file has version 28.9, produced by Scala 3.9.0-bin-nonbootstrapped,
+expected stable TASTy from 28.0 to 28.8"*, so calling `core` in process is not available to a
+plugin sbt 2 loads, and the wave-1 reflective boundary over the Java API is kept for both hosts —
+the direction G11 recommended.
+
+The cross-build the **Build layout** paragraph rejected works too: from sbt 1.12.5 with
+`crossScalaVersions := Seq("2.12.21", "3.8.4")`, `pluginCrossBuild / sbtVersion := "2.0.10"` and
+`scriptedSbt := "2.0.10"`, the `sbt-plugin` project compiles against sbt 2.0.10, publishes
+`eu.ww86:sbt-hocon-fmt_sbt2_3`, and its scripted suites launch `sbt-launch-2.0.10.jar`. What
+differs between the hosts is two small files, `src/main/scala-2.12` and `scala-3` (`HostSettings`:
+sbt 1's `retrieve` versus sbt 2's `moduleDescriptor`/`update`, and `Def.uncached`, which sbt 2
+requires of a task whose result holds a file).
+
+Superseded by this: **Scope**, **Build layout**, **Writes** and **Tests** below, which describe a
+standalone `sbt2-plugin/` build, the `sbt2` package and in-place writes. The delivered plugin keeps
+the wave-1 write operation, so no limitations note is needed for it, and the suite group is
+`sbt-hocon-fmt2` (`sbt sbt2PluginTest`) over the wave-1 fixtures. Still open from this plan: the
+release wiring (`docs/releasing.md`, `release.yml`, `signedReleaseTasks`), and re-verifying at
+sbt 2.1 GA.
+
 **Spike evidence.** sbt 2.0.10 runs on, and compiles plugins with, Scala 3.8.4 (`scala3-library_3`
 in its POM; `show scalaVersion` → `3.8.4`), the same TASTy minor as `core`'s 3.8.2 — the plugin
 compiled and ran against the published core, so the feared forward-TASTy gap does not exist on
@@ -18,7 +42,7 @@ transitive `sconfig_3` on the plugin classpath (`dependencyClasspath`, and logge
 `scripted` works on sbt 2 (the test build launched with `sbt-launch-2.0.10.jar`), and one fixture
 passed. Porting notes: `PathFinder.get` is `get()`; `scalaVersion` is declared per project.
 
-**Scope.** Repeat the 1.x surface: the four `Option` settings (`hoconSeparator`, `hoconDoubleIndent`,
+**Scope (superseded by the route change).** Repeat the 1.x surface: the four `Option` settings (`hoconSeparator`, `hoconDoubleIndent`,
 `hoconSimplifyNestedObjects`, `hoconFailOnDuplicates`), `hoconFormatSources` (default `*.conf` and
 `*.hocon` under the Compile and Test resource directories), `hoconFormat` and `hoconFormatCheck`,
 `allRequirements` on `JvmPlugin`, `aggregate := false` with one pass over
@@ -29,7 +53,7 @@ name), per-file `.hocon-fmt.conf` lookup plus overrides via core's
 Dropped: `IsolatedFormatter`, the java-api artifact, `FormatterArtifact`, the runtime classpath —
 the plugin matches on `Verdict` directly.
 
-**Build layout.** A standalone `sbt2-plugin/` build with its own `project/build.properties`
+**Build layout (superseded by the route change).** A standalone `sbt2-plugin/` build with its own `project/build.properties`
 (`sbt.version=2.0.10`), as `mill-plugin/`, `gradle-plugin/` and `maven-plugin/` stand alone; wave
 1's build and artifacts are untouched. `libraryDependencies += "eu.ww86" %% "hocon-fmt-core" %
 <version>`, package `eu.ww86.hoconfmt.sbt2`. Rejected: an sbt 2 row in the wave-1 project (sbt
@@ -38,7 +62,7 @@ the plugin matches on `Verdict` directly.
 the host API, not the two implementations — reflective java-api versus direct core — so it still
 needs version-specific sources and a second Scala version in the build).
 
-**Writes.** `hoconFormat` writes with `Files.write(target, formatted.getBytes(UTF_8))` after
+**Writes (superseded by the route change).** `hoconFormat` writes with `Files.write(target, formatted.getBytes(UTF_8))` after
 `Verdict.of` said `NeedsFormatting`: Mill's rule, no staging, no java-api. `docs/limitations.md`
 gains: *"The sbt 2 plugin writes in place: an interrupted write can leave the file partly written,
 and other hard links see the new content. An already formatted or refused file is still never
@@ -46,7 +70,7 @@ touched, not even its modification time; permissions, owner and symlinks survive
 `cats`/`FileFormatter` was rejected: cats-effect and fs2 on every user's plugin classpath for one
 rarely used path.
 
-**Tests.** `sbt2-plugin/src/sbt-test/` takes the wave-1 fixtures that carry over (check, format,
+**Tests (superseded by the route change).** `sbt2-plugin/src/sbt-test/` takes the wave-1 fixtures that carry over (check, format,
 options, refused, include, aggregate, custom-sources), rewrites `identity-write` to the in-place
 contract (bytes, mode and symlink survive; the hard link shares the content) and drops `java-api`;
 unit suites cover the options lookup and the shared-file conflict. Alias `sbt2PluginTest` mirrors

@@ -15,6 +15,7 @@ sbt scalafmtAll scalafmtSbt  # format; CI runs scalafmtCheckAll scalafmtSbtCheck
 sbt libraryDefects        # SconfigDefectsSpec on every platform: red by design, 29 (JVM), 30 (JS), 28 (Native);
                           # then KeepDetachedCommentsGuardSpec (JVM): red until released sconfig has the option
 sbt sbtPluginTest         # sbt plugin, scripted (slow: a fresh sbt per test)
+sbt sbt2PluginTest        # the same plugin under sbt 2.0.10, scripted (slow)
 sbt coreJVM/publishM2 javaApi/publishM2  # needed before the Gradle and Maven builds
 sbt javaApi/publishM2     # needed before the java-api tests: the contract suite loads this jar
 sbt coreJVM/publishLocal javaApi/publishLocal  # needed before the Mill build
@@ -43,7 +44,8 @@ platform is how a port rots.
 
 `core` (pure formatting, sconfig only) · `cats` (effectful file adapter) · `cli` (cats-effect `IOApp`) ·
 `web` (script for web pages) · `site` (the project page on Scala.js/Laminar, on `coreSite`: the core against a sconfig
-fork that keeps more comments — [docs/site.md](docs/site.md)) · `sbt-plugin` (Scala 2.12) · `gradle-plugin`,
+fork that keeps more comments — [docs/site.md](docs/site.md)) · `sbt-plugin` (Scala 2.12, and the
+same sources cross-built for sbt 2, whose tasks live in `src/main/scala-3`) · `gradle-plugin`,
 `maven-plugin` (standalone Java builds) · `mill-plugin` (standalone Mill build) · `npm/` (package
 template) · `python/` (wheel carrying the native binary) · `bench` · `.pre-commit-hooks.yaml`.
 Details and the reasons behind them: [docs/architecture.md](docs/architecture.md).

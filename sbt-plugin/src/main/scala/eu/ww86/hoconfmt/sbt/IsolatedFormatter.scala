@@ -21,34 +21,46 @@ final case class Inspection(
     failsOnRefusal: Boolean
 )
 
-/** The Scala 3 formatter, loaded apart from sbt's own Scala 2.12 library.
+/** The Scala 3 formatter, loaded apart from the host's own Scala library.
   *
   * Only JDK types are shared: the Java API takes the original bytes and a name, and its
   * verdict records are read reflectively. Decoding here would hide invalid UTF-8 from the core.
+  *
+  * The sources cross-build for the sbt 1 (Scala 2.12) and sbt 2 (Scala 3) hosts, so nothing
+  * here may use a construct the two spell differently: no `x: _*` splices, no `_` type
+  * wildcards, no `scala.collection.JavaConverters`.
+  *
+  * Every deviation wartremover sees in this file is the reflection boundary itself: the casts
+  * name types that exist only inside the isolated loader, `null` is the receiver of a static
+  * `Method.invoke`, and an unknown verdict or a formatter failure must fail the task rather
+  * than pass as a value.
   */
+@SuppressWarnings(
+  Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null", "org.wartremover.warts.Throw")
+)
 final class IsolatedFormatter private (check: Method, formatFile: Method, inspectFile: Method) {
 
   def verdictFor(content: Array[Byte], name: String): Verdict =
-    invoke(check, content, name)
+    mirror(unwrap(check.invoke(null, content, name)))
 
-  def format(file: Path): Verdict = invoke(formatFile, file)
+  def format(file: Path): Verdict =
+    mirror(unwrap(formatFile.invoke(null, file)))
 
   def inspect(file: Path, overrides: Map[String, String], write: Boolean): Inspection = {
-    import scala.collection.JavaConverters._
-    // Through `call`, so a rejected setting arrives as the Java API's IllegalArgumentException,
+    // Through `unwrap`, so a rejected setting arrives as the Java API's IllegalArgumentException,
     // message intact, not as the reflection wrapper with no message of its own.
-    val result                                   = call(inspectFile, file, overrides.asJava, Boolean.box(write))
+    val overridesJava = new java.util.LinkedHashMap[String, String]()
+    overrides.foreach { case (key, value) => overridesJava.put(key, value) }
+    val result                                   = unwrap(inspectFile.invoke(null, file, overridesJava, Boolean.box(write)))
     def read(value: AnyRef, key: String): AnyRef = value.getClass.getMethod(key).invoke(value)
     val report                                   = read(result, "report")
-    val findings                                 = read(report, "findings")
-      .asInstanceOf[java.util.List[AnyRef]]
-      .asScala
-      .map(finding => read(finding, "warning").asInstanceOf[String])
-      .toVector
+    val findings                                 = read(report, "findings").asInstanceOf[java.util.List[AnyRef]]
+    val warnings                                 =
+      (0 until findings.size()).toVector.map(i => read(findings.get(i), "warning").asInstanceOf[String])
     val failure = read(report, "failure").asInstanceOf[java.util.Optional[String]]
     Inspection(
       mirror(read(result, "verdict")),
-      findings ++ (if (failure.isPresent)
+      warnings ++ (if (failure.isPresent)
                      Seq("duplicate report could not run: " + failure.get())
                    else Nil),
       read(result, "failsOnDuplicates").asInstanceOf[java.lang.Boolean].booleanValue(),
@@ -61,35 +73,44 @@ final class IsolatedFormatter private (check: Method, formatFile: Method, inspec
     verdict.getClass.getSimpleName match {
       case "AlreadyFormatted" => Verdict.AlreadyFormatted
       case "NeedsFormatting"  => Verdict.NeedsFormatting(read("formatted").asInstanceOf[String])
-      case "Refused"          => Verdict.Refused(read("kind").asInstanceOf[Enum[_]].name(), read("reason").asInstanceOf[String])
+      case "Refused"          => Verdict.Refused(kindName(read("kind")), read("reason").asInstanceOf[String])
       case unknown            => throw new IllegalStateException(s"unknown Java API verdict: $unknown")
     }
   }
 
-  private def invoke(entry: Method, arguments: AnyRef*): Verdict = mirror(call(entry, arguments: _*))
+  // The kind is a JDK enum across the loader and only its name is read; Enum[Nothing] names the
+  // type without a wildcard, which the hosts' Scala versions spell differently.
+  private def kindName(kind: AnyRef): String =
+    kind.asInstanceOf[java.lang.Enum[Nothing]].name()
 
-  private def call(entry: Method, arguments: AnyRef*): AnyRef =
-    try entry.invoke(null, arguments: _*)
-    catch {
-      // Refusals are values; a failure inside the formatter must fail the task.
-      case e: InvocationTargetException => throw e.getCause
-    }
+  // A refusal is a value, but a failure inside the formatter must fail the task.
+  private def unwrap[A](call: => A): A =
+    try call
+    catch { case e: InvocationTargetException => throw e.getCause }
 
 }
 
 object IsolatedFormatter {
 
   def using[A](classpath: Seq[File])(use: IsolatedFormatter => A): A = {
-    // With the platform loader as parent, the two sides share the JDK and nothing else, so sbt's
-    // Scala 2.12 library cannot shadow the formatter's Scala 3 one.
+    // With the platform loader as parent, the two sides share the JDK and nothing else, so the
+    // host's Scala library cannot shadow the formatter's.
     val loader = new URLClassLoader(classpath.map(_.toURI.toURL).toArray, ClassLoader.getPlatformClassLoader)
     try {
       val api = loader.loadClass("eu.ww86.hoconfmt.java.HoconFmt")
       use(
         new IsolatedFormatter(
-          api.getMethod("check", classOf[Array[Byte]], classOf[String]),
-          api.getMethod("formatFile", classOf[Path]),
-          api.getMethod("inspectFile", classOf[Path], classOf[java.util.Map[_, _]], java.lang.Boolean.TYPE)
+          // `check` is overloaded between text and bytes; the worker sends the original bytes,
+          // so invalid UTF-8 stays a refusal instead of a replacement character. The entry
+          // points are matched by parameter types because a wildcard type literal, the other
+          // way to write this, is spelled differently on the two hosts.
+          api.getMethods
+            .filter(m =>
+              m.getName == "check" && m.getParameterCount == 2 && m.getParameterTypes()(0) == classOf[Array[Byte]]
+            )
+            .head,
+          api.getMethods.filter(m => m.getName == "formatFile" && m.getParameterCount == 1).head,
+          api.getMethods.filter(m => m.getName == "inspectFile" && m.getParameterCount == 3).head
         )
       )
     } finally loader.close()
