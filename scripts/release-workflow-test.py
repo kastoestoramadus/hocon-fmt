@@ -3,8 +3,10 @@
 
 Shell extraction covers this workflow's indentation and literal run blocks only.
 Publishing guards, publisher commands and actions, id-token grants and secret
-placement are checked on parsed YAML; GitHub expression
-evaluation and environment approval remain runner responsibilities.
+placement are checked on parsed YAML; local composite actions are read from this
+repository and their steps checked like the calling job's own; job-level
+reusable-workflow calls are refused unless allowlisted and guarded. GitHub
+expression evaluation and environment approval remain runner responsibilities.
 """
 from copy import deepcopy
 import os
@@ -18,8 +20,15 @@ import unittest
 import yaml
 
 
-WORKFLOW = (Path(__file__).resolve().parent.parent / '.github/workflows/release.yml').read_text()
+REPO_ROOT = Path(__file__).resolve().parent.parent
+WORKFLOW = (REPO_ROOT / '.github/workflows/release.yml').read_text()
 UPLOAD_CONDITION = "startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run"
+
+# Job-level `uses:` delegates every step to another workflow file this test does
+# not read, so a reusable workflow must carry the publishing guards itself AND sit
+# on this allowlist under its exact `uses:` value. Empty today: extend only after
+# reading the called file and pinning it (a full commit SHA for remote entries).
+REUSABLE_WORKFLOW_ALLOWLIST = ()
 
 # Denylist of known publisher actions; extend it when a new one appears — this is
 # not an exhaustive list, and a publisher action outside it is invisible here.
@@ -54,14 +63,20 @@ def joined_lines(text):
     return re.sub(r'\\\r?\n[ \t]*', ' ', text)
 
 
-def release_guard_errors(workflow):
+def release_guard_errors(workflow, repo_root=None, reusable_workflows=None):
+    repo_root = Path(repo_root) if repo_root is not None else REPO_ROOT
+    allowlist = REUSABLE_WORKFLOW_ALLOWLIST if reusable_workflows is None else reusable_workflows
     errors = []
     tag_guard = re.compile(r"startsWith\s*\(\s*github\.ref\s*,\s*['\"]refs/tags/v['\"]\s*\)")
     dry_run_guard = re.compile(r'!\s*inputs\.dry_run\b')
     # Textual denylist of publisher commands; extend it as new shapes appear.
     # npm/pnpm/yarn/sbt tolerate flags between tool and verb; gh api and curl count
-    # only when the same line also POSTs to a releases URL or a registry host
-    # (registry.npmjs.org, upload.pypi.org, central.sonatype.com, plugins.gradle.org).
+    # only when the same line also writes to a releases or uploads URL or a registry
+    # host (registry.npmjs.org, upload.pypi.org, central.sonatype.com,
+    # plugins.gradle.org): gh api posts with bare -f/-F or --input and writes with
+    # PUT/PATCH/DELETE (an explicit GET with -f stays a read); curl uploads with
+    # -d/--data*/-T/--upload-file or -X PUT. docker buildx --push, podman push and
+    # cargo release publish too.
     publish_commands = re.compile('|'.join((
         r'\bsonaUpload\b',
         r'\b(?:mvn|mvnw)\b[^\n]*\bdeploy\b',
@@ -73,14 +88,29 @@ def release_guard_errors(workflow):
         r'\btwine\s+upload\b',
         r'\buv\s+publish\b',
         r'\bgh\s+release\s+(?:create|upload|edit)\b',
-        r'\bgh\s+api\b(?=[^\n]*\s(?:-X|--method)\s*=?\s*POST\b)(?=[^\n]*\breleases\b)',
-        r'\bcurl\b(?=[^\n]*\s(?:-X|--request)\s*=?\s*POST\b)'
+        r'\bgh\s+api\b(?=[^\n]*\s(?:-X|--method)\s*=?\s*(?:POST|PUT|PATCH|DELETE)\b)'
+        r'(?=[^\n]*\b(?:releases|uploads)\b)',
+        r'\bgh\s+api\b(?![^\n]*\s(?:-X|--method)\s*=?\s*(?:GET|HEAD)\b)'
+        r'(?=[^\n]*\s-{1,2}(?:f|F|input)\b)(?=[^\n]*\b(?:releases|uploads)\b)',
+        r'\bcurl\b(?=[^\n]*\s(?:-X|--request)\s*=?\s*(?:POST|PUT)\b'
+        r'|\s(?:-d|-T|--data(?:-[a-z]+)?|--upload-file)\b)'
         r'(?=[^\n]*\b(?:registry\.npmjs\.org|upload\.pypi\.org|central\.sonatype\.com|plugins\.gradle\.org)\b)',
+        r'\bdocker\s+buildx\b[^\n]*\s--push\b',
         r'\bdocker\s+push\b',
+        r'\bpodman\s+push\b',
         r'\bcargo\s+publish\b',
+        r'\bcargo\s+release\b',
         r'\bsbt\b[^\n]*\bpublish\b',
         r'\bsbt\b[^\n]*\bci-release\b',
     )))
+    # A variable in command position hides the tool from every fixed-string rule
+    # above. Heuristic, not a guarantee: flag the line when the variable's own name
+    # or the rest of the line carries a publishing word. Generic names with
+    # harmless arguments ("$binary" smoke.conf) stay free; "$tool" upload with
+    # tool=twine is caught by the upload verb, a nameless alias with neither keyword
+    # remains a textual limit.
+    variable_command = re.compile(r'^[ \t]*["\']?\$\{?([A-Za-z_]\w*)\}?["\']?')
+    publishing_word = re.compile(r'\b(?:publish|upload|release|push)\w*', re.I)
 
     def guarded(condition):
         condition = str(condition or '')
@@ -105,6 +135,46 @@ def release_guard_errors(workflow):
     def references_secrets(value):
         return any(re.search(r'\bsecrets\s*(?:\.|\[)', s) for s in strings(value))
 
+    def local_action_errors(job, calling, uses, source, environment, depth=0):
+        # A local composite action runs its steps inside the calling job, so the
+        # action.yml from this repository is checked like part of the job: same
+        # publisher-command and publisher-action rules, same secrets rule, and a
+        # missing or unparseable file is refused instead of assumed harmless.
+        label = calling.get('name', 'unnamed step')
+        action_file = repo_root / Path(uses) / 'action.yml'
+        try:
+            resolved = action_file.resolve(strict=True)
+            resolved.relative_to(repo_root.resolve())
+            document = yaml.safe_load(resolved.read_text())
+        except (OSError, ValueError, yaml.YAMLError):
+            return [f'{job}/{label}: local action {uses} cannot be read from the repository']
+        if not isinstance(document, dict):
+            return [f'{job}/{label}: local action {uses} cannot be read from the repository']
+        found = []
+        if references_secrets(document) and environment != 'release':
+            found.append(f'{job}/{label}: local action {uses} references secrets; '
+                         'the calling job requires environment: release')
+        steps = (document.get('runs') or {}).get('steps') or []
+        for index, inner in enumerate(steps):
+            inner_label = inner.get('name', f'{label} step {index + 1}')
+            inner_uses = str(inner.get('uses') or '')
+            guards = guarded(source.get('if')) or guarded(calling.get('if')) or guarded(inner.get('if'))
+            if inner_uses.startswith('./'):
+                if depth >= 4:
+                    found.append(f'{job}/{inner_label}: local actions nest deeper than four levels')
+                else:
+                    found.extend(local_action_errors(job, inner, inner_uses, source,
+                                                     environment, depth + 1))
+                continue
+            if publish_commands.search(joined_lines(str(inner.get('run', '')))) and not guards:
+                found.append(f'{job}/{inner_label}: publishing if must require a version tag and !inputs.dry_run')
+            if publisher_action(inner):
+                if not guards:
+                    found.append(f'{job}/{inner_label}: publishing action if must require a version tag and !inputs.dry_run')
+                if environment != 'release':
+                    found.append(f'{job}/{inner_label}: publishing action requires environment: release')
+        return found
+
     for key, value in workflow.items():
         if key != 'jobs' and references_secrets(value):
             errors.append(f'{key}: secrets must belong to a job with environment: release')
@@ -125,19 +195,39 @@ def release_guard_errors(workflow):
         if (id_token_everywhere or grants_id_token(source.get('permissions'))) \
                 and not guarded(source.get('if')):
             errors.append(f'{name}: id-token: write requires a version tag and !inputs.dry_run on the job')
+        uses = str(source.get('uses') or '')
+        if uses and (uses not in allowlist or not guarded(source.get('if'))
+                     or environment != 'release'):
+            errors.append(f'{name}: reusable workflow {uses} must be on the allowlist and carry '
+                          'the release guards (tag and !inputs.dry_run on the job if, environment: release)')
+        if references_secrets(source) or not guarded(source.get('if')):
+            # A job that holds secrets or lacks the guards must not hide a publisher
+            # behind a variable-held tool name; see the heuristic comment above.
+            for item in source.get('steps', []):
+                run = joined_lines(str(item.get('run', '')))
+                for line in run.splitlines():
+                    match = variable_command.match(line)
+                    if match and (publishing_word.search(match.group(1))
+                                  or publishing_word.search(line[match.end():])):
+                        label = item.get('name', 'unnamed step')
+                        errors.append(f'{name}/{label}: variable-held tool looks like a '
+                                      f'publisher: {line.strip()}')
         for index, item in enumerate(source.get('steps', [])):
+            label = item.get('name', f'step {index + 1}')
+            uses = str(item.get('uses') or '')
+            if uses.startswith('./'):
+                errors.extend(local_action_errors(name, item, uses, source, environment))
+                continue
             # publishSigned stages locally; sonaUpload sends that staging repository remotely.
             # publishM2, publishLocal, publishToMavenLocal, npm pack and artifact builds
             # are also dry-run work.
             if publish_commands.search(joined_lines(item.get('run', ''))):
                 # A job condition gates all its steps, including `gh release create`.
                 if not (guarded(source.get('if')) or guarded(item.get('if'))):
-                    label = item.get('name', f'step {index + 1}')
                     errors.append(f'{name}/{label}: publishing if must require a version tag and !inputs.dry_run')
             if publisher_action(item):
                 # Trusted publishing needs no secret, so the secrets rule cannot
                 # pin the job; require the release environment beside the guards.
-                label = item.get('name', f'step {index + 1}')
                 if not (guarded(source.get('if')) or guarded(item.get('if'))):
                     errors.append(f'{name}/{label}: publishing action if must require a version tag and !inputs.dry_run')
                 if environment != 'release':
