@@ -128,7 +128,7 @@ them, flip the numeric output pins and update the limitation; no numeric refusal
 | `oneFieldObjectsInAnArray` (2), `envOverrides` (2) | rendered text parses and is a fixed point | `#598` merged, `#600` open | **already green on main**; a release containing `#598` |
 | `rejectedOnInput` `[]` list suffix (1) | the specification's list expansion | `#605` merged 2026-10-06 | **already green on main**; a release containing `#605` |
 | `should parse an array at the file root` (1) | a root array parses | none: the `Config` API returns an object | never, unless the API changes |
-| `HoconSpecCoverageSpec` refusals `mustRefuse` (6), sibling-field merges (4), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
+| `HoconSpecCoverageSpec` refusals `mustRefuse` (9), sibling-field merges (6), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
 | `UnresolvedMergeSpec` (16) | the variant rendering of an unresolved merge under an include | `#598`/`#600` | a release formats those merges stably |
 | `ExamplesSpec` catalogue refusals (7) | the pinned `now` of the defect examples | `#598`, `#605`, `#646`/`#647` | the examples move to `target` and the metadata's `upstream` note goes |
 | Numeric rendering (6 library tests), `NumericRenderingSpec` (8) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |

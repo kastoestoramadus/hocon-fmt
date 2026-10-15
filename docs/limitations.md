@@ -56,7 +56,7 @@ numeric output pin and the entry here. The numeric cases below remain accepted. 
 was tried on 2026-09-25: the regular suites pass on it, and the defects then known remain.
 
 Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`) — the inputs below are
-the shapes while the merge stands alone, and a field written after the merge can flip the verdict
+the shapes while the merge stands alone, and a field beside the merge or a leading comment can flip the verdict
 ([which one](#re-parseable-but-not-a-fixed-point-refusalunstableoutput)):
 
 - **`+=` field separator**: `a : [1]` then `a += 2`
@@ -362,8 +362,9 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 - **A merge a definition leaves behind**: `a : 1` then `a : ${a}`, or `a : [1]` then `a += 2`,
   renders as an unresolved-merge banner that parses but changes again on the next pass. A syntax
   check alone misses this. The BrokenOutput list names these same inputs while the merge stands
-  alone — there, the banner does not parse again; a single field written after the merge is what
-  flips the verdict to this one.
+  alone — there, the banner does not parse again. A field before the merge, a field after it at the
+  root, or a leading comment flips the verdict to this one; see the paragraph below for the shapes
+  measured.
 - **A cycle written over definitions**: the specification's self-referential example, `a : 1`,
   `b : 2`, `a : ${b}`, `b : ${a}`, renders the same banner. A cycle between bare names, with no
   other definition of either key, does not refuse at all: `a : ${b}` with `b : ${a}` formats to
@@ -381,11 +382,18 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
   (2026-10-12). The playground fork includes #598; the published core still depends on sconfig
   2.0.0, so the refusal stands until the dependency is upgraded and the pins re-checked.
 
-Which refusal a substitution merge earns is a fact about the shape around it, not about which
-defect it carries: the self-reference, the `+=` separator, the env override and the array and
-string concatenations refuse as `Refusal.BrokenOutput` while the merge stands alone, and as
-`Refusal.UnstableOutput` once any ordinary field follows (the object concatenation keeps
-`Refusal.BrokenOutput` either way). Pinned input by input in `HoconSpecCoverageSpec`.
+Both refuse, and no refused file is written; which refusal a substitution merge earns depends on
+the shape of the file around it, not only on the defect. Four measured inputs, with sconfig 2.0.0:
+
+- `a : 1` then `a : ${a}`, alone: `Refusal.BrokenOutput`
+- `b : 2`, `a : 1`, `a : ${a}`: `Refusal.UnstableOutput`, a field before the merge flips it
+- `a : 1`, `a : ${a}`, `name = app`: `Refusal.UnstableOutput`, a field after the merge at the root flips it
+- an object `o` holding `a = 1` then `a = ${a}`, followed by `name = x` after the object:
+  `Refusal.BrokenOutput`; a sibling after the enclosing object does not flip it
+
+The object concatenation (`e = ${g} { name = "east" }`) and the nested self-reference
+(`foo : ${foo.a}` with a trailing field) stay `Refusal.BrokenOutput` in the shapes measured. These
+examples are not a rule for every shape: the kind is pinned input by input in `HoconSpecCoverageSpec`.
 
 Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
 tree renders differently with `simplify-nested-objects = false`. Pinned over the examples in
