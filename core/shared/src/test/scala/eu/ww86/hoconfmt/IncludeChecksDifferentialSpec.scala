@@ -33,6 +33,35 @@ object IncludeChecksDifferentialInputs {
     "a=[{ include \"x\"\nx=1 }]\na=[{ include \"y\"\nx=2 }]",
     "include \"first\"\nx=0\ninclude \"second\"\nx.a=1\ninclude \"third\"\nx {}"
   )
+  val transitions: List[String] = {
+    val statement = org.scalacheck.Gen.oneOf(
+      """include "first.conf"""",
+      """include "second.conf"""",
+      "q=0",
+      "q {}",
+      "q.a=1",
+      "q.b=2",
+      "q=${?optional}",
+      "q=[1]",
+      "q={ a=1 }",
+      """"q.a"=3""",
+      "r { include \"nested.conf\"\nx=0\nx.a=1 }"
+    )
+    (0 until 1000).toList.map { seed =>
+      val statements = org.scalacheck.Gen
+        .listOfN(12, statement)(org.scalacheck.Gen.Parameters.default, org.scalacheck.rng.Seed(seed.toLong))
+        .getOrElse(sys.error(s"generator exhausted at $seed"))
+      val separator = if (seed % 2 == 0) "\n" else ", "
+      val body      = statements.mkString(separator)
+      seed % 4 match {
+        case 0 => body
+        case 1 => s"app {\n$body\n}"
+        case 2 => s"rows=[0] [{\n$body\n}]"
+        case _ => s"app={} {\n$body\n}"
+      }
+    }
+  }
+
   def large(n: Int): String = (0 until n).map(i => s"include \"part$i.conf\"\nkey$i=$i\n").mkString
 }
 
@@ -79,6 +108,9 @@ class IncludeChecksDifferentialSpec extends munit.FunSuite with IncludeChecksDif
   test("include checks agree on deterministic generated inputs") {
     PlaceholderFieldDifferentialInputs.generated.foreach(checkIncludeChecks)
     println("include differential: 1000 generated inputs")
+  }
+  test("include indexes preserve the earliest refusal across repeated-key transitions") {
+    IncludeChecksDifferentialInputs.transitions.foreach(checkIncludeChecks)
   }
   test("include checks agree through 2000 includes") {
     List(100, 250, 500, 1000, 2000).foreach(n => checkIncludeChecks(IncludeChecksDifferentialInputs.large(n)))
