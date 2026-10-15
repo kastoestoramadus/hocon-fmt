@@ -31,6 +31,11 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "self-referential substitution" -> "a : 1\na : ${a}",
     "nested self-reference"         -> "foo : { a : 1 }\nfoo : ${foo.a}",
     "env override in an object"     -> "o {\n  host = localhost\n  host = ${?HOST}\n}",
+    // A sibling after the enclosing object does not flip these: the banner still does not parse.
+    "env override in an object with a sibling after the object" ->
+      "o {\n  host = localhost\n  host = ${?HOST}\n}\nname = x",
+    "self-reference in an object with a sibling after the object" -> "o {\n  a = 1\n  a = ${a}\n}\nname = x",
+    "nested self-reference with a trailing field"                 -> "foo : { a : 1 }\nfoo : ${foo.a}\nname = app",
     // From the specification's "Array and object concatenation" examples.
     "array self-concatenation" -> "a : [ 1, 2 ]\na : ${a} [ 3, 4 ]"
   )
@@ -80,7 +85,10 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "self-referential substitution with a sibling field" -> "a : 1\na : ${a}\nname = app",
     "+= field separator with a sibling field"            -> "a : [1]\na += 2\nname = app",
     "env override with a sibling field"                  -> "host = localhost\nhost = ${?HOST}\nname = app",
-    "env override in an object with a sibling field"     -> "http {\n  host = \"127.0.0.1\"\n  host = ${?HOST}\n  port = 80\n}"
+    "env override in an object with a sibling field"     -> "http {\n  host = \"127.0.0.1\"\n  host = ${?HOST}\n  port = 80\n}",
+    // A field before the merge flips the verdict too, and so does a leading comment.
+    "self-referential substitution with a field before"    -> "b : 2\na : 1\na : ${a}",
+    "self-referential substitution with a leading comment" -> "# c\na : 1\na : ${a}"
   )
 
   mustRefuseUnstable.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach { case (name, raw) =>
