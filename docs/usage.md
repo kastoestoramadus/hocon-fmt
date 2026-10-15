@@ -207,6 +207,9 @@ Three builds of the same program:
 
 \* `--check` on one small file, averaged over 10 runs on one Linux machine.
 
+At v0.1.0 only the JVM build is published; the native binary and the Node build follow in wave 2,
+so `pipx`, the GitHub release and `npx` name where they will land.
+
 No launcher script ships with the JVM artifact; it is a jar whose manifest names
 `eu.ww86.hoconfmt.CmdApi`, so coursier runs it (`cs launch`, above) or `java -cp <classpath>
 eu.ww86.hoconfmt.CmdApi <args>` does, with the classpath from `cs fetch --classpath
