@@ -34,6 +34,23 @@ private[hoconfmt] object HoconText {
   // deepest flattened path is 12 (1,257-file subset).
   val MaxFlattenedPathSegments = 360
 
+  // The total work the duplicate report may spend on a file's key definitions: the sum over
+  // every definition of the square of its flattened path length. The report pairs every prefix
+  // of every definition's path against the definitions (`DuplicateReport.report`), so a
+  // statement with `w` written segments at enclosing length `E` costs
+  // `(E+1)^2 + ... + (E+w)^2`, and the file's total — not its longest statement, which the two
+  // limits above cap — is what a single dense file can still grow without bound: two
+  // 120-segment chains with 200 leaves of 120 segments each (160 KB, every written line at the
+  // limits, no duplicates) spent 12.0-12.8 s in the report on the JVM at a total of ~2.2
+  // billion, and 1600 leaves spent 122 s. Measured milliseconds fit the squared work almost
+  // exactly (R^2 0.993 over a 30-shape search; 6.6 ns per unit on the JVM, measured
+  // 2026-10-15), so the budget bounds the report's time directly. Calibrated to ten times the
+  // corpus maximum: the corpus's parseable files (1,190 readable of the 1,257-file analysis
+  // subset) measure at most 26,725, so the worst real file sits at 9% of the budget. One array
+  // element level counts as one flattened segment, as the report's walk sees it; see
+  // limitations.md.
+  val MaxPathWork = 300000L
+
   /** Stop before the parser or include passes can spend resources on unbounded nesting, and
     * before the duplicate report can spend them on an unbounded dotted key path, written on one
     * line or re-created by nesting.
