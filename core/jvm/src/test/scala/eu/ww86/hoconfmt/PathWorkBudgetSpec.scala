@@ -20,6 +20,22 @@ class PathWorkBudgetSpec extends munit.FunSuite {
 
   val bound = 10.seconds
 
+  test("many definitions of the same short path answer within the time bound") {
+    val source = "x = 1\n" * 30000
+    val result = TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source))
+    assertEquals(result.map(_.size), Right(29999))
+    assertEquals(
+      result.map(_.take(2)),
+      Right(
+        List(
+          Finding.KeyDefinedAgain(KeyPath.of("x"), 1, 2),
+          Finding.KeyDefinedAgain(KeyPath.of("x"), 2, 3)
+        )
+      )
+    )
+    assertEquals(result.map(_.takeRight(1)), Right(List(Finding.KeyDefinedAgain(KeyPath.of("x"), 29999, 30000))))
+  }
+
   def objectPath(segments: Int): String          = (1 to segments).map(i => s"k$i").mkString(".")
   def leafPath(leaf: Int, segments: Int): String = (1 to segments).map(j => s"l${leaf}k$j").mkString(".")
 
@@ -75,6 +91,35 @@ class PathWorkBudgetSpec extends munit.FunSuite {
     Verdict.of(boundary((under + 1).toInt)) match {
       case Verdict.Refused(refusal) => expectBudgetRefusal(refusal, s"boundary ${under + 1}")
       case other                    => fail(s"boundary ${under + 1}: expected a refused verdict, got $other")
+    }
+  }
+
+  test("every piece of an object concatenation inherits the field's path") {
+    val path   = objectPath(7)
+    val pieces = (1 to 343).map(i => "{ " + leafPath(i, 7) + " = 1 }").mkString(" ")
+    HoconText.checkNesting(path + " = " + pieces) match {
+      case Left(refusal) => expectBudgetRefusal(refusal, "object concatenation")
+      case other         => fail(s"expected the work-budget refusal, got $other")
+    }
+  }
+
+  test("every piece of an array concatenation inherits the field's path and one element level") {
+    val path = objectPath(7)
+    // S(7) + 292 * (9² + ... + 15²) = 302652, while omitting the field's
+    // path on later pieces counts less than 60000.
+    val pieces = (1 to 292).map(i => "[{ " + leafPath(i, 7) + " = 1 }]").mkString(" ")
+    HoconText.checkNesting(path + " = " + pieces) match {
+      case Left(refusal) => expectBudgetRefusal(refusal, "array concatenation")
+      case other         => fail(s"expected the work-budget refusal, got $other")
+    }
+  }
+
+  test("array levels have an exact budget boundary") {
+    // S(8) + S(16)-S(8) + 31 * (37² + ... + 42²) = 292145.
+    assertEquals(HoconText.checkNesting(arrayed(arrays = 20, leaves = 31)), Right(()))
+    HoconText.checkNesting(arrayed(arrays = 20, leaves = 32)) match {
+      case Left(refusal) => expectBudgetRefusal(refusal, "array boundary 32")
+      case other         => fail(s"expected the work-budget refusal, got $other")
     }
   }
 

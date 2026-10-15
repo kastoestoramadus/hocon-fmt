@@ -182,7 +182,7 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
       val leaf  = (i: Int) => (1 to 120).map(j => s"l${i}k$j").mkString(".")
       (chain + " {\n") * 2 + (1 to leaves).map(i => leaf(i) + " = 1\n").mkString + "}\n" * 2
     }
-    val source = dense(200)
+    val source                               = dense(200)
     def bound[R](name: String)(run: => R): R = {
       val start  = System.nanoTime()
       val result = TimeoutGuard.within(pathTimeBoundMs)(run)
