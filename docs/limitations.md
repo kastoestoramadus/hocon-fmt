@@ -504,6 +504,28 @@ include that reaches one of these is reported and left alone.
   window matters to you, open an issue: we would gladly hear of a better solution.
   [Usage](usage.md) has the full write contract.
 
+## Sequential file examination on Scala Native
+
+The Native CLI examines its selected files one at a time, in the order they were given; the JVM
+and Node CLIs examine them concurrently. The trigger is established: with concurrent fibres on the
+runtime's worker threads (`parTraverse`), the Scala Native 0.5.12 binary sometimes dies with an
+unhandled signal 11. A standalone cats-effect program with none of hocon-fmt's code crashes too.
+The root cause is not established, and nothing about it has been confirmed upstream.
+
+Measured on `--check` only, on one WSL2 machine:
+
+- Parallel build: 12 of 300 runs crashed in the bisect, and 1 of 100 in each of two reruns.
+- Sequential build: 0 abnormal exits in about 800 runs.
+- Median wall time 554 ms parallel versus 1154 ms sequential, about 2x.
+
+Zero in about 800 runs shows that the rate dropped sharply, not that the fault is gone. Other
+machines, operating systems, write mode and `--report` were not measured. The binary also keeps
+the compiled 512m initial heap, an earlier mitigation that stays in place.
+
+The measurements and the minimal reproduction are not part of this repository. The maintainer
+keeps them in the analysis workspace outside it (`work/codex-jobs/i5/report.md`,
+`work/codex-jobs/j1/report.md`).
+
 ## Speed
 
 The pinned sconfig 2.0.0 dropped the exception-based loop control of 1.12.4, which cost about

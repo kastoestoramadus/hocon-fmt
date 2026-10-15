@@ -396,10 +396,11 @@ object CmdApi extends IOApp {
     * Exiting from inside a parallel loop used to kill the JVM mid-iteration, so `--check` could
     * miss files entirely; now nothing exits until every outcome is in. The paths arrive from
     * `distinctPaths`, so a file named twice — however spelled, or once given and once walked — is
-    * not written by two fibers.
+    * not written by two fibres. [[FileTraversal]] decides per platform how the loop runs; its
+    * results keep this list's order either way.
     */
   def examineAll(styled: List[(Path, FormatOptions)], checkOnly: Boolean): IO[Run] =
-    styled.parTraverse { case (file, options) => examine(file, file.toString, checkOnly, options) }.map(Run(_))
+    FileTraversal(styled) { case (file, options) => examine(file, file.toString, checkOnly, options) }.map(Run(_))
 
   private val formatter = FileFormatter[IO]
 
