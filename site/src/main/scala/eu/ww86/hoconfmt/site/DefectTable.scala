@@ -84,7 +84,7 @@ object DefectTable {
       "the playground's fork carries #645; the published core stays on released sconfig and refuses the input until a release carries it"
     ),
     DefectRow(
-      "`a : ${b}` with `b : ${a}`",
+      "`a : 1`, `b : 2`, then `a : ${b}` with `b : ${a}` — a cycle over definitions",
       RefusalKind.UnstableOutput,
       List(PrLink(Sconfig, 598), PrLink(LightbendConfig, 868)),
       DefectRow.noFixYet

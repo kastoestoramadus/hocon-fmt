@@ -55,7 +55,9 @@ When a sconfig release fixes one, its test turns green: update the corresponding
 numeric output pin and the entry here. The numeric cases below remain accepted. sconfig 2.0.0
 was tried on 2026-09-25: the regular suites pass on it, and the defects then known remain.
 
-Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`):
+Rendered as text that cannot be read back safely (`Refusal.BrokenOutput`) — the inputs below are
+the shapes while the merge stands alone, and a field written after the merge can flip the verdict
+([which one](#re-parseable-but-not-a-fixed-point-refusalunstableoutput)):
 
 - **`+=` field separator**: `a : [1]` then `a += 2`
 - **Self-referential substitution**: `a : 1` then `a : ${a}`
@@ -357,18 +359,33 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
-- **Substitution cycle**: `a : ${b}` with `b : ${a}` renders as an unresolved-merge banner that
-  parses but changes again on the next pass. A syntax check alone misses this.
+- **A merge a definition leaves behind**: `a : 1` then `a : ${a}`, or `a : [1]` then `a += 2`,
+  renders as an unresolved-merge banner that parses but changes again on the next pass. A syntax
+  check alone misses this. The BrokenOutput list names these same inputs while the merge stands
+  alone — there, the banner does not parse again; a single field written after the merge is what
+  flips the verdict to this one.
+- **A cycle written over definitions**: the specification's self-referential example, `a : 1`,
+  `b : 2`, `a : ${b}`, `b : ${a}`, renders the same banner. A cycle between bare names, with no
+  other definition of either key, does not refuse at all: `a : ${b}` with `b : ${a}` formats to
+  the fixed point `a = ${b}`, `b = ${a}`, the second pass changes nothing, and resolution fails
+  with the same cycle complaint on the input and the output — nothing is hidden, and there is no
+  cycle detection to promise.
 - **Env override**: `host = localhost` then `host = ${?HOST}` stays an unresolved merge, rendered as
-  a banner that grows by one on every pass; at the file root the banner does not even parse
-  (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
-  files from GitHub are refused for it. The fixed-point fix is
-  [ekrich/sconfig#598](https://github.com/ekrich/sconfig/pull/598), merged 2026-09-30, and sconfig
-  v2.1.0 (2026-10-12) carries it. The render-option follow-up
+  a banner that grows by one on every pass; with no field after it, at the file root or inside an
+  object, the banner does not even parse (`Refusal.BrokenOutput`). The most common idiom in
+  Lightbend-style config: 357 of 1,650 real files from GitHub are refused for it. The fixed-point
+  fix is [ekrich/sconfig#598](https://github.com/ekrich/sconfig/pull/598), merged 2026-09-30, and
+  sconfig v2.1.0 (2026-10-12) carries it. The render-option follow-up
   [#600](https://github.com/ekrich/sconfig/pull/600) remains open, awaiting review and merge.
   Verified with `gh` on 2026-10-14: #598 `MERGED`, #600 `OPEN`, latest release v2.1.0
   (2026-10-12). The playground fork includes #598; the published core still depends on sconfig
   2.0.0, so the refusal stands until the dependency is upgraded and the pins re-checked.
+
+Which refusal a substitution merge earns is a fact about the shape around it, not about which
+defect it carries: the self-reference, the `+=` separator, the env override and the array and
+string concatenations refuse as `Refusal.BrokenOutput` while the merge stands alone, and as
+`Refusal.UnstableOutput` once any ordinary field follows (the object concatenation keeps
+`Refusal.BrokenOutput` either way). Pinned input by input in `HoconSpecCoverageSpec`.
 
 Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
 tree renders differently with `simplify-nested-objects = false`. Pinned over the examples in
