@@ -4,6 +4,8 @@
 > set hoconFailOnRefusal := Some(true)
 -> hoconFormat
 -> hoconFormatCheck
+> assertCheckFailsSaying HOCON formatting refusals found.
+> assertCheckFailsWithout not formatted
 > assertUntouched
 > set hoconFailOnRefusal := Some(false)
 > hoconFormatCheck
@@ -16,6 +18,11 @@ $ copy-file strict.conf .hocon-fmt.conf
 > set hoconFailOnRefusal := Some(false)
 > hoconFormatCheck
 $ copy-file duplicate.conf src/main/resources/duplicate.conf
+# Check mode names the unformatted file and writes nothing, refused or unformatted.
+-> hoconFormatCheck
+> assertSameBytes src/main/resources/duplicate.conf duplicate.conf
+> assertUntouched
+> assertCheckFailsSaying 1 HOCON files are not formatted
 > set hoconFailOnDuplicates := Some(true)
 -> hoconFormat
 $ must-mirror src/main/resources/duplicate.conf expected.conf
