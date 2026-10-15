@@ -75,10 +75,11 @@ already works and how to use it first; the work behind it last, and collapsed.
 ## The snapshot and the live refresh
 
 The contribution list ships in the page as a typed Scala file,
-`site/.../site/Contributions.scala` (58 entries, read from GitHub on 2026-10-07), so it renders
+`site/.../site/Contributions.scala` (62 entries, read from GitHub on 2026-10-14), so it renders
 offline, from `file://`, and when the API is out of reach. States were derived from the searches
-plus the release histories: sconfig v2.0.0 (2026-08-24) and lightbend/config v1.4.9 (2026-06-03)
-predate the 2026-09/10 merges, so those read "merged upstream, not yet in a release". A pull
+plus the release histories: sconfig v2.1.0 (2026-10-12) and lightbend/config v1.4.9 (2026-06-03)
+are the latest releases, so merges that landed by the sconfig release read "in a release" and the
+later ones "merged upstream, not yet in a release". A pull
 request counts as fixed only in that released state.
 
 The contributions section asks for the list when it is mounted: **one request per repository**, to

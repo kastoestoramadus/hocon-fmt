@@ -4,17 +4,17 @@ import eu.ww86.hoconfmt.site.Library.LightbendConfig
 import eu.ww86.hoconfmt.site.Library.Sconfig
 
 /** The snapshot of the author's pull requests against the libraries this formatter depends on,
-  * as read from GitHub with `gh` on 2026-10-07. It ships in the page, so the list renders
+  * as read from GitHub with `gh` on 2026-10-14. It ships in the page, so the list renders
   * offline, from file://, and when the API is out of reach; the live refresh only updates it.
   *
-  * States were derived from the searches plus the release histories: sconfig v2.0.0 was published
-  * 2026-08-24 and lightbend/config v1.4.9 on 2026-06-03, so anything merged after those dates is
+  * States were derived from the searches plus the release histories: sconfig v2.1.0 was published
+  * 2026-10-12 and lightbend/config v1.4.9 on 2026-06-03, so anything merged after those dates is
   * in no release yet. A pull request counts as fixed only in that released state.
   */
 object Contributions {
 
   /** The day `gh search prs --author kastoestoramadus` last fed this file. */
-  val readOn = "2026-10-07"
+  val readOn = "2026-10-14"
 
   def byNumber(library: Library, number: Int): Option[Contribution] =
     all.find(c => c.library == library && c.number == number)
@@ -34,10 +34,29 @@ object Contributions {
     ),
     Contribution(
       Sconfig,
+      645,
+      "Order fields defined on one line by their source order in keepOriginOrder renders",
+      Theme.FormatterProposal,
+      PrState.Open,
+      "Fields defined on the same line tied and came out in no defined order under `keepOriginOrder`; " +
+        "they keep their parse order now, which is what lets an include and the fields sharing its " +
+        "line keep their places. The playground above runs on a build that carries it."
+    ),
+    Contribution(
+      Sconfig,
+      644,
+      "Keep same-line fields in source order when rendering with `keepOriginOrder`",
+      Theme.FormatterProposal,
+      PrState.Closed,
+      "The first fix for the same-line order: closed as superseded by #645, which orders by the " +
+        "parse sequence instead of a stable sort."
+    ),
+    Contribution(
+      Sconfig,
       598,
       "Make the renderer's output parseable and a fixed point",
       Theme.UnresolvedMerges,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "Where a key is defined twice — `a : [1]` then `a += 2`, or an object concatenated onto a " +
         "substitution — the renderer produced text it cannot read back and output that grew on " +
         "every pass; it now renders what parses back and is a fixed point."
@@ -66,7 +85,7 @@ object Contributions {
       590,
       "Port lightbend/config#832 and #841: two rendering round-trip fixes (#2)",
       Theme.RendererRoundTrip,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "An object as the first entry of a root-level array lost its braces in non-JSON output, and " +
         "an unquoted string inside a value concatenation was re-quoted, which does not parse."
     ),
@@ -75,7 +94,7 @@ object Contributions {
       613,
       "Drop Option and Vector from the renderer code",
       Theme.RendererRoundTrip,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "Renderer internals: direct null checks and an array of chars replace the `Option` and " +
         "`Vector` wrappers on the render path; no behaviour change."
     ),
@@ -189,7 +208,7 @@ object Contributions {
       595,
       "Port lightbend/config#839+#846: don't evaluate substitutions hidden by values from resolved objects",
       Theme.SubstitutionsAndConcatenations,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "Per the specification a substitution hidden by a value it cannot merge with is never " +
         "evaluated; that now also holds when the hiding value itself arrives through a substitution."
     ),
@@ -198,7 +217,7 @@ object Contributions {
       596,
       "Port lightbend/config#725: route replaceChild through a held ConfigConcatenation's pieces",
       Theme.SubstitutionsAndConcatenations,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "Replacing a child inside a value concatenation now routes through the concatenation's own " +
         "pieces, which fixes wrong results for several configs (issues #725, #647, #356)."
     ),
@@ -284,10 +303,19 @@ object Contributions {
     ),
     Contribution(
       Sconfig,
+      653,
+      "fix : ConfigObject.values() dropping entries with equal values",
+      Theme.Ports,
+      PrState.Open,
+      "`ConfigObject.values()` collected into a set, so two keys holding the same value yielded " +
+        "one entry; it returns every value now (ports #877)."
+    ),
+    Contribution(
+      Sconfig,
       605,
       "List expansion from environment variables",
       Theme.Ports,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "`${MY_LIST[]}` resolves to a list read from `MY_LIST_0`, `MY_LIST_1`, … — the " +
         "env-variable list suffix the specification allows and the formatter must refuse until " +
         "this ships (ports #833)."
@@ -297,7 +325,7 @@ object Contributions {
       604,
       "Port lightbend/config#620+#686: override config with CONFIG_FORCE_* env vars",
       Theme.Ports,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "Opt-in `CONFIG_FORCE_<key>` environment overrides, off by default as upstream."
     ),
     Contribution(
@@ -305,7 +333,7 @@ object Contributions {
       603,
       "Port lightbend/config#619: let application.conf override reference.conf substitutions",
       Theme.Ports,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "`load()` resolves `reference.conf` together with `application.conf`, so the application " +
         "can override a value that `reference.conf` substitutes."
     ),
@@ -314,7 +342,7 @@ object Contributions {
       602,
       "Port lightbend/config#708+#709: ConfigFactory.parseApplicationReplacement",
       Theme.Ports,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "The `config.resource` / `config.file` / `config.url` selection becomes a public " +
         "`parseApplicationReplacement`, so other loading strategies can reuse it."
     ),
@@ -323,7 +351,7 @@ object Contributions {
       618,
       "Port lightbend/config#848: make SimpleConfigObject.keySet unmodifiable",
       Theme.Ports,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "Removing a key through the documented-immutable config's `keySet()` silently mutated it; " +
         "it now throws, like `withoutPath` does."
     ),
@@ -375,7 +403,7 @@ object Contributions {
       622,
       "Run uncached full test suites in CI",
       Theme.Project,
-      PrState.MergedUnreleased,
+      PrState.Released,
       "CI runs the uncached full suites, after sbt's incremental `test` reported cached suites as run."
     ),
     Contribution(

@@ -363,11 +363,12 @@ Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
   a banner that grows by one on every pass; at the file root the banner does not even parse
   (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
   files from GitHub are refused for it. The fixed-point fix is
-  [ekrich/sconfig#598](https://github.com/ekrich/sconfig/pull/598), merged 2026-09-30,
-  not yet released. The render-option follow-up
+  [ekrich/sconfig#598](https://github.com/ekrich/sconfig/pull/598), merged 2026-09-30, and sconfig
+  v2.1.0 (2026-10-12) carries it. The render-option follow-up
   [#600](https://github.com/ekrich/sconfig/pull/600) remains open, awaiting review and merge.
-  Verified with `gh` on 2026-10-09: #598 `MERGED`, #600 `OPEN`, latest release v2.0.0
-  (2026-08-24). The playground fork includes #598; the published core does not.
+  Verified with `gh` on 2026-10-14: #598 `MERGED`, #600 `OPEN`, latest release v2.1.0
+  (2026-10-12). The playground fork includes #598; the published core still depends on sconfig
+  2.0.0, so the refusal stands until the dependency is upgraded and the pins re-checked.
 
 Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
 tree renders differently with `simplify-nested-objects = false`. Pinned over the examples in
@@ -506,8 +507,8 @@ include that reaches one of these is reported and left alone.
 ## Speed
 
 The pinned sconfig 2.0.0 dropped the exception-based loop control of 1.12.4, which cost about
-2.3 us per `break` on Scala Native. Native `format` takes about 0.8 ms for a typical file (1.12.4:
-3.6 ms) and about 0.55 s for a generated 330 KB file (1.12.4: 2.0 s; the JVM takes 0.1 s). Its
+2.3 us per `break` on Scala Native. Native `format` takes about 0.9 ms for a typical file (1.12.4:
+3.6 ms) and about 0.3 s for a generated 330 KB file (1.12.4: 2.0 s; the JVM takes 0.1 s). Its
 renderer is still the slow part on Scala.js. Current numbers: `scripts/bench.py report`.
 
 ## What depending on sconfig means for your files

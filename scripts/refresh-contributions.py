@@ -27,10 +27,10 @@ from pathlib import Path
 
 AUTHOR = "kastoestoramadus"
 
-# Latest releases when the snapshot was written; refresh by hand when either
-# repository publishes: everything merged up to these dates is "released".
+# Latest releases; refresh by hand when either repository publishes: everything merged
+# up to these dates is "released".
 RELEASES = {
-    "ekrich/sconfig": ("v2.0.0", "2026-08-24"),
+    "ekrich/sconfig": ("v2.1.0", "2026-10-12"),
     "lightbend/config": ("v1.4.9", "2026-06-03"),
 }
 
