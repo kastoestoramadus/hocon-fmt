@@ -16,7 +16,7 @@ object IncludeChecksOldFormatter {
 
   // Visible to the tests: a copy over there would drift, and a library test rendering with
   // options other than these would prove nothing about this formatter.
-  private[hoconfmt] val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
+  val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
 
   def formattingOptions(options: FormatOptions): ConfigFormatOptions =
     ConfigFormatOptions.defaults
@@ -30,7 +30,7 @@ object IncludeChecksOldFormatter {
       // cannot change the output — sconfig#566 once removed FormattingOptions from under its users.
       .setNewLineAtEnd(true)
 
-  private[hoconfmt] def renderOptions(options: FormatOptions): ConfigRenderOptions =
+  def renderOptions(options: FormatOptions): ConfigRenderOptions =
     ConfigRenderOptions.defaults
       .setJson(false)
       .setOriginComments(false)
@@ -41,7 +41,7 @@ object IncludeChecksOldFormatter {
       .setShowEnvVariableValues(true)
       .setConfigFormatOptions(formattingOptions(options))
 
-  private[hoconfmt] def renderOptions: ConfigRenderOptions = renderOptions(FormatOptions.default)
+  def renderOptions: ConfigRenderOptions = renderOptions(FormatOptions.default)
 
   /** Formatted text, or why the input was left alone. */
   def format(source: String): Either[Refusal, String] =
@@ -63,7 +63,7 @@ object IncludeChecksOldFormatter {
 
   // sconfig's parser and renderer still recurse. Input beyond their capacity is unreadable
   // here; NonFatal (and Try) deliberately excludes this recoverable traversal failure.
-  private[hoconfmt] def stackCapacityRefusal: Refusal =
+  def stackCapacityRefusal: Refusal =
     Refusal.NotHocon("input nesting exceeds available stack capacity")
 
   def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] =
