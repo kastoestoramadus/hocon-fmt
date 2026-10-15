@@ -176,27 +176,29 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // refusal once the budget is in force; on a regression this fails by TimeoutException instead
   // of hanging the suite. Scala.js's own parse ceiling refuses the shape first, so only a
   // non-empty reason is asserted, not who refused.
-  test("the dense duplicate-report shape answers within the time bound") {
+  property("the dense duplicate-report shape answers within the time bound") {
     def dense(leaves: Int): String = {
       val chain = (1 to 120).map(i => s"k$i").mkString(".")
       val leaf  = (i: Int) => (1 to 120).map(j => s"l${i}k$j").mkString(".")
       (chain + " {\n") * 2 + (1 to leaves).map(i => leaf(i) + " = 1\n").mkString + "}\n" * 2
     }
-    val source                               = dense(200)
-    def bound[R](name: String)(run: => R): R = {
-      val start  = System.nanoTime()
-      val result = TimeoutGuard.within(pathTimeBoundMs)(run)
-      val millis = (System.nanoTime() - start) / 1e6
-      assert(millis < pathTimeBoundMs, s"the dense shape: $name took $millis ms")
-      result
-    }
-    bound("duplicate report")(DuplicateReport.findings(source)).fold(
-      refusal => assert(refusal.reason.nonEmpty),
-      _ => ()
-    )
-    bound("verdict")(Verdict.of(source)) match {
-      case Verdict.Refused(refusal) => assert(refusal.reason.nonEmpty)
-      case _                        => ()
+    forAll(Gen.choose(200, 400)) { leaves =>
+      val source                               = dense(leaves)
+      def bound[R](name: String)(run: => R): R = {
+        val start  = System.nanoTime()
+        val result = TimeoutGuard.within(pathTimeBoundMs)(run)
+        val millis = (System.nanoTime() - start) / 1e6
+        assert(millis < pathTimeBoundMs, s"the dense shape: $name took $millis ms")
+        result
+      }
+      bound("duplicate report")(DuplicateReport.findings(source)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+      bound("verdict")(Verdict.of(source)) match {
+        case Verdict.Refused(refusal) => assert(refusal.reason.nonEmpty)
+        case _                        => ()
+      }
     }
   }
 

@@ -20,6 +20,23 @@ class PathWorkBudgetSpec extends munit.FunSuite {
 
   val bound = 10.seconds
 
+  def collisionKey(index: Int): String =
+    (0 until 15).map(bit => if ((index & (1 << bit)) == 0) "Aa" else "BB").mkString
+
+  test("distinct short paths with identical hashes answer within the time bound") {
+    val source = (0 until 32768).map(i => collisionKey(i) + "=1\n").mkString
+    assertEquals(collisionKey(0).hashCode, collisionKey(32767).hashCode)
+    assertEquals(HoconText.checkNesting(source), Right(()))
+    assertEquals(TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source)), Right(Nil))
+  }
+
+  test("equal-hash warnings sharing a line answer within the time bound in source order") {
+    val source = (0 until 32768).map(i => collisionKey(i) + "=1," + collisionKey(i) + "=2").mkString(",")
+    assertEquals(HoconText.checkNesting(source), Right(()))
+    val expected = (0 until 32768).map(i => Finding.KeyDefinedAgain(KeyPath.of(collisionKey(i)), 1, 1)).toList
+    assertEquals(TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source)), Right(expected))
+  }
+
   test("many definitions of the same short path answer within the time bound") {
     val source = "x = 1\n" * 30000
     val result = TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source))
