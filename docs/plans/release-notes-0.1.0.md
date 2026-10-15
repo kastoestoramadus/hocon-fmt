@@ -32,7 +32,8 @@ it the same way.
 ## Refusing rather than corrupting
 
 A file the formatter will not format is **refused**: reported with the reason, left byte for byte
-untouched, and it does not fail the run. A `.conf` file that is not HOCON at all, a file that is
+untouched, and it does not fail the run by default (see fail-on-refusal). A `.conf` file that is not
+HOCON at all, a file that is
 not UTF-8, a `.json` file, a file whose formatting would lose a comment or an include, and the
 sconfig defects listed in [limitations](../limitations.md) all end that way. The name is the one
 the file is known by: a symlink is followed first, so a `.json` alias of a `.conf` target is
