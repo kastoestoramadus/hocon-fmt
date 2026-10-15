@@ -380,6 +380,16 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // The file loop's concurrency is a per-platform choice; whatever it is, the run's output and
+  // outcomes stay in the order the files were given.
+  tmp.test("outcomes come back in the order the files were given, whatever the loop's concurrency") { dir =>
+    for {
+      files     <- List("z.conf", "a.conf", "m.conf").traverse(name => write(dir, name, unformatted))
+      realPaths <- files.traverse(Files[IO].realPath)
+      run       <- check(files*)
+    } yield assertEquals(run.outcomes.map(_.path), realPaths.map(_.toString))
+  }
+
   tmp.test("write mode rewrites the file") { dir =>
     for {
       file <- write(dir, "a.conf", unformatted)
