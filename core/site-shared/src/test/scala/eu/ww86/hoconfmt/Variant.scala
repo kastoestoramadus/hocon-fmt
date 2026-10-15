@@ -35,6 +35,12 @@ object Variant {
     "mustRefuse: += field separator, nested"                                             -> fork,
     "mustRefuse: self-referential substitution"                                          -> fork,
     "mustRefuse: array self-concatenation"                                               -> fork,
+    "mustRefuse: nested self-reference"                                                  -> fork,
+    "mustRefuse: env override in an object"                                              -> fork,
+    "unstableMerge: self-referential substitution with a sibling field"                  -> fork,
+    "unstableMerge: += field separator with a sibling field"                             -> fork,
+    "unstableMerge: env override with a sibling field"                                   -> fork,
+    "unstableMerge: env override in an object with a sibling field"                      -> fork,
     "specSelfReference: substitution cycle (Examples of Self-Referential Substitutions)" -> fork
   )
 

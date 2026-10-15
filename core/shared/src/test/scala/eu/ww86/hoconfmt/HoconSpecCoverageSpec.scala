@@ -29,6 +29,8 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "+= field separator"            -> "a : [1]\na += 2",
     "+= field separator, nested"    -> "o { a : [1]\na += 2 }",
     "self-referential substitution" -> "a : 1\na : ${a}",
+    "nested self-reference"         -> "foo : { a : 1 }\nfoo : ${foo.a}",
+    "env override in an object"     -> "o {\n  host = localhost\n  host = ${?HOST}\n}",
     // From the specification's "Array and object concatenation" examples.
     "array self-concatenation" -> "a : [ 1, 2 ]\na : ${a} [ 3, 4 ]"
   )
@@ -43,14 +45,45 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
-  // Taken verbatim from the HOCON specification. The cycle renders as an unresolved-merge
-  // banner: it parses, so the output check passes, but a second pass changes it again.
+  // Taken verbatim from the HOCON specification's self-referential example. Both keys are
+  // defined first, and the cycle written over those definitions is an unresolved merge: it
+  // renders as a banner that parses but changes again on the next pass. A cycle between bare
+  // names, with no definition beside it, is a different shape — formatting settles it, and the
+  // test below pins that, so the docs name this input where the refusal is described.
   def specSelfReference = Map(
     "substitution cycle (Examples of Self-Referential Substitutions)" ->
       "a : 1\nb : 2\na : ${b}\nb : ${a}"
   )
 
   specSelfReference.filterNot((name, _) => Variant.differs(s"specSelfReference: $name")).foreach { case (name, raw) =>
+    test(s"formatter: refuses output that is not a fixed point: $name") {
+      assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
+      assertEquals(refusalOf(raw), Refusal.UnstableOutput, s"$name: refused for the wrong reason")
+    }
+  }
+
+  // The pure cycle is no refusal at all: `a : ${b}` with `b : ${a}` formats to a fixed point,
+  // and resolution fails with the same cycle complaint on the input and the output, so nothing
+  // is hidden. docs/limitations.md carries this shape next to the two merge refusals above.
+  test("formatter: formats a pure substitution cycle to a fixed point") {
+    val out = formatted("a : ${b}\nb : ${a}")
+    assertEquals(out, "a = ${b}\nb = ${a}\n")
+    assertEquals(formatted(out), out, "the second pass must keep the output")
+  }
+
+  // The same defects with one ordinary field written after the merge: the banner sconfig then
+  // renders parses again, so the output check passes and the second-pass check refuses instead.
+  // Which refusal a merge earns is a fact about the shape, not the defect; docs/limitations.md
+  // lists both verdicts with these inputs. The fork's base settles these merges, hence the
+  // ledger.
+  def mustRefuseUnstable = Map(
+    "self-referential substitution with a sibling field" -> "a : 1\na : ${a}\nname = app",
+    "+= field separator with a sibling field"            -> "a : [1]\na += 2\nname = app",
+    "env override with a sibling field"                  -> "host = localhost\nhost = ${?HOST}\nname = app",
+    "env override in an object with a sibling field"     -> "http {\n  host = \"127.0.0.1\"\n  host = ${?HOST}\n  port = 80\n}"
+  )
+
+  mustRefuseUnstable.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach { case (name, raw) =>
     test(s"formatter: refuses output that is not a fixed point: $name") {
       assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
       assertEquals(refusalOf(raw), Refusal.UnstableOutput, s"$name: refused for the wrong reason")
