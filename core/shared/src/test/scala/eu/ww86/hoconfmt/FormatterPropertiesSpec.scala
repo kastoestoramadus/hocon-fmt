@@ -53,6 +53,18 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  property("include indexes preserve exact verdicts in every option combination") {
+    forAll(Gen.oneOf(documents(includes = true), documentsWithConcatenations)) { doc =>
+      allOptions.foreach { options =>
+        assertEquals(
+          HoconFormatter.format(doc.text, options),
+          IncludeChecksOldFormatter.format(doc.text, options),
+          doc.text
+        )
+      }
+    }
+  }
+
   property("nested include-bearing inputs always yield a verdict with a reason on refusal") {
     forAll(Gen.choose(1, 160)) { depth =>
       val source = "include \"missing.conf\"\n" + "a {" * depth + "x=1" + "}" * depth
