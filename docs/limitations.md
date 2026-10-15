@@ -507,15 +507,23 @@ include that reaches one of these is reported and left alone.
 ## Sequential file examination on Scala Native
 
 The Native CLI examines its selected files one at a time, in the order they were given; the JVM
-and Node CLIs examine them concurrently. The reason is a Scala Native 0.5.12 collector defect:
-when several fibres allocate on the heap at the same time, the collector can corrupt it, and the
-process dies with an unhandled signal 11 — a standalone cats-effect program with none of
-hocon-fmt's code reproduces this. On the 1,000-file `--check` measurement of 2026-10-15, 1 of 100
-runs of the parallel build crashed and 0 of 100 runs of the sequential build did. Examining one
-file at a time costs about 2x wall time on that corpus (median 1.15 s versus 0.55 s). The binary
-also starts with the compiled 512m initial heap, the earlier mitigation for the same defect. Both
-hold until upstream fixes the collector; the measurements and the minimal reproduction are
-recorded outside this repository, in the analysis workspace (`work/codex-jobs/i5/report.md`,
+and Node CLIs examine them concurrently. The trigger is established: with concurrent fibres on the
+runtime's worker threads (`parTraverse`), the Scala Native 0.5.12 binary sometimes dies with an
+unhandled signal 11. A standalone cats-effect program with none of hocon-fmt's code crashes too.
+The root cause is not established, and nothing about it has been confirmed upstream.
+
+Measured on `--check` only, on one WSL2 machine:
+
+- Parallel build: 12 of 300 runs crashed in the bisect, and 1 of 100 in each of two reruns.
+- Sequential build: 0 abnormal exits in about 800 runs.
+- Median wall time 554 ms parallel versus 1154 ms sequential, about 2x.
+
+Zero in about 800 runs shows that the rate dropped sharply, not that the fault is gone. Other
+machines, operating systems, write mode and `--report` were not measured. The binary also keeps
+the compiled 512m initial heap, an earlier mitigation that stays in place.
+
+The measurements and the minimal reproduction are not part of this repository. The maintainer
+keeps them in the analysis workspace outside it (`work/codex-jobs/i5/report.md`,
 `work/codex-jobs/j1/report.md`).
 
 ## Speed
