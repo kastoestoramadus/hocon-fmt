@@ -504,6 +504,20 @@ include that reaches one of these is reported and left alone.
   window matters to you, open an issue: we would gladly hear of a better solution.
   [Usage](usage.md) has the full write contract.
 
+## Sequential file examination on Scala Native
+
+The Native CLI examines its selected files one at a time, in the order they were given; the JVM
+and Node CLIs examine them concurrently. The reason is a Scala Native 0.5.12 collector defect:
+when several fibres allocate on the heap at the same time, the collector can corrupt it, and the
+process dies with an unhandled signal 11 — a standalone cats-effect program with none of
+hocon-fmt's code reproduces this. On the 1,000-file `--check` measurement of 2026-10-15, 1 of 100
+runs of the parallel build crashed and 0 of 100 runs of the sequential build did. Examining one
+file at a time costs about 2x wall time on that corpus (median 1.15 s versus 0.55 s). The binary
+also starts with the compiled 512m initial heap, the earlier mitigation for the same defect. Both
+hold until upstream fixes the collector; the measurements and the minimal reproduction are
+recorded outside this repository, in the analysis workspace (`work/codex-jobs/i5/report.md`,
+`work/codex-jobs/j1/report.md`).
+
 ## Speed
 
 The pinned sconfig 2.0.0 dropped the exception-based loop control of 1.12.4, which cost about
