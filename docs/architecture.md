@@ -285,9 +285,12 @@ releases the option.
 
 ## Platforms
 
-The shipped Scala Native CLI starts with a 512m heap to mitigate intermittent collector crashes;
-[the improvement log](improvement-log/2026-10-13-native-initial-heap.md) records the remaining defect
-and the checks to repeat on upgrades.
+The shipped Scala Native CLI keeps the compiled 512m initial heap, an earlier mitigation that stays in
+place for intermittent crashes: the trigger is established (concurrent fibres on the runtime's worker
+threads; a standalone cats-effect program crashes too), the root cause is not, and the CLI now examines
+its files sequentially — [limitations](limitations.md#sequential-file-examination-on-scala-native) has
+the state of it. [The improvement log](improvement-log/2026-10-13-native-initial-heap.md) records what
+was measured then and the checks to repeat on upgrades.
 
 - **Regular expressions** must work on three engines. Scala Native runs `java.util.regex` on RE2:
   no lookaround, backreferences, possessive quantifiers or `\G` `\R` `\Z`. Scala.js translates to
