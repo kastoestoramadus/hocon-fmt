@@ -31,6 +31,11 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "self-referential substitution" -> "a : 1\na : ${a}",
     "nested self-reference"         -> "foo : { a : 1 }\nfoo : ${foo.a}",
     "env override in an object"     -> "o {\n  host = localhost\n  host = ${?HOST}\n}",
+    // The documented shapes, each complete: the definitions the quoted snippet depends on are included.
+    "array concatenation with a substitution"  -> "path = [ /bin ]\npath = ${path} [ /usr/bin ]",
+    "string concatenation with a substitution" -> "path : \"/bin\"\npath : ${path}\":d\"",
+    "object concatenation with a substitution" -> "g { x = 1 }\ne = ${g} { name = \"east\" }",
+    "env override alone at the root"           -> "host = localhost\nhost = ${?HOST}",
     // A sibling after the enclosing object does not flip these: the banner still does not parse.
     "env override in an object with a sibling after the object" ->
       "o {\n  host = localhost\n  host = ${?HOST}\n}\nname = x",
@@ -88,7 +93,9 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "env override in an object with a sibling field"     -> "http {\n  host = \"127.0.0.1\"\n  host = ${?HOST}\n  port = 80\n}",
     // A field before the merge flips the verdict too, and so does a leading comment.
     "self-referential substitution with a field before"    -> "b : 2\na : 1\na : ${a}",
-    "self-referential substitution with a leading comment" -> "# c\na : 1\na : ${a}"
+    "self-referential substitution with a leading comment" -> "# c\na : 1\na : ${a}",
+    "env override with a field before"                     -> "z = 1\nhost = localhost\nhost = ${?HOST}",
+    "env override with a leading comment"                  -> "# c\nhost = localhost\nhost = ${?HOST}"
   )
 
   mustRefuseUnstable.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach { case (name, raw) =>

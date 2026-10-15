@@ -73,9 +73,9 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("the comment cases of the ledger now format") {
-    // 27 rows named the comment and render cases the fork keeps; six more name the substitution
+    // 27 rows named the comment and render cases the fork keeps; the rest name the substitution
     // merges it settles, added with their pins in HoconSpecCoverageSpec.
-    assertEquals(Variant.ledger.size, 38)
+    assertEquals(Variant.ledger.size, 44)
     List("catalogue/detached-header-comment", "catalogue/trailing-comment-in-object").foreach { id =>
       Verdict.of(example(id).input) match {
         case Verdict.Refused(refusal) => fail(s"$id: ${refusal.reason}")
