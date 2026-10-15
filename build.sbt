@@ -392,7 +392,8 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "jvm-js" / "src" / "main" / "scala"
   )
   .platformsSettings(NativePlatform)(
-    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "native" / "src" / "main" / "scala"
+    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "native" / "src" / "main" / "scala",
+    Test / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "native" / "src" / "test" / "scala"
   )
   .jvmSettings(
     announceRuntime("cli on the JVM"),
