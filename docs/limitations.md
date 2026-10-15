@@ -179,14 +179,16 @@ and seven repository fixtures were unreadable and retain that result too.
 The budget alone would still allow slow repeated short keys: 30,000 definitions of `x = 1`
 cost only 30,000 units but took 10.06 s in the old report. The report now walks definitions
 backwards and indexes the nearest later replacement at each path, preserving the findings and
-their source order without pairing every twin. A differential property compares it with the
+their source order without pairing every twin. Both its index and warning-suppression set use structural ordering,
+so equal-hash key names cannot make those operations quadratic: 32,768 colliding keys take
+about 0.17 s, or under 0.4 s when every key produces a warning on one line. A differential property compares it with the
 original algorithm on 1,000 generated documents per platform.
 
-Measured on Linux/WSL2, JVM Java 25, on 2026-10-15: a search of 130 accepted shapes at or near the
-budget found its slowest warm report at 1.14 s for 300,000 distinct root fields (3.49 MB). A
-separate eight-round run measured 0.70–1.04 s warm and 2.30 s cold; the JVM CLI took 4.61–7.67 s
-end to end, including formatting and startup. The Scala Native 0.5.12 CLI took 13.76–16.09 s on
-the same file, with peak RSS 5.68 GiB, under an 8 GiB/no-swap scope. These are measurements, not a wall-clock deadline:
+Measured on Linux/WSL2, JVM Java 25, on 2026-10-15: a search of 133 accepted shapes at or near the
+budget found its slowest warm report at 1.31 s for 300,000 distinct root fields (3.49 MB). A
+separate eight-round run measured 0.89–1.34 s warm and 2.11 s cold; the JVM CLI took 4.60–4.70 s
+end to end, including formatting and startup. The Scala Native 0.5.12 CLI took 13.22–13.68 s on
+the same file, with peak RSS 5.70 GiB, under an 8 GiB/no-swap scope. These are measurements, not a wall-clock deadline:
 reading, parsing and rendering still depend on input bytes, including key/value lengths and
 comments. The scan is lexical and conservative, not a syntax validator. Scala.js still has its
 library's 33-segment parse limitation (see below).

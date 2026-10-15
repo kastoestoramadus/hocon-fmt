@@ -9,14 +9,15 @@ including their existing unreadable fixtures.
 
 A budget alone did not bound repeated short paths: 30,000 copies of `x = 1` cost 30,000 units
 but took 10.06 s. A reverse index now keeps the nearest eligible later replacement instead of
-enumerating every twin. The original algorithm remains a test oracle, compared on 1,000
+enumerating every twin. Ordered maps and an ordered warning-suppression set also bound equal-hash
+key lookup: 32,768 distinct colliding keys take about 0.17 s; 32,768 same-line warnings under 0.4 s. The original algorithm remains a test oracle, compared on 1,000
 generated sources per platform; deliberately removing object-valued replacements makes it fail.
 
 **Look at again before a release:** Re-measure before changing the limit. The 30-shape historical
 fit favoured squares over cubes (R² .99258 vs .98200), but it does not predict overhead for many
-short fields. A fresh 130-shape search reached 1.14 s warm JVM report time at 300,000 distinct
-root fields (3.49 MB); a separate run measured 2.30 s cold and 0.70–1.04 s warm. JVM CLI time was
-4.61–7.67 s, Native CLI 13.76–16.09 s under 8 GiB/no-swap, peaking at 5.68 GiB RSS. These include
+short fields. A fresh 133-shape search reached 1.31 s warm JVM report time at 300,000 distinct
+root fields (3.49 MB); a separate run measured 2.11 s cold and 0.89–1.34 s warm. JVM CLI time was
+4.60–4.70 s, Native CLI 13.22–13.68 s under 8 GiB/no-swap, peaking at 5.70 GiB RSS. These include
 formatting and startup, not just the report. Input byte length remains relevant. A single
 96-segment dotted path passes the budget; 97 segments do not. The Scala refusal's payload is now
 the reason string rather than an integer limit; external refusal kinds stay the same.

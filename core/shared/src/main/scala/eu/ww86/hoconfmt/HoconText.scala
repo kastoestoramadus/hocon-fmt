@@ -29,7 +29,7 @@ private[hoconfmt] object HoconText {
   // unbounded (160 KB spent 12-13 seconds in the report).
   val MaxFlattenedPathSegments = 360
 
-  // Prefix creation and hashing cost the report the sum of squared definition lengths. The
+  // Prefix creation and comparison cost the report the sum of squared definition lengths. The
   // 30 measured dense shapes fit this proxy better than cubes (R² .993 vs .982). Ten times
   // the corpus maximum of 26,725, rounded up; see limitations.md for the calibration and times.
   val MaxPathWork = 300000L
@@ -67,7 +67,7 @@ private[hoconfmt] object HoconText {
     // stands before (an include stands before no separator and defines nothing, so it counts
     // nothing). The work of one statement is the sum of the squared flattened lengths of the
     // definitions it writes, in closed form, and the running total is refused past the budget:
-    // the report builds and hashes every prefix of every definition's path. Its reverse index
+    // the report builds and compares every prefix of every definition's path. Its reverse index
     // avoids multiplying that work by the number of definitions sharing a path.
     @tailrec
     def scan(
@@ -263,7 +263,7 @@ private[hoconfmt] object HoconText {
 
   /** The work of one statement: `w` written segments at enclosing length `e` define paths of
     * `e+1` .. `e+w` segments (every prefix is a definition the dotted spelling leaves behind),
-    * and the report builds and hashes every prefix of each definition's path, so its cost is
+    * and the report builds and compares every prefix of each definition's path, so its cost is
     * the sum of the squared lengths. Closed form, `Long` where a `Long` is needed: a statement
     * under the other limits contributes at most ~21 million, and the total is refused long
     * before it could overflow.
