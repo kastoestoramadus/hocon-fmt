@@ -61,12 +61,12 @@ the shapes while the merge stands alone, and a field beside the merge or a leadi
 
 - **`+=` field separator**: `a : [1]` then `a += 2`
 - **Self-referential substitution**: `a : 1` then `a : ${a}`
-- **Array concatenation with a substitution**: `path = ${path} [ /usr/bin ]`
-- **String concatenation with a substitution**: `path : ${path}":d"`
-- **Nested self-reference**: `foo : ${foo.a}`
-- **Object concatenation with a substitution**: `e = ${g} { name = "east" }`, the ordinary
-  config-inheritance idiom, which sconfig renders as `e = ${g}name = east`. The one worth reporting
-  upstream first: short, obviously wrong, and common.
+- **Array concatenation with a substitution**: `path = [ /bin ]` then `path = ${path} [ /usr/bin ]`
+- **String concatenation with a substitution**: `path : "/bin"` then `path : ${path}":d"`
+- **Nested self-reference**: `foo : { a : 1 }` then `foo : ${foo.a}`
+- **Object concatenation with a substitution**: `g { x = 1 }` then `e = ${g} { name = "east" }`,
+  the ordinary config-inheritance idiom. The one worth reporting upstream first: short, obviously
+  wrong, and common.
 - **A one-field object inside an array that does not fit on one line** loses its braces: holding
   a substitution, `a : [ { b : ${?X} } ]` renders as `a = [ b = ${?X} ]`; so does one whose field is
   an object and that holds a comment. Two fields, or a field that fits on one line, keep them.
@@ -360,20 +360,21 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
 - **A merge a definition leaves behind**: `a : 1` then `a : ${a}`, or `a : [1]` then `a += 2`,
-  renders as an unresolved-merge banner that parses but changes again on the next pass. A syntax
-  check alone misses this. The BrokenOutput list names these same inputs while the merge stands
-  alone — there, the banner does not parse again. A field before the merge, a field after it at the
-  root, or a leading comment flips the verdict to this one; see the paragraph below for the shapes
-  measured.
+  can render as an unresolved-merge banner that parses but changes again on the next pass
+  (`Refusal.UnstableOutput`). A syntax check alone misses this. For the self-reference, a field
+  before the merge (`b : 2` above `a : 1`), a field after it at the root (`name = app`), or a
+  leading comment (`# c`) gives this verdict; the BrokenOutput list names the merge-alone shape, and
+  the paragraph below gives the measured examples.
 - **A cycle written over definitions**: the specification's self-referential example, `a : 1`,
   `b : 2`, `a : ${b}`, `b : ${a}`, renders the same banner. A cycle between bare names, with no
   other definition of either key, does not refuse at all: `a : ${b}` with `b : ${a}` formats to
   the fixed point `a = ${b}`, `b = ${a}`, the second pass changes nothing, and resolution fails
   with the same cycle complaint on the input and the output — nothing is hidden, and there is no
   cycle detection to promise.
-- **Env override**: `host = localhost` then `host = ${?HOST}` stays an unresolved merge, rendered as
-  a banner that grows by one on every pass; with no field after it, at the file root or inside an
-  object, the banner does not even parse (`Refusal.BrokenOutput`). The most common idiom in
+- **Env override**: `host = localhost` then `host = ${?HOST}`. Alone, at the file root or inside an
+  object, it is `Refusal.BrokenOutput`: the banner does not even parse. With a field before it
+  (`z = 1` above), a leading comment (`# c` above), or a field after it at the root (`name = app`),
+  it is `Refusal.UnstableOutput`: the banner parses and changes again on the next pass. The most common idiom in
   Lightbend-style config: 357 of 1,650 real files from GitHub are refused for it. The fixed-point
   fix is [ekrich/sconfig#598](https://github.com/ekrich/sconfig/pull/598), merged 2026-09-30, and
   sconfig v2.1.0 (2026-10-12) carries it. The render-option follow-up
@@ -391,8 +392,9 @@ the shape of the file around it, not only on the defect. Four measured inputs, w
 - an object `o` holding `a = 1` then `a = ${a}`, followed by `name = x` after the object:
   `Refusal.BrokenOutput`; a sibling after the enclosing object does not flip it
 
-The object concatenation (`e = ${g} { name = "east" }`) and the nested self-reference
-(`foo : ${foo.a}` with a trailing field) stay `Refusal.BrokenOutput` in the shapes measured. These
+The object concatenation (`g { x = 1 }` then `e = ${g} { name = "east" }`) and the nested
+self-reference (`foo : { a : 1 }` then `foo : ${foo.a}`, with `name = app` after them) stay
+`Refusal.BrokenOutput` in the shapes measured. These
 examples are not a rule for every shape: the kind is pinned input by input in `HoconSpecCoverageSpec`.
 
 Which refusal a defect gets, or whether it is refused at all, can depend on the options: the same
