@@ -9,13 +9,24 @@ class NestingDepthSpec extends munit.FunSuite {
   val pathLimit  = 120
   val pathReason = s"input dotted key paths exceed the maximum of $pathLimit segments"
 
+  // The budget reaches single statements first: S(96) = 299,536 is the longest dotted path it
+  // accepts, S(97) is over it, and the written cap above only has the say from 121 segments on.
+  val budgetBoundarySegments = 96
+
   // The flattened path — the segments of every enclosing object plus the written ones — is what
   // the duplicate report's cost follows, so nesting re-creates from short lines what the
-  // written-line limit above caps (a 20-level chain of 120-segment paths spent 34 seconds in the
-  // report). The scan counts it: a `{` adds the key path just written to what every definition
-  // inside inherits, and a `}` takes it back out. Pinned in the section at the bottom.
-  val flatLimit  = 360
-  val flatReason = s"input dotted key paths exceed the maximum of $flatLimit segments"
+  // written-line limit above caps (a 20-level chain of 120-segment paths spent 34 seconds in
+  // the report). The scan counts it: a `{` adds the key path just written to what every
+  // definition inside inherits, a `[` costs one segment for the element its definitions sit in
+  // (the report walks `k[0].f`), and a `}` takes it back out. The 360-segment flattened limit
+  // stays alongside the work budget. Object-only chains cost S(F) to reach flattened length F;
+  // array indices extend the path without defining keys of their own.
+
+  // The total the duplicate report may spend: the sum over the file's definitions of the square
+  // of their flattened path length, refused past the budget. The dense shapes that pinned the
+  // calibration live in PathWorkBudgetSpec; the tests here re-pin their boundaries to it.
+  def workReason =
+    s"the key paths' total squared length exceeds the duplicate report's budget of ${HoconText.MaxPathWork}"
 
   def dotted(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
 
@@ -35,13 +46,17 @@ class NestingDepthSpec extends munit.FunSuite {
   def objects(depth: Int, include: Boolean): String =
     "a {" * depth + (if (include) "include \"missing.conf\"\nx=1" else "x=1") + "}" * depth
 
+  def explicitObjects(depth: Int, body: String): String =
+    // A sibling every third level keeps JS's dotted paths short without doubling S(depth)
+    // past the total-work budget at 79/80 levels.
+    (1 to depth).map(i => "a {" + (if (i % 3 == 0) "s=0\n" else "")).mkString + body + "}" * depth
+
   for {
     include <- List(false, true)
     depth   <- List(limit - 1, limit)
   } {
     test(s"$depth nested objects format with include=$include") {
-      // Two fields keep parents explicit, avoiding sconfig's JS long-dotted-path refusal.
-      val source    = objects(depth, include).replace("a {", "a { sibling=0, ")
+      val source    = explicitObjects(depth, if (include) "include \"missing.conf\"\nx=1" else "x=1")
       val formatted = HoconFormatter.format(source)
       assert(formatted.isRight, formatted.toString)
     }
@@ -95,8 +110,7 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   def withSubstitution(depth: Int, field: String): String =
-    // A sibling per level keeps parents explicit, avoiding sconfig's JS long-dotted-path refusal.
-    "a { s=0\n" * depth + "x=1\n" + field + "\n" + "}" * depth
+    explicitObjects(depth, "x=1\n" + field + "\n")
 
   for ((name, field) <- substitutions) {
     test(s"a $name substitution is not nesting: $limit levels format, one more refuses") {
@@ -119,7 +133,7 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   test("a substitution with a substitution-like brace inside a string or comment is still skipped") {
-    val source = "a { s=0\n" * limit + "x=\"${\"\ny=${z} # ${\n" + "}" * limit
+    val source = explicitObjects(limit, "x=\"${\"\ny=${z} # ${\n")
     assert(HoconFormatter.format(source).isRight)
   }
 
@@ -134,16 +148,18 @@ class NestingDepthSpec extends munit.FunSuite {
 
   // --- Long dotted key paths ------------------------------------------------------
 
-  test("a dotted path one under the limit formats, with and without an include") {
+  test("a dotted path at the budget boundary formats, with and without an include") {
     assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
     List(false, true).foreach { include =>
-      val source = (if (include) "include \"missing.conf\"\n" else "") + dotted(pathLimit - 1)
+      val source = (if (include) "include \"missing.conf\"\n" else "") + dotted(budgetBoundarySegments)
       assert(HoconFormatter.format(source).isRight, source.take(80))
     }
   }
 
-  for (include <- List(false, true)) {
-    test(s"a dotted path one over the limit refuses with include=$include") {
+  test("a dotted path at the written limit is refused by the work budget, one over by the written cap") {
+    assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
+    assertEquals(HoconFormatter.format(dotted(pathLimit)).left.map(_.reason), Left(workReason))
+    List(false, true).foreach { include =>
       val source = (if (include) "include \"missing.conf\"\n" else "") + dotted(pathLimit + 1)
       HoconFormatter.format(source) match {
         case Left(refusal) => assertEquals(refusal.reason, pathReason)
@@ -160,10 +176,10 @@ class NestingDepthSpec extends munit.FunSuite {
     assertEquals(DuplicateReport.findings(dotted(pathLimit + 1)).left.map(_.reason), Left(pathReason))
   }
 
-  test("whitespace around the dots still counts segments: at the limit formats, one more refuses") {
+  test("whitespace around the dots still counts segments: under the budget formats, past the written cap refuses") {
     assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
     def spaced(segments: Int): String = List.fill(segments)("a").mkString(" . ") + " = 1\n"
-    assert(HoconFormatter.format(spaced(pathLimit)).isRight)
+    assert(HoconFormatter.format(spaced(budgetBoundarySegments)).isRight)
     assertEquals(HoconFormatter.format(spaced(pathLimit + 1)).left.map(_.reason), Left(pathReason))
   }
 
@@ -211,34 +227,36 @@ class NestingDepthSpec extends munit.FunSuite {
       + (if (leafSegments == 0) "leaf = 1\n" else leafPath(leafSegments) + " = 1\n")
       + "}\n" * levels
 
-  test("a chain at the flattened limit formats, one segment more refuses") {
-    assert(HoconFormatter.format(chain(11, 30, 30)).isRight) // 11*30 + 30 = 360
+  test("a chain at the flattened limit and one segment past it are refused by the work budget") {
+    // The budget fires first on both sides of the flattened boundary (S(360) of work is 52
+    // times the budget), so the flattened limit has no testable refusal of its own left.
+    assertEquals(HoconFormatter.format(chain(11, 30, 30)).left.map(_.reason), Left(workReason)) // 11*30 + 30 = 360
     assertEquals(
       HoconFormatter.format(chain(12, 30, 0)).left.map(_.reason), // 12*30 + 1 = 361
-      Left(flatReason)
+      Left(workReason)
     )
     Verdict.of(chain(12, 30, 0)) match {
-      case Verdict.Refused(refusal) => assertEquals(refusal.reason, flatReason)
+      case Verdict.Refused(refusal) => assertEquals(refusal.reason, workReason)
       case other                    => fail(s"expected a refused verdict, got $other")
     }
   }
 
-  test("a 20-level chain of maximal written paths refuses with the flattened reason") {
-    assertEquals(HoconFormatter.format(chain(20, 120, 0)).left.map(_.reason), Left(flatReason))
+  test("a 20-level chain of maximal written paths refuses with the work-budget reason") {
+    assertEquals(HoconFormatter.format(chain(20, 120, 0)).left.map(_.reason), Left(workReason))
   }
 
-  test("six 120-segment levels, 720 flattened segments, refuse with the flattened reason") {
-    assertEquals(HoconFormatter.format(chain(6, 120, 0)).left.map(_.reason), Left(flatReason)) // 6*120 + 1 = 721
+  test("six 120-segment levels, 720 flattened segments, refuse with the work-budget reason") {
+    assertEquals(HoconFormatter.format(chain(6, 120, 0)).left.map(_.reason), Left(workReason)) // 6*120 + 1 = 721
   }
 
-  test("duplicate analysis refuses a flattened path over the limit before its document parse") {
-    assertEquals(DuplicateReport.findings(chain(12, 30, 0)).left.map(_.reason), Left(flatReason))
+  test("duplicate analysis refuses an over-budget chain before its document parse") {
+    assertEquals(DuplicateReport.findings(chain(12, 30, 0)).left.map(_.reason), Left(workReason))
   }
 
   test("the written-line limit still refuses first inside nesting") {
-    // A 121-segment line inside a 120-segment object carries both counts over their limits;
-    // the line cap names its own limit, not the flattened one.
-    val source = objectPath(120) + " {\n" + leafPath(121) + " = 1\n}\n"
+    // A 121-segment line inside a 20-segment object carries both counts over their limits; the
+    // written cap fires mid-line, before the chain's statement is spent and with it the budget.
+    val source = objectPath(20) + " {\n" + leafPath(121) + " = 1\n}\n"
     assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(pathReason))
   }
 
@@ -250,10 +268,12 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   test("siblings inherit the enclosing path once, not once per sibling") {
-    // Seven leaves inside a 316-segment chain sit at 317..323 flattened segments, still under
-    // the limit; a scan that re-added the enclosing path per sibling would refuse them.
+    // Four 19-segment levels put the seven one-segment leaves at 77 flattened segments; the
+    // file counts 190,729 and must format, while a scan that re-added the enclosing path per
+    // sibling would count 837,498 for the leaves alone and refuse it.
+    val source = (objectPath(19) + " {\n") * 4 + (1 to 7).map(i => s"leaf$i = $i\n").mkString + "}\n" * 4
+    assertEquals(HoconText.checkNesting(source), Right(()))
     assume(libraryParsesLongPaths, "Scala.js sconfig cannot parse 33-element paths yet")
-    val source = (objectPath(79) + " {\n") * 4 + (1 to 7).map(i => s"leaf$i = $i\n").mkString + "}\n" * 4
     assert(HoconFormatter.format(source).isRight)
   }
 
@@ -289,42 +309,42 @@ class NestingDepthSpec extends munit.FunSuite {
   def spellings = List("brace", "eq", "colon", "append", "blanks", "newline", "array")
 
   for (spelling <- spellings) {
-    test(s"a chain one over the flattened limit refuses in the `$spelling` spelling") {
-      val source = chainIn(spelling, 12, 30, 0) // 12*30 + 1 = 361
-      assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(flatReason))
+    test(s"a chain one over the flattened limit refuses with the budget in the `$spelling` spelling") {
+      val source = chainIn(spelling, 12, 30, 0) // 12*30 + 1 = 361 flattened, work S(360) over the budget
+      assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(workReason))
       Verdict.of(source) match {
-        case Verdict.Refused(refusal) => assertEquals(refusal.reason, flatReason)
+        case Verdict.Refused(refusal) => assertEquals(refusal.reason, workReason)
         case other                    => fail(s"expected a refused verdict, got $other")
       }
     }
   }
 
   for (spelling <- spellings) {
-    test(s"a chain at the flattened limit passes the scan in the `$spelling` spelling") {
+    test(s"a chain well inside the budget passes the scan in the `$spelling` spelling") {
       // The `+=` spelling reaches its own parser limit (nested `+=` is an sconfig limitation the
       // scan must not be blamed for), so the scan alone is asserted on every spelling.
-      assertEquals(HoconText.checkNesting(chainIn(spelling, 11, 30, 30)), Right(())) // 360
+      assertEquals(HoconText.checkNesting(chainIn(spelling, 2, 20, 20)), Right(())) // work S(60) + siblings
     }
   }
 
   for (spelling <- List("brace", "eq", "colon", "blanks", "newline", "array")) {
-    test(s"a chain at the flattened limit formats in the `$spelling` spelling") {
-      assert(HoconFormatter.format(chainIn(spelling, 11, 30, 30)).isRight)
+    test(s"a chain well inside the budget formats in the `$spelling` spelling") {
+      assert(HoconFormatter.format(chainIn(spelling, 2, 20, 20)).isRight)
     }
   }
 
   for (spelling <- List("eq", "colon", "append", "blanks", "newline", "array")) {
     test(
-      s"duplicate analysis refuses a flattened path over the limit written with `$spelling` before its document parse"
+      s"duplicate analysis refuses an over-budget chain written with `$spelling` before its document parse"
     ) {
-      assertEquals(DuplicateReport.findings(chainIn(spelling, 12, 30, 0)).left.map(_.reason), Left(flatReason))
+      assertEquals(DuplicateReport.findings(chainIn(spelling, 12, 30, 0)).left.map(_.reason), Left(workReason))
     }
   }
 
   test("a value that is not an object lends its path to no later brace") {
-    // The count dies with the statement: after `x.y.z = 1`, a `{` must push nothing, or this
-    // at-limit shape would sit at 363 flattened segments and refuse.
-    assert(HoconFormatter.format("x.y.z = 1\n" + chain(11, 30, 30)).isRight)
-    assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(11, 30, 30)).isRight)
+    // The count dies with the statement: after `x.y.z = 1`, a `{` must push nothing, or the
+    // chain's leaves would inherit three segments they do not have.
+    assert(HoconFormatter.format("x.y.z = 1\n" + chain(2, 20, 20)).isRight)
+    assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(2, 20, 20)).isRight)
   }
 }

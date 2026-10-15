@@ -297,18 +297,29 @@ object DuplicateReport {
     (1 to path.segments.size).toVector.map(length => KeyPath(path.segments.take(length)))
 
   private def report(definitions: Vector[Definition]): List[Finding] = {
-    val byPath = definitions.zipWithIndex.groupBy { case (definition, _) =>
-      (definition.arrayScope, definition.keyPath)
-    }
-    val killed = definitions.zipWithIndex.flatMap { case (earlier, at) =>
-      prefixes(earlier.keyPath)
-        .flatMap(path => byPath.getOrElse((earlier.arrayScope, path), Vector.empty))
-        .filter { case (later, next) =>
-          next > at && (if (later.keyPath == earlier.keyPath) erases(later, earlier)
-                        else !later.objectValued && !later.holdsSubstitution)
-        }
-        .minByOption(_._2)
-        .map { case (later, _) => (earlier, later) }
+    type Address = (List[Int], KeyPath)
+    type Located = (Definition, Int)
+    val empty = Map.empty[Address, Located]
+    // Only the first later eraser matters. An object can erase a scalar at the same path;
+    // otherwise only a non-object without substitutions can erase the definition. Keeping
+    // both successors avoids examining every twin (quadratic even for one-segment paths).
+    val (_, _, killed) = definitions.zipWithIndex.foldRight((empty, empty, List.empty[(Definition, Definition)])) {
+      case ((earlier, at), (anyValue, nonObject, found)) =>
+        val later = prefixes(earlier.keyPath)
+          .flatMap { path =>
+            val index =
+              if (path == earlier.keyPath && !earlier.objectValued && !earlier.holdsSubstitution) anyValue
+              else nonObject
+            index.get((earlier.arrayScope, path))
+          }
+          .minByOption(_._2)
+        val killed        = later.fold(found) { case (definition, _) => (earlier, definition) :: found }
+        val address       = (earlier.arrayScope, earlier.keyPath)
+        val anyNext       = if (earlier.holdsSubstitution) anyValue else anyValue.updated(address, (earlier, at))
+        val nonObjectNext =
+          if (earlier.holdsSubstitution || earlier.objectValued) nonObject
+          else nonObject.updated(address, (earlier, at))
+        (anyNext, nonObjectNext, killed)
     }
     // One statement can define both an object and its leaves. When the whole statement dies at
     // the same line, the ancestor warning covers it; leaves on their own lines still get theirs.
@@ -322,7 +333,6 @@ object DuplicateReport {
         }
       }
       .map { case (earlier, later) => Finding.KeyDefinedAgain(earlier.keyPath, earlier.line, later.line) }
-      .toList
   }
 
   /** The path a field writes. A quoted key is one segment however many dots it holds; the period

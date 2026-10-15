@@ -5,6 +5,8 @@ import org.scalacheck.Prop.forAll
 
 class DuplicateReportBudgetSpec extends munit.ScalaCheckSuite {
 
+  override def scalaCheckTestParameters = super.scalaCheckTestParameters.withMinSuccessfulTests(1000)
+
   // Keep the original all-candidates algorithm as an oracle for the index. Small documents
   // exercise replacement, merging, substitution, array scopes and suppression of child warnings.
   def reference(definitions: Vector[DuplicateReport.Definition]): List[Finding] = {

@@ -115,7 +115,7 @@ class PathWorkBudgetSpec extends munit.FunSuite {
   }
 
   test("array levels have an exact budget boundary") {
-    // S(8) + S(16)-S(8) + 31 * (37² + ... + 42²) = 292145.
+    // S(8) + S(16)-S(8) + 31 * (37² + ... + 42²) = 292245.
     assertEquals(HoconText.checkNesting(arrayed(arrays = 20, leaves = 31)), Right(()))
     HoconText.checkNesting(arrayed(arrays = 20, leaves = 32)) match {
       case Left(refusal) => expectBudgetRefusal(refusal, "array boundary 32")
@@ -145,7 +145,7 @@ class PathWorkBudgetSpec extends munit.FunSuite {
 
   test("legitimate shapes stay accepted: the corpus-maximum shape, 79 short levels, corpus-worst-sized files") {
     // Depth 8 with 11-segment paths — the corpus-maximum shape NestingDepthSpec pins — counts
-    // 238,965 (S(88) + 89^2), 80% of the budget. 79 levels of one-segment keys count 173,980
+    // 238,965 (S(88) + 89^2), 80% of the budget. 79 levels of one-segment keys count 173,880
     // (S(79) + 80^2). Two thousand distinct 7-segment statements at the root — the shape of the
     // corpus's worst files, which count at most 26,725 — scale to 280,000, still under.
     assert(HoconFormatter.format((objectPath(11) + " {\n") * 8 + "leaf = 1\n" + "}\n" * 8).isRight)

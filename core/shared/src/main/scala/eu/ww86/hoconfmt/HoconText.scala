@@ -19,41 +19,24 @@ private[hoconfmt] object HoconText {
   val MaxNestingDepth = 80
 
   // Ten times the longest dotted key path in the same corpus (11 segments), rounded up. The
-  // written-line half of the path bound: the duplicate report's work on a definition grows with
+  // written-line half of the path bound: the duplicate report's work on a dotted statement grows with
   // the cube of its path's segments, so a single-line `a.a.a. ... = 1` spent 24 seconds in it at
   // 2,000 segments; see limitations.md.
   val MaxPathSegments = 120
 
-  // The other half of the path bound. The report's cost follows the flattened path — the
-  // segments of every enclosing object plus the written ones (`DuplicateReport.walkField`'s
-  // `at ++ segments`) — and the written-line limit above sees one statement, so nesting
-  // re-created the length from short lines: a 20-level chain of 120-segment paths (2,401
-  // flattened segments, 16.8 KB) spent 34 seconds in the report and 36 through the command line.
-  // Three written maxima hold the worst at-limit file well under the time bound on every
-  // platform, Scala Native included (measured 2026-10-14, see limitations.md); the corpus's
-  // deepest flattened path is 12 (1,257-file subset).
+  // Nesting and array elements extend a written path in the report. Retain the individual
+  // flattened cap alongside the total-work budget; a per-path cap alone left dense files
+  // unbounded (160 KB spent 12-13 seconds in the report).
   val MaxFlattenedPathSegments = 360
 
-  // The total work the duplicate report may spend on a file's key definitions: the sum over
-  // every definition of the square of its flattened path length. The report pairs every prefix
-  // of every definition's path against the definitions (`DuplicateReport.report`), so a
-  // statement with `w` written segments at enclosing length `E` costs
-  // `(E+1)^2 + ... + (E+w)^2`, and the file's total — not its longest statement, which the two
-  // limits above cap — is what a single dense file can still grow without bound: two
-  // 120-segment chains with 200 leaves of 120 segments each (160 KB, every written line at the
-  // limits, no duplicates) spent 12.0-12.8 s in the report on the JVM at a total of ~2.2
-  // billion, and 1600 leaves spent 122 s. Measured milliseconds fit the squared work almost
-  // exactly (R^2 0.993 over a 30-shape search; 6.6 ns per unit on the JVM, measured
-  // 2026-10-15), so the budget bounds the report's time directly. Calibrated to ten times the
-  // corpus maximum: the corpus's parseable files (1,190 readable of the 1,257-file analysis
-  // subset) measure at most 26,725, so the worst real file sits at 9% of the budget. One array
-  // element level counts as one flattened segment, as the report's walk sees it; see
-  // limitations.md.
+  // Prefix creation and hashing cost the report the sum of squared definition lengths. The
+  // 30 measured dense shapes fit this proxy better than cubes (R² .993 vs .982). Ten times
+  // the corpus maximum of 26,725, rounded up; see limitations.md for the calibration and times.
   val MaxPathWork = 300000L
 
   /** Stop before the parser or include passes can spend resources on unbounded nesting, and
     * before the duplicate report can spend them on an unbounded dotted key path, written on one
-    * line or re-created by nesting.
+    * line, re-created by nesting, or summed over a file of many definitions.
     */
   def checkNesting(text: String): Either[Refusal, Unit] = {
     // A key path runs from where a field can begin — the file, `{`, `,` or a newline — to the
@@ -64,29 +47,44 @@ private[hoconfmt] object HoconText {
     // The state is three flags, the count of the path last written and still without its value
     // (`pending`), and the enclosing key paths as a stack with their running sum, over the same
     // walk the depth check does: a `{` makes the path just written the enclosing one for
-    // everything inside, a `[` adds no segments of its own but passes the pending path to the
-    // objects of its elements (the report reaches `k[0].f`), and a `}` or `]` takes the
-    // innermost back out (an unbalanced closer takes nothing out, like the depth it never
-    // opened). The separator does not spend the written path: it moves it to `pending`, and the
-    // value's spelling decides when it is used — across blanks, a newline, a comment or a
-    // substitution the value may still begin with `{` or `[` (`a.b.c =\n{ ... }` parses, and
-    // `k = ${x} { ... }` is an object concatenation), while a word or a quote is a value that is
-    // not an object and takes the count away; a `,` and a closer end the statement. A
-    // substitution is skipped whole and can stand in no key path.
+    // everything inside, a `[` passes the pending path to the
+    // objects of its elements and costs one segment for the element itself — every definition
+    // inside an array element carries one `Index` segment per enclosing array level in the
+    // report's walk (`DuplicateReport.walk`, the array case), so the flattened count here has
+    // to count them too — and a `}` or `]` takes the innermost back out (an unbalanced closer
+    // takes nothing out, like the depth it never opened). The separator does not spend the
+    // written path: it moves it to `pending`, and the value's spelling decides when it is
+    // used — across blanks, a newline, a comment or a substitution the value may still begin
+    // with `{` or `[` (`a.b.c =\n{ ... }` parses, and `k = ${x} { ... }` is an object
+    // concatenation), while a word or a quote is a value that is not an object and takes the
+    // count away; a `,` ends the statement. A closer restores the field's pending path so a
+    // later concatenation piece inherits it too. A substitution is skipped whole and can stand
+    // in no key path.
+    //
+    // Every statement that writes a path also defines it, separator or not: `a.b = { ... }` and
+    // `a.b { ... }` both leave the definitions of `a` and `a.b` behind, so the work is counted
+    // where the statement is spent — at the separator, and at the `{` or `[` a written path
+    // stands before (an include stands before no separator and defines nothing, so it counts
+    // nothing). The work of one statement is the sum of the squared flattened lengths of the
+    // definitions it writes, in closed form, and the running total is refused past the budget:
+    // the report builds and hashes every prefix of every definition's path. Its reverse index
+    // avoids multiplying that work by the number of definitions sharing a path.
     @tailrec
     def scan(
         index: Int,
         depth: Int,
         segments: Int,
         pending: Int,
-        enclosing: List[Int],
+        enclosing: List[(Int, Int)],
         flat: Int,
+        work: Long,
         atKeyStart: Boolean,
         afterDot: Boolean
     ): Either[Refusal, Unit] =
-      if (segments > MaxPathSegments) Left(Refusal.PathTooDeep(MaxPathSegments))
+      if (segments > MaxPathSegments) Left(Refusal.PathTooDeep(writtenLimitReason))
       else if (flat + segments > MaxFlattenedPathSegments)
-        Left(Refusal.PathTooDeep(MaxFlattenedPathSegments))
+        Left(Refusal.PathTooDeep(flattenedLimitReason))
+      else if (work > MaxPathWork) Left(Refusal.PathTooDeep(workBudgetReason))
       else if (index >= text.length) Right(())
       else if (text.startsWith("\"\"\"", index))
         scan(
@@ -96,6 +94,7 @@ private[hoconfmt] object HoconText {
           pending = 0,
           enclosing,
           flat,
+          work,
           atKeyStart = false,
           afterDot = false
         )
@@ -107,11 +106,12 @@ private[hoconfmt] object HoconText {
           pending = 0,
           enclosing,
           flat,
+          work,
           atKeyStart = false,
           afterDot = false
         )
       else if (text.charAt(index) == '#' || text.startsWith("//", index))
-        scan(endOfLine(text, index), depth, segments, pending, enclosing, flat, atKeyStart, afterDot)
+        scan(endOfLine(text, index), depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot)
       // `${x}` and `${?x}` open no object: a file that nests exactly to the limit may use them.
       else if (text.startsWith("${", index))
         scan(
@@ -121,6 +121,7 @@ private[hoconfmt] object HoconText {
           pending,
           enclosing,
           flat,
+          work,
           atKeyStart = false,
           afterDot = false
         )
@@ -135,8 +136,9 @@ private[hoconfmt] object HoconText {
                 depth + 1,
                 segments = 0,
                 pending = 0,
-                enclosingPath :: enclosing,
+                (enclosingPath, 0) :: enclosing,
                 flat + enclosingPath,
+                work + statementWork(flat, segments),
                 atKeyStart = true,
                 afterDot = false
               )
@@ -150,22 +152,24 @@ private[hoconfmt] object HoconText {
                 depth + 1,
                 segments = 0,
                 pending = 0,
-                enclosingPath :: enclosing,
-                flat + enclosingPath,
+                (enclosingPath, 1) :: enclosing,
+                flat + enclosingPath + 1,
+                work + statementWork(flat, segments),
                 atKeyStart = false,
                 afterDot = false
               )
             }
           case '}' | ']' =>
             enclosing match {
-              case head :: rest =>
+              case (path, element) :: rest =>
                 scan(
                   index + 1,
                   math.max(0, depth - 1),
                   segments = 0,
-                  pending = 0,
+                  pending = path,
                   rest,
-                  flat - head,
+                  flat - path - element,
+                  work,
                   atKeyStart = false,
                   afterDot = false
                 )
@@ -177,6 +181,7 @@ private[hoconfmt] object HoconText {
                   pending = 0,
                   enclosing,
                   flat,
+                  work,
                   atKeyStart = false,
                   afterDot = false
                 )
@@ -193,26 +198,58 @@ private[hoconfmt] object HoconText {
               pending = if (segments > 0) segments else pending,
               enclosing,
               flat,
+              work + statementWork(flat, segments),
               atKeyStart = false,
               afterDot = false
             )
           case ',' =>
-            scan(index + 1, depth, segments = 0, pending = 0, enclosing, flat, atKeyStart = true, afterDot = false)
+            scan(
+              index + 1,
+              depth,
+              segments = 0,
+              pending = 0,
+              enclosing,
+              flat,
+              work,
+              atKeyStart = true,
+              afterDot = false
+            )
           case '\n' =>
-            scan(index + 1, depth, segments = 0, pending, enclosing, flat, atKeyStart = true, afterDot = false)
+            scan(index + 1, depth, segments = 0, pending, enclosing, flat, work, atKeyStart = true, afterDot = false)
           // A dot ends an element; the next piece or word begins one. A leading dot belongs to
           // no path and changes nothing.
           case '.' =>
-            scan(index + 1, depth, segments, pending, enclosing, flat, atKeyStart = false, afterDot = segments > 0)
+            scan(
+              index + 1,
+              depth,
+              segments,
+              pending,
+              enclosing,
+              flat,
+              work,
+              atKeyStart = false,
+              afterDot = segments > 0
+            )
           // Whitespace keeps the run: `a . b` and `a b` are one path expression either way.
           case ' ' | '\t' | '\r' | '\u000C' =>
-            scan(index + 1, depth, segments, pending, enclosing, flat, atKeyStart, afterDot)
+            scan(index + 1, depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot)
           case _ =>
             // A word is a key, which takes the count of the path it begins, or the start of a
             // value that is not an object, which takes the pending count away.
             if (atKeyStart || afterDot)
-              scan(index + 1, depth, segments + 1, pending = 0, enclosing, flat, atKeyStart = false, afterDot = false)
-            else scan(index + 1, depth, segments, pending = 0, enclosing, flat, atKeyStart = false, afterDot = false)
+              scan(
+                index + 1,
+                depth,
+                segments + 1,
+                pending = 0,
+                enclosing,
+                flat,
+                work,
+                atKeyStart = false,
+                afterDot = false
+              )
+            else
+              scan(index + 1, depth, segments, pending = 0, enclosing, flat, work, atKeyStart = false, afterDot = false)
         }
       }
 
@@ -221,8 +258,25 @@ private[hoconfmt] object HoconText {
     def beginElement(segments: Int, atKeyStart: Boolean, afterDot: Boolean): Int =
       if (atKeyStart || afterDot) segments + 1 else segments
 
-    scan(0, 0, segments = 0, pending = 0, enclosing = Nil, flat = 0, atKeyStart = true, afterDot = false)
+    scan(0, 0, segments = 0, pending = 0, enclosing = Nil, flat = 0, work = 0L, atKeyStart = true, afterDot = false)
   }
+
+  /** The work of one statement: `w` written segments at enclosing length `e` define paths of
+    * `e+1` .. `e+w` segments (every prefix is a definition the dotted spelling leaves behind),
+    * and the report builds and hashes every prefix of each definition's path, so its cost is
+    * the sum of the squared lengths. Closed form, `Long` where a `Long` is needed: a statement
+    * under the other limits contributes at most ~21 million, and the total is refused long
+    * before it could overflow.
+    */
+  private def statementWork(e: Int, w: Int): Long = {
+    def squareSum(k: Long): Long = k * (k + 1) * (2 * k + 1) / 6
+    squareSum(e.toLong + w) - squareSum(e.toLong)
+  }
+
+  private def writtenLimitReason   = s"input dotted key paths exceed the maximum of $MaxPathSegments segments"
+  private def flattenedLimitReason = s"input dotted key paths exceed the maximum of $MaxFlattenedPathSegments segments"
+  private def workBudgetReason     =
+    s"the key paths' total squared length exceeds the duplicate report's budget of $MaxPathWork"
 
   def spans(text: String): Vector[Span] = {
     @tailrec

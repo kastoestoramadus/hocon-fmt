@@ -14,11 +14,12 @@ enum Refusal derives CanEqual {
   /** An early lexical resource limit, shared by every platform before parsing. */
   case NestingTooDeep(limit: Int)
 
-  /** The other early lexical resource limit, found by the same scan: a dotted key path with more
-    * segments than the duplicate report's per-path work, which grows with the cube of the count,
-    * is worth.
+  /** The early lexical resource limits, found by the same scan: a dotted key path with more
+    * segments than the written cap, a flattened path past the nesting cap, or key paths whose
+    * total squared length exceeds the duplicate report's work budget. `detail` names the limit
+    * and what it bounds.
     */
-  case PathTooDeep(limit: Int)
+  case PathTooDeep(detail: String)
 
   /** The file is named as a format of its own that Lightbend's loader also reads, and this
     * formatter writes HOCON only. A round trip would hand back HOCON: a `.json` file's objects
@@ -70,7 +71,7 @@ enum Refusal derives CanEqual {
     case NotUtf8                                              => "not valid UTF-8"
     case NotHocon(detail)                                     => s"not valid HOCON: $detail"
     case NestingTooDeep(limit)                                => s"input nesting exceeds the maximum depth of $limit"
-    case PathTooDeep(limit)                                   => s"input dotted key paths exceed the maximum of $limit segments"
+    case PathTooDeep(detail)                                  => detail
     case OtherFormat(format)                                  => s"a $format file, and hocon-fmt formats HOCON only"
     case BrokenOutput(detail)                                 => s"the output would not parse again: $detail"
     case LostComment(text)                                    => s"a comment would be lost or duplicated: $text"

@@ -140,7 +140,7 @@ Scala.js and Scala Native were not run against them.
 
 ## Long dotted key paths
 
-`Refusal.PathTooDeep(120)` leaves input whose **longest dotted key path exceeds 120 segments**
+`Refusal.PathTooDeep` leaves input whose **longest dotted key path exceeds 120 segments**
 unchanged, with the reason `input dotted key paths exceed the maximum of 120 segments`. The same
 early scan that bounds nesting counts the segments of a key path — the `a.b.c` of `a.b.c = 1` is
 three — and refuses before include masking, parsing, rendering and duplicate analysis, on JVM,
@@ -150,50 +150,46 @@ is one), so dots inside a quoted key, a quoted value or an include target are ne
 `a . b` is two while `a b` is one. Key paths in `${...}` substitutions are skipped with the rest of
 the substitution; siblings do not accumulate.
 
-The bound exists because the duplicate report's work on a definition grows with the cube of its
-path's segments (every prefix of every path is paired against the definitions), and the command
-line runs that report on every file it examines. Bare sconfig is fast on the same input — a
-2,000-segment `a.a.a. ... = 1` parses, renders and reparses in about 60 ms — but the duplicate
-report spent 0.4 s at 500 segments, 2.8 s at 1,000 and 24 s at 2,000 on the JVM (measured
-2026-10-14, warm in-process), so a 10 KB file could hang a run for tens of seconds. At the limit
-itself the whole formatter, duplicate report included, needs milliseconds: a 120-segment path
-formats in about 2 ms warm, under 1 s through the command line, most of it JVM start-up.
+**The whole file has a work budget of 300,000.** A definition at flattened length `L` costs
+`L²` units. A dotted statement of `w` segments inside an enclosing path of length `E` defines
+every intermediate object too, so it costs `(E+1)² + ... + (E+w)²`. The scan adds these in
+constant time per statement and refuses once their total exceeds the budget, with kind
+`path-too-deep` and reason `the key paths' total squared length exceeds the duplicate report's
+budget of 300000`. A single 96-segment path costs 299,536 units and passes; 97 segments exceed
+the budget. Splitting it into nested objects does not remove that cost.
 
-**The flattened path is bounded too.** The report's cost follows the *flattened* path, that is the
-segments of every enclosing object plus the written ones, and the written-line limit alone saw one
-statement: nesting re-created a long flattened path from short lines, and a file of 20 nested
-levels, each a 120-segment path (2,400 flattened segments, 16.8 KB), took 34 s in the duplicate
-report and 36 s through the command line — refused, but only after the report had run, since the
-command line examines every file; 40 levels (4,800 segments) took 224 s (measured 2026-10-14 by an
-independent review). The same scan now counts the flattened path: a `{` makes the key path just
-written the enclosing one for every definition inside, a `}` takes it back out, and a definition
-whose flattened path passes **360 segments** — three written maxima — is refused with the same
-`PathTooDeep` reason naming 360. The 20-level file above is now refused by the scan in
-milliseconds, before anything is parsed. A file at the limit itself costs the duplicate report
-about 0.1 s per call on the JVM and about 1.2 s per call on the Native binary (measured
-2026-10-14 in-process, three rounds: 88–185 ms JVM, 1,207–1,268 ms Native, for 7 × 45, 2 × 120 and
-4 × 72 segment shapes); a shape at 720 flattened segments is refused in under a millisecond on
-both. The bound was 720 until 2026-10-14: at that limit the Native report took about 9 s per
-call, which is why the limit was halved. The corpus is unaffected: its deepest flattened path
-measured 12 segments, and the 1,257-file corpus's verdicts are unchanged by the bound.
+The flattened length includes every enclosing field path and **one segment per array element
+level** (`k[0].f` has three segments). `{` inherits the field's path whether written as `a.b {`,
+`a.b = {`, `a.b : {` or `a.b += {`; `[` also adds the element level. Every piece of an object or
+array concatenation inherits the field's path. Closing the value removes its contribution from
+the enclosing length; siblings inherit the same enclosing length and each contributes its own
+work. The 360-segment flattened cap remains alongside the written and nesting caps, but it does
+not provide a separate time guarantee.
 
-What the flattened bound does not change: the report's total work still grows with the number of
-definitions, as every pass over a file does. Each definition inherits the enclosing segments, so
-a file of many definitions under one long enclosing path costs more than a file of few, even when
-every definition sits within the bound; within the bound, shortening the paths is what shortens
-the run.
+The previous per-path caps accepted a 160 KB file with two 120-segment chains and 200 leaves of
+120 segments: its report took 12–13 s on the JVM, and 1,600 leaves took 122 s. Across 30 measured
+dense shapes, squared definition lengths fit the old timings better than cubes (R² 0.99258
+versus 0.98200; about 6.6 ns per squared unit). The budget is ten times the corpus maximum of
+26,725 units, rounded up: the maximum uses 8.91% of it. The historical corpus maxima are depth 8,
+written path 11 and flattened path 12; the budget also accepts their combined depth-8/path-11
+shape and 79 nested short keys. All 1,255 readable corpus `.conf`/`.hocon` files and 685 readable
+repository `.conf` files retain their exact verdicts and formatted bytes; three corpus entries
+and seven repository fixtures were unreadable and retain that result too.
 
-The written limit is ten times the longest dotted key path measured across the 34,644 files of the
-corpus scanned on 2026-10-14, sources included — 11 segments, in a test source of the
-apache-pekko-connectors repository — and the repository's own `.conf` files reach 3; the flattened
-limit of 360 is thirty times the deepest flattened path the corpus reaches (12) and four times the
-generous joint bound of its two recorded maxima (depth 8 times path 11). Longer paths can still be
-formatted by splitting the definition (`a.b.c = 1` for `a { b.c = 1 }`), which the flattened bound
-carries up to the same 360 segments — past about 2,400 the split form was refused as
-`not valid HOCON: input nesting exceeds available stack capacity` even before this bound existed. A
-path of 33 or more segments does not even parse on Scala.js today (see the
-[library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches
-shapes the library refuses anyway, until a Scala.js release carries the fix.
+The budget alone would still allow slow repeated short keys: 30,000 definitions of `x = 1`
+cost only 30,000 units but took 10.06 s in the old report. The report now walks definitions
+backwards and indexes the nearest later replacement at each path, preserving the findings and
+their source order without pairing every twin. A differential property compares it with the
+original algorithm on 1,000 generated documents per platform.
+
+Measured on Linux/WSL2, JVM Java 25, on 2026-10-15: a search of 130 accepted shapes at or near the
+budget found its slowest warm report at 1.14 s for 300,000 distinct root fields (3.49 MB). A
+separate eight-round run measured 0.70–1.04 s warm and 2.30 s cold; the JVM CLI took 4.61–7.67 s
+end to end, including formatting and startup. The Scala Native 0.5.12 CLI took 13.76–16.09 s on
+the same file, with peak RSS 5.68 GiB, under an 8 GiB/no-swap scope. These are measurements, not a wall-clock deadline:
+reading, parsing and rendering still depend on input bytes, including key/value lengths and
+comments. The scan is lexical and conservative, not a syntax validator. Scala.js still has its
+library's 33-segment parse limitation (see below).
 
 ## The preserved preamble
 
