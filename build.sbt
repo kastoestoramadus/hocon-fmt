@@ -386,6 +386,14 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .platformsSettings(JVMPlatform, NativePlatform)(
     Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "jvm-native" / "src" / "main" / "scala"
   )
+  // FileTraversal, the loop that examines the selected files, is a per-platform choice: the JVM
+  // and Scala.js examine concurrently, Scala Native one file at a time (docs/limitations.md).
+  .platformsSettings(JVMPlatform, JSPlatform)(
+    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "jvm-js" / "src" / "main" / "scala"
+  )
+  .platformsSettings(NativePlatform)(
+    Compile / unmanagedSourceDirectories += (ThisBuild / baseDirectory).value / "cli" / "native" / "src" / "main" / "scala"
+  )
   .jvmSettings(
     announceRuntime("cli on the JVM"),
     Compile / mainClass := Some("eu.ww86.hoconfmt.CmdApi"),
