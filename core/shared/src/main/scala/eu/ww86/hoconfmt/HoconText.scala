@@ -25,7 +25,7 @@ private[hoconfmt] object HoconText {
   val MaxPathSegments = 120
 
   // Prefix creation and comparison cost the report the sum of squared definition lengths. The
-  // 30 measured dense shapes fit this proxy better than cubes (R² .993 vs .982). Ten times
+  // old timings of 30 dense shapes fit this proxy better than cubes (R² .993 vs .982). Ten times
   // the corpus maximum of 26,725, rounded up; see limitations.md for the calibration and times.
   val MaxPathWork = 300000L
 

@@ -152,13 +152,13 @@ is one), so dots inside a quoted key, a quoted value or an include target are ne
 `a . b` is two while `a b` is one. Key paths in `${...}` substitutions are skipped with the rest of
 the substitution; siblings do not accumulate.
 
-**The whole file has a work budget of 300,000.** A definition at flattened length `L` costs
+**The whole file has a report-work budget of 300,000.** A definition at flattened length `L` costs
 `L²` units. A dotted statement of `w` segments inside an enclosing path of length `E` defines
 every intermediate object too, so it costs `(E+1)² + ... + (E+w)²`. The scan adds these in
 constant time per statement and refuses once their total exceeds the budget, with kind
 `path-too-deep` and reason `too many or too long key paths to check safely; use shorter key paths
-or split the configuration into smaller files (work budget 300000)`. A single 96-segment path costs 299,536 units and passes; 97 segments exceed
-the budget. Splitting it into nested objects does not remove that cost.
+or split the configuration into smaller files (work budget 300000)`. A single 96-segment path
+costs 299,536 units and passes the scan; 97 segments exceed the budget. Splitting it into nested objects does not remove that cost.
 
 Shorten the actual full key paths, or split the configuration into smaller files and format each
 part separately, preserving merge and include order. There is a conservative refusal band:
@@ -191,9 +191,9 @@ it also caps the definition count because every definition costs at least one un
 
 The budget is 11.2 times the corpus maximum of 26,725 units (8.91% of it). The historical corpus
 maxima are depth 8, written path 11 and flattened path 12; the budget also accepts their combined
-depth-8/path-11 shape and 79 nested short keys. The 2026-10-16 parity run compares exact verdicts, formatted bytes and ordered findings on the
-1,257-path corpus manifest and 697 repository `.conf`/`.hocon` paths; unreadable paths are
-recorded in both runs.
+depth-8/path-11 shape and 79 nested short keys. The 2026-10-16 parity run found zero differences
+in exact verdicts, formatted bytes and ordered findings on 1,257 corpus paths (1,255 readable)
+and 697 repository `.conf`/`.hocon` paths (690 readable); unreadable paths retain that result.
 
 The budget alone would still allow slow repeated short keys: 30,000 definitions of `x = 1`
 cost only 30,000 units but took 10.06 s in the old report. The report now walks definitions
@@ -203,8 +203,8 @@ so equal-hash key names cannot make those operations quadratic: 32,768 colliding
 about 0.17 s, or under 0.4 s when every key produces a warning on one line. A differential property compares it with the
 original algorithm on 1,000 generated documents per platform.
 
-On Linux/WSL2, Java 25 JVM, the independent 2026-10-16 search of 44 shape families found the
-slowest accepted **report** at 1.87 s cold / 1.31 s warm for 300,000 distinct root fields
+On Linux/WSL2, Java 25 JVM, among the compact near-budget shapes in the independent 2026-10-16
+search, the slowest accepted **report** took 1.87 s cold / 1.31 s warm for 300,000 distinct root fields
 (3.49 MB); the earlier 133-shape search found the same warm maximum. The Native 0.5.12 CLI
 on that shape took **13.1 s and 6.06 GiB peak RSS** under an 8 GiB/no-swap scope; the JVM CLI
 took 4.13 s and about 1.9 GB RSS. These are measured cases, not a wall-clock or memory guarantee.
@@ -226,10 +226,11 @@ independent review, **21,428 lines of `a.b.kN = 1` (310,310 bytes)** pass this s
 124–169 ms. Bare `ConfigFactory.parseString` on 4,000 / 8,000 / 16,000 such keys took about
 0.9 / 2.1 / 8.9 s; spelling 16,000 keys as `a { b { k0 = 1 ... } }` took 13 ms.
 The revision reproduced 0.66 / 2.02 / 8.71 s with the formatter's parse options;
-independent root objects with the same path lengths took only 17 ms at 16,000 keys. The same parsing defect exists on `main` before the report budget.
+independent root objects with the same path lengths took only 17 ms at 16,000 keys. The same
+parsing defect exists on `main` before the report budget.
 
-Repeated `k += 1` is a second shape of this parser problem: 300,000 lines accepted by the resource scan did not
-finish the JVM CLI within 20 minutes of CPU in the review. Two red-by-design `library:` cases
+Repeated `k += 1` is a second shape of this parser problem: 300,000 lines accepted by the
+resource scan did not finish the JVM CLI within 20 minutes of CPU in the review. Two red-by-design `library:` cases
 in `SconfigDefectsSpec` compare bare parsing of shared dotted keys and repeated appends with
 nested fields and a literal array. They run outside ordinary formatter tests.
 
