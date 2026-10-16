@@ -206,6 +206,30 @@ reading, parsing and rendering still depend on input bytes, including key/value 
 comments. The scan is lexical and conservative, not a syntax validator. Scala.js still has its
 library's 33-segment parse limitation (see below).
 
+### Slow sconfig object merges and appends (follow-up refusal)
+
+Bare sconfig 2.0.0 parses many dotted definitions sharing an object quadratically. In the
+independent review, **21,428 lines of `a.b.kN = 1` (310,310 bytes)** pass this scan but take
+**20.6 s through the JVM CLI and 105 s through the Native CLI**; the report itself takes only
+124–169 ms. Bare `ConfigFactory.parseString` on 4,000 / 8,000 / 16,000 such keys took about
+0.9 / 2.1 / 8.9 s; spelling 16,000 keys as `a { b { k0 = 1 ... } }` took 13 ms.
+The revision reproduced 0.66 / 2.02 / 8.71 s with the formatter's parse options;
+independent root objects with the same path lengths took only 17 ms at 16,000 keys. The same parsing defect exists on `main` before the report budget.
+
+Repeated `k += 1` is a second shape of this parser problem: 300,000 lines accepted by the resource scan did not
+finish the JVM CLI within 20 minutes of CPU in the review. Two red-by-design `library:` cases
+in `SconfigDefectsSpec` compare bare parsing of shared dotted keys and repeated appends with
+nested fields and a literal array. They run outside ordinary formatter tests.
+
+A scan-level refusal for these parser defects is **follow-up work, not implemented in this
+report-budget change**. The current scan counts lengths, not normalized key names or merge
+history. A blanket dotted-statement or append count also rejects independent objects/keys;
+a targeted refusal needs key identity, quoted/concatenated spelling, object/array scope and
+merge-shape calibration on all platforms. That guard should refuse before the sconfig parse,
+with corpus verdict parity, rather than rewrite input inside `HoconFormatter`.
+For now, nested spelling can avoid the shared-prefix parser cost, but retains the same report
+units; replacing repeated appends with an equivalent literal array can avoid that parse cost.
+
 ## The preserved preamble
 
 A file that opens with a block of comments and blank lines, a blank line under the block and the
