@@ -66,18 +66,18 @@ class HoconFormatterJsSpec extends munit.FunSuite {
 
   test("every refusal has a name a page can branch on") {
     val names = Map(
-      Refusal.NestingTooDeep(80)           -> "nestingTooDeep",
-      Refusal.PathTooDeep(120)             -> "pathTooDeep",
-      Refusal.NotUtf8                      -> "notUtf8",
-      Refusal.NotHocon("")                 -> "notHocon",
-      Refusal.OtherFormat("JSON")          -> "otherFormat",
-      Refusal.BrokenOutput("")             -> "brokenOutput",
-      Refusal.LostComment("")              -> "lostComment",
-      Refusal.LostInclude("")              -> "lostInclude",
-      Refusal.MovedInclude("")             -> "movedInclude",
-      Refusal.ShadowedByInclude("o", 2, 1) -> "shadowedByInclude",
-      Refusal.ReservedName                 -> "reservedName",
-      Refusal.UnstableOutput               -> "unstableOutput"
+      Refusal.NestingTooDeep(80)                                                       -> "nestingTooDeep",
+      Refusal.PathTooDeep("input dotted key paths exceed the maximum of 120 segments") -> "pathTooDeep",
+      Refusal.NotUtf8                                                                  -> "notUtf8",
+      Refusal.NotHocon("")                                                             -> "notHocon",
+      Refusal.OtherFormat("JSON")                                                      -> "otherFormat",
+      Refusal.BrokenOutput("")                                                         -> "brokenOutput",
+      Refusal.LostComment("")                                                          -> "lostComment",
+      Refusal.LostInclude("")                                                          -> "lostInclude",
+      Refusal.MovedInclude("")                                                         -> "movedInclude",
+      Refusal.ShadowedByInclude("o", 2, 1)                                             -> "shadowedByInclude",
+      Refusal.ReservedName                                                             -> "reservedName",
+      Refusal.UnstableOutput                                                           -> "unstableOutput"
     )
     names.foreach((refusal, name) => assertEquals(HoconFormatterJs.nameOf(refusal), name))
   }

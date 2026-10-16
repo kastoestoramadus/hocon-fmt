@@ -12,7 +12,7 @@ public enum RefusalKind {
     NotHocon,
     /** The input exceeds the platform-independent lexical nesting limit. */
     NestingTooDeep,
-    /** The input's longest dotted key path exceeds the platform-independent segment limit. */
+    /** The input's dotted key paths exceed the platform-independent lexical limits. */
     PathTooDeep,
     /** The file is named as a format of its own that Lightbend's loader also reads. */
     OtherFormat,

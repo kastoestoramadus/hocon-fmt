@@ -142,7 +142,7 @@ Scala.js and Scala Native were not run against them.
 
 ## Long dotted key paths
 
-`Refusal.PathTooDeep(120)` leaves input whose **longest dotted key path exceeds 120 segments**
+`Refusal.PathTooDeep` leaves input whose **longest dotted key path exceeds 120 segments**
 unchanged, with the reason `input dotted key paths exceed the maximum of 120 segments`. The same
 early scan that bounds nesting counts the segments of a key path — the `a.b.c` of `a.b.c = 1` is
 three — and refuses before include masking, parsing, rendering and duplicate analysis, on JVM,
@@ -152,50 +152,96 @@ is one), so dots inside a quoted key, a quoted value or an include target are ne
 `a . b` is two while `a b` is one. Key paths in `${...}` substitutions are skipped with the rest of
 the substitution; siblings do not accumulate.
 
-The bound exists because the duplicate report's work on a definition grows with the cube of its
-path's segments (every prefix of every path is paired against the definitions), and the command
-line runs that report on every file it examines. Bare sconfig is fast on the same input — a
-2,000-segment `a.a.a. ... = 1` parses, renders and reparses in about 60 ms — but the duplicate
-report spent 0.4 s at 500 segments, 2.8 s at 1,000 and 24 s at 2,000 on the JVM (measured
-2026-10-14, warm in-process), so a 10 KB file could hang a run for tens of seconds. At the limit
-itself the whole formatter, duplicate report included, needs milliseconds: a 120-segment path
-formats in about 2 ms warm, under 1 s through the command line, most of it JVM start-up.
+**The whole file has a report-work budget of 300,000.** A definition at flattened length `L` costs
+`L²` units. A dotted statement of `w` segments inside an enclosing path of length `E` defines
+every intermediate object too, so it costs `(E+1)² + ... + (E+w)²`. The scan adds these in
+constant time per statement and refuses once their total exceeds the budget, with kind
+`path-too-deep` and reason `too many or too long key paths to check safely; use shorter key paths
+or split the configuration into smaller files`. A single 96-segment path
+costs 299,536 units and passes the scan; 97 segments exceed the budget. Splitting it into nested objects does not remove that cost.
 
-**The flattened path is bounded too.** The report's cost follows the *flattened* path, that is the
-segments of every enclosing object plus the written ones, and the written-line limit alone saw one
-statement: nesting re-created a long flattened path from short lines, and a file of 20 nested
-levels, each a 120-segment path (2,400 flattened segments, 16.8 KB), took 34 s in the duplicate
-report and 36 s through the command line — refused, but only after the report had run, since the
-command line examines every file; 40 levels (4,800 segments) took 224 s (measured 2026-10-14 by an
-independent review). The same scan now counts the flattened path: a `{` makes the key path just
-written the enclosing one for every definition inside, a `}` takes it back out, and a definition
-whose flattened path passes **360 segments** — three written maxima — is refused with the same
-`PathTooDeep` reason naming 360. The 20-level file above is now refused by the scan in
-milliseconds, before anything is parsed. A file at the limit itself costs the duplicate report
-about 0.1 s per call on the JVM and about 1.2 s per call on the Native binary (measured
-2026-10-14 in-process, three rounds: 88–185 ms JVM, 1,207–1,268 ms Native, for 7 × 45, 2 × 120 and
-4 × 72 segment shapes); a shape at 720 flattened segments is refused in under a millisecond on
-both. The bound was 720 until 2026-10-14: at that limit the Native report took about 9 s per
-call, which is why the limit was halved. The corpus is unaffected: its deepest flattened path
-measured 12 segments, and the 1,257-file corpus's verdicts are unchanged by the bound.
+Shorten the actual full key paths, or split the configuration into smaller files and format each
+part separately, preserving merge and include order. There is a conservative refusal band:
+6,000 lines of `app.service.module.feature.optN = N` (249,780 bytes) cost 330,000 units and
+refuse in 3 ms, while `main` before this budget formats them in about 1.0–1.4 s on the JVM;
+12,000 lines (505,780 bytes) refuse too, versus about 4.2–5.2 s previously. At five segments,
+5,454 lines fit and 5,455 do not. The default remains 300,000, 11.2 times the corpus maximum:
+raising it changes refusal policy and needs an owner decision, rather than an extrapolation
+from one fast shape. Nesting the same full paths retains their definitions and cost.
 
-What the flattened bound does not change: the report's total work still grows with the number of
-definitions, as every pass over a file does. Each definition inherits the enclosing segments, so
-a file of many definitions under one long enclosing path costs more than a file of few, even when
-every definition sits within the bound; within the bound, shortening the paths is what shortens
-the run.
+The flattened length includes every enclosing field path and **one segment per array element
+level** (`k[0].f` has three segments). `{` inherits the field's path whether written as `a.b {`,
+`a.b = {`, `a.b : {` or `a.b += {`; `[` also adds the element level. Every piece of an object or
+array concatenation inherits the field's path. Closing the value removes its contribution from
+the enclosing length; siblings inherit the same enclosing length and each contributes its own
+work. The obsolete 360-segment flattened cap is removed with its boundary tests: at this budget
+an enclosing path has at most 96 key segments (`S(96) = 299,536`) and 80 array levels, and even
+an unfinished 120-segment statement stays below 360 before the next work check. Historical
+slow-chain and spelling regressions now pin the work budget.
 
-The written limit is ten times the longest dotted key path measured across the 34,644 files of the
-corpus scanned on 2026-10-14, sources included — 11 segments, in a test source of the
-apache-pekko-connectors repository — and the repository's own `.conf` files reach 3; the flattened
-limit of 360 is thirty times the deepest flattened path the corpus reaches (12) and four times the
-generous joint bound of its two recorded maxima (depth 8 times path 11). Longer paths can still be
-formatted by splitting the definition (`a.b.c = 1` for `a { b.c = 1 }`), which the flattened bound
-carries up to the same 360 segments — past about 2,400 the split form was refused as
-`not valid HOCON: input nesting exceeds available stack capacity` even before this bound existed. A
-path of 33 or more segments does not even parse on Scala.js today (see the
-[library defects](#sconfig-defects-the-formatter-refuses) below), so there the guard only reaches
-shapes the library refuses anyway, until a Scala.js release carries the fix.
+The previous per-path caps accepted a 160 KB file with two 120-segment chains and 200 leaves of
+120 segments: its report took 12–13 s on the JVM, and 1,600 leaves took 122 s. Across 30 measured
+dense shapes, squared definition lengths fit the **old algorithm's** timings better than cubes
+(R² 0.99258 versus 0.98200; about 6.6 ns per squared unit). That constant does not calibrate
+the new algorithm. The independent review measured about 20–34 ns per unit on large deep shapes
+with the budget lifted for calibration, about 31–55 ns for object chains and 54–66 ns for array
+chains. At the shallow end, 300,000 distinct root definitions cost about 4.4 microseconds per
+unit (1.31 s warm). The budget is a conservative shape proxy, not a conversion to seconds;
+it also caps the definition count because every definition costs at least one unit.
+
+The budget is 11.2 times the corpus maximum of 26,725 units (8.91% of it). The historical corpus
+maxima are depth 8, written path 11 and flattened path 12; the budget also accepts their combined
+depth-8/path-11 shape and 79 nested short keys. The 2026-10-16 parity run found zero differences
+in exact verdicts, formatted bytes and ordered findings on 1,257 corpus paths (1,255 readable)
+and 697 repository `.conf`/`.hocon` paths (690 readable); unreadable paths retain that result.
+
+The budget alone would still allow slow repeated short keys: 30,000 definitions of `x = 1`
+cost only 30,000 units but took 10.06 s in the old report. The report now walks definitions
+backwards and indexes the nearest later replacement at each path, preserving the findings and
+their source order without pairing every twin. Both its index and warning-suppression set use structural ordering,
+so equal-hash key names cannot make those operations quadratic: 32,768 colliding keys take
+about 0.17 s, or under 0.4 s when every key produces a warning on one line. A differential property compares it with the
+original algorithm on 1,000 generated documents per platform.
+
+On Linux/WSL2, Java 25 JVM, among the compact near-budget shapes in the independent 2026-10-16
+search, the slowest accepted **report** took 1.87 s cold / 1.31 s warm for 300,000 distinct root fields
+(3.49 MB); the earlier 133-shape search found the same warm maximum. The Native 0.5.12 CLI
+on that shape took **13.1 s and 6.06 GiB peak RSS** under an 8 GiB/no-swap scope; the JVM CLI
+took 4.13 s and about 1.9 GB RSS. These are measured cases, not a wall-clock or memory guarantee.
+The revision remeasured 300,000 roots at 11.56 s / 6.06 GiB on Native and 100,000 roots at
+3.48 s / 2.04 GiB. A lower cap would materially reduce Native memory, but also refuse more
+files; no separate root-definition cap is introduced without an owner policy decision.
+
+**The accepted-file worst case is bounded here for the report's key-path work only.** Reading,
+lexing, document parsing and rendering also depend on input bytes. For example, the report on
+3/9 MB scalar arrays took 1.8/4.5 s in the review; empty objects and scalars consume bytes
+without adding key definitions, and the CLI has no file-size limit. Scala.js also retains its
+library's 33-segment parse limitation (see below).
+
+### Slow sconfig object merges and appends (follow-up refusal)
+
+Bare sconfig 2.0.0 parses many dotted definitions sharing an object quadratically. In the
+independent review, **21,428 lines of `a.b.kN = 1` (310,310 bytes)** pass this scan but take
+**20.6 s through the JVM CLI and 105 s through the Native CLI**; the report itself takes only
+124–169 ms. Bare `ConfigFactory.parseString` on 4,000 / 8,000 / 16,000 such keys took about
+0.9 / 2.1 / 8.9 s; spelling 16,000 keys as `a { b { k0 = 1 ... } }` took 13 ms.
+The revision reproduced 0.66 / 2.02 / 8.71 s with the formatter's parse options;
+independent root objects with the same path lengths took only 17 ms at 16,000 keys. The same
+parsing defect exists on `main` before the report budget.
+
+Repeated `k += 1` is a second shape of this parser problem: 300,000 lines accepted by the
+resource scan did not finish the JVM CLI within 20 minutes of CPU in the review. Two red-by-design `library:` cases
+in `SconfigDefectsSpec` compare bare parsing of shared dotted keys and repeated appends with
+nested fields and a literal array. They run outside ordinary formatter tests.
+
+A scan-level refusal for these parser defects is **follow-up work, not implemented in this
+report-budget change**. The current scan counts lengths, not normalized key names or merge
+history. A blanket dotted-statement or append count also rejects independent objects/keys;
+a targeted refusal needs key identity, quoted/concatenated spelling, object/array scope and
+merge-shape calibration on all platforms. That guard should refuse before the sconfig parse,
+with corpus verdict parity, rather than rewrite input inside `HoconFormatter`.
+For now, nested spelling can avoid the shared-prefix parser cost, but retains the same report
+units; replacing repeated appends with an equivalent literal array can avoid that parse cost.
 
 ## The preserved preamble
 

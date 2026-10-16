@@ -4,7 +4,9 @@ import org.ekrich.config.impl.*
 import org.ekrich.config.parser.{ConfigDocumentFactory, ConfigNode}
 
 import scala.annotation.tailrec
+import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.jdk.CollectionConverters.*
+import scala.math.Ordering.Implicits.seqOrdering
 import scala.util.control.NonFatal
 
 /** A key a later definition of the same path replaces, so the earlier value never takes effect. */
@@ -297,24 +299,48 @@ object DuplicateReport {
     (1 to path.segments.size).toVector.map(length => KeyPath(path.segments.take(length)))
 
   private def report(definitions: Vector[Definition]): List[Finding] = {
-    val byPath = definitions.zipWithIndex.groupBy { case (definition, _) =>
-      (definition.arrayScope, definition.keyPath)
+    type Address = (List[Int], KeyPath)
+    type Located = (Definition, Int)
+    given Ordering[KeyPath.Segment] with {
+      def compare(left: KeyPath.Segment, right: KeyPath.Segment): Int = (left, right) match {
+        case (KeyPath.Segment.Name(a), KeyPath.Segment.Name(b))   => a.compareTo(b)
+        case (KeyPath.Segment.Index(a), KeyPath.Segment.Index(b)) => Integer.compare(a, b)
+        case (KeyPath.Segment.Name(_), KeyPath.Segment.Index(_))  => -1
+        case (KeyPath.Segment.Index(_), KeyPath.Segment.Name(_))  => 1
+      }
     }
-    val killed = definitions.zipWithIndex.flatMap { case (earlier, at) =>
-      prefixes(earlier.keyPath)
-        .flatMap(path => byPath.getOrElse((earlier.arrayScope, path), Vector.empty))
-        .filter { case (later, next) =>
-          next > at && (if (later.keyPath == earlier.keyPath) erases(later, earlier)
-                        else !later.objectValued && !later.holdsSubstitution)
-        }
-        .minByOption(_._2)
-        .map { case (later, _) => (earlier, later) }
+    val scopeOrder: Ordering[List[Int]] = summon[Ordering[List[Int]]]
+    val pathOrder: Ordering[KeyPath]    = summon[Ordering[List[KeyPath.Segment]]].on[KeyPath](_.segments)
+    given Ordering[Address]             = Ordering.Tuple2(using scopeOrder, pathOrder)
+    // Names with identical hashes must not make either lookup or warning suppression
+    // quadratic again, even when many definitions share a line.
+    val empty = TreeMap.empty[Address, Located]
+    // Only the first later eraser matters. An object can erase a scalar at the same path;
+    // otherwise only a non-object without substitutions can erase the definition. Keeping
+    // both successors avoids examining every twin (quadratic even for one-segment paths).
+    val (_, _, killed) = definitions.zipWithIndex.foldRight((empty, empty, List.empty[(Definition, Definition)])) {
+      case ((earlier, at), (anyValue, nonObject, found)) =>
+        val later = prefixes(earlier.keyPath)
+          .flatMap { path =>
+            val index =
+              if (path == earlier.keyPath && !earlier.objectValued && !earlier.holdsSubstitution) anyValue
+              else nonObject
+            index.get((earlier.arrayScope, path))
+          }
+          .minByOption(_._2)
+        val killed        = later.fold(found) { case (definition, _) => (earlier, definition) :: found }
+        val address       = (earlier.arrayScope, earlier.keyPath)
+        val anyNext       = if (earlier.holdsSubstitution) anyValue else anyValue.updated(address, (earlier, at))
+        val nonObjectNext =
+          if (earlier.holdsSubstitution || earlier.objectValued) nonObject
+          else nonObject.updated(address, (earlier, at))
+        (anyNext, nonObjectNext, killed)
     }
     // One statement can define both an object and its leaves. When the whole statement dies at
     // the same line, the ancestor warning covers it; leaves on their own lines still get theirs.
-    val covered = killed.map { case (earlier, later) =>
+    val covered = TreeSet.from(killed.map { case (earlier, later) =>
       (earlier.arrayScope, earlier.line, later.line, earlier.keyPath)
-    }.toSet
+    })(using Ordering.Tuple4(using scopeOrder, Ordering.Int, Ordering.Int, pathOrder))
     killed
       .filterNot { case (earlier, later) =>
         prefixes(earlier.keyPath).dropRight(1).exists { path =>
@@ -322,7 +348,6 @@ object DuplicateReport {
         }
       }
       .map { case (earlier, later) => Finding.KeyDefinedAgain(earlier.keyPath, earlier.line, later.line) }
-      .toList
   }
 
   /** The path a field writes. A quoted key is one segment however many dots it holds; the period

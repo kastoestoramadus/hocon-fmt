@@ -137,8 +137,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // limitations.md). The generator mixes ordinary chains with ones past every limit, so both
   // the refusal and the surviving shapes are exercised. The value's spelling is part of the
   // shape: the written path must survive `=`, `:`, `+=` and the blanks after it to the `{`,
-  // or a chain written that way slips past every bound. The boundary (360 flattened segments)
-  // gets its own share: levels times segments from 8 x 24 to 14 x 40 straddles it on both sides.
+  // or a chain written that way slips past every bound. The historical 360-segment family gets
+  // its own share; these large chains now exceed the total-work budget.
   property("no nested dotted path throws or exceeds a time bound") {
     val spelling = Gen.oneOf("brace", "eq", "colon", "append")
     val nesting  = Gen.frequency(
@@ -178,6 +178,39 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
         refusal => assert(refusal.reason.nonEmpty),
         _ => ()
       )
+    }
+  }
+
+  // The dense shape behind the duplicate report's work budget: two 120-segment chains, 200
+  // leaves of 120 segments each — the 160 KB shape that spent 12-13 s in the duplicate report
+  // on the JVM while every written line stayed at the limit. The report the command line and
+  // the integrations run (`DuplicateReport.findings`) must come back within the bound, as a
+  // refusal once the budget is in force; on a regression this fails by TimeoutException instead
+  // of hanging the suite. Scala.js's own parse ceiling refuses the shape first, so only a
+  // non-empty reason is asserted, not who refused.
+  property("the dense duplicate-report shape answers within the time bound") {
+    def dense(leaves: Int): String = {
+      val chain = (1 to 120).map(i => s"k$i").mkString(".")
+      val leaf  = (i: Int) => (1 to 120).map(j => s"l${i}k$j").mkString(".")
+      (chain + " {\n") * 2 + (1 to leaves).map(i => leaf(i) + " = 1\n").mkString + "}\n" * 2
+    }
+    forAll(Gen.choose(200, 400)) { leaves =>
+      val source                               = dense(leaves)
+      def bound[R](name: String)(run: => R): R = {
+        val start  = System.nanoTime()
+        val result = TimeoutGuard.within(pathTimeBoundMs)(run)
+        val millis = (System.nanoTime() - start) / 1e6
+        assert(millis < pathTimeBoundMs, s"the dense shape: $name took $millis ms")
+        result
+      }
+      bound("duplicate report")(DuplicateReport.findings(source)).fold(
+        refusal => assert(refusal.reason.nonEmpty),
+        _ => ()
+      )
+      bound("verdict")(Verdict.of(source)) match {
+        case Verdict.Refused(refusal) => assert(refusal.reason.nonEmpty)
+        case _                        => ()
+      }
     }
   }
 

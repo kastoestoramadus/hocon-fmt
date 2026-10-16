@@ -52,7 +52,7 @@ class ExamplesSpec extends munit.FunSuite {
       Refusal.NotUtf8,
       Refusal.NotHocon("detail"),
       Refusal.NestingTooDeep(80),
-      Refusal.PathTooDeep(120),
+      Refusal.PathTooDeep("input dotted key paths exceed the maximum of 120 segments"),
       Refusal.OtherFormat("JSON"),
       Refusal.BrokenOutput("detail"),
       Refusal.LostComment("# gone"),

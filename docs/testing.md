@@ -12,7 +12,7 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 | `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
 | `PreambleSpec` | `core/default-shared` | the [preserved preamble](limitations.md#the-preserved-preamble) on the published core: the rule's boundary cases, the verbatim header, and that a refusal from the body still names the file's own lines; the page's fork keeps the same comments through its carrier, pinned in `CommentCarrierSpec` |
-| `NestingDepthSpec` | `core/shared` | the 80-level lexical resource limit: boundary objects/arrays with and without includes, strings/comments and substitutions ignored, and early refusal before duplicate parsing |
+| `NestingDepthSpec` | `core/shared` | lexical resource limits: 80 nesting levels, 120 written key segments and 300,000 report-work units; boundary objects/arrays, ignored strings/comments/substitutions, and actionable early refusal |
 | `DuplicateReportSpec` | `core/shared` | the duplicate report: replaced definitions and ancestor barriers, independent array scopes, and resolution showing which values survive |
 | `ExamplesSpec` | `core/shared` | every directory example: today’s verdict and exact expected output, on JVM, Scala.js and Native; prints the roadmap |
 | `VerdictSpec` | `core/shared` | the per-file decision every integration acts on, including strict UTF-8, the origin a parse failure names and the formats a file's name rules out |

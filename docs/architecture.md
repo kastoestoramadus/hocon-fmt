@@ -41,10 +41,12 @@ follows and the mismatches left open: [naming](naming.md).
 
 A lexical [depth check](limitations.md#excessive-nesting) runs before this pipeline and before
 duplicate analysis: more than 80 brace/bracket levels in code refuses as `NestingTooDeep`, and
-the same scan refuses a dotted key path longer than 120 segments, or one past 360 segments once
-the enclosing objects' paths are added, as
+the same scan refuses a dotted key path longer than 120 segments or total report work above
+300,000 units, as
 [`PathTooDeep`](limitations.md#long-dotted-key-paths), with the same limits on every platform.
-Strings and comments do not consume either budget.
+Each definition costs its squared flattened path length, including array element levels.
+Strings and comments do not consume these budgets. This bounds report key-path work; sconfig
+parsing and input-byte costs remain separate limitations.
 
 1. A [preserved preamble](#the-preserved-preamble) is taken first: the leading block of comments
    and blank lines is kept verbatim and stands in for the parse as blank lines, one per line, so
