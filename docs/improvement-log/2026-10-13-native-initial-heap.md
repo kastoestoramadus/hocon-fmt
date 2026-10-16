@@ -10,7 +10,10 @@ Update 2026-10-15: the collector is no longer the established cause. PR 141's in
 ([limitations](../limitations.md#sequential-file-examination-on-scala-native)) established only the
 trigger — concurrent fibres on the runtime's worker threads (`parTraverse`), which crash a standalone
 cats-effect program with none of hocon-fmt's code too — and found the root cause still not established;
-the Native CLI now examines its files sequentially. What was measured below stands as recorded.
+the Native CLI now examines its files sequentially. The same applies to the later lines that still say
+"collector defect" (the stress-loop note and the release section): for those too only the trigger is
+established, with concurrent fibres on the runtime's worker threads (`parTraverse`), and the root cause
+is not. What was measured below stands as recorded.
 
 ## Reproduction and verification
 

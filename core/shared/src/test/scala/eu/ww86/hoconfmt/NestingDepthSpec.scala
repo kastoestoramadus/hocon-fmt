@@ -227,7 +227,7 @@ class NestingDepthSpec extends munit.FunSuite {
     assertEquals(HoconFormatter.format(chain(20, 120, 0)).left.map(_.reason), Left(flatReason))
   }
 
-  test("six 120-segment levels, 720 flattened segments, refuse with the flattened reason") {
+  test("six 120-segment levels, 721 flattened segments, refuse with the flattened reason") {
     assertEquals(HoconFormatter.format(chain(6, 120, 0)).left.map(_.reason), Left(flatReason)) // 6*120 + 1 = 721
   }
 
