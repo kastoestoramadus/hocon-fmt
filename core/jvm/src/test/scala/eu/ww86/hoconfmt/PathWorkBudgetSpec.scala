@@ -111,6 +111,13 @@ class PathWorkBudgetSpec extends munit.FunSuite {
     }
   }
 
+  test("the work-budget refusal reason fits the 120 characters the CLI keeps") {
+    HoconText.checkNesting(boundary(343)) match {
+      case Left(refusal) => assert(refusal.reason.length <= 120, s"${refusal.reason.length}: ${refusal.reason}")
+      case other         => fail(s"expected the work-budget refusal, got $other")
+    }
+  }
+
   test("every piece of an object concatenation inherits the field's path") {
     val path   = objectPath(7)
     val pieces = (1 to 343).map(i => "{ " + leafPath(i, 7) + " = 1 }").mkString(" ")
