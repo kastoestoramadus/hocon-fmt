@@ -229,12 +229,6 @@ since IntelliJ users already have something.
 
 ## Build tools
 
-### sbt 2 (M)
-
-sbt 2 runs plugins on Scala 3, so a cross-build of the sbt plugin could call the core directly, as
-the Mill plugin does, and drop the isolated class loader. Worth doing when sbt 2 is final and
-sbt-scalafmt has moved.
-
 ### Mill without a trait (S)
 
 `./mill eu.ww86.hoconfmt.mill.HoconFormatter/checkAll __.resources`, an external module like Mill's
