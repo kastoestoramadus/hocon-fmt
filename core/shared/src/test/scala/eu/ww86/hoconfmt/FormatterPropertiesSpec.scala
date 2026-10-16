@@ -307,6 +307,33 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  // docs/limitations.md promises that a cycle between bare names is not a refusal: whatever the
+  // length of the ring, formatting settles it, and the second pass keeps what the first wrote.
+  // Resolving that fixed point still fails with the same cycle complaint the input had — nothing
+  // is hidden — so this pins the verdict and the stability, not a resolution.
+  property("a pure substitution cycle of any length formats to a fixed point, in any option combination") {
+    forAll(Gen.choose(2, 8)) { size =>
+      // ScalaCheck shrinks toward 0, out of the generated range; a ring has at least two keys.
+      val n = 2 max size
+      allOptions.foreach { options =>
+        val sep = options.separator match {
+          case Separator.Equals => " = "
+          case Separator.Colon  => ": "
+        }
+        val cycle = (0 until n).map(i => "k" + i + " : ${k" + ((i + 1) % n) + "}").mkString("\n")
+        val fixed = (0 until n)
+          .map(i => "k" + i + sep + "${k" + ((i + 1) % n) + "}")
+          .mkString("", "\n", "\n")
+        HoconFormatter.format(cycle, options) match {
+          case Right(out) =>
+            assertEquals(out, fixed, s"ring of $n, $options")
+            assertEquals(HoconFormatter.format(out, options), Right(out), s"second pass, ring of $n, $options")
+          case Left(refusal) => fail(s"ring of $n, $options: refused: ${refusal.reason}")
+        }
+      }
+    }
+  }
+
   // User text that looks like what IncludeMasking writes, next to a real include: the formatter may
   // refuse the file, but a file it formats keeps that text.
   property("never alters text that looks like a placeholder, in any option combination") {

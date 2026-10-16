@@ -40,7 +40,7 @@ Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; 
 |---|---:|---|---|
 | `SconfigDefectsSpec` (core/shared) | 29 | SCONFIG | bare round trip; 28 red on JVM/Native, 29 on JS with sconfig 2.0.0; earlier main measurements predate the six numeric cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
-| `HoconSpecCoverageSpec` (core/shared) | 30 | 17 SCONFIG / 13 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 13 MIXED |
+| `HoconSpecCoverageSpec` (core/shared) | 48 | 17 SCONFIG / 31 MIXED | normalised 8 + supported 9 SCONFIG; the other 31 are refusal and comment groups, MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
 | `FormatterPropertiesSpec` (core/shared) | 12 | 11 OURS / 1 MIXED | 1000 generated documents × 8 option sets each |
 | `NumericRenderingSpec` (core/shared) | 8 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
@@ -128,7 +128,7 @@ them, flip the numeric output pins and update the limitation; no numeric refusal
 | `oneFieldObjectsInAnArray` (2), `envOverrides` (2) | rendered text parses and is a fixed point | `#598` merged, `#600` open | **already green on main**; a release containing `#598` |
 | `rejectedOnInput` `[]` list suffix (1) | the specification's list expansion | `#605` merged 2026-10-06 | **already green on main**; a release containing `#605` |
 | `should parse an array at the file root` (1) | a root array parses | none: the `Config` API returns an object | never, unless the API changes |
-| `HoconSpecCoverageSpec` refusals `mustRefuse` (4), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
+| `HoconSpecCoverageSpec` refusals `mustRefuse` (13), sibling-field merges (8), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
 | `UnresolvedMergeSpec` (16) | the variant rendering of an unresolved merge under an include | `#598`/`#600` | a release formats those merges stably |
 | `ExamplesSpec` catalogue refusals (7) | the pinned `now` of the defect examples | `#598`, `#605`, `#646`/`#647` | the examples move to `target` and the metadata's `upstream` note goes |
 | Numeric rendering (6 library tests), `NumericRenderingSpec` (8) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |
