@@ -15,9 +15,8 @@ enum Refusal derives CanEqual {
   case NestingTooDeep(limit: Int)
 
   /** The early lexical resource limits, found by the same scan: a dotted key path with more
-    * segments than the written cap, a flattened path past the nesting cap, or key paths whose
-    * total squared length exceeds the duplicate report's work budget. `detail` names the limit
-    * and what it bounds.
+    * segments than the written cap, or key paths whose total squared flattened length exceeds
+    * the duplicate report's work budget. `detail` names the limit and what it bounds.
     */
   case PathTooDeep(detail: String)
 

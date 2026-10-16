@@ -137,8 +137,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // limitations.md). The generator mixes ordinary chains with ones past every limit, so both
   // the refusal and the surviving shapes are exercised. The value's spelling is part of the
   // shape: the written path must survive `=`, `:`, `+=` and the blanks after it to the `{`,
-  // or a chain written that way slips past every bound. The boundary (360 flattened segments)
-  // gets its own share: levels times segments from 8 x 24 to 14 x 40 straddles it on both sides.
+  // or a chain written that way slips past every bound. The historical 360-segment family gets
+  // its own share; these large chains now exceed the total-work budget.
   property("no nested dotted path throws or exceeds a time bound") {
     val spelling = Gen.oneOf("brace", "eq", "colon", "append")
     val nesting  = Gen.frequency(

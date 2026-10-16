@@ -271,11 +271,9 @@ class NestingDepthSpec extends munit.FunSuite {
   // and the brace — `=`, `:`, `+=`, blanks, a newline, a comment — the object inside inherits the
   // path just written. That is what the duplicate report counts (probed on sconfig: `a.b.c.x` in
   // every spelling, across a newline and a comment too, and `a.b.c[0].x` for the object inside an
-  // array, siblings alike). Pinned at the boundary: 12 levels of 30 carry 361 flattened segments
-  // and must refuse before the parser runs, 11 levels with a 30-segment leaf sit at 360 and must
-  // survive. The paths stay at 30 segments, which the library parses on Scala.js too, and a
-  // sibling per level keeps two fields in every object, so the render flattens nothing: one long
-  // dotted line in the output would not reparse there.
+  // array, siblings alike). Small chains pass the scan; long chains refuse by total work before
+  // the parser. A sibling per level keeps two fields in every object, so the render flattens
+  // nothing: one long dotted line in the output would not reparse on Scala.js.
   def chainIn(spelling: String, levels: Int, segments: Int, leafSegments: Int): String = {
     val opener = spelling match {
       case "brace"   => objectPath(segments) + " { sibling = 0\n"
