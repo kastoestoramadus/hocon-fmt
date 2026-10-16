@@ -26,7 +26,7 @@ class NestingDepthSpec extends munit.FunSuite {
   // of their flattened path length, refused past the budget. The dense shapes that pinned the
   // calibration live in PathWorkBudgetSpec; the tests here re-pin their boundaries to it.
   def workReason =
-    s"the key paths' total squared length exceeds the duplicate report's budget of ${HoconText.MaxPathWork}"
+    s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget ${HoconText.MaxPathWork})"
 
   def dotted(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
 

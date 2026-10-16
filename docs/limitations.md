@@ -156,9 +156,18 @@ the substitution; siblings do not accumulate.
 `L²` units. A dotted statement of `w` segments inside an enclosing path of length `E` defines
 every intermediate object too, so it costs `(E+1)² + ... + (E+w)²`. The scan adds these in
 constant time per statement and refuses once their total exceeds the budget, with kind
-`path-too-deep` and reason `the key paths' total squared length exceeds the duplicate report's
-budget of 300000`. A single 96-segment path costs 299,536 units and passes; 97 segments exceed
+`path-too-deep` and reason `too many or too long key paths to check safely; use shorter key paths
+or split the configuration into smaller files (work budget 300000)`. A single 96-segment path costs 299,536 units and passes; 97 segments exceed
 the budget. Splitting it into nested objects does not remove that cost.
+
+Shorten the actual full key paths, or split the configuration into smaller files and format each
+part separately, preserving merge and include order. There is a conservative refusal band:
+6,000 lines of `app.service.module.feature.optN = N` (249,780 bytes) cost 330,000 units and
+refuse in 3 ms, while `main` before this budget formats them in about 1.0–1.4 s on the JVM;
+12,000 lines (505,780 bytes) refuse too, versus about 4.2–5.2 s previously. At five segments,
+5,454 lines fit and 5,455 do not. The default remains 300,000, 11.2 times the corpus maximum:
+raising it changes refusal policy and needs an owner decision, rather than an extrapolation
+from one fast shape. Nesting the same full paths retains their definitions and cost.
 
 The flattened length includes every enclosing field path and **one segment per array element
 level** (`k[0].f` has three segments). `{` inherits the field's path whether written as `a.b {`,
