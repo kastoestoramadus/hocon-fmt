@@ -157,7 +157,7 @@ the substitution; siblings do not accumulate.
 every intermediate object too, so it costs `(E+1)² + ... + (E+w)²`. The scan adds these in
 constant time per statement and refuses once their total exceeds the budget, with kind
 `path-too-deep` and reason `too many or too long key paths to check safely; use shorter key paths
-or split the configuration into smaller files (work budget 300000)`. A single 96-segment path
+or split the configuration into smaller files`. A single 96-segment path
 costs 299,536 units and passes the scan; 97 segments exceed the budget. Splitting it into nested objects does not remove that cost.
 
 Shorten the actual full key paths, or split the configuration into smaller files and format each

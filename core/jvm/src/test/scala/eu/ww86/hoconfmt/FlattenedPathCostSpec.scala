@@ -15,7 +15,7 @@ class FlattenedPathCostSpec extends munit.FunSuite {
 
   val bound      = 10.seconds
   def workReason =
-    s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget ${HoconText.MaxPathWork})"
+    s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files"
 
   def objectPath(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".")
 

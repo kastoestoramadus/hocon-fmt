@@ -268,7 +268,7 @@ private[hoconfmt] object HoconText {
 
   private def writtenLimitReason = s"input dotted key paths exceed the maximum of $MaxPathSegments segments"
   private def workBudgetReason   =
-    s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget $MaxPathWork)"
+    s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files"
 
   def spans(text: String): Vector[Span] = {
     @tailrec
