@@ -18,8 +18,8 @@ class NestingDepthSpec extends munit.FunSuite {
   // written-line limit above caps (a 20-level chain of 120-segment paths spent 34 seconds in
   // the report). The scan counts it: a `{` adds the key path just written to what every
   // definition inside inherits, a `[` costs one segment for the element its definitions sit in
-  // (the report walks `k[0].f`), and a `}` takes it back out. The 360-segment flattened limit
-  // stays alongside the work budget. Object-only chains cost S(F) to reach flattened length F;
+  // (the report walks `k[0].f`), and a `}` takes it back out. Object-only chains cost S(F)
+  // to reach flattened length F;
   // array indices extend the path without defining keys of their own.
 
   // The total the duplicate report may spend: the sum over the file's definitions of the square
@@ -227,20 +227,6 @@ class NestingDepthSpec extends munit.FunSuite {
       + (if (leafSegments == 0) "leaf = 1\n" else leafPath(leafSegments) + " = 1\n")
       + "}\n" * levels
 
-  test("a chain at the flattened limit and one segment past it are refused by the work budget") {
-    // The budget fires first on both sides of the flattened boundary (S(360) of work is 52
-    // times the budget), so the flattened limit has no testable refusal of its own left.
-    assertEquals(HoconFormatter.format(chain(11, 30, 30)).left.map(_.reason), Left(workReason)) // 11*30 + 30 = 360
-    assertEquals(
-      HoconFormatter.format(chain(12, 30, 0)).left.map(_.reason), // 12*30 + 1 = 361
-      Left(workReason)
-    )
-    Verdict.of(chain(12, 30, 0)) match {
-      case Verdict.Refused(refusal) => assertEquals(refusal.reason, workReason)
-      case other                    => fail(s"expected a refused verdict, got $other")
-    }
-  }
-
   test("a 20-level chain of maximal written paths refuses with the work-budget reason") {
     assertEquals(HoconFormatter.format(chain(20, 120, 0)).left.map(_.reason), Left(workReason))
   }
@@ -307,17 +293,6 @@ class NestingDepthSpec extends munit.FunSuite {
   }
 
   def spellings = List("brace", "eq", "colon", "append", "blanks", "newline", "array")
-
-  for (spelling <- spellings) {
-    test(s"a chain one over the flattened limit refuses with the budget in the `$spelling` spelling") {
-      val source = chainIn(spelling, 12, 30, 0) // 12*30 + 1 = 361 flattened, work S(360) over the budget
-      assertEquals(HoconFormatter.format(source).left.map(_.reason), Left(workReason))
-      Verdict.of(source) match {
-        case Verdict.Refused(refusal) => assertEquals(refusal.reason, workReason)
-        case other                    => fail(s"expected a refused verdict, got $other")
-      }
-    }
-  }
 
   for (spelling <- spellings) {
     test(s"a chain well inside the budget passes the scan in the `$spelling` spelling") {

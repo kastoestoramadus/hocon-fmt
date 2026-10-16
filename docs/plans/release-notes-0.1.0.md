@@ -69,8 +69,8 @@ a value, never a write, and never a failed build unless a fail-on policy asks fo
 - Blank lines are not kept, and duplicate definitions collapse to the later one, which the CLI and
   the plugins report as a warning (failing the run only with `fail-on-duplicates`).
 - **Deep input is bounded before it is parsed**: input with more than 80 simultaneous opening
-  `{` or `[` delimiters in code, a dotted key path over 120 segments, or a flattened path over
-  360 (the enclosing objects counted), or total report work above 300,000 units is refused.
+  `{` or `[` delimiters in code, a dotted key path over 120 segments, or total report work
+  above 300,000 units is refused.
   Each definition costs its squared flattened path length, including array levels. The corpus
   maximum is 26,725 units, 11.2 times below the budget. This bounds report key-path work only;
   [sconfig parsing and Native memory costs](../limitations.md#long-dotted-key-paths) remain.

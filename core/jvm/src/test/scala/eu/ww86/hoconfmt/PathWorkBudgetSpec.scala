@@ -6,7 +6,7 @@ import scala.concurrent.duration.DurationInt
   * length exceeds `HoconText.MaxPathWork` is refused by the scan, before anything is parsed. The
   * report pairs every prefix of every definition's path against the definitions
   * (`DuplicateReport.report`), so its cost follows the file's total work, not the longest single
-  * statement the written and flattened limits cap: two 120-segment chains with 200 leaves of 120
+  * statement the old per-path limits capped: two 120-segment chains with 200 leaves of 120
   * segments each (160 KB, every written line at the limits, no duplicates) spent 12.0-12.8 s in
   * `DuplicateReport.findings` on the JVM while the scan accepted it. The budget refuses the shape
   * in under a millisecond — through the report the command line and the other integrations run,

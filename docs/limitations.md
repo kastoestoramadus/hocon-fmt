@@ -174,8 +174,10 @@ level** (`k[0].f` has three segments). `{` inherits the field's path whether wri
 `a.b = {`, `a.b : {` or `a.b += {`; `[` also adds the element level. Every piece of an object or
 array concatenation inherits the field's path. Closing the value removes its contribution from
 the enclosing length; siblings inherit the same enclosing length and each contributes its own
-work. The 360-segment flattened cap remains alongside the written and nesting caps, but it does
-not provide a separate time guarantee.
+work. The obsolete 360-segment flattened cap is removed with its boundary tests: at this budget
+an enclosing path has at most 96 key segments (`S(96) = 299,536`) and 80 array levels, and even
+an unfinished 120-segment statement stays below 360 before the next work check. Historical
+slow-chain and spelling regressions now pin the work budget.
 
 The previous per-path caps accepted a 160 KB file with two 120-segment chains and 200 leaves of
 120 segments: its report took 12–13 s on the JVM, and 1,600 leaves took 122 s. Across 30 measured

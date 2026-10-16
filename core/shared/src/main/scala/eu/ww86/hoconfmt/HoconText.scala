@@ -24,11 +24,6 @@ private[hoconfmt] object HoconText {
   // 2,000 segments; see limitations.md.
   val MaxPathSegments = 120
 
-  // Nesting and array elements extend a written path in the report. Retain the individual
-  // flattened cap alongside the total-work budget; a per-path cap alone left dense files
-  // unbounded (160 KB spent 12-13 seconds in the report).
-  val MaxFlattenedPathSegments = 360
-
   // Prefix creation and comparison cost the report the sum of squared definition lengths. The
   // 30 measured dense shapes fit this proxy better than cubes (R² .993 vs .982). Ten times
   // the corpus maximum of 26,725, rounded up; see limitations.md for the calibration and times.
@@ -82,8 +77,6 @@ private[hoconfmt] object HoconText {
         afterDot: Boolean
     ): Either[Refusal, Unit] =
       if (segments > MaxPathSegments) Left(Refusal.PathTooDeep(writtenLimitReason))
-      else if (flat + segments > MaxFlattenedPathSegments)
-        Left(Refusal.PathTooDeep(flattenedLimitReason))
       else if (work > MaxPathWork) Left(Refusal.PathTooDeep(workBudgetReason))
       else if (index >= text.length) Right(())
       else if (text.startsWith("\"\"\"", index))
@@ -274,7 +267,6 @@ private[hoconfmt] object HoconText {
   }
 
   private def writtenLimitReason   = s"input dotted key paths exceed the maximum of $MaxPathSegments segments"
-  private def flattenedLimitReason = s"input dotted key paths exceed the maximum of $MaxFlattenedPathSegments segments"
   private def workBudgetReason     =
     s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget $MaxPathWork)"
 

@@ -4,8 +4,8 @@ import scala.concurrent.duration.DurationInt
 
 /** The duplicate report's time bound is real: `TimeoutGuard` runs the call on a worker thread
   * and the test thread gives up at the bound, so a regression fails the suite in seconds instead
-  * of hanging it. The resource limits behind the refusals live in the scan — the written and
-  * flattened caps, and the work budget that bounds the report's total (`HoconText.MaxPathWork`,
+  * of hanging it. The resource limits behind the refusals live in the scan — the written cap
+  * and the work budget that bounds the report's total (`HoconText.MaxPathWork`,
   * pinned by `PathWorkBudgetSpec`): the shapes here are the ones that once spent tens of seconds
   * in the report, and every one of them must be refused within the bound. The shared property in
   * `FormatterPropertiesSpec` runs the same shapes with the bound asserted after the call, which
@@ -37,8 +37,8 @@ class FlattenedPathCostSpec extends munit.FunSuite {
     expectRefused(TimeoutGuard.within(bound.toMillis)(DuplicateReport.findings(source)))
   }
 
-  test("the dense shape at the flattened limit is refused by the work budget within the time bound") {
-    // Two 120-segment chains and a 120-segment leaf: every written line at the caps, 360
+  test("the historical dense 360-segment shape refuses within the time bound") {
+    // Two 120-segment chains and a 120-segment leaf: every written line at the written cap, 360
     // flattened segments, total work S(360) — the 50-leaf family of this shape spent 3.0-3.5 s
     // in the report on the JVM before the budget, 200 leaves 12.0-12.8 s.
     val source = (objectPath(120) + " {\n") * 2 + objectPath(120) + " = 1\n" + "}\n" * 2
