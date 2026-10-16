@@ -28,12 +28,6 @@ class NestingDepthSpec extends munit.FunSuite {
   def workReason =
     s"the key paths' total squared length exceeds the duplicate report's budget of ${HoconText.MaxPathWork}"
 
-  test("a work-budget refusal explains the remedy in plain language") {
-    val source = (1 to 6000).map(i => s"app.service.module.feature.opt$i = 1\n").mkString
-    val expected = s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget ${HoconText.MaxPathWork})"
-    assertEquals(HoconText.checkNesting(source).left.map(_.reason), Left(expected))
-  }
-
   def dotted(segments: Int): String = (1 to segments).map(i => s"k$i").mkString(".") + " = 1\n"
 
   // The library cannot parse a path of 33 or more elements on Scala.js yet
@@ -353,4 +347,11 @@ class NestingDepthSpec extends munit.FunSuite {
     assert(HoconFormatter.format("x.y.z = 1\n" + chain(2, 20, 20)).isRight)
     assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(2, 20, 20)).isRight)
   }
+  test("a work-budget refusal explains the remedy in plain language") {
+    val source   = (1 to 6000).map(i => s"app.service.module.feature.opt$i = 1\n").mkString
+    val expected =
+      s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget ${HoconText.MaxPathWork})"
+    assertEquals(HoconText.checkNesting(source).left.map(_.reason), Left(expected))
+  }
+
 }
