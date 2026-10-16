@@ -44,6 +44,7 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
     val leaves = (0 until 8000).map(i => s"k$i = 1\n").mkString
     val nested = "a { b {\n" + leaves + "}}\n"
     val dotted = (0 until 8000).map(i => s"a.b.k$i = 1\n").mkString
+    val _ = parseTime(nested)
     val reference = parseTime(nested)
     val elapsed = parseTime(dotted)
     assert(elapsed <= reference * 20 + 200000000L,
@@ -52,6 +53,7 @@ class SconfigDefectsSpec extends munit.FunSuite with HoconTestSupport {
 
   test("library: repeated appends should parse near a literal array's cost") {
     val literal = "k = [" + List.fill(8000)("1").mkString(",") + "]"
+    val _ = parseTime(literal)
     val reference = parseTime(literal)
     val elapsed = parseTime("k += 1\n" * 8000)
     assert(elapsed <= reference * 20 + 200000000L,
