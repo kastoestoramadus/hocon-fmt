@@ -88,7 +88,7 @@ object Status {
     case RefusalKind.NotHocon       => "The parser cannot read this text as HOCON. Check the syntax at the location below."
     case RefusalKind.NestingTooDeep => "The text exceeds the nesting limit checked before parsing on every platform."
     case RefusalKind.PathTooDeep    =>
-      "The text's longest dotted key path exceeds the segment limit checked before parsing on every platform."
+      "The text has too many or too long key paths to check safely before parsing; shorten the paths or split the configuration into smaller files."
     case RefusalKind.OtherFormat =>
       "The file name specifies another format. This formatter writes HOCON only."
     case RefusalKind.BrokenOutput =>
