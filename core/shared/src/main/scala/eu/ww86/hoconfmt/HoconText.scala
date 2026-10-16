@@ -266,8 +266,8 @@ private[hoconfmt] object HoconText {
     squareSum(e.toLong + w) - squareSum(e.toLong)
   }
 
-  private def writtenLimitReason   = s"input dotted key paths exceed the maximum of $MaxPathSegments segments"
-  private def workBudgetReason     =
+  private def writtenLimitReason = s"input dotted key paths exceed the maximum of $MaxPathSegments segments"
+  private def workBudgetReason   =
     s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files (work budget $MaxPathWork)"
 
   def spans(text: String): Vector[Span] = {

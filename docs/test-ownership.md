@@ -44,7 +44,7 @@ The Java/plugin/acceptance counts were checked from source registration only.
 
 | suite (where) | cases | class | notes |
 |---|---:|---|---|
-| `SconfigDefectsSpec` (core/shared) | 30 | SCONFIG | bare round trip; 29 red on JVM with sconfig 2.0.0; current JS/Native failure totals not re-measured |
+| `SconfigDefectsSpec` (core/shared) | 32 | SCONFIG | bare library calls; 2026-10-16: 31 red JVM, 32 red JS, 30 red Native (one skipped); includes two parse-cost cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
 | `HoconSpecCoverageSpec` (core/shared) | 48 | 17 SCONFIG / 31 MIXED | normalised 8 + supported 9 SCONFIG; the other 31 are refusal and comment groups, MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
@@ -73,8 +73,13 @@ The Java/plugin/acceptance counts were checked from source registration only.
 
 The numeric rendering limitation has ten acceptance/output pins (MIXED) and six bare-library
 reproductions (SCONFIG). It remains accepted by owner decision: no numeric refusal or rendering
-patch is carried. `SconfigDefectsSpec` has 29 red cases out of 30 on the JVM at `ca20d44`,
-plus the separate JVM detached-comment guard. Current JS/Native totals were not re-measured.
+patch is carried. Rechecked on 2026-10-16 with sconfig 2.0.0: `SconfigDefectsSpec` has
+31 red cases out of 32 on the JVM, 32 out of 32 on JS, and 30 out of 32 on Native (one passes,
+one is skipped for unbounded recursion). The separate JVM detached-comment guard remains red.
+The two new `library:` cases compare the parse cost of 8,000 shared dotted keys with nested
+fields and 8,000 appends with a literal array (20 times the equivalent parse plus 200 ms).
+They reproduce the parser defects without formatter transformations; a pre-parse refusal is
+follow-up work, as documented in [limitations](limitations.md#slow-sconfig-object-merges-and-appends-follow-up-refusal).
 The totals below describe the earlier 2026-10-09 snapshot.
 
 At the 2026-10-09 snapshot, core JVM totalled 450 passing; with the two defect suites, 471, of
@@ -137,6 +142,7 @@ them, flip the numeric output pins and update the limitation; no numeric refusal
 | `HoconSpecCoverageSpec` refusals `mustRefuse` (13), sibling-field merges (8), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
 | `UnresolvedMergeSpec` (16) | the variant rendering of an unresolved merge under an include | `#598`/`#600` | a release formats those merges stably |
 | `ExamplesSpec` catalogue refusals (7) | the pinned `now` of the defect examples | `#598`, `#605`, `#646`/`#647` | the examples move to `target` and the metadata's `upstream` note goes |
+| Shared dotted object merges and repeated appends (2 library tests) | parse near the equivalent nested/literal form's cost | not filed; owner reviews the ledger first | a release avoids quadratic parsing; pre-parse refusal is follow-up work |
 | Numeric rendering (6 library tests), `NumericRenderingSpec` (10) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |
 | `KeepDetachedCommentsGuardSpec` (1) | `setKeepDetachedComments` exists | `#647` | the released library carries the option; then the fork and carrier are deleted |
 
