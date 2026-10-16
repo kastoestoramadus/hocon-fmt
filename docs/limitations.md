@@ -556,8 +556,8 @@ keeps them in the analysis workspace outside it (`work/codex-jobs/i5/report.md`,
 ## Speed
 
 The pinned sconfig 2.0.0 dropped the exception-based loop control of 1.12.4, which cost about
-2.3 us per `break` on Scala Native. Native `format` takes about 0.9 ms for a typical file (1.12.4:
-3.6 ms) and about 0.3 s for a generated 330 KB file (1.12.4: 2.0 s; the JVM takes 0.1 s). Its
+2.3 us per `break` on Scala Native. Native `format` takes about 1 ms for a typical file (1.12.4:
+3.6 ms) and 0.3-0.4 s for a generated 330 KB file (1.12.4: 2.0 s; the JVM takes 0.1 s). Its
 renderer is still the slow part on Scala.js. Current numbers: `scripts/bench.py report`.
 
 ## What depending on sconfig means for your files
