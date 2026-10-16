@@ -35,6 +35,23 @@ object Variant {
     "mustRefuse: += field separator, nested"                                             -> fork,
     "mustRefuse: self-referential substitution"                                          -> fork,
     "mustRefuse: array self-concatenation"                                               -> fork,
+    "mustRefuse: nested self-reference"                                                  -> fork,
+    "mustRefuse: env override in an object"                                              -> fork,
+    "mustRefuse: env override in an object with a sibling after the object"              -> fork,
+    "mustRefuse: self-reference in an object with a sibling after the object"            -> fork,
+    "mustRefuse: nested self-reference with a trailing field"                            -> fork,
+    "mustRefuse: array concatenation with a substitution"                                -> fork,
+    "mustRefuse: string concatenation with a substitution"                               -> fork,
+    "mustRefuse: object concatenation with a substitution"                               -> fork,
+    "mustRefuse: env override alone at the root"                                         -> fork,
+    "unstableMerge: self-referential substitution with a sibling field"                  -> fork,
+    "unstableMerge: += field separator with a sibling field"                             -> fork,
+    "unstableMerge: env override with a sibling field"                                   -> fork,
+    "unstableMerge: env override in an object with a sibling field"                      -> fork,
+    "unstableMerge: self-referential substitution with a field before"                   -> fork,
+    "unstableMerge: self-referential substitution with a leading comment"                -> fork,
+    "unstableMerge: env override with a field before"                                    -> fork,
+    "unstableMerge: env override with a leading comment"                                 -> fork,
     "specSelfReference: substitution cycle (Examples of Self-Referential Substitutions)" -> fork
   )
 

@@ -12,9 +12,12 @@ is: files the formatter cannot prove safe are refused, without writing or breaki
 The list has not been reviewed by hand yet; the second release tightens it. The dated JVM
 measurement and corpus caveat are in [limitations](../limitations.md#refusals-in-v010).
 
-The workflow still implements the earlier split below. Before tagging v0.1.0, move Maven
-publishing into the first wave and complete Gradle publishing without enabling the later
-Native, npm or PyPI jobs. Gradle setup is now a first-release blocker.
+The workflow no longer implements the earlier split below: since #129 (2026-10-14) it offers the
+selective targets [releasing](../releasing.md) describes — a checkbox per target and
+`RELEASE_TARGETS` on tags, with `core`, `sbt-plugin`, `maven-plugin` and `gradle-plugin` selected
+by default, and the Maven and Gradle uploads wired in. What is still missing is the PyPI
+publisher job and the npm trusted-publisher job. The superseded plan below is kept only as the
+record of that decision.
 
 ## Earlier two-wave plan (2026-10-09; scope superseded above)
 
@@ -42,18 +45,20 @@ jobs. The hooks pin PyPI and npm versions, so they must not be advertised before
 
 ## Code
 
-1. **`release.yml` has no PyPI, npm or Gradle job.** It builds the wheels and the npm tarball and
-   attaches them to the GitHub release, and it stages Central. Missing: `pypa/gh-action-pypi-publish`
-   with `environment: pypi` and `id-token: write`; an npm trusted-publisher job (npm >= 11.5.1);
-   `com.gradle.plugin-publish` in `gradle-plugin/` (website, VCS URL, tags) and
-   `./gradlew publishPlugins` in the job.
+1. **`release.yml` has no PyPI publisher job.** It builds the wheels and the npm tarball, uploads
+   the npm package as an artifact, attaches the release assets and stages Central; the Gradle
+   submission is wired (`com.gradle.plugin-publish` 2.2.1 in `gradle-plugin/build.gradle.kts`,
+   `./gradlew publishPlugins` in the workflow behind the `gradle-plugin` checkbox). Missing:
+   `pypa/gh-action-pypi-publish` with `environment: pypi` and `id-token: write`; an npm
+   trusted-publisher job (npm >= 11.5.1) — the npm job packs the tarball but does not publish.
 2. **The Central job is unverified** (#28, #29, #31): signing, `sonaUpload`, the Maven `release`
    profile and Mill's `publishAll` have never run with the real secrets. The dry run in
    `docs/releasing.md` step 2 is the test; it needs a manual `workflow_dispatch` on `main`.
-3. **Version in five places** (`build.sbt`, `gradle-plugin/build.gradle.kts`,
-   `maven-plugin/pom.xml`, `mill-plugin/build.mill`, `.pre-commit-hooks.yaml`);
-   `scripts/check-release-version.sh` guards the tag. Check that `java-api` takes its version from
-   `build.sbt` and is among the artifacts the checker covers.
+3. **Version in six places** (`build.sbt`, `java-api/build.gradle.kts`, `gradle-plugin/build.gradle.kts`,
+   `maven-plugin/pom.xml`, `mill-plugin/build.mill`, and the `additional_dependencies` of all four
+   hooks in `.pre-commit-hooks.yaml`); `scripts/check-release-version.sh` guards the tag and
+   covers `java-api/build.gradle.kts` with the others. The runbook in [releasing](../releasing.md)
+   tells which files each selected target checks; unselected channel versions may trail.
 4. **Sconfig and refusals.** The current core uses published sconfig 2.0.0 (`build.sbt`);
    the playground still uses the pinned fork. The owner's 2026-10-13 decision is to ship the
    current refusal list in v0.1.0 and tighten it in the second release. Keep

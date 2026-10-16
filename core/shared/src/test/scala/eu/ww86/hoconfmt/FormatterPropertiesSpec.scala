@@ -53,6 +53,18 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  property("include indexes preserve exact verdicts in every option combination") {
+    forAll(Gen.oneOf(documents(includes = true), documentsWithConcatenations)) { doc =>
+      allOptions.foreach { options =>
+        assertEquals(
+          HoconFormatter.format(doc.text, options),
+          IncludeChecksOldFormatter.format(doc.text, options),
+          doc.text
+        )
+      }
+    }
+  }
+
   property("nested include-bearing inputs always yield a verdict with a reason on refusal") {
     forAll(Gen.choose(1, 160)) { depth =>
       val source = "include \"missing.conf\"\n" + "a {" * depth + "x=1" + "}" * depth
@@ -336,6 +348,33 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
         HoconFormatter
           .format(doc.text, options)
           .foreach(out => assertSameMeaning(out, doc.text, s"meaning changed, output:\n$out"))
+      }
+    }
+  }
+
+  // docs/limitations.md promises that a cycle between bare names is not a refusal: whatever the
+  // length of the ring, formatting settles it, and the second pass keeps what the first wrote.
+  // Resolving that fixed point still fails with the same cycle complaint the input had — nothing
+  // is hidden — so this pins the verdict and the stability, not a resolution.
+  property("a pure substitution cycle of any length formats to a fixed point, in any option combination") {
+    forAll(Gen.choose(2, 8)) { size =>
+      // ScalaCheck shrinks toward 0, out of the generated range; a ring has at least two keys.
+      val n = 2 max size
+      allOptions.foreach { options =>
+        val sep = options.separator match {
+          case Separator.Equals => " = "
+          case Separator.Colon  => ": "
+        }
+        val cycle = (0 until n).map(i => "k" + i + " : ${k" + ((i + 1) % n) + "}").mkString("\n")
+        val fixed = (0 until n)
+          .map(i => "k" + i + sep + "${k" + ((i + 1) % n) + "}")
+          .mkString("", "\n", "\n")
+        HoconFormatter.format(cycle, options) match {
+          case Right(out) =>
+            assertEquals(out, fixed, s"ring of $n, $options")
+            assertEquals(HoconFormatter.format(out, options), Right(out), s"second pass, ring of $n, $options")
+          case Left(refusal) => fail(s"ring of $n, $options: refused: ${refusal.reason}")
+        }
       }
     }
   }

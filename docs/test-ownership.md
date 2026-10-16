@@ -31,45 +31,51 @@ red on 1.12.4), `HoconSpecCoverageSpec` 30, `FormatterPropertiesSpec` 10, `Examp
 `PreambleSpec` 12 (new), `CommentCarrierSpec` 15 with a 17-entry ledger; core JVM 517 cases with
 495 passing (`sbt test` excludes the two defect suites).
 
+Current inventory rechecked on 2026-10-15 at `ca20d44` (sconfig 2.0.0). JVM runner totals
+and source registration counts below supersede the inventory counts, not the dated historical
+runs above. `HoconSpecCoverageSpec` remains 30 executed cases on this commit.
+
 ## 1. Inventory
 
-Counts are executed cases. `libraryDefects` cases are excluded from `sbt test`; the site's
+Counts are registered cases; JVM and JS totals were also checked by running the suites.
+The Java/plugin/acceptance counts were checked from source registration only.
+`libraryDefects` cases are excluded from `sbt test`; the site's
 `ComponentSpec` 26 includes three style-switch cases driven by a loop.
 
 | suite (where) | cases | class | notes |
 |---|---:|---|---|
-| `SconfigDefectsSpec` (core/shared) | 29 | SCONFIG | bare round trip; 28 red on JVM/Native, 29 on JS with sconfig 2.0.0; earlier main measurements predate the six numeric cases |
+| `SconfigDefectsSpec` (core/shared) | 30 | SCONFIG | bare round trip; 29 red on JVM with sconfig 2.0.0; current JS/Native failure totals not re-measured |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
-| `HoconSpecCoverageSpec` (core/shared) | 30 | 17 SCONFIG / 13 MIXED | normalised 8 + supported 9 SCONFIG; refusal groups 13 MIXED |
+| `HoconSpecCoverageSpec` (core/shared) | 48 | 17 SCONFIG / 31 MIXED | normalised 8 + supported 9 SCONFIG; the other 31 are refusal and comment groups, MIXED |
 | `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
-| `FormatterPropertiesSpec` (core/shared) | 12 | 11 OURS / 1 MIXED | 1000 generated documents × 8 option sets each |
-| `NumericRenderingSpec` (core/shared) | 8 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
-| `DuplicateReportSpec` (core/shared) | 28 | 18 OURS / 10 MIXED | resolution assertions are sconfig's |
+| `FormatterPropertiesSpec` (core/shared) | 18 | OURS / MIXED | 1000 successful checks per property by default; option-matrix properties cover 8 styles |
+| `NumericRenderingSpec` (core/shared) | 10 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
+| `DuplicateReportSpec` (core/shared) | 29 | OURS / MIXED | resolution assertions are sconfig's |
 | `ExamplesSpec` (core/shared) | 31 | 23 OURS / 8 MIXED | one case per example (23) plus 8 suite tests |
 | `IncludeDetectionSpec` (core/shared) | 23 | OURS | the detection contract |
-| `IncludeOrderSpec` (core/shared) | 13 | OURS | moved include = our refusal |
+| `IncludeOrderSpec` (core/shared) | 17 | OURS | moved include = our refusal |
 | `IncludeCollisionSpec` (core/shared) | 235 | OURS | placeholder collision, every option set |
 | `UnresolvedMergeSpec` (core/shared) | 24 | 8 OURS / 16 MIXED | variant rendering under include |
-| `VerdictSpec`, `OptionsSpec`, `FormatOptionsSpec` (core/shared) | 30 | OURS | verdicts, pinned options, config parsing |
+| `VerdictSpec`, `OptionsSpec`, `FormatOptionsSpec` (core/shared) | 56 | OURS | verdicts, pinned options, config parsing |
 | `GoldenFileSpec` (core/jvm-native) | 3 | OURS | our output, byte for byte |
 | `ShowcaseSafetySpec`, `TryAndFutureSpec` (core/shared) | 3 | OURS | |
 | `CommentCarrierDefaultSpec` (core/default-shared) | 3 | OURS | the published no-op carrier |
 | `PreambleSpec` (core/default-shared) | 12 | OURS | the published core's preserved preamble: the rule's boundary, the verbatim header, the file's own lines in a refusal |
-| `CommentCarrierSpec` (core/site-shared) | 15 | OURS | the fork seam and its ledger |
-| `FileFormatterSpec`, failure, consumer (cats, JVM) | 18 | OURS | writes, identity, atomicity |
-| `CmdApiSpec`, `GitIgnoreSpec` (cli, JVM) | 64 | OURS | exit codes, walk, config lookup |
-| zio suites (JVM; 24, with a property) | 24 | OURS | |
-| `HoconFormatterJsSpec` (web, JS) | 8 | OURS | |
-| site suites (JS) | 88 | OURS | page logic, merge, fake browser |
-| java-api (Java/Kotlin) | 37 | OURS | |
-| gradle functionalTest, maven `src/it`, mill, sbt scripted | 16 / 15 / 12 / 10 | OURS | integrations |
-| `CliAcceptanceSuite` (acceptance) | 11 | OURS | processes, all three runtimes |
+| `CommentCarrierSpec` (core/site-shared) | 18 | OURS | the fork seam and its ledger |
+| `FileFormatterSpec`, failure, consumer (cats, JVM) | 19 | OURS | writes, identity, atomicity |
+| `CmdApiSpec`, `GitIgnoreSpec` (cli, JVM) | 82 | OURS | exit codes, walk, config lookup |
+| zio suites (JVM; with a property) | 25 | OURS | |
+| `HoconFormatterJsSpec` (web, JS) | 9 | OURS | |
+| site suites (JS) | 90 | OURS | page logic, merge, fake browser |
+| java-api (Java/Kotlin) | 46 | OURS | |
+| gradle functionalTest, maven `src/it`, mill, sbt scripted | 18 / 23 / 17 / 10 | OURS | integrations; sbt 2 also has 10 scripted cases |
+| `CliAcceptanceSuite` (acceptance) | 72 | OURS | 24 registered cases per runtime, all three runtimes |
 
-The numeric rendering limitation adds eight acceptance/output pins (MIXED) and six bare-library
+The numeric rendering limitation has ten acceptance/output pins (MIXED) and six bare-library
 reproductions (SCONFIG). It remains accepted by owner decision: no numeric refusal or rendering
-patch is carried. `SconfigDefectsSpec` now has 28 red cases on JVM/Native and 29 on Scala.js,
-plus the separate JVM detached-comment guard. The totals below describe the earlier
-2026-10-09 snapshot.
+patch is carried. `SconfigDefectsSpec` has 29 red cases out of 30 on the JVM at `ca20d44`,
+plus the separate JVM detached-comment guard. Current JS/Native totals were not re-measured.
+The totals below describe the earlier 2026-10-09 snapshot.
 
 At the 2026-10-09 snapshot, core JVM totalled 450 passing; with the two defect suites, 471, of
 which 20 were red (19 `SconfigDefectsSpec` cases plus the guard; 20 defects on Scala.js, which has the nesting defect of
@@ -128,10 +134,10 @@ them, flip the numeric output pins and update the limitation; no numeric refusal
 | `oneFieldObjectsInAnArray` (2), `envOverrides` (2) | rendered text parses and is a fixed point | `#598` merged, `#600` open | **already green on main**; a release containing `#598` |
 | `rejectedOnInput` `[]` list suffix (1) | the specification's list expansion | `#605` merged 2026-10-06 | **already green on main**; a release containing `#605` |
 | `should parse an array at the file root` (1) | a root array parses | none: the `Config` API returns an object | never, unless the API changes |
-| `HoconSpecCoverageSpec` refusals `mustRefuse` (4), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
+| `HoconSpecCoverageSpec` refusals `mustRefuse` (13), sibling-field merges (8), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
 | `UnresolvedMergeSpec` (16) | the variant rendering of an unresolved merge under an include | `#598`/`#600` | a release formats those merges stably |
 | `ExamplesSpec` catalogue refusals (7) | the pinned `now` of the defect examples | `#598`, `#605`, `#646`/`#647` | the examples move to `target` and the metadata's `upstream` note goes |
-| Numeric rendering (6 library tests), `NumericRenderingSpec` (8) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |
+| Numeric rendering (6 library tests), `NumericRenderingSpec` (10) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |
 | `KeepDetachedCommentsGuardSpec` (1) | `setKeepDetachedComments` exists | `#647` | the released library carries the option; then the fork and carrier are deleted |
 
 Checked on 2026-10-09 by running the two defect suites against sconfig main `f351262a`:
@@ -147,10 +153,10 @@ green, and the full `coreJVM` run on main fails exactly where a release will for
 |---|---|---|---|---|
 | `scripts/fetch-sconfig-fork.sh` (34 lines, sbt 2 build, pinned sha) | a clone + JS publish per sha; a CI cache keyed by the script's hash | `#647` draft | with `setKeepDetachedComments` | delete script, `sconfigFork`, `checkSconfigFork` and the two workflow steps — [site](site.md#returning-to-upstream-sconfig) steps 1–2 |
 | `coreSite` project, site wiring (48 build lines, 6 `coreSite` sites) | a second core dependency graph and suite | `#647` | same | point `site` at `coreJS`, drop from aggregates — step 2 |
-| `CommentCarrier` (330 lines), `Carried` (15), `core/default-shared` (17), the call sites | the seam plus its two halves | `#647` | same | enable the option in `parseOptions`, delete the seam and `Variant` — step 3 |
-| `CommentCarrierSpec` (154), `Variant` ledger (41), `KeepDetachedCommentsGuardSpec` (27) | 18 ledger entries to keep in step with the examples | `#647` | same | delete with the seam — step 4 |
+| `CommentCarrier` (336 lines), `Carried` (15), `core/default-shared` (25), the call sites | the seam plus its two halves | `#647` | same | enable the option in `parseOptions`, delete the seam and `Variant` — step 3 |
+| `CommentCarrierSpec` (192), `Variant` ledger (50), `KeepDetachedCommentsGuardSpec` (27) | 27 ledger entries to keep in step with the examples | `#647` | same | delete with the seam — step 4 |
 | Refusal paths for library defects: `BrokenOutput`, `UnstableOutput`, `LostComment` checks and their docs | stays as the safety net; the red list above is what would shrink | `#598`/`#600`/`#605`/`#647` | one release at a time | the checks never go: a release only stops them firing for the retired cases; update `limitations.md`, the red list and the examples' `upstream` notes |
-| `MovedInclude`/`LostInclude` guards, `IncludeMasking` (327 + 101 lines) | ours, kept forever: include handling is ours by the division of labour | [Java #733] relates, no fix | — | none |
+| `MovedInclude`/`LostInclude` guards, `IncludeMasking` (348 lines) and `IncludeOrder` (118 lines) | ours, kept forever: include handling is ours by the division of labour | [Java #733] relates, no fix | — | none |
 | Pinned `sconfig = "2.0.0"` in `build.sbt` | one line, plus the artifact set | releases after v2.0.0 | each release | bump; a release containing `#598`/`#605` also drops the refusals named above |
 | Documented normalisations (`//`→`#`, flattening, canonical numbers, LF/no BOM, inline comments moving) | none: renderer behaviour we ask for | none | — | never; they are the pinned style |
 

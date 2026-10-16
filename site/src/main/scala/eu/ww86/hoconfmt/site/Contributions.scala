@@ -317,8 +317,8 @@ object Contributions {
       Theme.Ports,
       PrState.Released,
       "`${MY_LIST[]}` resolves to a list read from `MY_LIST_0`, `MY_LIST_1`, … — the " +
-        "env-variable list suffix the specification allows and the formatter must refuse until " +
-        "this ships (ports #833)."
+        "env-variable list suffix the specification allows. It shipped in sconfig 2.1.0; the core " +
+        "pins 2.0.0, so the formatter still refuses it (ports #833)."
     ),
     Contribution(
       Sconfig,
