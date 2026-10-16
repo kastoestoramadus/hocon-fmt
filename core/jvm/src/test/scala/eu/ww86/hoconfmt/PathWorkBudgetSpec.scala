@@ -68,8 +68,9 @@ class PathWorkBudgetSpec extends munit.FunSuite {
   }
 
   def expectBudgetRefusal(refusal: Refusal, shape: String): Unit = refusal match {
-    case why @ Refusal.PathTooDeep(_) => assert(why.reason.contains("too many or too long key paths"), s"$shape: ${why.reason}")
-    case other                        => fail(s"$shape: expected the work-budget refusal, got $other")
+    case why @ Refusal.PathTooDeep(_) =>
+      assert(why.reason.contains("too many or too long key paths"), s"$shape: ${why.reason}")
+    case other => fail(s"$shape: expected the work-budget refusal, got $other")
   }
 
   test("the over-10s shape, two 120-segment chains and 200 leaves of 120 segments, refuses within the time bound") {
