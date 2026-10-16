@@ -78,7 +78,7 @@ private[hoconfmt] object IncludeShadow {
     * object `a` and the value `a.o` on one line, and the object the merge keeps would make the
     * dropped leaf look kept. Neither can the pair decide between two definitions written on one
     * line that erase each other, which share both halves; [[survives]] denies the pair's vouch when
-    * [[erasedByALaterLineTwin]] finds one, and the candidate filter refuses over both reads.
+    * [[LineTwins]] finds one, and the candidate filter refuses over both reads.
     *
     * The root's own origin is left out: it is the text's first line, which a definition can share
     * only by standing at the very top, where no include can stand before it. Objects, arrays and
@@ -127,69 +127,85 @@ private[hoconfmt] object IncludeShadow {
     definition.arrayPositionsTrusted && kept.contains((definition.keyPath, definition.line)) && !erasedByALaterLineTwin
 
   private def first(outline: DuplicateReport.Outline, root: ConfigObject): Option[Refusal.ShadowedByInclude] = {
-    val kept = keptValues(root)
-    outline.includes
-      .sortBy(_.line)
-      .iterator
-      .flatMap(include => firstStanding(include, outline.definitions, root, kept))
-      .nextOption()
+    val kept     = keptValues(root)
+    val includes = outline.includes.sortBy(_.line).zipWithIndex.groupBy { case (include, _) =>
+      (include.arrayScope, include.scope)
+    }
+    val definitions = outline.definitions
+      .flatMap { definition =>
+        definition.keyPath.segments.inits
+          .map(segments => (definition.arrayScope, KeyPath(segments)))
+          .filter(includes.contains)
+          .map(scope => scope -> definition)
+      }
+      .groupMap(_._1)(_._2)
+    includes.iterator
+      .flatMap { case (scope, statements) =>
+        firstStanding(statements, definitions.getOrElse(scope, Vector.empty), root, kept)
+      }
+      .minByOption(_._1)
+      .map(_._2)
   }
 
-  /** The first definition of an include's object to refuse over, in line order.
-    *
-    * The questions a refusal asks are about the definitions around one of them: what stands after
-    * it, what stands between the include and it, and which paths are related to its own. Asking
-    * them of one definition at a time scans the object once per definition, which a large file
-    * with a concatenation pays for every definition — a definition inside a piece is never read off
-    * the merged tree, so each of them is a candidate. Everything the answers read is therefore
-    * indexed once per include and once per path: which the merge kept, what stands after a
-    * position, what stands before one, and which paths hold a relative of another.
+  /** Index an include-bearing scope once, then ask each doubtful definition which includes could
+    * expose it. A surviving blocker between an include and an empty object rules that include
+    * out: only includes at or after the last such blocker can refuse over the object.
     */
   private def firstStanding(
-      include: DuplicateReport.Include,
+      includes: Vector[(DuplicateReport.Include, Int)],
       definitions: Vector[DuplicateReport.Definition],
       root: ConfigObject,
       kept: Set[(KeyPath, Int)]
-  ): Option[Refusal.ShadowedByInclude] = {
-    val inItsObject = definitions.filter(definition => standsIn(definition, include))
-    // One group per line and path, built once: the fallback below asks every definition whether
-    // another one beside it on its line keeps it out of the merge, and scanning the whole object
-    // for each of them is what made a large include-bearing file quadratic.
-    val onItsLine = inItsObject.zipWithIndex.groupBy { case (definition, _) =>
-      (definition.line, definition.keyPath)
+  ): Option[(Int, Refusal.ShadowedByInclude)] = {
+    val twins      = new LineTwins(definitions.zipWithIndex)
+    val survivesAt = definitions.zipWithIndex.map { case (definition, at) =>
+      survives(kept, definition, twins.erasedLater(at, definition))
     }
-    val survivesAt = inItsObject.zipWithIndex.map { case (definition, at) =>
-      survives(kept, definition, erasedByALaterLineTwin(onItsLine, at, definition))
-    }
-    val candidates = inItsObject.indices.filter { at =>
-      val definition = inItsObject(at)
-      definition.position > include.position &&
-      (!survivesAt(at) || overshadowedOnItsLine(onItsLine, at, definition).nonEmpty)
-    }
-    if (candidates.isEmpty) None
-    else {
-      val around = new Around(include, inItsObject, survivesAt, onItsLine)
-      candidates
-        .sortBy(at => inItsObject(at).line)
-        .iterator
-        .flatMap { at =>
-          Option.when[Refusal.ShadowedByInclude](refuses(inItsObject(at), at, around, root))(
-            Refusal.ShadowedByInclude(inItsObject(at).keyPath.rendered, include.line, inItsObject(at).line)
-          )
+    val keptTwins = new LineTwins(definitions.zipWithIndex.filter { case (_, at) => survivesAt(at) })
+    val around    = new Around(definitions, survivesAt, twins, keptTwins)
+
+    // The document walk advances both line and position in source order; line ties retain that
+    // order. A binary search finds the first include after a blocker without visiting the others.
+    def includeAtOrAfter(position: Int): Option[(DuplicateReport.Include, Int)] = {
+      @tailrec
+      def lowerBound(from: Int, until: Int): Int =
+        if (from == until) from
+        else {
+          val middle = from + (until - from) / 2
+          if (includes(middle)._1.position < position) lowerBound(middle + 1, until)
+          else lowerBound(from, middle)
         }
-        .nextOption()
+      includes.lift(lowerBound(0, includes.size))
     }
+
+    definitions.indices.iterator
+      .flatMap { at =>
+        val definition = definitions(at)
+        if ((survivesAt(at) && !twins.overshadowed(at, definition)) || !refuses(definition, at, around, root)) None
+        else {
+          val blocker = if (definition.objectValued) around.lastBlocker(at) else -1
+          includeAtOrAfter(blocker)
+            .filter(_._1.position < definition.position)
+            .map[((Int, Int, Int), Refusal.ShadowedByInclude)] { case (include, rank) =>
+              (
+                (rank, definition.line, at),
+                Refusal.ShadowedByInclude(definition.keyPath.rendered, include.line, definition.line)
+              )
+            }
+        }
+      }
+      .minByOption(_._1)
+      .map { case ((rank, _, _), refusal) => (rank, refusal) }
   }
 
-  /** One include's object, and every answer a refusal reads off it, built once: which definitions
-    * the merge kept, the groups sharing a line and path, the paths related to each other, and what
-    * stands after a definition and between the include and it.
+  /** One scope's definitions, indexed independently of its includes: which definitions survived,
+    * which twins erase them, which paths are related, and the suffix and latest-blocker facts.
     */
   final private class Around(
-      include: DuplicateReport.Include,
       definitions: Vector[DuplicateReport.Definition],
       survives: Vector[Boolean],
-      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]]
+      twins: LineTwins,
+      keptTwins: LineTwins
   ) {
 
     private val related = new RelatedPaths(definitions)
@@ -201,11 +217,11 @@ private[hoconfmt] object IncludeShadow {
     private val afterSurvived = new PathCounts
     private val afterObjects  = new PathCounts
 
-    /** The same, for the definitions between the include and the one asked about — only the ones
-      * the merge kept, since a dropped definition there did nothing.
+    /** Only surviving predecessors can block an include. Their latest position is the lower
+      * bound for an include which could expose an empty object.
       */
-    private val beforeSurvived = new PathCounts
-    private val beforeObjects  = new PathCounts
+    private val beforeSurvived = new PathLatest
+    private val beforeObjects  = new PathLatest
 
     private val after: Vector[(Boolean, Boolean, Boolean)] = definitions.indices.foldRight(Vector.empty) {
       (at, answers) =>
@@ -221,93 +237,63 @@ private[hoconfmt] object IncludeShadow {
         answer +: answers
     }
 
-    private val before: Vector[(Boolean, Boolean)] = definitions.indices.foldLeft(Vector.empty) { (answers, at) =>
+    private val before: Vector[Int] = definitions.indices.foldLeft(Vector.empty) { (answers, at) =>
       val definition = definitions(at)
-      val answer     =
-        if (definition.position <= include.position) (false, false)
-        else
-          (
-            beforeObjects.atOrBelow(definition.keyPath) > 0,
-            beforeSurvived.below(definition.keyPath)
-          )
-      if (survives(at) && definition.position > include.position) {
-        beforeSurvived.add(definition.keyPath)
-        if (definition.objectValued) beforeObjects.add(definition.keyPath)
+      val answer     = math.max(beforeObjects.atOrBelow(definition.keyPath), beforeSurvived.below(definition.keyPath))
+      if (survives(at)) {
+        beforeSurvived.add(definition.keyPath, definition.position)
+        if (definition.objectValued) beforeObjects.add(definition.keyPath, definition.position)
       }
       answers :+ answer
     }
 
-    def keptAt(at: Int): Boolean                                            = survives(at)
-    def overshadowingOf(at: Int): Vector[(DuplicateReport.Definition, Int)] =
-      overshadowedOnItsLine(onItsLine, at, definitions(at))
-    def relatedTo(at: Int): Boolean = related.relatedTo(at)
-
-    /** Whether a survived definition stands after this one at its path or below it. */
-    def afterAtOrBelow(at: Int): Boolean = after(at)._1
-
-    /** Whether an object stands after this one at its path, whatever the merge kept of it. */
-    def afterObjectAt(at: Int): Boolean = after(at)._2
-
-    /** Whether anything stands after this one below its path. */
-    def afterBelow(at: Int): Boolean = after(at)._3
-
-    /** Whether a survived object stands between the include and this one at its path or below it. */
-    def beforeObjectsAtOrBelow(at: Int): Boolean = before(at)._1
-
-    /** Whether a survived definition stands between the include and this one below its path. */
-    def beforeBelow(at: Int): Boolean = before(at)._2
+    def erasingKept(at: Int): Boolean       = keptTwins.erasing(at, definitions(at))
+    def erasingObject(at: Int): Boolean     = twins.erasingObject(at, definitions(at))
+    def erasingKeptObject(at: Int): Boolean = keptTwins.erasingObject(at, definitions(at))
+    def relatedTo(at: Int): Boolean         = related.relatedTo(at)
+    def afterAtOrBelow(at: Int): Boolean    = after(at)._1
+    def afterObjectAt(at: Int): Boolean     = after(at)._2
+    def afterBelow(at: Int): Boolean        = after(at)._3
+    def lastBlocker(at: Int): Int           = before(at)
   }
 
-  /** Whether a definition standing later on the same line and path erases this one. The later one's
-    * value is the value the merge kept at the pair, so the pair carries the later one's origin and
-    * cannot vouch for the earlier — the doubt is one-sided: a twin in front cannot have replaced
-    * anything, since the merge follows the source. `q=0, q.a=1, include "f.conf", q {}` is what the
-    * doubt is for: `q = 0` is erased by both `q.a = 1` and `q {}`, so the pair did not vouch for it,
-    * and the refusal `q {}` needed was reached even though the pair's value came from the leaf.
+  /** Erasure depends only on these two flags. At most four summaries answer a same-line query,
+    * even if a line repeats one path thousands of times. Kept twins use the same summaries.
     */
-  private def erasedByALaterLineTwin(
-      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
-      at: Int,
-      definition: DuplicateReport.Definition
-  ): Boolean =
-    lineTwins(onItsLine, at, definition).exists { case (other, otherAt) =>
-      otherAt > at && DuplicateReport.erases(other, definition)
-    }
+  private case class Kind(objectValued: Boolean, holdsSubstitution: Boolean) derives CanEqual
 
-  /** The definitions beside `definition` on its line that keep it out of the merged tree: the same
-    * path, and either the other writes a value the two cannot merge with, or this one is an object
-    * with nothing inside it, which the other's object swallows whole — `p {}` beside `p { a = 1 }`
-    * leaves nothing of its own to see in the rendering. The merged tree carries a path and a line
-    * per value and no column, so which of the two a value at that path on that line came from
-    * cannot be read off it: [[survives]] can vouch for neither. The group is read off
-    * `onItsLine`, built once per include, and each definition comes with its place in it.
-    */
-  private def overshadowedOnItsLine(
-      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
-      at: Int,
-      definition: DuplicateReport.Definition
-  ): Vector[(DuplicateReport.Definition, Int)] =
-    lineTwins(onItsLine, at, definition).filter { case (other, _) =>
-      DuplicateReport.erases(other, definition) || definition.writesNothing && other.objectValued
-    }
+  final private class LineTwins(definitions: Vector[(DuplicateReport.Definition, Int)]) {
+    private val groups = definitions
+      .groupBy { case (definition, _) => (definition.line, definition.keyPath) }
+      .view
+      .mapValues { entries =>
+        entries
+          .groupMap { case (definition, _) => Kind(definition.objectValued, definition.holdsSubstitution) }(_._2)
+          .map { case (kind, indices) => kind -> (indices.toSet, indices.maxOption.getOrElse(-1)) }
+      }
+      .toMap
 
-  /** The group of definitions sharing `definition`'s line and path, each with its place, this one
-    * left out: what the two reads above ask of a line.
-    */
-  private def lineTwins(
-      onItsLine: Map[(Int, KeyPath), Vector[(DuplicateReport.Definition, Int)]],
-      at: Int,
-      definition: DuplicateReport.Definition
-  ): Vector[(DuplicateReport.Definition, Int)] =
-    onItsLine.getOrElse((definition.line, definition.keyPath), Vector.empty).filter { case (_, otherAt) =>
-      otherAt != at
-    }
+    private def erases(kind: Kind, definition: DuplicateReport.Definition): Boolean =
+      !kind.holdsSubstitution && (!kind.objectValued || (!definition.objectValued && !definition.holdsSubstitution))
 
-  /** Whether a definition stands in the object an include stands in. Definitions elsewhere never
-    * meet the include: the included file's fields are inlined into that object alone.
-    */
-  private def standsIn(definition: DuplicateReport.Definition, include: DuplicateReport.Include): Boolean =
-    definition.arrayScope == include.arrayScope && definition.keyPath.segments.startsWith(include.scope.segments)
+    def erasedLater(at: Int, definition: DuplicateReport.Definition): Boolean =
+      groups.getOrElse((definition.line, definition.keyPath), Map.empty).exists { case (kind, (_, last)) =>
+        last > at && erases(kind, definition)
+      }
+
+    private def other(at: Int, definition: DuplicateReport.Definition)(matches: Kind => Boolean): Boolean =
+      groups.getOrElse((definition.line, definition.keyPath), Map.empty).exists { case (kind, (indices, _)) =>
+        matches(kind) && indices.size > (if (indices(at)) 1 else 0)
+      }
+
+    def overshadowed(at: Int, definition: DuplicateReport.Definition): Boolean =
+      other(at, definition)(kind => erases(kind, definition) || definition.writesNothing && kind.objectValued)
+
+    def erasing(at: Int, definition: DuplicateReport.Definition): Boolean = other(at, definition)(erases(_, definition))
+
+    def erasingObject(at: Int, definition: DuplicateReport.Definition): Boolean =
+      other(at, definition)(kind => kind.objectValued && erases(kind, definition))
+  }
 
   /** Whether a definition the merge dropped could let the include's values through.
     *
@@ -321,37 +307,17 @@ private[hoconfmt] object IncludeShadow {
       around: Around,
       root: ConfigObject
   ): Boolean = {
-    val erasing = around.overshadowingOf(at).filter { case (other, _) => DuplicateReport.erases(other, definition) }
     if (!around.relatedTo(at)) false
     else if (definition.objectValued) {
-      // An object with nothing inside it adds nothing to a merge, so replacing a value that is
-      // not an object is the only work it does. Only a definition the rendering keeps, between
-      // the include and this one and on this path or a path below it, has made the path an
-      // object already — a dropped one may have done nothing itself. And a later definition the
-      // rendering keeps ends the merge with a value of its own.
+      // The last intervening blocker is checked against the include position separately. Twins
+      // all name the same path, so a kept erasing twin already ends or starts that object's merge.
       definition.writesNothing &&
-      !(around.afterAtOrBelow(at) ||
-        erasing.exists { case (other, otherAt) =>
-          around.keptAt(otherAt) && sameOrBelow(other.keyPath, definition.keyPath)
-        }) &&
-      !(around.beforeObjectsAtOrBelow(at) ||
-        around.beforeBelow(at) ||
-        erasing.exists { case (other, otherAt) =>
-          around.keptAt(otherAt) &&
-          (sameOrBelow(other.keyPath, definition.keyPath) && other.objectValued ||
-            sitsBelow(definition.keyPath, other.keyPath))
-        })
+      !(around.afterAtOrBelow(at) || around.erasingKept(at)) && !around.erasingKeptObject(at)
     } else {
-      // A value that is not an object erases what came before, the included file's value
-      // included. Losing it lets the included value merge into the object a later definition of
-      // the path leaves behind; a merged tree that is not an object at the path means the
-      // rendering ends with a value that erases the included one instead.
-      (around.afterObjectAt(at) ||
-        around.afterBelow(at) ||
-        erasing.exists { case (other, _) =>
-          (other.keyPath == definition.keyPath && other.objectValued) ||
-          sitsBelow(definition.keyPath, other.keyPath)
-        }) && couldHoldObject(root, definition)
+      (around.afterObjectAt(at) || around.afterBelow(at) || around.erasingObject(at)) && couldHoldObject(
+        root,
+        definition
+      )
     }
   }
 
@@ -394,6 +360,25 @@ private[hoconfmt] object IncludeShadow {
 
     /** Whether one of the paths seen stands strictly below `path`. */
     def below(path: KeyPath): Boolean = atOrBelow(path) > exact(path)
+  }
+
+  /** Latest surviving positions, including strict descendants separately: a count cannot tell
+    * whether the last blocker precedes or follows a particular include.
+    */
+  final private class PathLatest {
+    private val atOrBelowPositions = scala.collection.mutable.HashMap.empty[KeyPath, Int]
+    private val belowPositions     = scala.collection.mutable.HashMap.empty[KeyPath, Int]
+
+    def add(path: KeyPath, position: Int): Unit = {
+      (path :: properPrefixes(path)).foreach { prefix =>
+        atOrBelowPositions.update(prefix, math.max(atOrBelow(prefix), position))
+      }
+      properPrefixes(path).foreach { prefix =>
+        belowPositions.update(prefix, math.max(below(prefix), position))
+      }
+    }
+    def atOrBelow(path: KeyPath): Int = atOrBelowPositions.getOrElse(path, -1)
+    def below(path: KeyPath): Int     = belowPositions.getOrElse(path, -1)
   }
 
   /** The paths above a path, from the one-segment path down to the full one but not including it. */
@@ -441,9 +426,4 @@ private[hoconfmt] object IncludeShadow {
         }
     }
 
-  private def sameOrBelow(one: KeyPath, other: KeyPath): Boolean = one == other || sitsBelow(other, one)
-
-  /** Whether `inner` is a field inside `outer`, one or more steps down. */
-  private def sitsBelow(outer: KeyPath, inner: KeyPath): Boolean =
-    inner.segments.size > outer.segments.size && inner.segments.startsWith(outer.segments)
 }

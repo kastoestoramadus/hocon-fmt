@@ -26,20 +26,18 @@ private[hoconfmt] object IncludeOrder {
   def moved(source: String, rendered: String, originals: Map[Int, String]): Option[String] =
     if (originals.isEmpty) None
     else
-      keysBefore(rendered, originals.keySet).toOption.flatMap { after =>
-        // A source that reads in the masked form but not with its includes on lines of their own
-        // is not understood well enough to vouch for: every position then counts as moved.
-        val before =
-          keysBefore(IncludeMasking.mask(source, onOwnLines = true).text, originals.keySet).getOrElse(Map.empty)
+      leavesIn(rendered, originals.keySet).toOption.flatMap { afterLeaves =>
+        // An unreadable source has no vouched-for positions, just as in the original check.
+        val beforeLeaves = leavesIn(IncludeMasking.mask(source, onOwnLines = true).text, originals.keySet).toOption
+        val sets         = new PathSets(afterLeaves.size + beforeLeaves.fold(0)(_.size))
+        val before       = beforeLeaves.map(keysBefore(_, sets)).getOrElse(Map.empty)
+        val after        = keysBefore(afterLeaves, sets)
         originals.toList.sortBy(_._1).collectFirst {
           case (index, statement) if after.contains(index) && !before.get(index).contains(after(index)) => statement
         }
       }
 
-  /** Where an include stands: the keys defined before it, and whether a key shares its line, in
-    * which case sconfig's order says nothing.
-    */
-  private case class Position(before: Set[List[String]], tied: Boolean)
+  private case class Position(before: Int, tied: Boolean)
 
   private case class Leaf(path: List[String], line: Int, include: Option[Int])
 
@@ -50,15 +48,67 @@ private[hoconfmt] object IncludeOrder {
     def unapply(digits: String | Null): Option[Int] = Option(digits).flatMap(_.toIntOption)
   }
 
-  private def keysBefore(masked: String, ours: Set[Int]): Try[Map[Int, Position]] =
-    Try(ConfigFactory.parseString(masked, HoconFormatter.parseOptions).root).map { root =>
-      val leaves = leavesOf(root, Nil, ours)
-      leaves.collect { case Leaf(path, line, Some(index)) =>
-        val inItsObject = leaves.filter(other => other.path.startsWith(path.dropRight(1)) && other.path != path)
-        val before      = inItsObject.filter(_.line < line).map(_.path).toSet
-        index -> Position(before, tied = inItsObject.exists(_.line == line))
-      }.toMap
+  private def leavesIn(masked: String, ours: Set[Int]): Try[List[Leaf]] =
+    Try(ConfigFactory.parseString(masked, HoconFormatter.parseOptions).root).map(leavesOf(_, Nil, ours))
+
+  /** Sweep whole lines before adding their paths, so a tied field never counts as preceding an
+    * include. Each leaf contributes only to the enclosing scopes which actually hold includes.
+    */
+  private def keysBefore(leaves: List[Leaf], sets: PathSets): Map[Int, Position] = {
+    val scopes    = leaves.collect { case Leaf(path, _, Some(_)) => path.dropRight(1) }.toSet
+    val roots     = scala.collection.mutable.HashMap.empty[List[String], Int]
+    val positions = scala.collection.mutable.HashMap.empty[Leaf, Position]
+    leaves.groupBy(_.line).toList.sortBy(_._1).foreach { case (_, onLine) =>
+      val inScopes = onLine
+        .flatMap { leaf =>
+          leaf.path.inits.filter(scopes.contains).map(scope => scope -> leaf)
+        }
+        .groupMap(_._1)(_._2)
+      inScopes.foreach { case (scope, entries) =>
+        val before = roots.getOrElse(scope, 0)
+        val paths  = entries.map(_.path).toSet
+        entries.foreach { leaf =>
+          if (leaf.include.nonEmpty && leaf.path.dropRight(1) == scope)
+            positions.update(leaf, Position(before, paths.size > 1))
+        }
+        roots.update(scope, entries.foldLeft(before)((root, leaf) => sets.add(root, leaf.path)))
+      }
     }
+    // Preserve the original tree walk's choice if more than one leaf names an issued index.
+    leaves.collect { case leaf @ Leaf(_, _, Some(index)) => index -> positions(leaf) }.toMap
+  }
+
+  /** Canonical persistent sets of path IDs. Interning complete child pairs makes root equality
+    * exact, including across the two parses; no fingerprint or probabilistic hash is trusted.
+    * Each insertion copies O(log(paths)) nodes instead of copying all preceding paths per include.
+    */
+  final private class PathSets(maxPaths: Int) {
+    private val paths    = scala.collection.mutable.HashMap.empty[List[String], Int]
+    private val interned = scala.collection.mutable.HashMap.empty[(Int, Int), Int]
+    // Zero is the empty subtree, one the occupied terminal; internal nodes start at two.
+    private val nodes  = scala.collection.mutable.ArrayBuffer((0, 0), (0, 0))
+    private val topBit = 31 - Integer.numberOfLeadingZeros(math.max(1, maxPaths))
+
+    def add(root: Int, path: List[String]): Int = {
+      val index                            = paths.getOrElseUpdate(path, paths.size)
+      def insert(node: Int, bit: Int): Int =
+        if (bit < 0) 1
+        else {
+          val (left, right) = nodes(node)
+          val children      =
+            if ((index & (1 << bit)) == 0) (insert(left, bit - 1), right)
+            else (left, insert(right, bit - 1))
+          interned.getOrElseUpdate(
+            children, {
+              val next = nodes.size
+              val _    = nodes.addOne(children)
+              next
+            }
+          )
+        }
+      insert(root, topBit)
+    }
+  }
 
   /** The values that are not objects, with the line each starts on. Our placeholders are told
     * apart the way `unmask` tells them: the key and the value carry the same index. Guards are
