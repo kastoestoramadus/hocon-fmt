@@ -6,6 +6,12 @@ on this workload. `GC_INITIAL_HEAP_SIZE` in the environment still overrides the 
 This is a mitigation: the underlying collector defect remains for workloads that trigger many
 collections, including larger inputs or a smaller environment override.
 
+Update 2026-10-15: the collector is no longer the established cause. PR 141's investigation
+([limitations](../limitations.md#sequential-file-examination-on-scala-native)) established only the
+trigger — concurrent fibres on the runtime's worker threads (`parTraverse`), which crash a standalone
+cats-effect program with none of hocon-fmt's code too — and found the root cause still not established;
+the Native CLI now examines its files sequentially. What was measured below stands as recorded.
+
 ## Reproduction and verification
 
 `scripts/native-stress.sh <binary> [runs=200] [files=100]` creates already-formatted service

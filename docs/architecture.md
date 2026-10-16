@@ -98,6 +98,17 @@ Strings and comments do not consume either budget.
    The check is deliberately conservative: the included file cannot be read at format time, so it
    refuses a form a later, better-informed pass could allow.
 
+The include checks share indexes across includes in the same scope. `IncludeOrder` sweeps origin
+lines and stores canonical persistent sets of preceding full paths: equality of their roots is an
+exact set comparison, including across the source and rendered parses. Whole lines are queried
+before their paths are inserted, preserving the same-line tie rule. `IncludeShadow` builds its
+survival, same-line twin and related-path indexes once per object path and array scope. For an
+empty object it remembers the latest surviving blocker, then finds the first include between that
+blocker and the definition; suffix facts answer the questions about later definitions. Refusals
+retain their original include order, then definition line and source order. Frozen test-only
+implementations compare both direct checks and complete formatter results on generated and corpus
+inputs.
+
 `HoconText` finds the strings and comments of a text in one pass. Masking asks it whether an
 `include` is code, and the comment check asks it for each comment's text.
 
@@ -285,9 +296,12 @@ releases the option.
 
 ## Platforms
 
-The shipped Scala Native CLI starts with a 512m heap to mitigate intermittent collector crashes;
-[the improvement log](improvement-log/2026-10-13-native-initial-heap.md) records the remaining defect
-and the checks to repeat on upgrades.
+The shipped Scala Native CLI keeps the compiled 512m initial heap, an earlier mitigation that stays in
+place for intermittent crashes: the trigger is established (concurrent fibres on the runtime's worker
+threads; a standalone cats-effect program crashes too), the root cause is not, and the CLI now examines
+its files sequentially — [limitations](limitations.md#sequential-file-examination-on-scala-native) has
+the state of it. [The improvement log](improvement-log/2026-10-13-native-initial-heap.md) records what
+was measured then and the checks to repeat on upgrades.
 
 - **Regular expressions** must work on three engines. Scala Native runs `java.util.regex` on RE2:
   no lookaround, backreferences, possessive quantifiers or `\G` `\R` `\Z`. Scala.js translates to
