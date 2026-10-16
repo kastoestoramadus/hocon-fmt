@@ -357,8 +357,10 @@ Dropped in the include's object (`Refusal.ShadowedByInclude`):
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
-- **Substitution cycle**: `a : ${b}` with `b : ${a}` renders as an unresolved-merge banner that
-  parses but changes again on the next pass. A syntax check alone misses this.
+- **Substitution cycle over definitions**: `a : 1`, `b : 2`, then `a : ${b}` and `b : ${a}`
+  renders as unresolved-merge banners that parse but change again on the next pass. A syntax
+  check alone misses this. The bare cycle `a : ${b}` with `b : ${a}` is already a fixed point
+  on sconfig 2.0.0; it is not the shape fixed by #598.
 - **Env override**: `host = localhost` then `host = ${?HOST}` stays an unresolved merge, rendered as
   a banner that grows by one on every pass; at the file root the banner does not even parse
   (`Refusal.BrokenOutput`). The most common idiom in Lightbend-style config: 357 of 1,650 real
