@@ -181,13 +181,19 @@ slow-chain and spelling regressions now pin the work budget.
 
 The previous per-path caps accepted a 160 KB file with two 120-segment chains and 200 leaves of
 120 segments: its report took 12–13 s on the JVM, and 1,600 leaves took 122 s. Across 30 measured
-dense shapes, squared definition lengths fit the old timings better than cubes (R² 0.99258
-versus 0.98200; about 6.6 ns per squared unit). The budget is ten times the corpus maximum of
-26,725 units, rounded up: the maximum uses 8.91% of it. The historical corpus maxima are depth 8,
-written path 11 and flattened path 12; the budget also accepts their combined depth-8/path-11
-shape and 79 nested short keys. All 1,255 readable corpus `.conf`/`.hocon` files and 685 readable
-repository `.conf` files retain their exact verdicts and formatted bytes; three corpus entries
-and seven repository fixtures were unreadable and retain that result too.
+dense shapes, squared definition lengths fit the **old algorithm's** timings better than cubes
+(R² 0.99258 versus 0.98200; about 6.6 ns per squared unit). That constant does not calibrate
+the new algorithm. The independent review measured about 20–34 ns per unit on large deep shapes
+with the budget lifted for calibration, about 31–55 ns for object chains and 54–66 ns for array
+chains. At the shallow end, 300,000 distinct root definitions cost about 4.4 microseconds per
+unit (1.31 s warm). The budget is a conservative shape proxy, not a conversion to seconds;
+it also caps the definition count because every definition costs at least one unit.
+
+The budget is 11.2 times the corpus maximum of 26,725 units (8.91% of it). The historical corpus
+maxima are depth 8, written path 11 and flattened path 12; the budget also accepts their combined
+depth-8/path-11 shape and 79 nested short keys. The 2026-10-16 parity run compares exact verdicts, formatted bytes and ordered findings on the
+1,257-path corpus manifest and 697 repository `.conf`/`.hocon` paths; unreadable paths are
+recorded in both runs.
 
 The budget alone would still allow slow repeated short keys: 30,000 definitions of `x = 1`
 cost only 30,000 units but took 10.06 s in the old report. The report now walks definitions
@@ -197,13 +203,19 @@ so equal-hash key names cannot make those operations quadratic: 32,768 colliding
 about 0.17 s, or under 0.4 s when every key produces a warning on one line. A differential property compares it with the
 original algorithm on 1,000 generated documents per platform.
 
-Measured on Linux/WSL2, JVM Java 25, on 2026-10-15: a search of 133 accepted shapes at or near the
-budget found its slowest warm report at 1.31 s for 300,000 distinct root fields (3.49 MB). A
-separate eight-round run measured 0.89–1.34 s warm and 2.11 s cold; the JVM CLI took 4.60–4.70 s
-end to end, including formatting and startup. The Scala Native 0.5.12 CLI took 13.22–13.68 s on
-the same file, with peak RSS 5.70 GiB, under an 8 GiB/no-swap scope. These are measurements, not a wall-clock deadline:
-reading, parsing and rendering still depend on input bytes, including key/value lengths and
-comments. The scan is lexical and conservative, not a syntax validator. Scala.js still has its
+On Linux/WSL2, Java 25 JVM, the independent 2026-10-16 search of 44 shape families found the
+slowest accepted **report** at 1.87 s cold / 1.31 s warm for 300,000 distinct root fields
+(3.49 MB); the earlier 133-shape search found the same warm maximum. The Native 0.5.12 CLI
+on that shape took **13.1 s and 6.06 GiB peak RSS** under an 8 GiB/no-swap scope; the JVM CLI
+took 4.13 s and about 1.9 GB RSS. These are measured cases, not a wall-clock or memory guarantee.
+The revision remeasured 300,000 roots at 11.56 s / 6.06 GiB on Native and 100,000 roots at
+3.48 s / 2.04 GiB. A lower cap would materially reduce Native memory, but also refuse more
+files; no separate root-definition cap is introduced without an owner policy decision.
+
+**The accepted-file worst case is bounded here for the report's key-path work only.** Reading,
+lexing, document parsing and rendering also depend on input bytes. For example, the report on
+3/9 MB scalar arrays took 1.8/4.5 s in the review; empty objects and scalars consume bytes
+without adding key definitions, and the CLI has no file-size limit. Scala.js also retains its
 library's 33-segment parse limitation (see below).
 
 ### Slow sconfig object merges and appends (follow-up refusal)
