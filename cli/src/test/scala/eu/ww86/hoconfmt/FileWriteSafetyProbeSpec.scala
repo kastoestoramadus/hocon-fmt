@@ -45,4 +45,15 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
       } yield assert(clue(after == "concurrent = edit\n"))
   }
 
+  tmp.test("a run does not die on a file of blank lines") { dir =>
+    // 5 MiB: under a bounded heap (the shipped Native binary starts at 512m) sconfig's
+    // tokenizer queues one token per newline and the run dies with an unhandled
+    // OutOfMemoryError instead of reporting an outcome for this file. Measured OOM at
+    // -Xmx512m on 5 MiB: 480-hocon-fmt-file-write-safety-probe/evidence/d10-oome.log.
+    for {
+      file <- write(dir, "flood.conf", flood(5 * 1024 * 1024))
+      run  <- rewrite(file)
+    } yield assert(clue(run.outcomes.size == 1))
+  }
+
 }

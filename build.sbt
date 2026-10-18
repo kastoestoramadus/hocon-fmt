@@ -405,6 +405,10 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     Compile / mainClass := Some("eu.ww86.hoconfmt.CmdApi"),
     // IOApp ends with System.exit, which must end a forked JVM and not sbt.
     run / fork := true,
+    // Tests run where the shipped Native binary runs: a bounded heap, in a forked JVM so an
+    // unhandled error in a test ends that JVM rather than this build (probe 480).
+    Test / fork := true,
+    Test / javaOptions += "-Xmx512m",
     // A forked run starts in the project's directory; relative paths mean the one sbt runs in.
     run / baseDirectory := (ThisBuild / baseDirectory).value
   )
