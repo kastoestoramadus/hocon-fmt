@@ -410,7 +410,10 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     Test / fork := true,
     Test / javaOptions += "-Xmx512m",
     // A forked run starts in the project's directory; relative paths mean the one sbt runs in.
-    run / baseDirectory := (ThisBuild / baseDirectory).value
+    run / baseDirectory := (ThisBuild / baseDirectory).value,
+    // A forked test JVM starts there too: without this the 3 JsonReportSpec fixture reads fail with
+    // NoSuchFileException on cli/src/test/resources/... (found by the 480 probe review run).
+    Test / baseDirectory := (ThisBuild / baseDirectory).value
   )
   .jsSettings(
     announceRuntime("cli on Scala.js"),
