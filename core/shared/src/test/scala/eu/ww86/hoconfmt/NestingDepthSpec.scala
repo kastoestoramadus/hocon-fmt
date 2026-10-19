@@ -321,7 +321,10 @@ class NestingDepthSpec extends munit.FunSuite {
     assert(HoconFormatter.format("x.y.z = \"1\"\n" + chain(2, 20, 20)).isRight)
   }
   test("a work-budget refusal explains the remedy in plain language") {
-    val source   = (1 to 6000).map(i => s"app.service.module.feature.opt$i = 1\n").mkString
+    // Distinct first keys keep the merge budget out of the count, so the total path work is what
+    // refuses; the same statements under one first key refuse earlier, at the merge budget, with
+    // their own remedy (MergeBudgetSpec).
+    val source   = (1 to 6000).map(i => s"app$i.service.module.feature.opt$i = 1\n").mkString
     val expected =
       s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files"
     assertEquals(HoconText.checkNesting(source).left.map(_.reason), Left(expected))

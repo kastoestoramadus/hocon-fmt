@@ -29,6 +29,18 @@ private[hoconfmt] object HoconText {
   // the corpus maximum of 26,725, rounded up; see limitations.md for the calibration and times.
   val MaxPathWork = 300000L
 
+  // Many definitions merging through one key cost sconfig time quadratic in their number: the
+  // parser walks the object grown so far for every definition merged into it, so 21,428 dotted
+  // lines under one prefix took 20.6 s on the JVM CLI and 105 s on the Native one, where the
+  // nested spelling of the same file took 13 ms, and repeated `+=` is the same class. The scan
+  // counts that work where it is written: every statement that writes a dotted path or appends
+  // charges the first segment of its path in the object it stands in, and the Nth charge of one
+  // segment costs 2N-1 — N definitions through one key, N^2. The 1,257-file corpus stays under
+  // 22,512 units, 89 times below the budget, and this repository's own files under 20; the
+  // largest accepted shape, 1,414 dotted definitions through one prefix, formats in about three
+  // seconds of JVM CLI time; see limitations.md for the calibration and the times.
+  val MaxMergeWork = 2000000L
+
   /** Stop before the parser or include passes can spend resources on unbounded nesting, and
     * before the duplicate report can spend them on an unbounded dotted key path, written on one
     * line, re-created by nesting, or summed over a file of many definitions.
@@ -64,6 +76,13 @@ private[hoconfmt] object HoconText {
     // definitions it writes, in closed form, and the running total is refused past the budget:
     // the report builds and compares every prefix of every definition's path. Its reverse index
     // avoids multiplying that work by the number of definitions sharing a path.
+    //
+    // Merge work is counted apart from the report's: many definitions merging through one key —
+    // dotted spellings of its children, `+=` repeats of it — cost the parser time quadratic in
+    // their number, so each such statement charges the first segment of its path in the object
+    // it stands in (a plain repeat of a one-segment key defines nothing through the key and
+    // charges nothing), the Nth charge of a name costs 2N-1, and the total is refused past
+    // `MaxMergeWork` before the parser spends it.
     @tailrec
     def scan(
         index: Int,
@@ -74,10 +93,12 @@ private[hoconfmt] object HoconText {
         flat: Int,
         work: Long,
         atKeyStart: Boolean,
-        afterDot: Boolean
+        afterDot: Boolean,
+        merge: MergeState
     ): Either[Refusal, Unit] =
       if (segments > MaxPathSegments) Left(Refusal.PathTooDeep(writtenLimitReason))
       else if (work > MaxPathWork) Left(Refusal.PathTooDeep(workBudgetReason))
+      else if (merge.units > MaxMergeWork) Left(Refusal.SlowMerges(mergeBudgetReason))
       else if (index >= text.length) Right(())
       else if (text.startsWith("\"\"\"", index))
         scan(
@@ -89,7 +110,8 @@ private[hoconfmt] object HoconText {
           flat,
           work,
           atKeyStart = false,
-          afterDot = false
+          afterDot = false,
+          merge.begun(segments, atKeyStart, afterDot, index)
         )
       else if (text.charAt(index) == '"')
         scan(
@@ -101,10 +123,11 @@ private[hoconfmt] object HoconText {
           flat,
           work,
           atKeyStart = false,
-          afterDot = false
+          afterDot = false,
+          merge.begun(segments, atKeyStart, afterDot, index)
         )
       else if (text.charAt(index) == '#' || text.startsWith("//", index))
-        scan(endOfLine(text, index), depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot)
+        scan(endOfLine(text, index), depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot, merge)
       // `${x}` and `${?x}` open no object: a file that nests exactly to the limit may use them.
       else if (text.startsWith("${", index))
         scan(
@@ -116,7 +139,8 @@ private[hoconfmt] object HoconText {
           flat,
           work,
           atKeyStart = false,
-          afterDot = false
+          afterDot = false,
+          merge
         )
       else {
         text.charAt(index) match {
@@ -133,7 +157,8 @@ private[hoconfmt] object HoconText {
                 flat + enclosingPath,
                 work + statementWork(flat, segments),
                 atKeyStart = true,
-                afterDot = false
+                afterDot = false,
+                merge.charge(text, segments, index).openScope
               )
             }
           case '[' =>
@@ -149,7 +174,8 @@ private[hoconfmt] object HoconText {
                 flat + enclosingPath + 1,
                 work + statementWork(flat, segments),
                 atKeyStart = false,
-                afterDot = false
+                afterDot = false,
+                merge.charge(text, segments, index).reset
               )
             }
           case '}' | ']' =>
@@ -164,7 +190,8 @@ private[hoconfmt] object HoconText {
                   flat - path - element,
                   work,
                   atKeyStart = false,
-                  afterDot = false
+                  afterDot = false,
+                  merge.closed(text.charAt(index) == '}')
                 )
               case Nil =>
                 scan(
@@ -176,14 +203,16 @@ private[hoconfmt] object HoconText {
                   flat,
                   work,
                   atKeyStart = false,
-                  afterDot = false
+                  afterDot = false,
+                  merge.closed(text.charAt(index) == '}')
                 )
             }
           // The value follows: the path just written, `+=` included, is whole, and stays pending
           // until the value says whether it is an object. A second path cannot be written before
           // the value, so a separator with a count in hand starts one; `+=` arrives here twice
-          // and the `=` of it finds nothing new to move.
-          case '=' | ':' | '+' =>
+          // and the `=` of it finds nothing new to move. `+=` also charges the merge budget as
+          // an append, where `=` and `:` charge only a written dotted path.
+          case '+' =>
             scan(
               index + 1,
               depth,
@@ -193,7 +222,21 @@ private[hoconfmt] object HoconText {
               flat,
               work + statementWork(flat, segments),
               atKeyStart = false,
-              afterDot = false
+              afterDot = false,
+              if (segments > 0) merge.copy(sawPlus = true).charge(text, segments, index) else merge
+            )
+          case '=' | ':' =>
+            scan(
+              index + 1,
+              depth,
+              segments = 0,
+              pending = if (segments > 0) segments else pending,
+              enclosing,
+              flat,
+              work + statementWork(flat, segments),
+              atKeyStart = false,
+              afterDot = false,
+              if (segments > 0) merge.charge(text, segments, index) else merge
             )
           case ',' =>
             scan(
@@ -205,10 +248,22 @@ private[hoconfmt] object HoconText {
               flat,
               work,
               atKeyStart = true,
-              afterDot = false
+              afterDot = false,
+              merge.reset
             )
           case '\n' =>
-            scan(index + 1, depth, segments = 0, pending, enclosing, flat, work, atKeyStart = true, afterDot = false)
+            scan(
+              index + 1,
+              depth,
+              segments = 0,
+              pending,
+              enclosing,
+              flat,
+              work,
+              atKeyStart = true,
+              afterDot = false,
+              merge
+            )
           // A dot ends an element; the next piece or word begins one. A leading dot belongs to
           // no path and changes nothing.
           case '.' =>
@@ -221,11 +276,12 @@ private[hoconfmt] object HoconText {
               flat,
               work,
               atKeyStart = false,
-              afterDot = segments > 0
+              afterDot = segments > 0,
+              merge.endedFirst(segments, index)
             )
           // Whitespace keeps the run: `a . b` and `a b` are one path expression either way.
           case ' ' | '\t' | '\r' | '\u000C' =>
-            scan(index + 1, depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot)
+            scan(index + 1, depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot, merge)
           case _ =>
             // A word is a key, which takes the count of the path it begins, or the start of a
             // value that is not an object, which takes the pending count away.
@@ -239,10 +295,22 @@ private[hoconfmt] object HoconText {
                 flat,
                 work,
                 atKeyStart = false,
-                afterDot = false
+                afterDot = false,
+                merge.begun(segments, atKeyStart, afterDot, index)
               )
             else
-              scan(index + 1, depth, segments, pending = 0, enclosing, flat, work, atKeyStart = false, afterDot = false)
+              scan(
+                index + 1,
+                depth,
+                segments,
+                pending = 0,
+                enclosing,
+                flat,
+                work,
+                atKeyStart = false,
+                afterDot = false,
+                merge
+              )
         }
       }
 
@@ -251,7 +319,79 @@ private[hoconfmt] object HoconText {
     def beginElement(segments: Int, atKeyStart: Boolean, afterDot: Boolean): Int =
       if (atKeyStart || afterDot) segments + 1 else segments
 
-    scan(0, 0, segments = 0, pending = 0, enclosing = Nil, flat = 0, work = 0L, atKeyStart = true, afterDot = false)
+    scan(
+      0,
+      0,
+      segments = 0,
+      pending = 0,
+      enclosing = Nil,
+      flat = 0,
+      work = 0L,
+      atKeyStart = true,
+      afterDot = false,
+      merge = MergeState(Map.empty[String, Int] :: Nil, 0L, firstStart = -1, firstEnd = -1, sawPlus = false)
+    )
+  }
+
+  /** The merge counters the walk carries beside its nesting and path counts: the charge count of
+    * every first written key segment per object scope, the total they cost, and the
+    * statement-local span and operator that say whether the statement charges and under what
+    * name. Immutable: the corpus's largest scope map holds a few hundred names.
+    */
+  final private case class MergeState(
+      scopes: List[Map[String, Int]],
+      units: Long,
+      firstStart: Int,
+      firstEnd: Int,
+      sawPlus: Boolean
+  ) {
+
+    def reset: MergeState = copy(firstStart = -1, firstEnd = -1, sawPlus = false)
+
+    /** A piece that begins the path's first segment remembers where the name starts, for the
+      * charge at the statement's separator.
+      */
+    def begun(segmentsBefore: Int, atKeyStart: Boolean, afterDot: Boolean, index: Int): MergeState =
+      if ((atKeyStart || afterDot) && segmentsBefore == 0 && firstStart < 0) copy(firstStart = index) else this
+
+    /** The first unquoted dot ends the first segment's name. */
+    def endedFirst(segments: Int, index: Int): MergeState =
+      if (segments > 0 && firstEnd < 0) copy(firstEnd = index) else this
+
+    /** The Nth charge of one name costs 2N-1, so N definitions through one key cost N^2, the
+      * shape of the parser's merge cost. A statement charges when it writes a dotted path (two
+      * or more segments) or appends with `+=`; a plain repeat of a one-segment key charges
+      * nothing. The name is the first segment's text with quotes stripped, so `"a".b` and `a.b`
+      * are one key; a statement that charged nothing leaves its span for the next piece of the
+      * same name to finish.
+      */
+    def charge(text: String, segments: Int, where: Int): MergeState = {
+      val name =
+        if (firstStart >= 0)
+          text.substring(firstStart, if (firstEnd >= 0) firstEnd else where).replace("\"", "").trim
+        else ""
+      scopes match {
+        case inner :: outer if (segments >= 2 || sawPlus) && name.nonEmpty =>
+          val count = inner.getOrElse(name, 0) + 1
+          copy(
+            scopes = inner.updated(name, count) :: outer,
+            units = units + (2L * count - 1)
+          ).reset
+        // The root scope is always on the stack; a statement that charges nothing keeps it.
+        case _ => this
+      }
+    }
+
+    /** An object opens a scope of its own, after its own statement charged in the enclosing one;
+      * an array opens none.
+      */
+    def openScope: MergeState = copy(scopes = Map.empty[String, Int] :: scopes).reset
+
+    /** A `}` takes the innermost object's scope back out — never the root's — and a `]` closes
+      * an array, which opened none.
+      */
+    def closed(isObject: Boolean): MergeState =
+      (if (isObject && scopes.length > 1) copy(scopes = scopes.drop(1)) else this).reset
   }
 
   /** The work of one statement: `w` written segments at enclosing length `e` define paths of
@@ -269,6 +409,8 @@ private[hoconfmt] object HoconText {
   private def writtenLimitReason = s"input dotted key paths exceed the maximum of $MaxPathSegments segments"
   private def workBudgetReason   =
     s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files"
+  private def mergeBudgetReason =
+    "too many definitions merge through the same key; write them nested in { } or as one [ ] array, or split the file"
 
   def spans(text: String): Vector[Span] = {
     @tailrec

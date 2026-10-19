@@ -24,6 +24,7 @@ object ExampleGenerator {
         "not-hocon",
         "nesting-too-deep",
         "path-too-deep",
+        "slow-merges",
         "other-format",
         "broken-output",
         "lost-comment",

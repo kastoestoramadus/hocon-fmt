@@ -75,9 +75,19 @@ class MergeBudgetSpec extends munit.FunSuite {
     assertEquals(DuplicateReport.findings(dotted(boundary + 1)).left.map(_.reason), Left(mergeReason))
   }
 
-  test("the last accepted shapes format") {
-    assert(HoconFormatter.format(dotted(boundary)).isRight)
-    assert(HoconFormatter.format(plus(boundary)).isRight)
+  test("the last accepted dotted shape formats") {
+    val dottedOut = HoconFormatter.format(dotted(boundary))
+    assert(dottedOut.isRight, dottedOut.toString)
+  }
+
+  test("repeated += below the budget still refuses through the render defect, as before") {
+    // sconfig renders an accumulated `k += 1` chain in a form its own parser rejects, at any
+    // repeat count, so such files were never formattable; the merge budget refuses them at the
+    // scan instead, before the parser spends its quadratic time on them.
+    HoconFormatter.format(plus(20)) match {
+      case Left(_: Refusal.BrokenOutput) => ()
+      case other                         => fail(s"expected the render defect's refusal, got $other")
+    }
   }
 
   test("a corpus-shaped file of 18 dotted keys under one prefix formats") {

@@ -59,6 +59,7 @@ object JsonReport {
     case Refusal.NotUtf8                    => "NotUtf8"
     case Refusal.NestingTooDeep(_)          => "NestingTooDeep"
     case Refusal.PathTooDeep(_)             => "PathTooDeep"
+    case Refusal.SlowMerges(_)              => "SlowMerges"
     case Refusal.NotHocon(_)                => "NotHocon"
     case Refusal.OtherFormat(_)             => "OtherFormat"
     case Refusal.BrokenOutput(_)            => "BrokenOutput"
