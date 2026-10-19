@@ -230,7 +230,7 @@ lexing, document parsing and rendering also depend on input bytes. For example, 
 without adding key definitions, and the CLI has no file-size limit. Scala.js also retains its
 library's 33-segment parse limitation (see below).
 
-### Slow sconfig object merges and appends (follow-up refusal)
+### Slow sconfig object merges and appends (scan-level refusal)
 
 Bare sconfig 2.0.0 parses many dotted definitions sharing an object quadratically. In the
 independent review, **21,428 lines of `a.b.kN = 1` (310,310 bytes)** pass this scan but take
@@ -242,18 +242,41 @@ independent root objects with the same path lengths took only 17 ms at 16,000 ke
 parsing defect exists on `main` before the report budget.
 
 Repeated `k += 1` is a second shape of this parser problem: 300,000 lines accepted by the
-resource scan did not finish the JVM CLI within 20 minutes of CPU in the review. Two red-by-design `library:` cases
-in `SconfigDefectsSpec` compare bare parsing of shared dotted keys and repeated appends with
-nested fields and a literal array. They run outside ordinary formatter tests.
+resource scan did not finish the JVM CLI within 20 minutes of CPU in the review. Two red-by-design `library:`
+cases in `SconfigDefectsSpec` compare bare parsing of shared dotted keys and repeated appends with
+nested fields and a literal array; they stay red, target the library directly and run outside
+ordinary formatter tests.
 
-A scan-level refusal for these parser defects is **follow-up work, not implemented in this
-report-budget change**. The current scan counts lengths, not normalized key names or merge
-history. A blanket dotted-statement or append count also rejects independent objects/keys;
-a targeted refusal needs key identity, quoted/concatenated spelling, object/array scope and
-merge-shape calibration on all platforms. That guard should refuse before the sconfig parse,
-with corpus verdict parity, rather than rewrite input inside `HoconFormatter`.
-For now, nested spelling can avoid the shared-prefix parser cost, but retains the same report
-units; replacing repeated appends with an equivalent literal array can avoid that parse cost.
+**The scan refuses these shapes before the parser spends its quadratic time.** The same walk
+that counts report work now counts merge work: per object scope, every statement that writes a
+dotted path or appends with `+=` charges the first segment of its path in the object it stands
+in, a plain repeat of a one-segment key defines nothing through the key and charges nothing,
+the Nth charge of one name costs `2N-1` — N definitions through one key are N² — and the
+running total is refused past `MaxMergeWork = 2,000,000` with kind `slow-merges` and reason
+`too many definitions merge through the same key; write them nested in { } or as one [ ]
+array, or split the file`. The charge uses the scan's own segmentation: dots inside a quoted
+key or a value are never segments, and `${...}` substitutions charge nothing.
+
+Calibration: the corpus maximum is 22,512 units over 1,255 readable of 1,257 paths, 89 times
+under the budget, and this repository's own files stay under 20 units, so no accepted file
+changes verdict. The measured boundary sits at 1,414 dotted definitions through one prefix
+(1,999,396 units; 1,415 charge 2,002,225 and refuse). On an otherwise idle box the largest
+accepted shape formats through the cold JVM CLI in 1.55 s, while shapes far past the budget —
+2,828, 5,657 and 16,000 dotted definitions through one prefix — refuse in 1.04–1.17 s of whole
+CLI run; on `main` those seconds grow quadratically (net of a 4.9 s overhead on a busier box:
+3.4 s at 2,000, 18.1 s at 5,657, 63.8 s at 16,000, over 145 s at 21,428). Untouched shapes
+stay accepted at their old cost: 16,000 nested keys format in 3.41 s and 30,000 plain
+definitions in 3.47 s on the same quiet box. These are measured shapes, not a wall-clock
+guarantee; the budget is a shape proxy, as for the report work above.
+
+Repeated `k += 1` was never formattable: sconfig renders the accumulated append chain in a form
+its own parser rejects, so `main` already refuses it with `BrokenOutput` (`the output would not
+parse again`) after paying the quadratic parse. The merge budget refuses the heavy counts at
+the scan instead — 16,000 repeats of one key refuse within 1.12 s of cold JVM CLI — while a
+`+=` count under the budget keeps the pre-existing render refusal: 1,414 repeats pass the scan,
+parse, and refuse exactly as on `main`. Nested spelling avoids the shared-prefix parse cost
+but retains the same report units; replacing repeated appends with an equivalent literal array
+avoids both costs.
 
 ## The preserved preamble
 

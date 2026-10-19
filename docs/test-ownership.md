@@ -142,7 +142,7 @@ them, flip the numeric output pins and update the limitation; no numeric refusal
 | `HoconSpecCoverageSpec` refusals `mustRefuse` (13), sibling-field merges (8), cycle (1), comments (6) | our `BrokenOutput`/`UnstableOutput`/`LostComment` verdicts on the above | as above | the corresponding release, then delete the case |
 | `UnresolvedMergeSpec` (16) | the variant rendering of an unresolved merge under an include | `#598`/`#600` | a release formats those merges stably |
 | `ExamplesSpec` catalogue refusals (7) | the pinned `now` of the defect examples | `#598`, `#605`, `#646`/`#647` | the examples move to `target` and the metadata's `upstream` note goes |
-| Shared dotted object merges and repeated appends (2 library tests) | parse near the equivalent nested/literal form's cost | not filed; owner reviews the ledger first | a release avoids quadratic parsing; pre-parse refusal is follow-up work |
+| Shared dotted object merges and repeated appends (2 library tests) | parse near the equivalent nested/literal form's cost | not filed; owner reviews the ledger first | a release avoids quadratic parsing; the scan's merge budget refuses the heavy shapes before the parse since 2026-10-19 |
 | Numeric rendering (6 library tests), `NumericRenderingSpec` (10) | preserved string conversion and number type in the red suite; accepted current output in the formatter | [#654](https://github.com/ekrich/sconfig/issues/654) | a release preserves numeric spelling/type; flip the acceptance pins |
 | `KeepDetachedCommentsGuardSpec` (1) | `setKeepDetachedComments` exists | `#647` | the released library carries the option; then the fork and carrier are deleted |
 
