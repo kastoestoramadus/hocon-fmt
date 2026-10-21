@@ -9,12 +9,13 @@ package eu.ww86.hoconfmt
   * The rule is narrow on purpose. The preamble is the longest run of blank and comment-only lines
   * that the file opens with, without the comment block that sits directly above the first line of
   * the body: that block is attached by the parse to the field below it and must not move. What is
-  * left must hold a comment, so a file that opens with blank lines only has no preamble, and a
-  * file of nothing but comments has no body to format and is still refused.
+  * left must hold a comment, so a file that opens with blank lines only has no preamble; a file
+  * of nothing but comments has no body to format, and the document engine keeps it as written.
   *
   * The page's fork keeps the same comments through its `CommentCarrier` instead, normalised and
-  * without the blank lines; `CommentCarrierSpec` pins that output there. What both must do is keep
-  * the comment and the meaning, which `HoconSpecCoverageSpec` asserts for the shared cases.
+  * without the blank lines; `CommentCarrierSpec` pins that output there. Comments the preamble
+  * does not cover are the document engine's now, kept where they stand; only the preamble block
+  * itself is byte-exact.
   */
 class PreambleSpec extends munit.FunSuite with HoconTestSupport {
 
@@ -46,17 +47,19 @@ class PreambleSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(formatted("# head\n\n# section\na = 1\n"), "# head\n\n# section\na = 1\n")
   }
 
-  test("a file of comments only has no body, so no preamble, and is still refused") {
-    assertEquals(HoconFormatter.format("# one\n# two\n"), Left(Refusal.LostComment("one")))
-    assertEquals(HoconFormatter.format("# only\n\n"), Left(Refusal.LostComment("only")))
+  test("a file of comments only has no body, so no preamble, and is kept as written") {
+    assertEquals(HoconFormatter.format("# one\n# two\n"), Right("# one\n# two\n"))
+    assertEquals(HoconFormatter.format("# only\n\n"), Right("# only\n"))
   }
 
   test("a file that opens with blank lines only has no preamble") {
     assertEquals(formatted("\n\na = 1\n"), "a = 1\n")
   }
 
-  test("a braced root keeps its header") {
-    assertEquals(formatted("# head\n\n{ a : 1 }\n"), "# head\n\na = 1\n")
+  test("a braced root keeps its header and its braces") {
+    // the document engine keeps the braces a braced root was written with; the resolving render
+    // unwrapped them
+    assertEquals(formatted("# head\n\n{ a : 1 }\n"), "# head\n\n{ a = 1 }\n")
   }
 
   test("a body with an include formats with its header") {
@@ -79,12 +82,13 @@ class PreambleSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(refusal, Refusal.ShadowedByInclude("o", includeLine = 3, definitionLine = 4))
   }
 
-  // What the preamble path does not cover: a block the body needs, or one no block can be put in
-  // front of. These are the refusals the command line keeps, docs/limitations.md lists them.
-  test("comments elsewhere in the file are still refused") {
-    assertEquals(HoconFormatter.format("a = 1\n# mid\n\nb = 2\n"), Left(Refusal.LostComment("mid")))
-    assertEquals(HoconFormatter.format("a = 1\n# tail\n"), Left(Refusal.LostComment("tail")))
-    assertEquals(HoconFormatter.format("o {\n  a = 1\n  # last\n}\n"), Left(Refusal.LostComment("last")))
-    assertEquals(HoconFormatter.format("a = [\n  1\n  # tail\n]\n"), Left(Refusal.LostComment("tail")))
+  // What the preamble path does not cover: the document engine's own comment keeping. These were
+  // refusals while the resolving render dropped the comments; they are output pins now, and the
+  // comments stand where the file put them.
+  test("comments elsewhere in the file are kept where they stand") {
+    assertEquals(HoconFormatter.format("a = 1\n# mid\n\nb = 2\n"), Right("a = 1\n# mid\n\nb = 2\n"))
+    assertEquals(HoconFormatter.format("a = 1\n# tail\n"), Right("a = 1\n# tail\n"))
+    assertEquals(HoconFormatter.format("o {\n  a = 1\n  # last\n}\n"), Right("o {\n  a = 1\n  # last\n}\n"))
+    assertEquals(HoconFormatter.format("a = [\n  1\n  # tail\n]\n"), Right("a = [\n  1\n  # tail\n]\n"))
   }
 }
