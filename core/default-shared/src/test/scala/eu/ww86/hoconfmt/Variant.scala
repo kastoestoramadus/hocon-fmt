@@ -8,8 +8,8 @@ package eu.ww86.hoconfmt
 object Variant {
   val ledger: Map[String, String] = Map.empty
 
-  /** The fork base fixes the unresolved-object-merge rendering pinned by the shared suite. */
-  val unresolvedMergesFormat: Boolean = false
+  /** The document engine keeps unresolved object merges as written, like the fork base did. */
+  val unresolvedMergesFormat: Boolean = true
 
   def differs(id: String): Boolean = ledger.contains(id)
 

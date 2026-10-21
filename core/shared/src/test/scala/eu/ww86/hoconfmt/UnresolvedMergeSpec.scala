@@ -7,6 +7,10 @@ package eu.ww86.hoconfmt
   * the keys and values a restoration would land on. The reserved-name check has to judge such a
   * value that way; letting the exception reach `format` refuses valid HOCON with "need to
   * Config#resolve()", which blames the input for a library limitation.
+  *
+  * The document engine keeps these merges as written — no resolution, no banner — so the merge
+  * shapes format at a fixed point under every option combination, while the reserved name inside
+  * one is still caught by the guard tree.
   */
 class UnresolvedMergeSpec extends munit.FunSuite {
 
@@ -20,8 +24,8 @@ class UnresolvedMergeSpec extends munit.FunSuite {
   val include = "include \"f.conf\"\n"
 
   // The specification's merge idiom: `a` is defined, then `a.b` merges into it, and the merge waits
-  // on the substitution. Valid HOCON; sconfig renders it as a banner the pipeline cannot hand back,
-  // which is the refusal the formatter has to give.
+  // on the substitution. Valid HOCON; the document engine keeps every statement as written, so
+  // both shapes format with the include in place and stay put on the second pass.
   val mergeUnderInclude = include + "o {\n  a = ${x}\n  a.b = 1\n}\n"
 
   // The same merge at the file root, where the banner says so in as many words.
