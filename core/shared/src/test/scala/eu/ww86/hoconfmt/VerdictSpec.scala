@@ -127,8 +127,10 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
     refusals.foreach(r => assert(r.reason.nonEmpty, s"$r has no reason"))
   }
 
-  // A lone surrogate escape is valid HOCON and renders as the raw character, which UTF-8 cannot
-  // carry: writing the output replaced it with '?', so the file on disk no longer parsed.
+  // A lone surrogate escape is valid HOCON. The resolving render turned it into the raw character,
+  // which UTF-8 cannot carry (writing it produced '?'), so it was refused; the document engine
+  // keeps the escape as written, and the output is the input: UTF-8 carries the escape text, and
+  // the raw-half cases below are still refused.
   List(
     "a high half in a value"           -> "a = \"\\ud83d\"\n",
     "a low half in a value"            -> "a = \"\\udc00\"\n",
@@ -137,10 +139,10 @@ class VerdictSpec extends munit.FunSuite with HoconTestSupport {
     "reversed halves"                  -> "a = \"\\udc00\\ud83d\"\n",
     "a high half before ordinary text" -> "a = \"\\ud83dx\"\n"
   ).foreach { (name, source) =>
-    test(s"an unpaired surrogate in $name is refused, not written as '?'") {
+    test(s"an unpaired surrogate escape in $name is kept as written") {
       List(Verdict.of(source), Verdict.of(source.getBytes(UTF_8))).foreach {
-        case Verdict.Refused(Refusal.BrokenOutput(detail)) => assert(detail.contains("surrogate"), detail)
-        case other                                         => fail(s"expected BrokenOutput, got $other")
+        case Verdict.AlreadyFormatted => assert(true)
+        case other                    => fail(s"expected AlreadyFormatted, got $other")
       }
     }
   }
