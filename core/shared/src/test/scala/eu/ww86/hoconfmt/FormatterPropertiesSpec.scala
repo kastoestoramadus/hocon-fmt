@@ -294,6 +294,10 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   property("keeps every key defined before an include before it, in any option combination") {
     val documentsWithUniqueIncludes = documents(includes = true, distinctKeys = true)
       .suchThat(doc => doc.includes.distinct == doc.includes)
+      // A key sharing the include's line is ordered before it in the statement list, but the
+      // reader below sees order through sconfig's line numbers, which do not order same-line
+      // statements (SconfigDefectsSpec); IncludeOrderSpec pins those by exact output instead.
+      .suchThat(doc => !doc.text.linesIterator.exists(line => line.contains(",") && doc.includes.exists(line.contains)))
     forAll(documentsWithUniqueIncludes) { doc =>
       allOptions.foreach { options =>
         HoconFormatter.format(doc.text, options).foreach { out =>
