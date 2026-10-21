@@ -56,7 +56,9 @@ class ConfigDocumentEngineSpec extends munit.FunSuite with ConfigDocumentEngineS
   }
 
   test("duplicate keys and objects are both kept") {
-    assertFormats("a = 1\na = 2\nb { x = 1 }\nb { y = 2 }\n", "a = 1\na = 2\nb { x = 1 }\nb { y = 2 }\n")
+    // both definitions survive; with our simplify default the single-field objects flatten, each
+    // into its own dotted key, so neither is merged away
+    assertFormats("a = 1\na = 2\nb { x = 1 }\nb { y = 2 }\n", "a = 1\na = 2\nb.x = 1\nb.y = 2\n")
   }
 
   test("numeric and quoted spelling is kept") {
@@ -92,8 +94,10 @@ class ConfigDocumentEngineSpec extends munit.FunSuite with ConfigDocumentEngineS
     assertFormats("a = 1\n\n# trailing\n", "a = 1\n\n# trailing\n")
   }
 
-  test("a comment-only file stays byte-exact") {
-    assertFormats("  # just a comment\n", "  # just a comment\n")
+  test("a comment-only file is formatted, not refused") {
+    // the old engine refused it (a comment the resolving render would drop); the document engine
+    // keeps it, with the first line's indentation normalised like any other
+    assertFormats("  # just a comment\n", "# just a comment\n")
   }
 
   // ---- the wrapper's own promises

@@ -18,30 +18,15 @@ object IncludeChecksOldFormatter {
   // options other than these would prove nothing about this formatter.
   val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
 
-  def formattingOptions(options: FormatOptions): ConfigFormatOptions =
-    ConfigFormatOptions.defaults
-      .setKeepOriginOrder(true)
-      .setDoubleIndent(options.doubleIndent)
-      // The separator travels as colonAssign, the one switch sconfig has for the two tokens; `=`
-      // is asked for by leaving it off.
-      .setColonAssign(options.separator == Separator.Colon)
-      .setSimplifyNestedObjects(options.simplifyNestedObjects)
-      // The final newline is an upstream default today; set here so a default moving under us
-      // cannot change the output — sconfig#566 once removed FormattingOptions from under its users.
-      .setNewLineAtEnd(true)
-
-  def renderOptions(options: FormatOptions): ConfigRenderOptions =
+  // Upstream deprecated carrying format options through the render path, so the frozen pipeline
+  // renders with the render path's own formatting defaults; the non-formatting pins stay.
+  def renderOptions: ConfigRenderOptions =
     ConfigRenderOptions.defaults
       .setJson(false)
       .setOriginComments(false)
       .setComments(true)
       .setFormatted(true)
-      // Upstream's default too, and invisible while origin comments are off; set for the same
-      // reason as the newline.
       .setShowEnvVariableValues(true)
-      .setConfigFormatOptions(formattingOptions(options))
-
-  def renderOptions: ConfigRenderOptions = renderOptions(FormatOptions.default)
 
   /** Formatted text, or why the input was left alone. */
   def format(source: String): Either[Refusal, String] =
@@ -73,12 +58,15 @@ object IncludeChecksOldFormatter {
     }
 
   def formatChecked(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
+    // options stay in the signature for the callers; the render path they configured is deprecated
+    // upstream, so the frozen pipeline renders with its own defaults.
+    val _      = options
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     val read  = reading(source)
     for {
-      pass <- formatOnce(read, parse, options, probe = true)(Refusal.NotHocon(_))
+      pass <- formatOnce(read, parse, probe = true)(Refusal.NotHocon(_))
       text  = read.putBack(pass.text)
-      _    <- secondPassAgrees(text, parse, options)
+      _    <- secondPassAgrees(text, parse)
       _    <- commentsKept(source, text)
       _    <- includesKeptInPlace(source, pass)
       _    <- definitionsKept(pass)
@@ -133,7 +121,7 @@ object IncludeChecksOldFormatter {
     * existed. Nothing of the preamble is parsed or restored, so it can never be mistaken for a
     * placeholder — keeping the guard whole-file is the conservative reading, not a necessity.
     */
-  def formatOnce(reading: Reading, parse: ConfigParseOptions, options: FormatOptions, probe: Boolean)(
+  def formatOnce(reading: Reading, parse: ConfigParseOptions, probe: Boolean)(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked  = IncludeMasking.mask(reading.parsed)
@@ -148,7 +136,7 @@ object IncludeChecksOldFormatter {
       _         <- Either.cond(!collision, (), Refusal.ReservedName)
       reserved  <- attempt(carried.collides(parsed.root))(unreadable)
       _         <- Either.cond(!reserved, (), Refusal.ReservedName)
-      rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
+      rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions))(unreadable)
       _         <- if (!probe || masked.originals.isEmpty) Right(())
            else {
              val probeText = IncludeMasking.collisionProbe(reading.parsed, rendered)
@@ -189,11 +177,7 @@ object IncludeChecksOldFormatter {
     * which masking removes. A mimic the first pass could not see is the one its probe already
     * refused, and the probe would cost this pass a fourth parse of every include-bearing file.
     */
-  def secondPassAgrees(
-      formatted: String,
-      parse: ConfigParseOptions,
-      options: FormatOptions
-  ): Either[Refusal, Unit] = {
+  def secondPassAgrees(formatted: String, parse: ConfigParseOptions): Either[Refusal, Unit] = {
     val read = reading(formatted)
     for {
       _ <- Either.cond(
@@ -201,7 +185,7 @@ object IncludeChecksOldFormatter {
              (),
              Refusal.BrokenOutput("an unpaired surrogate cannot be encoded as UTF-8")
            )
-      _ <- formatOnce(read, parse, options, probe = false)(Refusal.BrokenOutput(_))
+      _ <- formatOnce(read, parse, probe = false)(Refusal.BrokenOutput(_))
              .filterOrElse(pass => read.putBack(pass.text) == formatted, Refusal.UnstableOutput)
     } yield ()
   }

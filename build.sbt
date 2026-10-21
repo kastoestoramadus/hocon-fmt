@@ -1,7 +1,11 @@
 import scala.scalanative.build.{LTO, Mode}
 
-val scala3  = "3.9.0"
-val sconfig = "2.0.0"
+val scala3 = "3.9.0"
+// TASK-910: the document-engine sconfig — ekrich/sconfig PR #655 at e9a97037176714658c, built
+// from source into a task-private Maven repository (see results 910: build-sconfig-655-private.sh
+// and dependency-lock.json for the exact recipe). Overridable so 911 can rebuild it in its own
+// repository. Not a release: the version says where it came from.
+val sconfig = sys.env.getOrElse("HOCON_FMT_SCONFIG_DOC655_VERSION", "2.2.0-docfmt655-e9a9703717")
 val munit   = "1.2.4"
 // UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
 // Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
@@ -20,6 +24,14 @@ val munitScalaCheck = "1.2.0"
 
 ThisBuild / scalaVersion := scala3
 ThisBuild / version      := "0.1.0"
+// TASK-910: where the document-engine sconfig above is resolved from.
+ThisBuild / resolvers += {
+  val path = sys.env.getOrElse(
+    "HOCON_FMT_SCONFIG_DOC655_M2",
+    "/home/walidus/ai-based-projects/idle-coordinator/data/queue/results/910-hocon-document-engine/m2"
+  )
+  "hocon-fmt-doc655" at s"file://$path"
+}
 
 // The compiler enforces what review would otherwise have to catch: a match that misses a case (a
 // new Refusal reaching code that does not handle it), a value computed and dropped, == between

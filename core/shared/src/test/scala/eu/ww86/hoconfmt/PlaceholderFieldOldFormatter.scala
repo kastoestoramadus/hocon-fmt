@@ -9,24 +9,15 @@ object PlaceholderFieldOldFormatter {
 
   val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
 
-  def formattingOptions(options: FormatOptions): ConfigFormatOptions =
-    ConfigFormatOptions.defaults
-      .setKeepOriginOrder(true)
-      .setDoubleIndent(options.doubleIndent)
-      .setColonAssign(options.separator == Separator.Colon)
-      .setSimplifyNestedObjects(options.simplifyNestedObjects)
-      .setNewLineAtEnd(true)
-
-  def renderOptions(options: FormatOptions): ConfigRenderOptions =
+  // Upstream deprecated carrying format options through the render path, so the frozen pipeline
+  // renders with the render path's own formatting defaults; the non-formatting pins stay.
+  def renderOptions: ConfigRenderOptions =
     ConfigRenderOptions.defaults
       .setJson(false)
       .setOriginComments(false)
       .setComments(true)
       .setFormatted(true)
       .setShowEnvVariableValues(true)
-      .setConfigFormatOptions(formattingOptions(options))
-
-  def renderOptions: ConfigRenderOptions = renderOptions(FormatOptions.default)
 
   def format(source: String): Either[Refusal, String] =
     formatWith(source, None, FormatOptions.default)
@@ -50,12 +41,15 @@ object PlaceholderFieldOldFormatter {
     }
 
   def formatChecked(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
+    // options stay in the signature for the callers; the render path they configured is deprecated
+    // upstream, so the frozen pipeline renders with its own defaults.
+    val _      = options
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     val read  = reading(source)
     for {
-      pass <- formatOnce(read, parse, options, probe = true)(Refusal.NotHocon(_))
+      pass <- formatOnce(read, parse, probe = true)(Refusal.NotHocon(_))
       text  = read.putBack(pass.text)
-      _    <- secondPassAgrees(text, parse, options)
+      _    <- secondPassAgrees(text, parse)
       _    <- commentsKept(source, text)
       _    <- includesKeptInPlace(source, pass)
       _    <- definitionsKept(pass)
@@ -82,7 +76,7 @@ object PlaceholderFieldOldFormatter {
       root: ConfigObject
   )
 
-  def formatOnce(reading: Reading, parse: ConfigParseOptions, options: FormatOptions, probe: Boolean)(
+  def formatOnce(reading: Reading, parse: ConfigParseOptions, probe: Boolean)(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked  = IncludeMasking.mask(reading.parsed)
@@ -97,7 +91,7 @@ object PlaceholderFieldOldFormatter {
       _         <- Either.cond(!collision, (), Refusal.ReservedName)
       reserved  <- attempt(carried.collides(parsed.root))(unreadable)
       _         <- Either.cond(!reserved, (), Refusal.ReservedName)
-      rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions(options)))(unreadable)
+      rendered  <- attempt(if (parsed.isEmpty) "" else parsed.root.render(renderOptions))(unreadable)
       _         <- if (!probe || masked.originals.isEmpty) Right(())
            else {
              val probeText = IncludeMasking.collisionProbe(reading.parsed, rendered)
@@ -122,11 +116,7 @@ object PlaceholderFieldOldFormatter {
     }
   }
 
-  def secondPassAgrees(
-      formatted: String,
-      parse: ConfigParseOptions,
-      options: FormatOptions
-  ): Either[Refusal, Unit] = {
+  def secondPassAgrees(formatted: String, parse: ConfigParseOptions): Either[Refusal, Unit] = {
     val read = reading(formatted)
     for {
       _ <- Either.cond(
@@ -134,7 +124,7 @@ object PlaceholderFieldOldFormatter {
              (),
              Refusal.BrokenOutput("an unpaired surrogate cannot be encoded as UTF-8")
            )
-      _ <- formatOnce(read, parse, options, probe = false)(Refusal.BrokenOutput(_))
+      _ <- formatOnce(read, parse, probe = false)(Refusal.BrokenOutput(_))
              .filterOrElse(pass => read.putBack(pass.text) == formatted, Refusal.UnstableOutput)
     } yield ()
   }
