@@ -34,7 +34,9 @@ class ExamplesSpec extends munit.FunSuite {
       assert(example.input.contains(input), s"$id lost merged input: $input")
       assert(example.input.linesIterator.size > 4, s"$id is still too small")
     }
-    assert(ExampleData.all.filter(e => e.now == "formatted").forall(_.input.linesIterator.size > 4))
+    // No blanket size floor over every formatted example: the document engine formats the
+    // deliberate minimal repros too (`catalogue/sconfig-defect` is two lines by design), and the
+    // merged examples above carry their own floor.
   }
 
   test("catalogue shows nested comments, detached array comments and merges in arrays") {
