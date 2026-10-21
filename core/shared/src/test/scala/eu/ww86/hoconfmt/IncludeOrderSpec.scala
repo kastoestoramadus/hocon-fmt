@@ -1,15 +1,17 @@
 package eu.ww86.hoconfmt
 
 /** An include is a field like any other: a later definition wins, so what comes before it decides
-  * which value a key resolves to. sconfig orders fields by the line they start on and leaves
-  * fields sharing a line in no defined order (`SconfigDefectsSpec`), and a key defined twice is
-  * rendered once, where it first appeared. Either can carry a field across an include, which
-  * changes what the file resolves to, so the formatter must refuse.
+  * which value a key resolves to. The document engine keeps every statement where it stands, so
+  * an include can no longer change places with a field — the order check (`MovedInclude`) stays
+  * as a guard and these fixtures pin the order the engine actually keeps. sconfig's shared-line
+  * ordering quirks remain pinned in `SconfigDefectsSpec`.
   */
 class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
 
   // `defaults.conf` holds `zone = "eu"`: written first, the include is overridden by `zone`.
-  val moved = Map(
+  // None of these move any more: the include stays in front of whatever shared its line, which
+  // is the order the file resolves to.
+  val keptInPlace = Map(
     "a field after the include on its line" -> (
       """include "defaults.conf", zone = "us"""",
       """include "defaults.conf""""
@@ -52,32 +54,35 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
     )
   )
 
-  moved.filterNot((name, _) => Variant.differs(s"includeOrder: $name")).foreach { case (name, (raw, statement)) =>
-    test(s"refuses $name") {
-      assertEquals(refusalOf(raw), Refusal.MovedInclude(statement))
-    }
+  keptInPlace.filterNot((name, _) => Variant.differs(s"includeOrder: $name")).foreach {
+    case (name, (raw, statement)) =>
+      test(s"formats $name, include in place") {
+        val out = formatted(raw)
+        assert(out.contains(statement), s"[$name] the include statement left the output: $out")
+        assertEquals(formatted(out), out, "the second pass must keep the output")
+      }
   }
 
   def kept = Map(
     "the include on its own line, first" -> (
       "include \"defaults.conf\"\nzone = \"us\"",
-      "include \"defaults.conf\"\nzone = us\n"
+      "include \"defaults.conf\"\nzone = \"us\"\n"
     ),
     "the include on its own line, last" -> (
       "zone = \"us\"\ninclude \"defaults.conf\"",
-      "zone = us\ninclude \"defaults.conf\"\n"
+      "zone = \"us\"\ninclude \"defaults.conf\"\n"
     ),
     "an include in an object, own lines" -> (
       "app {\n  include \"defaults.conf\"\n  zone = \"us\"\n}",
-      "app {\n  include \"defaults.conf\"\n  zone = us\n}\n"
+      "app {\n  include \"defaults.conf\"\n  zone = \"us\"\n}\n"
     ),
     "a field before the include on its line" -> (
       "zone = \"us\", include \"defaults.conf\"",
-      "zone = us\ninclude \"defaults.conf\"\n"
+      "zone = \"us\", include \"defaults.conf\"\n"
     ),
     "an include alone in its object" -> (
       "app { include \"defaults.conf\" }",
-      "app {\n  include \"defaults.conf\"\n}\n"
+      "app { include \"defaults.conf\" }\n"
     ),
     "an empty object before the include" -> (
       "p.q {}\ninclude \"defaults.conf\"",
