@@ -71,16 +71,35 @@ object HoconFormatter {
     Refusal.NotHocon("input nesting exceeds available stack capacity")
 
   private def formatWith(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] =
-    try HoconText.checkNesting(source).flatMap(_ => formatChecked(source, origin, options))
+    formatInjecting(source, origin, options, identity)
+
+  /** The seam the guard tests inject a losing render through: `tweak` rewrites the text the first
+    * pass carries, after the engine's own survival checks have read the real render, and the
+    * second pass renders without it. No reachable input loses a comment or reorders an include —
+    * the document engine keeps both verbatim, and the 13,272-case corpus sweep refused none — so
+    * without this seam the guards in [[formatChecked]] could not be exercised at all.
+    */
+  private[hoconfmt] def formatInjecting(
+      source: String,
+      origin: Option[String],
+      options: FormatOptions,
+      tweak: String => String
+  ): Either[Refusal, String] =
+    try HoconText.checkNesting(source).flatMap(_ => formatChecked(source, origin, options, tweak))
     catch {
       case _: StackOverflowError => Left(stackCapacityRefusal)
     }
 
-  private def formatChecked(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
+  private def formatChecked(
+      source: String,
+      origin: Option[String],
+      options: FormatOptions,
+      tweak: String => String
+  ): Either[Refusal, String] = {
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     val read  = reading(source)
     for {
-      pass <- formatOnce(read, parse, options, probe = true)(Refusal.NotHocon(_))
+      pass <- formatOnce(read, parse, options, probe = true, tweak)(Refusal.NotHocon(_))
       text  = read.putBack(pass.text)
       _    <- secondPassAgrees(text, parse, options)
       _    <- commentsKept(source, text)
@@ -139,7 +158,13 @@ object HoconFormatter {
     * existed. Nothing of the preamble is parsed or restored, so it can never be mistaken for a
     * placeholder — keeping the guard whole-file is the conservative reading, not a necessity.
     */
-  private def formatOnce(reading: Reading, parse: ConfigParseOptions, options: FormatOptions, probe: Boolean)(
+  private def formatOnce(
+      reading: Reading,
+      parse: ConfigParseOptions,
+      options: FormatOptions,
+      probe: Boolean,
+      tweak: String => String = identity
+  )(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
     val masked  = IncludeMasking.mask(reading.parsed)
@@ -167,7 +192,7 @@ object HoconFormatter {
       // back for unmasking; the document engine writes no placeholders, and the statements
       // themselves are what the survival check above reads.
       _ <- includeStatementsPresent(rendered, masked.originals)
-    } yield Pass(rendered, masked.originals, carried.text, tree)
+    } yield Pass(tweak(rendered), masked.originals, carried.text, tree)
   }
 
   /** The resolving parse the guards read: the masked text with its includes as placeholders, the
