@@ -121,18 +121,18 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
   test("repository refusal policy fails both commands and preserves refused bytes") {
     withFiles(project,
       ".hocon-fmt.conf" -> text("fail-on-refusal = true\n"),
-      "resources/refused.conf" -> text("# only a comment\n")
+      "resources/refused.conf" -> text("a : ${\n")
     ) { run =>
       assert(failure(run.eval(project.hoconFormat())).contains("HOCON formatting refusals found."))
       assert(failure(run.eval(project.hoconFormatCheck())).contains("HOCON formatting refusals found."))
-      assertEquals(read(project, "resources/refused.conf"), "# only a comment\n")
+      assertEquals(read(project, "resources/refused.conf"), "a : ${\n")
     }
   }
 
   test("explicit refusal and duplicate overrides remain independent") {
     withFiles(project,
       ".hocon-fmt.conf" -> text("fail-on-refusal = true\nfail-on-duplicates = true\n"),
-      "resources/refused.conf" -> text("# only a comment\n")
+      "resources/refused.conf" -> text("a : ${\n")
     ) { run =>
       assert(run.eval(project.hoconFormatCheck(failOnRefusal = Some(false))).isRight)
       assert(failure(run.eval(project.hoconFormatCheck(failOnDuplicates = Some(false))))
@@ -140,9 +140,9 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       os.write(project.moduleDir / "resources" / "duplicate.conf", "x=1\nx=2\n")
       assert(failure(run.eval(project.hoconFormat(failOnRefusal = Some(false))))
         .contains("HOCON duplicate definitions found."))
-      assertEquals(read(project, "resources/duplicate.conf"), "x = 2\n")
+      assertEquals(read(project, "resources/duplicate.conf"), "x = 1\nx = 2\n")
       assert(run.eval(project.hoconFormat(failOnRefusal = Some(false), failOnDuplicates = Some(false))).isRight)
-      assertEquals(read(project, "resources/refused.conf"), "# only a comment\n")
+      assertEquals(read(project, "resources/refused.conf"), "a : ${\n")
     }
   }
 
@@ -152,7 +152,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       "resources/app.conf" -> text("a=1\na=2\nb {c=3}\n")
     ) { run =>
       assert(run.eval(project.hoconFormat()).isRight)
-      assertEquals(read(project, "resources/app.conf"), "a: 2\nb.c: 3\n")
+      assertEquals(read(project, "resources/app.conf"), "a: 1\na: 2\nb.c: 3\n")
       assert(run.log.contains("defined again"), run.log)
     }
   }
@@ -165,7 +165,7 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
     ) { run =>
       val formattedBefore = os.mtime(project.moduleDir / "resources" / "formatted.conf")
       assert(run.eval(project.hoconFormat()).isRight)
-      assertEquals(read(project, "resources/application.conf"), "app {\n  name = svc\n  port = 8080\n}\n")
+      assertEquals(read(project, "resources/application.conf"), "app {\n  name = \"svc\"\n  port = 8080\n}\n")
       assertEquals(os.mtime(project.moduleDir / "resources" / "formatted.conf"), formattedBefore)
       assert(run.log.contains("Formatted resources/application.conf"), run.log)
       assert(!run.log.contains("Formatted resources/formatted.conf"), run.log)
@@ -182,16 +182,17 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
       assert(run.eval(project.hoconFormat()).isRight)
       assertEquals(
         read(project, "resources/application.conf"),
-        "include \"other.conf\"\napp {\n  name = demo\n  include required(\"nested.conf\")\n  port = 8080\n}\n"
+        "include \"other.conf\"\napp {\n  name = \"demo\"\n  include required(\"nested.conf\")\n  port = 8080\n}\n"
       )
     }
   }
 
   test("hoconFormat leaves each refused file byte for byte, warns once, and formats the rest") {
+    // `+=` is no longer refused — the document engine writes it verbatim (fork fixture B) — so the
+    // refused set is the broken file and the non-UTF-8 one.
     val refused = Seq(
-      "resources/broken.conf"      -> text("a : ${\n"),
-      "resources/latin1.conf"      -> Array[Byte](0x61, 0x20, 0x3a, 0x20, 0x22, 0x63, 0x61, 0x66, 0xe9.toByte, 0x22, 0x0a),
-      "resources/plus-equals.conf" -> text("a : [1]\na += 2\n")
+      "resources/broken.conf" -> text("a : ${\n"),
+      "resources/latin1.conf" -> Array[Byte](0x61, 0x20, 0x3a, 0x20, 0x22, 0x63, 0x61, 0x66, 0xe9.toByte, 0x22, 0x0a)
     )
     withFiles(project, refused :+ ("resources/acceptable.conf" -> text("retries   =   3\n"))*) { run =>
       assert(run.eval(project.hoconFormat()).isRight)
