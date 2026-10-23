@@ -187,7 +187,8 @@ Parsing resolves and discards `include` directives, so they cannot survive parse
 Each **whole statement** is swapped for a placeholder field before parsing and swapped back after:
 
 1. `mask` finds `include` at a word boundary in code (outside strings and comments, as
-   `HoconText` reports them), and the extent of the statement:
+   `HoconText` reports them), and the extent of the statement — `IncludeStatements` is the one
+   scanner that locates statements, shared with the survival checks:
    a quoted target, or `required(...)` / `file(...)` / `url(...)` / `classpath(...)` with balanced
    parentheses. Anything else (`include_path`, the word in prose) is left alone. The statement
    becomes `__INCLUDE_<n>` plus a guard field; the original is kept in a side table.
