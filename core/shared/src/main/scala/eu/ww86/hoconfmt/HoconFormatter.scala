@@ -120,17 +120,14 @@ object HoconFormatter {
     * lines: comments and blank lines are both non-tokens, so the body parses to the tree and the
     * origin lines the file itself would give, and a refusal from the body names the file's lines.
     *
-    * Where the parse already keeps detached comments (the page's fork), the block survives the
-    * ordinary path through the carrier instead, and this path stays out of its way: one mechanism
-    * owns the block, never both.
+    * The document engine runs on both variants; the wrapper preserves the same preamble bytes
+    * even when the resolving parser can retain detached comments itself.
     */
   private def reading(source: String): Reading =
-    if (CommentCarrier.keepsDetachedComments) Reading(source, source, "")
-    else
-      Preamble.split(source) match {
-        case Some(split) => Reading(source, split.blankLines + split.body, split.preamble)
-        case None        => Reading(source, source, "")
-      }
+    Preamble.split(source) match {
+      case Some(split) => Reading(source, split.blankLines + split.body, split.preamble)
+      case None        => Reading(source, source, "")
+    }
 
   /** What one round trip produced: the formatted text (the document engine writes include
     * statements itself, so nothing is put back), the includes by the index the source gave them,

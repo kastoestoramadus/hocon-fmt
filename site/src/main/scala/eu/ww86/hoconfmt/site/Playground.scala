@@ -2,7 +2,7 @@ package eu.ww86.hoconfmt.site
 
 import com.raquo.laminar.api.L.*
 
-import org.ekrich.config.{ConfigFactory, ConfigRenderOptions, ConfigResolveOptions, ConfigUtil}
+import org.ekrich.config.{ConfigFactory, ConfigFormatOptions, ConfigRenderOptions, ConfigResolveOptions, ConfigUtil}
 import org.scalajs.dom
 
 import scala.jdk.CollectionConverters.*
@@ -206,8 +206,7 @@ object Playground {
         a(href := "https://github.com/ekrich/sconfig/issues/646", "#646"),
         ", draft ",
         a(href := "https://github.com/ekrich/sconfig/pull/647", "#647"),
-        "), so it keeps some comments and renders some merges the released CLI still refuses; ",
-        "everything published uses released sconfig unchanged."
+        "), shared by the command line and playground until the document engine and comment fixes are released."
       )
     )
   }
@@ -271,6 +270,21 @@ object Playground {
   private def settledText(input: Signal[String], first: String, debounceMs: Int): Signal[String] =
     input.distinct.changes.debounce(debounceMs).startWith(first).distinct
 
+  // UPSTREAM-SCONFIG: resolved trees still need the legacy ordering options until upstream
+  // offers a non-deprecated origin-order render API; document formatting cannot recover that order.
+  @scala.annotation.nowarn("cat=deprecation")
+  private def resolvedRenderOptions: ConfigRenderOptions =
+    ConfigRenderOptions.defaults
+      .setJson(false)
+      .setOriginComments(false)
+      .setComments(false)
+      .setConfigFormatOptions(
+        ConfigFormatOptions.defaults
+          .setDoubleIndent(true)
+          .setKeepOriginOrder(true)
+          .setNewLineAtEnd(true)
+      )
+
   /** Resolve only accepted text, removing the include placeholders without reading any files.
     * The browser has no process environment; disabling it also makes the preview reproducible.
     * What sconfig renders resolved is raw text again, so the style choices reach the resolved
@@ -292,7 +306,7 @@ object Playground {
         val rendered = local
           .resolve(ConfigResolveOptions.defaults.setUseSystemEnvironment(false))
           .root
-          .render(ConfigRenderOptions.defaults.setJson(false).setOriginComments(false).setComments(false)) + "\n"
+          .render(resolvedRenderOptions)
         // Every value here survived the verdict's collision probe on the input, so our renderer
         // refusing its own accepted render is not a case to dress up: the untouched render stays
         // the truth about the values, and a refusal line would hide them behind one message.
