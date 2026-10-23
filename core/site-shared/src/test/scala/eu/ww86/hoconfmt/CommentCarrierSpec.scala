@@ -44,7 +44,7 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
       "two includes on one line"                            -> "include \"a.conf\"\ninclude \"b.conf\"\n",
       "a field after the include, in an object in an array" -> "arr = [\n  {\n    include \"f.conf\"\n    a = 2\n  }\n]\n"
     )
-    val cases = new IncludeOrderSpec().moved.filter((name, _) => Variant.differs(s"includeOrder: $name"))
+    val cases = new IncludeOrderSpec().keptInPlace.filter((name, _) => Variant.differs(s"includeOrder: $name"))
     assertEquals(cases.keySet, expected.keySet)
     cases.foreach { case (name, (raw, _)) =>
       assertEquals(stable(raw), expected(name), name)
