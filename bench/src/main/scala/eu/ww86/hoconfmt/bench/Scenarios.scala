@@ -1,5 +1,7 @@
 package eu.ww86.hoconfmt.bench
 
+import eu.ww86.hoconfmt.HoconText
+
 /** Inputs to time the formatter on, generated so every run and every platform measures the same
   * text. Each stresses a different part of the pipeline.
   */
@@ -12,7 +14,7 @@ object Scenarios {
     Scenario("large", sections(5000)),
     Scenario("includes", includes(300)),
     Scenario("comments", commented(2000)),
-    Scenario("nested", nested(150)),
+    Scenario("nested", nested(HoconText.MaxNestingDepth)),
     Scenario("probe-family", probeFamily(30000))
   )
 
@@ -47,7 +49,9 @@ object Scenarios {
     (0 until count).map(i => s"# setting $i explained\nkey$i = $i\n").mkString
 
   def nested(depth: Int): String =
-    (0 until depth).map(i => s"k$i { ").mkString + "v = 1" + " }" * depth + "\n"
+    // A sibling breaks long single-child paths for the Scala.js regex implementation.
+    (0 until depth).map(i => s"k$i { " + (if (i % 3 == 0) "s = 0\n" else "")).mkString +
+      "v = 1" + " }" * depth + "\n"
 
   /** A comment spelling the probe-prefix family, under an include so the probe runs. Finding the
     * first index no text spells must not rescan either text once per candidate index.
