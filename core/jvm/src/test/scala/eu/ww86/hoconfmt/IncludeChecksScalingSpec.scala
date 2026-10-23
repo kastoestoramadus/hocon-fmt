@@ -9,7 +9,8 @@ import org.ekrich.config.ConfigFactory
   * GC pauses; the ratio guards algorithmic work rather than wall-clock load or allocation latency.
   */
 class IncludeChecksScalingSpec extends munit.FunSuite {
-  val threadCpu: java.lang.management.ThreadMXBean = Option(ManagementFactory.getThreadMXBean).getOrElse(fail("no thread CPU timer"))
+  val threadCpu: java.lang.management.ThreadMXBean =
+    Option(ManagementFactory.getThreadMXBean).getOrElse(fail("no thread CPU timer"))
   assert(threadCpu.isCurrentThreadCpuTimeSupported, "the scaling guard needs a JVM thread CPU timer")
   if (!threadCpu.isThreadCpuTimeEnabled) { threadCpu.setThreadCpuTimeEnabled(true) }
 
