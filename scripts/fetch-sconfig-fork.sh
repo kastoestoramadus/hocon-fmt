@@ -1,34 +1,49 @@
 #!/usr/bin/env bash
-# UPSTREAM-SCONFIG: temporary. Once ekrich/sconfig releases setKeepDetachedComments
-# (#646, PR #647), delete this script, the `checkSconfigFork` task and `coreSite` in build.sbt,
-# and the script's steps in .github/workflows; docs/site.md "Returning to upstream sconfig"
-# lists every place (`git grep UPSTREAM-SCONFIG`).
+# UPSTREAM-SCONFIG: remove this bootstrap and checkSconfigFork when released sconfig
+# includes ConfigDocument.format (#655) and setKeepDetachedComments (#646/#647).
+# See docs/site.md "Returning to upstream sconfig" for the remaining seams.
 #
-# Publishes the sconfig fork the project page runs on, to the local Ivy repository: Scala.js,
-# Scala 3, version 2.1.0-hocon-fmt-<sha10>. The fork is kastoestoramadus/sHOCON, tag
-# fork-main-727eb3074a, pinned to the sha below so a build is reproducible. Needs git and sbt.
-# Run it once per sha (it skips when the artifact is already published), before `sbt test`.
+# Publishes the pinned kastoestoramadus/sHOCON fork for Scala 3.9.0 on JVM, JS and
+# Native, to local Ivy and Maven repositories. Needs git and sbt; run before builds.
 set -euo pipefail
 
-SHA=727eb3074aac668362b51aa576e4c3db367f88bb
+SHA=298311f25f723534fb5f10f98841a3ac8907dc8c
 SHORT=${SHA:0:10}
 VERSION="2.1.0-hocon-fmt-$SHORT"
+REPOSITORY=${HOCON_FMT_FORK_REPOSITORY:-https://github.com/kastoestoramadus/sHOCON.git}
 CACHE=${HOCON_FMT_FORK_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/hocon-fmt/sconfig-fork-$SHORT}
-IVY=$HOME/.ivy2/local/org.ekrich/sconfig_sjs1_3/$VERSION
+IVY_HOME=${HOCON_FMT_FORK_IVY_HOME:-$HOME/.ivy2}
+M2=${HOCON_FMT_FORK_M2_REPOSITORY:-${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}}
+ARTIFACTS=(sconfig_3 sconfig_sjs1_3 sconfig_native0.5_3)
 
-if [ -d "$IVY" ]; then
-  echo "sconfig fork $VERSION is already published: $IVY"
+published() {
+  local artifact ivy maven
+  for artifact in "${ARTIFACTS[@]}"; do
+    ivy="$IVY_HOME/local/org.ekrich/$artifact/$VERSION"
+    maven="$M2/org/ekrich/$artifact/$VERSION"
+    [ -s "$ivy/jars/$artifact.jar" ] && [ -s "$ivy/ivys/ivy.xml" ] &&
+      [ -s "$maven/$artifact-$VERSION.jar" ] && [ -s "$maven/$artifact-$VERSION.pom" ] || return 1
+  done
+}
+
+if published; then
+  echo "sconfig fork $VERSION is already published to local Ivy and Maven repositories"
   exit 0
 fi
 
 if [ ! -d "$CACHE/.git" ]; then
   mkdir -p "$CACHE"
   git -C "$CACHE" init -q
-  git -C "$CACHE" remote add origin https://github.com/kastoestoramadus/sHOCON.git
 fi
-git -C "$CACHE" fetch -q --depth 1 origin "$SHA"
-git -C "$CACHE" checkout -q --detach FETCH_HEAD
+# Read the override even when reusing a source cache; never retain a local origin.
+git -C "$CACHE" fetch -q --depth 1 "$REPOSITORY" "$SHA"
+git -C "$CACHE" checkout -q --detach "$SHA"
 
-# The fork's own build is sbt 2; ++3.9.0! pins the Scala version hocon-fmt compiles with.
-(cd "$CACHE" && sbt -batch "set ThisBuild / version := \"$VERSION\"; ++3.9.0!; sconfigJS/publishLocal")
+# The fork uses sbt 2; publish the Scala version every formatter module compiles with.
+(cd "$CACHE" && sbt -batch "-Dsbt.ivy.home=$IVY_HOME" "-Dmaven.repo.local=$M2" \
+  "set ThisBuild / version := \"$VERSION\"" '++3.9.0!' \
+  sconfigJVM/publishLocal sconfigJVM/publishM2 \
+  sconfigJS/publishLocal sconfigJS/publishM2 \
+  sconfigNative/publishLocal sconfigNative/publishM2)
+published || { echo "sconfig fork publication is incomplete" >&2; exit 1; }
 echo "published sconfig fork $VERSION"

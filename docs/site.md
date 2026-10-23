@@ -186,44 +186,46 @@ Locations below are in `site/src/main/scala/eu/ww86/hoconfmt/site/` at the revie
 
 <!-- UPSTREAM-SCONFIG: delete this section and the checklist below once the option is released. -->
 
-The playground runs a development build of sconfig, the fork `kastoestoramadus/sHOCON` at the
-sha pinned in `scripts/fetch-sconfig-fork.sh`. It carries `setKeepDetachedComments`
-([ekrich/sconfig#646](https://github.com/ekrich/sconfig/issues/646), draft
-[#647](https://github.com/ekrich/sconfig/pull/647)), so the page keeps a comment above a blank
-line, and the base of that branch (sconfig main) also fixes some merge renderings released
-sconfig 2.0.0 gets wrong. A muted line under the playground says so. Everything published, the
-command line and the plugins, uses released sconfig unchanged.
+All formatter modules use the fork `kastoestoramadus/sHOCON` at the sha pinned in
+`scripts/fetch-sconfig-fork.sh`. It combines the fork's existing fixes, including
+`setKeepDetachedComments` ([#647](https://github.com/ekrich/sconfig/pull/647)), with
+[`ConfigDocument.format` from #655](https://github.com/ekrich/sconfig/pull/655).
+The CLI, Java API, build-tool plugins, web and playground share the same dependency version.
 
-Pinned fork commit: `727eb3074aac668362b51aa576e4c3db367f88bb`, tagged
-`fork-main-727eb3074a` in `kastoestoramadus/sHOCON`. The local artifact is
-`2.1.0-hocon-fmt-727eb3074a`; the published core stays on sconfig 2.0.0.
+Pinned fork commit: `298311f25f723534fb5f10f98841a3ac8907dc8c` on `hocon-fmt/doc655` in
+`kastoestoramadus/sHOCON`. The local artifact is `2.1.0-hocon-fmt-298311f25f`.
+The document-engine input is PR #655 at `bb644a195007b197da7272abb4674867d5326b15`;
+the fork history, including its comment fixes, is preserved by a merge.
 
-- `scripts/fetch-sconfig-fork.sh` clones the fork at the pinned sha into
-  `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes the Scala.js artifact for Scala 3.9.0 to
-  the local Ivy repository as `2.1.0-hocon-fmt-<sha10>`. Run it once per sha, before `sbt test`;
-  CI and the Pages workflow run it first and cache `~/.ivy2/local/org.ekrich` by the script's hash.
-  An sbt source dependency is impossible (the fork builds with sbt 2), and JitPack and GitHub
-  Packages cannot serve it without auth or an sbt 2 build.
-- `checkSconfigFork` runs before `coreSite` resolves anything and fails naming the script. The
-  build never skips a platform whose input is missing, so a machine without the fork fails
-  `sbt test` rather than leaving the site untested.
-- The fork's build needs sbt-scalajs 1.22, so the whole build moved there from 1.20.1; its artifact
-  carries Scala.js IR 1.22, which 1.20 cannot link.
+- `scripts/fetch-sconfig-fork.sh` fetches the pinned sha from GitHub into
+  `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes JVM, Scala.js and Scala Native
+  artifacts for Scala 3.9.0 to local Ivy and Maven repositories. Run it before any build.
+  A complete publication is reused; a missing jar or descriptor triggers publication again.
+- `checkSconfigFork` runs before core and coreSite resolve dependencies, checking jars and Ivy
+  descriptors for all three platforms. Its failure names the bootstrap script.
+- Every sbt workflow job prepares the fork first. CI and Pages caches include both local
+  repositories and are keyed by the script's hash.
+- Maven and Gradle resolve the same fork transitively through the Java API and core from
+  Maven Local. sbt and Mill use local Ivy. The pre-commit test prepares the fork before
+  building the CLI packages.
 
 ### Moving the fork pin
 
-1. Verify the reviewed tag with `git ls-remote https://github.com/kastoestoramadus/sHOCON.git refs/tags/fork-main-727eb3074a`.
-2. Change `SHA` in `scripts/fetch-sconfig-fork.sh`, its base `VERSION` if needed, and
-   `sconfigFork` in `build.sbt` to `<base>-hocon-fmt-<first ten SHA characters>`.
-   Update the pinned commit and tag above and in `scripts/sconfig-fork-pin-test.py`.
-   Keep `++3.9.0!`: the fork's sbt 2 build must publish for the page's Scala version.
-3. Run `python3 scripts/sconfig-fork-pin-test.py`, then build the Scala.js fork:
-   `JVM_OPTS="-Xmx3g -Dmaven.repo.local=/absolute/task/m2-fork" scripts/fetch-sconfig-fork.sh`.
-   The script publishes to `~/.ivy2/local/org.ekrich/sconfig_sjs1_3/<version>`; it has
-   no private Ivy home option. No binary belongs in this repository.
-4. With one sbt JVM at a time, run `sbt -J-Xmx3g -Dmaven.repo.local=/absolute/task/m2 site/test site/build scalafmtCheckAll crossCompile coreJVM/test coreSite/test`.
-   Regenerate changed page expectations using the golden workflow in [testing](testing.md#shared-examples),
-   review every changed line against the fork fixes, and keep published-core fixtures unchanged.
+1. Merge the desired upstream changes into the fork, preserve the fork commits, and test it.
+   Push that fork commit before pushing a formatter branch that pins it.
+2. Set `SHA` in `scripts/fetch-sconfig-fork.sh` and `sconfigFork` in `build.sbt` to the full
+   commit and `2.1.0-hocon-fmt-<first ten SHA characters>`. Update the pin above.
+   Keep `++3.9.0!`: the fork's sbt 2 build must publish for the formatter's Scala version.
+3. Run `python3 scripts/sconfig-fork-pin-test.py`, then `scripts/fetch-sconfig-fork.sh`.
+   The default source is GitHub; `HOCON_FMT_FORK_REPOSITORY` can name a local clone for
+   verification before pushing. `HOCON_FMT_FORK_CACHE` selects its separate source cache.
+4. For isolated builds, set `HOCON_FMT_FORK_IVY_HOME` and
+   `HOCON_FMT_FORK_M2_REPOSITORY` and give consuming tools the matching
+   `-Dsbt.ivy.home` and `-Dmaven.repo.local` properties. Defaults are `~/.ivy2` and
+   `~/.m2/repository`; the script also honours the release workflow's `MAVEN_REPO_LOCAL`.
+5. With one sbt JVM at a time, run `sbt coreJVM/test acceptance/test site/test site/build
+   scalafmtCheckAll scalafmtSbtCheck crossCompile coreSite/test`. Review changed expectations
+   against the merged upstream changes before updating fixtures.
 
 ## Returning to upstream sconfig
 
@@ -231,12 +233,14 @@ Pinned fork commit: `727eb3074aac668362b51aa576e4c3db367f88bb`, tagged
 
 Everything that exists only for the fork carries the marker `UPSTREAM-SCONFIG:`; `git grep
 UPSTREAM-SCONFIG` lists it. The signal is `KeepDetachedCommentsGuardSpec` (`sbt libraryDefects`):
-it is red until released sconfig has `setKeepDetachedComments`, and green once the dependency
-`sconfig` in `build.sbt` is a release that carries it. Then:
+the fork already has the option, so a green result on this branch does not establish release
+availability. Switch `sconfig` in `build.sbt` to a release carrying both `ConfigDocument.format`
+and `setKeepDetachedComments`, run the guard and the full formatter suites, then:
 
 1. Delete `scripts/fetch-sconfig-fork.sh`, the `sconfigFork` value and `checkSconfigFork` in
-   `build.sbt`, and the two script steps (with their cache) in `.github/workflows/ci.yml` and
-   `pages.yml`.
+   `build.sbt`, and every fork bootstrap step (with its cache) in `.github/workflows/ci.yml`,
+   `pages.yml`, `release.yml` and `scripts/pre-commit-e2e.sh`. Replace the `sconfig = sconfigFork`
+   alias with the released version, and delete `scripts/sconfig-fork-pin-test.py`.
 2. Delete the `coreSite` project, point `site` back at `coreJS`, and drop it from `root`'s aggregate and `test` sequence and from `crossCompile`.
 3. In `core`, enable the option in `HoconFormatter.parseOptions` and delete the seam:
    `CommentCarrier` with `keepsDetachedComments` (which gates the preamble path: with the option

@@ -14,7 +14,7 @@ in v0.1.0. No origin, speed or comparison claims were added.
 ## Measurement quoted
 
 The measured source is work/codex-jobs/g1/raw/corpus-compare.txt under
-/home/walidus/hocon-fmt-analysis-2026-10-11, from the 2026-10-13 JVM CLI refresh at c94d49e:
+the owner's `hocon-fmt-analysis-2026-10-11` evidence directory, from the 2026-10-13 JVM CLI refresh at c94d49e:
 
 ```text
 before: 1257 files; after: 1257 files

@@ -208,6 +208,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Import the signing key
         if: contains(needs.version.outputs.selected, 'core') || contains(needs.version.outputs.selected, 'sbt-plugin') || contains(needs.version.outputs.selected, 'maven-plugin') || contains(needs.version.outputs.selected, 'gradle-plugin')
         env:
@@ -328,6 +331,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Link
         run: sbt cliNative/nativeLink
       - name: Smoke test
@@ -362,6 +368,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Pack
         run: |
           sbt cliJS/npmPackage
@@ -385,6 +394,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - run: sbt web/bundle
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
