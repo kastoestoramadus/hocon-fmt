@@ -26,9 +26,9 @@ private[hoconfmt] object IncludeMasking {
   case class Masked(text: String, originals: Map[Int, String])
 
   /** With `onOwnLines`, each placeholder is also put on a line of its own, so that sconfig's
-    * origin lines tell where it stood among the fields around it: [[IncludeOrder]] reads the
-    * source that way. The text is for reading only, never rendered; a comma after the statement
-    * stays on the placeholder's line, since a line may not begin with one.
+    * origin lines tell where it stood among the fields around it — the reading the retired
+    * include-order walk used to make. The text is for reading only, never rendered; a comma
+    * after the statement stays on the placeholder's line, since a line may not begin with one.
     */
   def mask(source: String, onOwnLines: Boolean = false): Masked =
     maskWithPrefix(source, onOwnLines, PlaceholderPrefix)

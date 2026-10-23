@@ -283,8 +283,9 @@ object HoconFormatter {
     *
     * The document engine keeps the order of fields and includes structurally, so the check is the
     * order itself: the statements, whitespace collapsed, appear in the output as many times and in
-    * the order the source gave them. The placeholder walk it replaces (`IncludeOrder`) located an
-    * include by the field the resolving pipeline substituted for it.
+    * the order the source gave them. The placeholder walk this check replaced — the retired
+    * include-order machinery — located an include by the field the resolving pipeline substituted
+    * for it.
     */
   private def includesKeptInPlace(pass: Pass): Either[Refusal, Unit] = {
     val before  = pass.originals.toList.sortBy(_._1).map(_._2)

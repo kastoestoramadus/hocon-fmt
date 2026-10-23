@@ -45,9 +45,8 @@ class IncludeChecksScalingSpec extends munit.FunSuite {
     assert(after < before * 24, s"$name grew ${after / before} times for eight times the includes (limit 24)")
   }
 
-  test("moved includes avoid rescanning the object per include") {
-    checkScaling("moved", (source, masked, _, rendered) => IncludeOrder.moved(source, rendered, masked.originals))
-  }
+  // The moved-order scaling row is gone with IncludeOrder: the document engine keeps include
+  // order structurally, so there is no per-include position walk left to bound.
   test("shadowed includes avoid rebuilding the object per include") {
     checkScaling("shadowed", (_, masked, root, _) => IncludeShadow.shadowed(masked.text, masked.originals, root))
   }

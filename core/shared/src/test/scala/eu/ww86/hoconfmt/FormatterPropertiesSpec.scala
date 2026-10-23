@@ -42,8 +42,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // The two properties that compared the formatter byte-for-byte with the frozen old pipeline
   // (placeholder scan, include indexes) are retired with the document engine: it formats what
   // the resolving render refused, so the pipelines disagree by design. Their generators stay in
-  // use through the other properties; PlaceholderFieldOldFormatter and IncludeChecksOldFormatter
-  // themselves are 912's to delete per the retirement manifest.
+  // use through the other properties; the replicas themselves (PlaceholderFieldOldFormatter,
+  // IncludeChecksOldFormatter) and the include-order check are deleted with this retirement.
 
   property("nested include-bearing inputs always yield a verdict with a reason on refusal") {
     forAll(Gen.choose(1, 160)) { depth =>

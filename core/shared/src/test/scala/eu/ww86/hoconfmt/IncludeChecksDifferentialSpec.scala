@@ -75,20 +75,6 @@ trait IncludeChecksDifferentialChecks extends munit.Assertions {
         Try(ConfigFactory.parseString(masked.text, HoconFormatter.parseOptions).root).toOption
       }
       .foreach { root =>
-        Try(root.render(HoconFormatter.renderOptions)).toOption.foreach { rendered =>
-          assertEquals(
-            IncludeOrder.moved(source, rendered, masked.originals),
-            IncludeOrderOracle.moved(source, rendered, masked.originals),
-            source
-          )
-          // Changed renderings exercise non-empty results and the source-order choice between includes.
-          val reversed = IncludeMasking.mask(source.linesIterator.toList.reverse.mkString("\n")).text
-          assertEquals(
-            IncludeOrder.moved(source, reversed, masked.originals),
-            IncludeOrderOracle.moved(source, reversed, masked.originals),
-            source
-          )
-        }
         assertEquals(
           IncludeShadow.shadowed(masked.text, masked.originals, root),
           IncludeShadowOracle.shadowed(masked.text, masked.originals, root),
@@ -97,8 +83,11 @@ trait IncludeChecksDifferentialChecks extends munit.Assertions {
       }
     // The old-formatter equivalence row is retired: the document engine formats what the
     // resolving render refused (duplicates, +=, unresolved merges, same-line includes), so the
-    // two pipelines disagree by design. The oracle comparisons above are engine-independent and
-    // stay; IncludeChecksOldFormatter itself is 912's to delete per the retirement manifest.
+    // two pipelines disagree by design. The shadow oracle comparison above is engine-independent
+    // and stays. The old-pipeline replicas (IncludeChecksOldFormatter,
+    // PlaceholderFieldOldFormatter) and the include-order check they carried (IncludeOrder,
+    // IncludeOrderOracle) are deleted: the document engine keeps include order structurally,
+    // pinned by IncludeOrderSpec and the scripted include goldens.
   }
 }
 
