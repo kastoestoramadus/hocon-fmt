@@ -15,7 +15,7 @@ class HoconFormatterJsSpec extends munit.FunSuite {
   test("a text that needs formatting comes back formatted") {
     val result = format("app {\n    name  =  \"svc\"\n   port =8080\n}\n")
     assertEquals(field(result, "verdict"), Some("needsFormatting"))
-    assertEquals(field(result, "formatted"), Some("app {\n  name = svc\n  port = 8080\n}\n"))
+    assertEquals(field(result, "formatted"), Some("app {\n  name = \"svc\"\n  port = 8080\n}\n"))
     assertEquals(field(result, "refusal"), None)
     assertEquals(field(result, "reason"), None)
   }
@@ -50,18 +50,20 @@ class HoconFormatterJsSpec extends munit.FunSuite {
     assert(field(result, "reason").exists(_.startsWith("not valid HOCON: playground: ")), field(result, "reason"))
   }
 
-  test("a comment that would be lost is a refusal of its own") {
+  test("a trailing comment survives the document engine") {
     val result = format("a : 1\n# trailing\n")
-    assertEquals(field(result, "refusal"), Some("lostComment"))
-    assertEquals(field(result, "reason"), Some("a comment would be lost or duplicated: trailing"))
+    assertEquals(field(result, "verdict"), Some("needsFormatting"))
+    assertEquals(field(result, "formatted"), Some("a = 1\n# trailing\n"))
+    assertEquals(field(result, "refusal"), None)
+    assertEquals(field(result, "reason"), None)
   }
 
-  test("an unpaired surrogate escape is refused without exposing formatted text") {
+  test("an unpaired surrogate escape stays written without decoding") {
     val result = format("a = \"\\ud83d\"\n")
-    assertEquals(field(result, "verdict"), Some("refused"))
-    assertEquals(field(result, "formatted"), None)
-    assertEquals(field(result, "refusal"), Some("brokenOutput"))
-    assert(field(result, "reason").exists(_.contains("surrogate")), field(result, "reason"))
+    assertEquals(field(result, "verdict"), Some("alreadyFormatted"))
+    assertEquals(field(result, "formatted"), Some("a = \"\\ud83d\"\n"))
+    assertEquals(field(result, "refusal"), None)
+    assertEquals(field(result, "reason"), None)
   }
 
   test("every refusal has a name a page can branch on") {

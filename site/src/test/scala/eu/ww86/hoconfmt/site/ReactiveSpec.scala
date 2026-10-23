@@ -46,12 +46,21 @@ class ReactiveSpec extends munit.FunSuite {
   // The verdict is the playground's own: a parse failure names the playground as where it tripped.
   test("a refusal keeps the exact pasted text in the settled verdict") {
     val owner = new ManualOwner
-    val text  = "[1, 2]\n"
+    val text  = "a : ${"
     val seen  = scala.collection.mutable.ListBuffer.empty[(String, Verdict)]
     val _     = Playground.verdicts(Var(text).signal, text).foreach(seen += _)(using owner)
     assertEquals(seen.map(_._1).toList, List(text))
     assertEquals(seen.map(_._2).toList, List(Verdict.of(text, "playground")))
     assert(seen.exists { case (_, Verdict.Refused(_)) => true; case _ => false })
+    owner.killSubscriptions()
+  }
+
+  test("a root array remains accepted in the settled verdict") {
+    val owner = new ManualOwner
+    val text  = "[1, 2]\n"
+    val seen  = scala.collection.mutable.ListBuffer.empty[(String, Verdict)]
+    val _ = Playground.verdicts(Var(text).signal, text).foreach(seen += _)(using owner)
+    assertEquals(seen.toList, List(text -> Verdict.AlreadyFormatted))
     owner.killSubscriptions()
   }
 
