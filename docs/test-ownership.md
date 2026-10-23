@@ -162,7 +162,7 @@ green, and the full `coreJVM` run on main fails exactly where a release will for
 | `CommentCarrier` (336 lines), `Carried` (15), `core/default-shared` (25), the call sites | the seam plus its two halves | `#647` | same | enable the option in `parseOptions`, delete the seam and `Variant` — step 3 |
 | `CommentCarrierSpec` (192), `Variant` ledger (50), `KeepDetachedCommentsGuardSpec` (27) | 27 ledger entries to keep in step with the examples | `#647` | same | delete with the seam — step 4 |
 | Refusal paths for library defects: `BrokenOutput`, `UnstableOutput`, `LostComment` checks and their docs | stays as the safety net; the red list above is what would shrink | `#598`/`#600`/`#605`/`#647` | one release at a time | the checks never go: a release only stops them firing for the retired cases; update `limitations.md`, the red list and the examples' `upstream` notes |
-| `MovedInclude`/`LostInclude` guards, `IncludeMasking` (348 lines) and `IncludeOrder` (118 lines) | ours, kept forever: include handling is ours by the division of labour | [Java #733] relates, no fix | — | none |
+| `MovedInclude`/`LostInclude` guards, `IncludeMasking` (348 lines); `IncludeOrder` (118 lines) retired with the document engine | ours, kept forever: include handling is ours by the division of labour | [Java #733] relates, no fix | — | none |
 | Pinned `sconfig = "2.0.0"` in `build.sbt` | one line, plus the artifact set | releases after v2.0.0 | each release | bump; a release containing `#598`/`#605` also drops the refusals named above |
 | Documented normalisations (`//`→`#`, flattening, canonical numbers, LF/no BOM, inline comments moving) | none: renderer behaviour we ask for | none | — | never; they are the pinned style |
 

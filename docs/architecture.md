@@ -69,13 +69,12 @@ parsing and input-byte costs remain separate limitations.
    is `Refusal.LostComment`. A difference alone would miss the second kind — sconfig's `+=`
    desugaring copies the comment of the appended field onto both halves of the expansion — and a
    comment nobody wrote is as much a change to the file as a lost one.
-7. `IncludeOrder` refuses output in which an include has changed places with a field
-   (`Refusal.MovedInclude`). The placeholder is a field to sconfig, which orders fields by the line
-   they start on and fields sharing a line arbitrarily, so the include can end up on the other side
-   of a field that a later definition would override. For each include it compares the full paths
-   of the keys defined before it in its object, in the masked rendering and in the source; the source
-   is read with `mask(_, onOwnLines = true)`, which puts each placeholder on a line of its own, since
-   its real line does not say where it stood.
+7. The order check refuses output in which an include has changed places with a field
+   (`Refusal.MovedInclude`). The document engine keeps every statement where it stands, so the
+   check is the order itself: the statements, whitespace collapsed, must appear in the output as
+   many times and in the order the source gave them. (The placeholder walk this replaced — the
+   retired `IncludeOrder` — located an include by the field the resolving pipeline substituted
+   for it; see `docs/improvement-log/2026-10-08-34-include-order-refusal.md` for its history.)
 8. `IncludeShadow` refuses output in which a definition the merge drops stood in the include's
    object on a path the include may write (`Refusal.ShadowedByInclude`). The placeholder makes the
    parse resolve the text as if the included file said nothing, so a definition a later one replaces
@@ -100,10 +99,8 @@ parsing and input-byte costs remain separate limitations.
    The check is deliberately conservative: the included file cannot be read at format time, so it
    refuses a form a later, better-informed pass could allow.
 
-The include checks share indexes across includes in the same scope. `IncludeOrder` sweeps origin
-lines and stores canonical persistent sets of preceding full paths: equality of their roots is an
-exact set comparison, including across the source and rendered parses. Whole lines are queried
-before their paths are inserted, preserving the same-line tie rule. `IncludeShadow` builds its
+The include checks share indexes across includes in the same scope. The order check compares the
+statements themselves, whitespace collapsed, so it holds no index of its own. `IncludeShadow` builds its
 survival, same-line twin and related-path indexes once per object path and array scope. For an
 empty object it remembers the latest surviving blocker, then finds the first include between that
 blocker and the definition; suffix facts answer the questions about later definitions. Refusals
@@ -290,7 +287,7 @@ masking](#include-masking) judges its own (`PlaceholderTree`), so a spelling the
 refused (`Refusal.ReservedName`) rather than restored. Both `:` and `=` are matched, the renderer
 writing the asked-for separator. A rendering whose prefix occurrences are not exactly the three
 each placeholder writes is left unrestored: the block is then a lost comment and the file is
-refused, never altered. `IncludeOrder` gets the text with the comments already restored, so it
+refused, never altered. The order check gets the text with the comments already restored, so it
 never sees a placeholder. The regex rules of include masking apply.
 
 This is temporary: [site](site.md#returning-to-upstream-sconfig) lists what goes when sconfig
