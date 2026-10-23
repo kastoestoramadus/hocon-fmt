@@ -370,7 +370,7 @@ class ComponentSpec extends munit.FunSuite {
             assertEquals(input.value.asInstanceOf[String], example.input)
             assertEquals(output.value.asInstanceOf[String], formatted(example.input))
             val status = find(container, "status").textContent.asInstanceOf[String]
-            val states = List("Formatted", "Formatted", "Formatted", "Formatted", "Left unchanged", "Already formatted")
+            val states = List("Formatted", "Formatted", "Formatted", "Already formatted", "Left unchanged", "Already formatted")
             assert(status.contains(states(index)), status)
             if index == 1 then {
               val finding = find(container, "findings").textContent.asInstanceOf[String]
@@ -526,10 +526,12 @@ class ComponentSpec extends munit.FunSuite {
     val (input, output) = panes(container)
     type_(input, "z = 1\na = 2\nm = 3\n")
     settle(250).map { _ =>
-      val _ = find(container, "resolved-tab").fire("click")
+      val _        = find(container, "resolved-tab").fire("click")
       val rendered = output.value.asInstanceOf[String]
-      assertEquals(rendered.linesIterator.filter(_.contains(" = ")).map(_.takeWhile(_ != ' ')).toList,
-        List("z", "a", "m"))
+      assertEquals(
+        rendered.linesIterator.filter(_.contains(" = ")).map(_.takeWhile(_ != ' ')).toList,
+        List("z", "a", "m")
+      )
       val _ = root.unmount()
       ()
     }

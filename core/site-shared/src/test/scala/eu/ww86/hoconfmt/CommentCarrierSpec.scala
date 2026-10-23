@@ -8,8 +8,10 @@ import org.ekrich.config.parser.ConfigDocumentFactory
 class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
 
   def documentFormat(source: String): String =
-    ConfigDocumentFactory.parseString(source)
-      .format(ConfigFormatOptions.defaults.setSimplifyNestedObjects(true)).render
+    ConfigDocumentFactory
+      .parseString(source)
+      .format(ConfigFormatOptions.defaults.setSimplifyNestedObjects(true))
+      .render
 
   private def example(id: String): Example =
     ExampleData.all.find(_.id == id).getOrElse(fail(s"no example $id"))

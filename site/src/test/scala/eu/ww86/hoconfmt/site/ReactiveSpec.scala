@@ -59,7 +59,7 @@ class ReactiveSpec extends munit.FunSuite {
     val owner = new ManualOwner
     val text  = "[1, 2]\n"
     val seen  = scala.collection.mutable.ListBuffer.empty[(String, Verdict)]
-    val _ = Playground.verdicts(Var(text).signal, text).foreach(seen += _)(using owner)
+    val _     = Playground.verdicts(Var(text).signal, text).foreach(seen += _)(using owner)
     assertEquals(seen.toList, List(text -> Verdict.AlreadyFormatted))
     owner.killSubscriptions()
   }
