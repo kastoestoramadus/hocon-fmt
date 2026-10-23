@@ -370,7 +370,8 @@ class ComponentSpec extends munit.FunSuite {
             assertEquals(input.value.asInstanceOf[String], example.input)
             assertEquals(output.value.asInstanceOf[String], formatted(example.input))
             val status = find(container, "status").textContent.asInstanceOf[String]
-            val states = List("Formatted", "Formatted", "Formatted", "Already formatted", "Left unchanged", "Already formatted")
+            val states =
+              List("Formatted", "Formatted", "Formatted", "Already formatted", "Left unchanged", "Already formatted")
             assert(status.contains(states(index)), status)
             if index == 1 then {
               val finding = find(container, "findings").textContent.asInstanceOf[String]
