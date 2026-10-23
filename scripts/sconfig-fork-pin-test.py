@@ -12,6 +12,23 @@ REPOSITORY = 'https://github.com/kastoestoramadus/sHOCON.git'
 ARTIFACTS = ('sconfig_3', 'sconfig_sjs1_3', 'sconfig_native0.5_3')
 
 
+def split_sbt_commands(line: str) -> list[str]:
+    """Split one sbt command line on the semicolons that sit outside double quotes."""
+    commands: list[str] = []
+    current: list[str] = []
+    quoted = False
+    for character in line:
+        if character == '"':
+            quoted = not quoted
+        if character == ';' and not quoted:
+            commands.append(''.join(current).strip())
+            current = []
+        else:
+            current.append(character)
+    commands.append(''.join(current).strip())
+    return [command for command in commands if command]
+
+
 class SconfigForkPinTest(unittest.TestCase):
     script: str
     build: str
@@ -105,6 +122,43 @@ class SconfigForkPinTest(unittest.TestCase):
                 result = self.probe_cache(missing)
                 self.assertEqual(result.returncode, 42, result.stdout + result.stderr)
                 self.assertIn('fetch required', result.stderr)
+
+    def stubbed_sbt_argv(self) -> list[str]:
+        """Run the bootstrap against a partial cache with an sbt stub that records its argv."""
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            bin_dir = home / 'bin'
+            bin_dir.mkdir()
+            git = bin_dir / 'git'
+            git.write_text('#!/bin/sh\nexit 0\n')
+            git.chmod(0o755)
+            recorded = home / 'sbt-argv.txt'
+            sbt = bin_dir / 'sbt'
+            sbt.write_text(f'#!/bin/sh\nprintf \'%s\\n\' "$@" > "{recorded}"\nexit 1\n')
+            sbt.chmod(0o755)
+            env = {key: value for key, value in os.environ.items()
+                   if not key.startswith('HOCON_FMT_FORK_') and key != 'MAVEN_REPO_LOCAL'}
+            env.update(HOME=str(home), PATH=f'{bin_dir}:{env["PATH"]}',
+                       HOCON_FMT_FORK_CACHE=str(home / 'source'))
+            subprocess.run(['bash', str(ROOT / 'scripts/fetch-sconfig-fork.sh')],
+                           env=env, text=True, capture_output=True, check=False)
+            return recorded.read_text().splitlines()
+
+    def test_sbt_commands_arrive_as_one_semicolon_separated_argument(self) -> None:
+        """The sbt 2 thin client joins command arguments with spaces before parsing;
+        only one ';'-separated argument parses identically with and without it."""
+        argv = self.stubbed_sbt_argv()
+        flags = [arg for arg in argv if arg.startswith('-')]
+        command_args = [arg for arg in argv if not arg.startswith('-')]
+        self.assertIn('-batch', flags)
+        self.assertTrue(any(arg.startswith('-Dsbt.ivy.home=') for arg in flags))
+        self.assertTrue(any(arg.startswith('-Dmaven.repo.local=') for arg in flags))
+        expected = [f'set ThisBuild / version := "{self.version}"', '++3.9.0!']
+        expected += [f'sconfig{platform}/{task}'
+                     for platform in ('JVM', 'JS', 'Native')
+                     for task in ('publishLocal', 'publishM2')]
+        self.assertEqual(len(command_args), 1, command_args)
+        self.assertEqual(split_sbt_commands(' '.join(command_args)), expected)
 
 
 if __name__ == '__main__':
