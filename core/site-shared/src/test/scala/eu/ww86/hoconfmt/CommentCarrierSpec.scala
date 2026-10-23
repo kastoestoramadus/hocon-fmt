@@ -2,9 +2,14 @@ package eu.ww86.hoconfmt
 
 import scala.scalajs.js
 
-import org.ekrich.config.{ConfigFactory, ConfigObject}
+import org.ekrich.config.{ConfigFactory, ConfigFormatOptions, ConfigObject}
+import org.ekrich.config.parser.ConfigDocumentFactory
 
 class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
+
+  def documentFormat(source: String): String =
+    ConfigDocumentFactory.parseString(source)
+      .format(ConfigFormatOptions.defaults.setSimplifyNestedObjects(true)).render
 
   private def example(id: String): Example =
     ExampleData.all.find(_.id == id).getOrElse(fail(s"no example $id"))
@@ -18,10 +23,9 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     out
   }
 
-  test("the examples record exact fork outcomes where the published core refuses") {
+  test("the page examples match the shared document-engine outcomes") {
     ExampleData.all.filter(_.siteNow.nonEmpty).foreach { e =>
-      assert(Variant.differs(e.id), e.id)
-      assertEquals(e.siteNow, Some("formatted"), e.id)
+      assertEquals(e.siteNow, Some(e.now), e.id)
       val actual = stable(e.input)
       val update = js.Dynamic.global.process.env.selectDynamic("UPDATE_GOLDEN")
       if (js.typeOf(update) == "string" && (update.toString == "1" || update.toString == "true")) {
@@ -36,18 +40,11 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
   }
 
   test("same-line includes keep their order with the fork") {
-    val expected = Map(
-      "a field after the include on its line"               -> "include \"defaults.conf\"\nzone = us\n",
-      "a field after the include in an object"              -> "app {\n  include \"defaults.conf\"\n  zone = us\n}\n",
-      "fields on both sides of the include on its line"     -> "a = 1\ninclude \"defaults.conf\"\nb = 2\n",
-      "a function-form include followed by a field"         -> "include required(file(\"defaults.conf\"))\nzone = us\n",
-      "two includes on one line"                            -> "include \"a.conf\"\ninclude \"b.conf\"\n",
-      "a field after the include, in an object in an array" -> "arr = [\n  {\n    include \"f.conf\"\n    a = 2\n  }\n]\n"
-    )
-    val cases = new IncludeOrderSpec().keptInPlace.filter((name, _) => Variant.differs(s"includeOrder: $name"))
-    assertEquals(cases.keySet, expected.keySet)
-    cases.foreach { case (name, (raw, _)) =>
-      assertEquals(stable(raw), expected(name), name)
+    val cases = new IncludeOrderSpec().keptInPlace
+    cases.foreach { case (name, (raw, statement)) =>
+      val actual = stable(raw)
+      assertEquals(actual, documentFormat(raw), name)
+      assert(actual.contains(statement), name)
     }
   }
 
@@ -59,8 +56,8 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
-  test("overflowing numbers refuse with the fork") {
-    assertEquals(HoconFormatter.format("a = 1e400"), Left(Refusal.UnstableOutput))
+  test("overflowing numeric spelling stays written with the document engine") {
+    assertEquals(stable("a = 1e400"), documentFormat("a = 1e400"))
   }
 
   test("the option is on") {
@@ -69,13 +66,13 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
 
   test("a header above a blank line is kept") {
     val out = stable("# Copyright 2025\n\na : 1")
-    assertEquals(out, "# Copyright 2025\na = 1\n")
+    assertEquals(out, "# Copyright 2025\n\na = 1\n")
   }
 
   test("the comment cases of the ledger now format") {
     // 27 rows named the comment and render cases the fork keeps; the rest name the substitution
     // merges it settles, added with their pins in HoconSpecCoverageSpec.
-    assertEquals(Variant.ledger.size, 44)
+    assertEquals(Variant.ledger, Map.empty[String, String])
     List("catalogue/detached-header-comment", "catalogue/trailing-comment-in-object").foreach { id =>
       Verdict.of(example(id).input) match {
         case Verdict.Refused(refusal) => fail(s"$id: ${refusal.reason}")
@@ -85,7 +82,7 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     // The two coverage fixtures; the block split by a blank line keeps both halves, in order.
     assertEquals(
       stable("o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"),
-      "o {\n  a = 1\n  # one\n  # two\n  b = 2\n}\n"
+      documentFormat("o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}")
     )
   }
 
@@ -108,18 +105,19 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
     assert(out.contains("include \"x.conf\""), out)
   }
 
-  test("a comment at the end of an array is still refused") {
-    assertEquals(HoconFormatter.format("a : [\n  1\n  # tail\n]"), Left(Refusal.LostComment("tail")))
+  test("a comment at the end of an array survives the document engine") {
+    val source = "a : [\n  1\n  # tail\n]"
+    assertEquals(stable(source), documentFormat(source))
   }
 
-  test("a ledger example no longer ends as its pinned outcome") {
-    Variant.ledger.keys.filter(_.contains("/")).foreach { id =>
+  test("page metadata records the shared document-engine verdict") {
+    ExampleData.all.filter(_.siteNow.nonEmpty).map(_.id).foreach { id =>
       val actual = Verdict.of(example(id).input) match {
         case Verdict.NeedsFormatting(_) => "formatted"
         case Verdict.AlreadyFormatted   => "already-formatted"
         case Verdict.Refused(r)         => s"refused:${kindOf(r)}"
       }
-      assertNotEquals(actual, example(id).now, id)
+      assertEquals(actual, example(id).now, id)
     }
   }
 
@@ -142,7 +140,7 @@ class CommentCarrierSpec extends munit.FunSuite with HoconTestSupport {
       val source = user + "\nb : 1\n# end\n"
       HoconFormatter.format(source) match {
         case Right(out) =>
-          assert(out.contains(kept), s"$name: [$kept] changed in:\n$out")
+          assertEquals(out, documentFormat(source), s"$name: written placeholder spelling changed ($kept)")
           assert(out.contains("# end"), s"$name: the comment was lost:\n$out")
         case Left(_) => () // refusing is allowed; altering is not
       }
