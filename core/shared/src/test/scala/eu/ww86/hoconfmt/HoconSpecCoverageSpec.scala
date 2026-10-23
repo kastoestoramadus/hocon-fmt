@@ -12,20 +12,22 @@ import eu.ww86.hoconfmt.HoconFormatter.format
   *
   * Coverage of the HOCON specification.
   *
-  * Two groups: constructs the formatter destroys (bugs, pinned so a fix shows up as a failure),
-  * and normalisations it performs on purpose (pinned so they are not "fixed" by accident).
+  * Through the document engine the file is kept as written: spelling, comments and unresolved
+  * merges all survive, so most of what is pinned here is that keeping (a regression shows up as
+  * a failure), plus the supported constructs that must not change meaning.
   *
   * @see
   *   https://github.com/lightbend/config/blob/main/HOCON.md
   */
 class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
 
-  // --- Never hand back output we cannot read again ---------------------------------------------
-  // These constructs cannot survive the parse-render round trip. Returning Success with
-  // unparseable output is the worst outcome available, because CmdApi writes on success:
-  // rewrite mode would replace a valid config with a broken one. Refusing is correct.
+  // --- Unresolved merges are kept as written ----------------------------------------------------
+  // The document engine resolves nothing, so every one of these shapes formats verbatim: the
+  // output re-parses, means the same and is a fixed point. The resolving render behind the old
+  // engine corrupted or destabilised them, which is why this group was once a refusal list
+  // (the library defects behind those refusals stay pinned in SconfigDefectsSpec).
 
-  val mustRefuse = Map(
+  val keptVerbatim = Map(
     "+= field separator"            -> "a : [1]\na += 2",
     "+= field separator, nested"    -> "o { a : [1]\na += 2 }",
     "self-referential substitution" -> "a : 1\na : ${a}",
@@ -45,30 +47,32 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "array self-concatenation" -> "a : [ 1, 2 ]\na : ${a} [ 3, 4 ]"
   )
 
-  mustRefuse.filterNot((name, _) => Variant.differs(s"mustRefuse: $name")).foreach { case (name, raw) =>
-    test(s"formatter: refuses rather than corrupts: $name") {
+  // The ledger id keeps its historical `mustRefuse:` prefix: the site variant filters by it.
+  keptVerbatim.filterNot((name, _) => Variant.differs(s"mustRefuse: $name")).foreach { case (name, raw) =>
+    test(s"formatter: keeps as written: $name") {
       assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
-      refusalOf(raw) match {
-        case Refusal.BrokenOutput(_) => ()
-        case other                   => fail(s"$name: refused for the wrong reason: ${other.reason}")
-      }
+      val out = formatted(raw)
+      assert(out.parses.isSuccess, s"output does not re-parse: $out")
+      assertSameMeaning(out, raw, s"formatting changed the meaning of: $raw")
+      assertEquals(formatted(out), out, "the second pass must keep the output")
     }
   }
 
   // Taken verbatim from the HOCON specification's self-referential example. Both keys are
-  // defined first, and the cycle written over those definitions is an unresolved merge: it
-  // renders as a banner that parses but changes again on the next pass. A cycle between bare
-  // names, with no definition beside it, is a different shape — formatting settles it, and the
-  // test below pins that, so the docs name this input where the refusal is described.
+  // defined first, and the cycle written over those definitions is an unresolved merge: the
+  // document engine keeps the file as written, so it formats at a fixed point and the cycle
+  // still fails resolution identically on the input and the output — nothing is hidden.
   def specSelfReference = Map(
     "substitution cycle (Examples of Self-Referential Substitutions)" ->
       "a : 1\nb : 2\na : ${b}\nb : ${a}"
   )
 
   specSelfReference.filterNot((name, _) => Variant.differs(s"specSelfReference: $name")).foreach { case (name, raw) =>
-    test(s"formatter: refuses output that is not a fixed point: $name") {
+    test(s"formatter: keeps a substitution cycle as written at a fixed point: $name") {
       assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
-      assertEquals(refusalOf(raw), Refusal.UnstableOutput, s"$name: refused for the wrong reason")
+      val out = formatted(raw)
+      assertEquals(out, "a = 1\nb = 2\na = ${b}\nb = ${a}\n", s"$name: wrong rendering")
+      assertEquals(formatted(out), out, "the second pass must keep the output")
     }
   }
 
@@ -81,27 +85,29 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(formatted(out), out, "the second pass must keep the output")
   }
 
-  // The same defects with one ordinary field written after the merge: the banner sconfig then
-  // renders parses again, so the output check passes and the second-pass check refuses instead.
-  // Which refusal a merge earns is a fact about the shape, not the defect; docs/limitations.md
-  // lists both verdicts with these inputs. The fork's base settles these merges, hence the
-  // ledger.
-  def mustRefuseUnstable = Map(
+  // The same shapes with one ordinary field written around the merge: siblings, preceding
+  // fields and leading comments change nothing any more — the document engine keeps every
+  // statement as written, so each formats at a fixed point. The ledger id keeps its historical
+  // `unstableMerge:` prefix for the site variant.
+  def keptVerbatimWithSibling = Map(
     "self-referential substitution with a sibling field" -> "a : 1\na : ${a}\nname = app",
     "+= field separator with a sibling field"            -> "a : [1]\na += 2\nname = app",
     "env override with a sibling field"                  -> "host = localhost\nhost = ${?HOST}\nname = app",
     "env override in an object with a sibling field"     -> "http {\n  host = \"127.0.0.1\"\n  host = ${?HOST}\n  port = 80\n}",
-    // A field before the merge flips the verdict too, and so does a leading comment.
+    // A field before the merge and a leading comment are the same shape.
     "self-referential substitution with a field before"    -> "b : 2\na : 1\na : ${a}",
     "self-referential substitution with a leading comment" -> "# c\na : 1\na : ${a}",
     "env override with a field before"                     -> "z = 1\nhost = localhost\nhost = ${?HOST}",
     "env override with a leading comment"                  -> "# c\nhost = localhost\nhost = ${?HOST}"
   )
 
-  mustRefuseUnstable.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach { case (name, raw) =>
-    test(s"formatter: refuses output that is not a fixed point: $name") {
+  keptVerbatimWithSibling.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach { case (name, raw) =>
+    test(s"formatter: keeps as written: $name") {
       assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
-      assertEquals(refusalOf(raw), Refusal.UnstableOutput, s"$name: refused for the wrong reason")
+      val out = formatted(raw)
+      assert(out.parses.isSuccess, s"output does not re-parse: $out")
+      assertSameMeaning(out, raw, s"formatting changed the meaning of: $raw")
+      assertEquals(formatted(out), out, "the second pass must keep the output")
     }
   }
 
@@ -127,25 +133,26 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     }
   }
 
-  // The other direction: sconfig's `+=` desugaring copies the comment of the appended field onto
-  // both halves of the expansion (`a = ${?a}[` and the appended element), so a render of `# c`
-  // above `a += 2` holds it twice. A duplicated comment is a phantom the author never wrote, and
-  // it is refused the way a lost one is — SconfigDefectsSpec pins the library bug.
+  // The old engine's `+=` desugaring copied the comment of the appended field onto both halves
+  // of the expansion, so a render of `# c` above `a += 2` held it twice and was refused. The
+  // document engine keeps `+=` verbatim, so the comment appears exactly once
+  // (SconfigDefectsSpec still pins the library bug the old path worked around).
   List(
     "on an appended field"               -> "# c\na += 2",
     "on an appended field, in an object" -> "o {\n  # c\n  a += 2\n}"
   ).filterNot((name, _) => Variant.differs(s"duplicatedComment: $name")).foreach { case (name, raw) =>
-    test(s"formatter: never duplicates a comment: $name") {
-      assertEquals(refusalOf(raw), Refusal.LostComment("c"))
+    test(s"formatter: renders an appended field's comment exactly once: $name") {
+      val out = formatted(raw)
+      assertEquals(out.count(_ == '#'), 1, s"[$name] the comment must appear once: $out")
     }
   }
 
   // The commonest lost comment in the wild: a blank line between the comment and the field that
-  // follows. Inside an object, where no preamble can stand, sconfig drops the comment outright
-  // (see SconfigDefectsSpec), so the only safe answer is to refuse; 20 of 23 reference.conf files
-  // in the Akka, Pekko, Play, Kamon, Gatling and ssl-config corpus hold such a comment. A block at
-  // the top of the file, which the command line keeps as a preserved preamble and the page's fork
-  // keeps through its carrier, is pinned by PreambleSpec and CommentCarrierSpec.
+  // follows. The old resolving render dropped it inside an object (see SconfigDefectsSpec), so
+  // the only safe answer was a refusal; the document engine keeps the block, blank line and all.
+  // 20 of 23 reference.conf files in the Akka, Pekko, Play, Kamon, Gatling and ssl-config corpus
+  // hold such a comment. A block at the top of the file is pinned by PreambleSpec and
+  // CommentCarrierSpec.
   def commentAboveBlankLine = Map(
     "a comment block split by a blank line" ->
       "o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"
@@ -155,10 +162,10 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     case (name, raw) =>
       test(s"formatter: never loses a comment: $name") {
         assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
-        refusalOf(raw) match {
-          case Refusal.LostComment(_) => ()
-          case other                  => fail(s"$name: refused for the wrong reason: ${other.reason}")
-        }
+        val out = formatted(raw)
+        assert(out.contains("# one"), s"comment [# one] lost from: $out")
+        assert(out.contains("# two"), s"comment [# two] lost from: $out")
+        assertSameMeaning(out, raw, s"formatting changed the meaning of: $raw")
       }
   }
 
@@ -173,23 +180,23 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     assertSameMeaning(out, source, s"the header changed the meaning of:\n$source")
   }
 
-  // --- Normalised on purpose: meaning kept, original spelling not ------------------------------
+  // --- Kept as written: meaning kept, original spelling kept ------------------------------------
 
-  def normalised = List(
-    ("// comments become #", "// c\na : 1", "# c"),
-    ("the default separator is =", "a : 1", "a = 1"),
+  def keptAsWritten = List(
+    ("// comment spelling stays", "// c\na : 1", "// c"),
+    ("the separator is normalised to the option (default =)", "a : 1", "a = 1"),
     ("nested objects are flattened to paths", "a { b { c : 1 } }", "a.b.c = 1"),
-    ("triple-quoted strings become escaped", "a : \"\"\"x\ny\"\"\"", "a = \"x\\ny\""),
-    ("+= appends become the expanded substitution", "a += 2", "a = ${?a}["),
-    ("number literals are canonicalised", "a : 1.5e3", "a = 1500"),
-    ("unicode escapes are resolved", "a : \"\\u0041\"", "a = A")
+    ("triple-quoted strings stay triple-quoted", "a : \"\"\"x\ny\"\"\"", "\"\"\""),
+    ("+= stays +=", "a += 2", "a += 2"),
+    ("number literals keep their spelling", "a : 1.5e3", "1.5e3"),
+    ("unicode escapes stay as written", "a : \"\\u0041\"", "\\u0041")
   )
 
-  normalised.foreach { case (name, raw, expectedFragment) =>
-    test(s"formatter: normalised: $name") {
+  keptAsWritten.foreach { case (name, raw, expectedFragment) =>
+    test(s"formatter: kept as written: $name") {
       val out = formatted(raw)
       assert(out.contains(expectedFragment), s"expected [$expectedFragment] in: $out")
-      assertSameMeaning(out, raw, s"normalisation changed meaning: $raw")
+      assertSameMeaning(out, raw, s"formatting changed the meaning of: $raw")
     }
   }
 

@@ -9,6 +9,18 @@ active. I/O, usage and config errors take precedence as exit 2; otherwise a chec
 enabled refusal/duplicate failure gives 1. Stdin refusals already exit 1 under either policy.
 The CLI summary counts skipped (refused) files. See [usage](usage.md#fail-on-refusal).
 
+## Formatted documents and resolved previews
+
+The Formatted pane and CLI preserve the written document: root arrays format, statements that
+share a line keep that line and their commas, and spellings such as an unusual Unicode escape
+or a value concatenation may be kept as written. The site's Resolved pane instead previews local
+values with includes unloaded and environment variables disabled. It keeps source key order,
+but resolution collapses duplicate definitions, substitutes values, omits comments, and may
+normalize those spellings or reject a value the document parser can preserve (for example,
+`a : [1]suffix`). The current fork already rejects malformed Unicode escapes such as
+`"\u+041"` during document parsing; keeping spelling does not bypass syntax validation. This difference
+is a preview limitation, not a new formatter refusal; Formatted retains the original document.
+
 ## Refusals in v0.1.0
 
 The first release is the JVM core and the sbt 1.x, Gradle and Maven plugins. Native binaries,

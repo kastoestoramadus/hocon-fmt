@@ -15,8 +15,10 @@ class CommentCarrierDefaultSpec extends munit.FunSuite {
     assert(!CommentCarrier.keepsDetachedComments, "the preamble path, not the parse, keeps a detached block here")
   }
 
-  test("a comment no field follows is still refused") {
-    assertEquals(HoconFormatter.format("o {\n  a : 1\n  # last\n}"), Left(Refusal.LostComment("last")))
+  // the resolving render dropped a comment no field followed, which the guard refused; the
+  // document engine keeps it where it stood
+  test("a comment no field follows is kept") {
+    assertEquals(HoconFormatter.format("o {\n  a : 1\n  # last\n}"), Right("o {\n  a = 1\n  # last\n}\n"))
   }
 
   test("the variant ledger is empty") {

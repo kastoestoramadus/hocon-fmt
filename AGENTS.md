@@ -7,7 +7,7 @@ sconfig, cross-built for the JVM, Scala.js and Scala Native. GPL-3.0.
 ## Commands
 
 ```bash
-scripts/fetch-sconfig-fork.sh  # once per pinned sha, before sbt test: publishes the sconfig fork the page runs on
+scripts/fetch-sconfig-fork.sh  # once per pinned sha, before sbt test: publishes the pinned sconfig fork for every module
 sbt test                  # core + cli on JVM, Scala.js, Scala Native, web, and site (needs Node and clang)
 sbt coverageJvm           # statement and branch coverage on the JVM (reports under */target/scala-*/scoverage-report; not a gate)
 sbt crossCompile          # compile every platform's tests; needs neither Node nor clang
@@ -74,9 +74,10 @@ Details and the reasons behind them: [docs/architecture.md](docs/architecture.md
 - **Do not "fix" the intentional normalisations** (`//` to `#`, `:` to `=` by default, flattened paths, …)
   listed in [docs/limitations.md](docs/limitations.md).
 <!-- UPSTREAM-SCONFIG: delete this rule and the `coreSite` mention under Layout when the fork goes; docs/site.md has the steps. -->
-- **The page runs on a sconfig fork, temporarily.** `coreSite` is the core's sources against
-  `scripts/fetch-sconfig-fork.sh`'s artifact, with the real `CommentCarrier` from
-  `core/site-shared`; everything published uses released sconfig and the no-op carrier. Code that
+- **Every module runs on one sconfig fork, temporarily.** `scripts/fetch-sconfig-fork.sh`
+  publishes the pinned JVM, JS and Native artifacts to local Ivy and Maven repositories.
+  The fork combines `ConfigDocument.format` (#655) with the existing fork fixes. `coreSite`
+  uses the real `CommentCarrier` from `core/site-shared`; core uses the no-op carrier. Code that
   exists only for the fork carries `UPSTREAM-SCONFIG:` (`git grep` lists the revert); the steps are
   in [docs/site.md](docs/site.md#returning-to-upstream-sconfig).
 - **One version everywhere**: see [docs/releasing.md](docs/releasing.md) for the six places.

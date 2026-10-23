@@ -186,11 +186,11 @@ class ComponentSpec extends munit.FunSuite {
     assert(prose.contains("parser test fixtures") && prose.contains("not a production prevalence estimate"), prose)
     assert(prose.contains("not been reviewed by hand") && prose.contains("second release"), prose)
     assert(prose.contains("include \"defaults.conf\", zone = \"us\""), prose)
-    assert(prose.contains("The command line refuses this input") && prose.contains("byte for byte"), prose)
-    assert(prose.contains("The playground formats this input in the same order"), prose)
+    assert(prose.contains("The document engine keeps the include and field on their original line"), prose)
+    assert(prose.contains("The command line and playground use the same engine"), prose)
     assertEquals(
       formatted("include \"defaults.conf\", zone = \"us\""),
-      "include \"defaults.conf\"\nzone = us\n"
+      "include \"defaults.conf\", zone = \"us\"\n"
     )
     val links = refusals
       .findAll((node: js.Dynamic) => node.nodeName.asInstanceOf[String] == "A")
@@ -341,7 +341,7 @@ class ComponentSpec extends munit.FunSuite {
     type_(input, "[1, 2]\n")
     settle(500)
       .flatMap { _ =>
-        assertEquals(output.value.asInstanceOf[String], "[1, 2]\n", "a refusal leaves the text as typed")
+        assertEquals(output.value.asInstanceOf[String], "[1, 2]\n", "an accepted root array stays as typed")
         val _ = buttons.head.fire("click")
         settle(500)
       }
@@ -353,7 +353,7 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
-  test("the six stories show their formatted output, findings, and permanent refusals") {
+  test("the six stories show formatting, refusals, and preserved duplicate comments") {
     val container = install(Github())
     val root      = mount(container)(Playground())
     val buttons   = findAll(container, "example")
@@ -370,14 +370,16 @@ class ComponentSpec extends munit.FunSuite {
             assertEquals(input.value.asInstanceOf[String], example.input)
             assertEquals(output.value.asInstanceOf[String], formatted(example.input))
             val status = find(container, "status").textContent.asInstanceOf[String]
-            assert(status.contains(if index < 4 then "Formatted" else "Left unchanged"), status)
+            val states =
+              List("Formatted", "Formatted", "Formatted", "Already formatted", "Left unchanged", "Already formatted")
+            assert(status.contains(states(index)), status)
             if index == 1 then {
               val finding = find(container, "findings").textContent.asInstanceOf[String]
               assert(finding.contains("service.port"), finding)
               assert(finding.contains("line 1") && finding.contains("line 3"), finding)
             }
             if index == 4 then assert(status.contains("playground: 4"), status)
-            if index == 5 then assert(status.contains("Keep this operational note"), status)
+            if index == 5 then assert(output.value.asInstanceOf[String].contains("Keep this operational note"))
             println(s"Story ${index + 1}: ${example.title}: $status")
           }
         }
@@ -487,7 +489,7 @@ class ComponentSpec extends munit.FunSuite {
       }
   }
 
-  test("resolution preserves user placeholder names, explains missing values, and keeps refusals untouched") {
+  test("resolution preserves user placeholders, explains missing values, and resolves kept duplicates") {
     val container       = install(Github())
     val root            = mount(container)(Playground())
     val (input, output) = panes(container)
@@ -504,7 +506,7 @@ class ComponentSpec extends munit.FunSuite {
         val safety = ExampleData.showcase.last.input
         type_(input, safety)
         settle(250).map { _ =>
-          assertEquals(output.value.asInstanceOf[String], safety)
+          assertEquals(output.value.asInstanceOf[String], "service.port = 9000\n")
           assert(find(container, "findings").textContent.asInstanceOf[String].contains("service.port"))
           val _ = find(container, "formatted-tab").fire("click")
           assertEquals(output.value.asInstanceOf[String], safety)
@@ -517,6 +519,23 @@ class ComponentSpec extends munit.FunSuite {
         val _ = root.unmount()
         ()
       }
+  }
+
+  test("the resolved view keeps source key order instead of sorting") {
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    type_(input, "z = 1\na = 2\nm = 3\n")
+    settle(250).map { _ =>
+      val _        = find(container, "resolved-tab").fire("click")
+      val rendered = output.value.asInstanceOf[String]
+      assertEquals(
+        rendered.linesIterator.filter(_.contains(" = ")).map(_.takeWhile(_ != ' ')).toList,
+        List("z", "a", "m")
+      )
+      val _ = root.unmount()
+      ()
+    }
   }
 
   test("the style switches shape the resolved view too: its text goes through our renderer") {

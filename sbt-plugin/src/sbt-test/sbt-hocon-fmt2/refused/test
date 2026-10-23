@@ -1,15 +1,15 @@
-# plus-equals.conf is a known sconfig defect, broken.conf is not HOCON, and latin1.conf is not
-# UTF-8. Each is refused: reported, never written, and no reason to fail the build.
+# The document engine renders += verbatim (fork fixture B), so plus-equals.conf is formatted
+# instead of refused; broken.conf is not HOCON and latin1.conf is not UTF-8. Each refusal is
+# reported, never written, and no reason to fail the build.
 $ sleep 1000
 $ touch before-format
 $ sleep 1000
 
 > hoconFormat
-> assertWarnedOnce hoconFormat src/main/resources/plus-equals.conf src/main/resources/broken.conf src/main/resources/latin1.conf
-> assertSameBytes src/main/resources/plus-equals.conf original/plus-equals.conf
+$ must-mirror src/main/resources/plus-equals.conf expected/plus-equals.conf
+> assertWarnedOnce hoconFormat src/main/resources/broken.conf src/main/resources/latin1.conf
 > assertSameBytes src/main/resources/broken.conf original/broken.conf
 > assertSameBytes src/main/resources/latin1.conf original/latin1.conf
--$ newer src/main/resources/plus-equals.conf before-format
 -$ newer src/main/resources/broken.conf before-format
 -$ newer src/main/resources/latin1.conf before-format
 
@@ -17,4 +17,4 @@ $ sleep 1000
 $ must-mirror src/main/resources/acceptable.conf expected/acceptable.conf
 
 > hoconFormatCheck
-> assertWarnedOnce hoconFormatCheck src/main/resources/plus-equals.conf src/main/resources/broken.conf src/main/resources/latin1.conf
+> assertWarnedOnce hoconFormatCheck src/main/resources/broken.conf src/main/resources/latin1.conf

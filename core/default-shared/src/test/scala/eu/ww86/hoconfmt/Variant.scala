@@ -8,27 +8,13 @@ package eu.ww86.hoconfmt
 object Variant {
   val ledger: Map[String, String] = Map.empty
 
-  /** The fork base fixes the unresolved-object-merge rendering pinned by the shared suite. */
-  val unresolvedMergesFormat: Boolean = false
+  /** The document engine keeps unresolved object merges as written, like the fork base did. */
+  val unresolvedMergesFormat: Boolean = true
 
   def differs(id: String): Boolean = ledger.contains(id)
 
-  /** The examples `ExamplesSpec` pins as refused differently depending on the style options; the
-    * published core is the reference. The page's fork renders some of them, hence the twin in
-    * `core/site-shared`.
+  /** The document engine formats every example whatever the options, like the fork did, so no
+    * example is refused differently any more.
     */
-  val refusedDifferently: List[(String, List[String])] = List(
-    "catalogue/env-override-root-not-parseable" -> List(
-      "simplify=true: refused:broken-output",
-      "simplify=false: refused:unstable-output"
-    ),
-    "catalogue/object-substitution-then-field" -> List(
-      "simplify=true: refused:broken-output",
-      "simplify=false: formatted"
-    ),
-    "catalogue/sconfig-defect" -> List(
-      "simplify=true: refused:broken-output",
-      "simplify=false: refused:unstable-output"
-    )
-  )
+  val refusedDifferently: List[(String, List[String])] = Nil
 }

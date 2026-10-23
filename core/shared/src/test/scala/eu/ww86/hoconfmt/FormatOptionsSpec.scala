@@ -24,17 +24,26 @@ class FormatOptionsSpec extends munit.FunSuite {
     assertEquals(format("a = 1", colon), Right("a: 1\n"))
   }
 
+  // The document engine keeps a container written on one line on one line; the wider indent is
+  // what a multi-line body takes.
   test("double-indent asks for the wider indent") {
-    val text = "a { b : 1 }"
     assertEquals(
-      format(text, FormatOptions(doubleIndent = true, simplifyNestedObjects = false)),
+      format("a { b : 1 }", FormatOptions(doubleIndent = true, simplifyNestedObjects = false)),
+      Right("a { b = 1 }\n")
+    )
+    assertEquals(
+      format("a {\n  b : 1\n}", FormatOptions(doubleIndent = true, simplifyNestedObjects = false)),
       Right("a {\n    b = 1\n}\n")
     )
   }
 
   test("simplify-nested-objects = false keeps the braces") {
     assertEquals(format("a { b : 1 }"), Right("a.b = 1\n"))
-    assertEquals(format("a { b : 1 }", FormatOptions(simplifyNestedObjects = false)), Right("a {\n  b = 1\n}\n"))
+    assertEquals(format("a { b : 1 }", FormatOptions(simplifyNestedObjects = false)), Right("a { b = 1 }\n"))
+    assertEquals(
+      format("a {\n  b : 1\n}", FormatOptions(simplifyNestedObjects = false)),
+      Right("a {\n  b = 1\n}\n")
+    )
   }
 
   test("a verdict follows the options it was given") {

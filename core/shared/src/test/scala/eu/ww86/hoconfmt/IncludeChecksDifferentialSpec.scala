@@ -95,7 +95,10 @@ trait IncludeChecksDifferentialChecks extends munit.Assertions {
           source
         )
       }
-    assertEquals(HoconFormatter.format(source), IncludeChecksOldFormatter.format(source), source)
+    // The old-formatter equivalence row is retired: the document engine formats what the
+    // resolving render refused (duplicates, +=, unresolved merges, same-line includes), so the
+    // two pipelines disagree by design. The oracle comparisons above are engine-independent and
+    // stay; IncludeChecksOldFormatter itself is 912's to delete per the retirement manifest.
   }
 }
 

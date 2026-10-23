@@ -65,8 +65,8 @@ object Page {
         "For example, ",
         code("""include "defaults.conf", zone = "us""""),
         " is an include and a field sharing one line. ",
-        "The command line refuses this input because rendering could move the include across the field and change which value wins; the file stays byte for byte as it was. ",
-        "The playground formats this input in the same order using its sconfig fork. ",
+        "The document engine keeps the include and field on their original line, preserving which value wins. ",
+        "The command line and playground use the same engine. ",
         "Refusal never writes or breaks a file. See ",
         a(href := Status.limitationsPage, "docs/limitations.md"),
         "."

@@ -238,7 +238,9 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   }
 
   tmp.test("refusal failure composes with duplicate and check policies without writing refusals") { dir =>
-    val source = "# trailing comment\n"
+    // Comment-only files format under the document engine (910 changed-expectations row 4), so the
+    // refused fixture is an unterminated substitution: refused by both engines, never written.
+    val source = "a : ${"
     for {
       refused   <- write(dir, "refused.conf", source)
       invalid   <- write(dir, "invalid.conf", Array[Byte](0xff.toByte))
@@ -280,7 +282,7 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   tmp.test("repository refusal policy can be cleared without clearing duplicate failures") { dir =>
     for {
       _             <- write(dir, ".hocon-fmt.conf", "fail-on-refusal = true\nfail-on-duplicates = true\n")
-      refused       <- write(dir, "refused.conf", "# only a comment\n")
+      refused       <- write(dir, "refused.conf", "a : ${")
       duplicate     <- write(dir, "duplicate.conf", "x = 2\n# discarded\nx = 3\n")
       strict        <- checkWith(StyleOverrides.none, refused)
       off           <- checkWith(StyleOverrides(failOnRefusal = Some(false)), refused)
@@ -315,7 +317,9 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       run    <- rewrite(file)
       output <- textOf(file)
     } yield {
-      assertEquals(output, "a: 2\nb.c: 3\n")
+      // The document engine keeps both definitions of a duplicate (910 changed-expectations
+      // row 1); the report still finds exactly the one redefinition.
+      assertEquals(output, "a: 1\na: 2\nb.c: 3\n")
       assertEquals(run.outcomes.flatMap(_.findings).size, 1)
       assertEquals(run.exitCode, ExitCode.Success)
     }
@@ -415,7 +419,8 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
-  // The renderer hands back the lone surrogate itself, and the encoder wrote '?' in its place.
+  // The document engine keeps the escape text as written (910 VerdictSpec, commit 6c56784): the
+  // file is treated as formatted, never refused, and the bytes round-trip untouched.
   tmp.test("write mode leaves a file with an unpaired surrogate escape untouched") { dir =>
     val source = "a = \"\\ud83d\"\n"
     for {
@@ -427,8 +432,8 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       assertEquals(bytes, source.getBytes(UTF_8).toList)
       assertEquals(run.exitCode, ExitCode.Success)
       assertEquals(checked.exitCode, ExitCode.Success)
-      assert(run.rendered.contains("cannot format, leaving unchanged"), run.rendered)
-      assert(checked.rendered.contains("cannot format, leaving unchanged"), checked.rendered)
+      assert(!run.rendered.contains("cannot format, leaving unchanged"), run.rendered)
+      assert(!checked.rendered.contains("cannot format, leaving unchanged"), checked.rendered)
     }
   }
 
@@ -969,10 +974,10 @@ class CmdApiSpec extends munit.CatsEffectSuite {
   }
 
   test("write mode warns about the dead definition, and the warning changes no exit code by default") {
-    // A file with a dead duplicate is not formatted, so a run that rewrites it would exit 0 even
-    // without the report; what the report adds is the line saying why.
+    // The document engine keeps both definitions (910 changed-expectations row 1), so the run
+    // writes the text with both lines; what the report adds is the line saying why.
     val result = CmdApi.formatStdin(duplicated.getBytes(UTF_8), "editor.conf", StyleOverrides.none)
-    assertEquals(result.stdout, "x = 2\n")
+    assertEquals(result.stdout, "x = 1\nx = 2\n")
     assertEquals(result.exitCode, ExitCode.Success)
     assertEquals(
       result.stderr,
@@ -984,7 +989,7 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     val result =
       CmdApi.formatStdin(duplicated.getBytes(UTF_8), "editor.conf", StyleOverrides(failOnDuplicates = Some(true)))
     assertEquals(result.exitCode, ExitCode(1))
-    assertEquals(result.stdout, "x = 2\n")
+    assertEquals(result.stdout, "x = 1\nx = 2\n")
   }
 
   tmp.test("the warning names the file, the earlier line and the line that replaces it") { dir =>
@@ -993,7 +998,7 @@ class CmdApiSpec extends munit.CatsEffectSuite {
       run  <- rewrite(file)
       text <- textOf(file)
     } yield {
-      assertEquals(text, "x = 2\n")
+      assertEquals(text, "x = 1\nx = 2\n")
       assert(
         run.rendered.contains(s"$file:1: x defined again at line 2; the earlier value never takes effect"),
         run.rendered
@@ -1002,19 +1007,20 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
-  // A refusal never fails a run, so a refused file with a dead duplicate is where the default and
-  // the flag part ways: the warning is the only thing the report says about the file.
-  tmp.test("a refused file is still reported on, and --fail-on-duplicates fails it") { dir =>
-    val refused = "x = 1\nx = 2\n# nothing follows\n"
+  // The document engine keeps duplicates and the trailing comment, so the file is no longer
+  // refused (910 changed-expectations rows 1 and 4); the warning is still the only thing the
+  // report says by default, and the flag is what fails the run.
+  tmp.test("a dead-duplicate file is still reported on, and --fail-on-duplicates fails it") { dir =>
+    val dead = "x = 1\nx = 2\n# nothing follows\n"
     for {
-      file   <- write(dir, "a.conf", refused)
+      file   <- write(dir, "a.conf", dead)
       plain  <- check(file)
       strict <- checkWith(StyleOverrides(failOnDuplicates = Some(true)), file)
       text   <- textOf(file)
     } yield {
-      assertEquals(text, refused)
+      assertEquals(text, dead)
       assertEquals(plain.exitCode, ExitCode.Success)
-      assert(plain.rendered.contains("cannot format, leaving unchanged"), plain.rendered)
+      assert(!plain.rendered.contains("cannot format, leaving unchanged"), plain.rendered)
       assert(plain.rendered.contains("x defined again at line 2"), plain.rendered)
       assertEquals(strict.exitCode, ExitCode(1))
       assertEquals(strict.rendered, plain.rendered)

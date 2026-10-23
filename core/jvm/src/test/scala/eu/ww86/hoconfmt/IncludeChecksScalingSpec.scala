@@ -1,11 +1,19 @@
 package eu.ww86.hoconfmt
 
+import java.lang.management.ManagementFactory
+
 import org.ekrich.config.ConfigFactory
 
 /** Eight times the input may pay for parsing and indexes; rescanning every field per include
-  * grows by roughly sixty-four times. This generous ratio avoids a millisecond machine budget.
+  * grows by roughly sixty-four times. Thread CPU time excludes scheduler pauses and other suites'
+  * GC pauses; the ratio guards algorithmic work rather than wall-clock load or allocation latency.
   */
 class IncludeChecksScalingSpec extends munit.FunSuite {
+  val threadCpu: java.lang.management.ThreadMXBean =
+    Option(ManagementFactory.getThreadMXBean).getOrElse(fail("no thread CPU timer"))
+  assert(threadCpu.isCurrentThreadCpuTimeSupported, "the scaling guard needs a JVM thread CPU timer")
+  if (!threadCpu.isThreadCpuTimeEnabled) { threadCpu.setThreadCpuTimeEnabled(true) }
+
   override val munitTimeout: scala.concurrent.duration.Duration = scala.concurrent.duration.Duration(5, "minutes")
 
   def checkScaling(
@@ -25,15 +33,15 @@ class IncludeChecksScalingSpec extends munit.FunSuite {
     val _                              = large()
     def median(run: () => Any): Double = (0 until 3)
       .map { _ =>
-        val start = System.nanoTime()
+        val start = threadCpu.getCurrentThreadCpuTime
         val _     = run()
-        (System.nanoTime() - start).toDouble / 1000000
+        (threadCpu.getCurrentThreadCpuTime - start).toDouble / 1000000
       }
       .sorted
       .apply(1)
     val before = median(small)
     val after  = median(large)
-    println(s"include scaling $name: 200=$before ms, 1600=$after ms, ratio=${after / before}")
+    println(s"include scaling CPU $name: 200=$before ms, 1600=$after ms, ratio=${after / before}")
     assert(after < before * 24, s"$name grew ${after / before} times for eight times the includes (limit 24)")
   }
 

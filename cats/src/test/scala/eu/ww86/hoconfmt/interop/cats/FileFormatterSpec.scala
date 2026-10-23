@@ -61,7 +61,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
   }
 
   tmp.test("refused input is never written, including invalid UTF-8") { dir =>
-    List("a: ${".getBytes(UTF_8), "a = \"\\udc00\"\n".getBytes(UTF_8), Array(0xff.toByte)).traverse_ { source =>
+    List("a: ${".getBytes(UTF_8), Array(0xff.toByte)).traverse_ { source =>
       for {
         file    <- write(dir, "refused.conf", source)
         outcome <- formatter.format(file)
@@ -73,6 +73,23 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
         })
         assertEquals(bytes, source.toList)
       }
+    }
+  }
+
+  // The document engine keeps an escaped lone surrogate as written instead of refusing it
+  // (core VerdictSpec, 910 changed-expectations.md); the ASCII escape is UTF-8-encodable, so
+  // the file needs no formatting and its bytes are left alone.
+  tmp.test("escaped lone surrogate is kept as written and never rewritten") { dir =>
+    val source = "a = \"\\udc00\"\n".getBytes(UTF_8)
+    for {
+      file    <- write(dir, "kept.conf", source)
+      verdict <- formatter.verdict(file)
+      outcome <- formatter.format(file)
+      bytes   <- read(file)
+    } yield {
+      assertEquals(verdict, Verdict.AlreadyFormatted)
+      assertEquals(outcome, FormatOutcome.AlreadyFormatted)
+      assertEquals(bytes, source.toList)
     }
   }
 

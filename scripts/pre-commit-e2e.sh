@@ -14,6 +14,9 @@ export PRE_COMMIT_HOME="$work/pre-commit-cache"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
+# UPSTREAM-SCONFIG: the CLI needs the same pinned fork as the other integrations.
+"$root/scripts/fetch-sconfig-fork.sh"
+
 (cd "$root" && sbt -batch cliNative/nativeLink cliJS/npmPackage)
 "$root/scripts/native-stress.sh" "$root/cli/.native/target/scala-3.9.0/hocon-fmt" 100 100
 python3 "$root/python/build_wheel.py" --binary "$root/cli/.native/target/scala-3.9.0/hocon-fmt" --out "$work"
@@ -36,7 +39,7 @@ repos:
 EOF
 
 unformatted=$(printf 'app {\n    name = "svc"\n   port =8080\n}')
-formatted=$(printf 'app {\n  name = svc\n  port = 8080\n}')
+formatted=$(printf 'app {\n  name = "svc"\n  port = 8080\n}')
 
 # Runs one family of hooks, the formatter and the check, against fresh fixtures.
 scenario() {

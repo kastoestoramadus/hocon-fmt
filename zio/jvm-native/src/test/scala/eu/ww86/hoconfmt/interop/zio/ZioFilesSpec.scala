@@ -55,7 +55,7 @@ class ZioFilesSpec extends munit.FunSuite {
   }
 
   test("refused HOCON and invalid UTF-8 remain byte-for-byte untouched") {
-    List(bytes("a={"), bytes("a = \"\\ud83d\"\n"), Array[Byte](0xc3.toByte, 0x28.toByte)).foreach { original =>
+    List(bytes("a={"), Array[Byte](0xc3.toByte, 0x28.toByte)).foreach { original =>
       withFile(original) { path =>
         val before = Files.getLastModifiedTime(path)
         run(ZioFiles.format(path).either) match {
@@ -67,6 +67,18 @@ class ZioFilesSpec extends munit.FunSuite {
         assertEquals(Files.readAllBytes(path).toSeq, original.toSeq)
         assertEquals(Files.getLastModifiedTime(path), before)
       }
+    }
+  }
+
+  // The document engine keeps an escaped lone surrogate as written instead of refusing it
+  // (core VerdictSpec, 910 changed-expectations.md); the ASCII escape needs no rewrite.
+  test("an escaped lone surrogate is kept as written, byte-for-byte") {
+    val original = bytes("a = \"\\ud83d\"\n")
+    withFile(original) { path =>
+      val before = Files.getLastModifiedTime(path)
+      assertEquals(run(ZioFiles.format(path)), Verdict.AlreadyFormatted)
+      assertEquals(Files.readAllBytes(path).toSeq, original.toSeq)
+      assertEquals(Files.getLastModifiedTime(path), before)
     }
   }
 

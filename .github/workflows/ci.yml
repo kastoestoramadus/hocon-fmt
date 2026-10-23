@@ -108,13 +108,15 @@ jobs:
       - name: Set up sbt
         uses: sbt/setup-sbt@v1
 
-      # UPSTREAM-SCONFIG: the page runs on a sconfig fork until ekrich/sconfig releases the option
-      # (#646/#647); delete this step and its cache once it does (docs/site.md, "Returning to
+      # UPSTREAM-SCONFIG: all modules use the fork until sconfig releases the engine and option
+      # (#655/#646/#647); delete this step and its cache once it does (docs/site.md, "Returning to
       # upstream sconfig"). The cache is keyed on the script, which pins the fork's sha.
       - name: Cache the sconfig fork
         uses: actions/cache@v4
         with:
-          path: ~/.ivy2/local/org.ekrich
+          path: |
+            ~/.ivy2/local/org.ekrich
+            ~/.m2/repository/org/ekrich
           key: sconfig-fork-${{ hashFiles('scripts/fetch-sconfig-fork.sh') }}
       - name: Publish the sconfig fork
         run: scripts/fetch-sconfig-fork.sh
@@ -146,6 +148,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Scripted tests
         run: sbt sbtPluginTest
 
@@ -161,6 +166,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Scripted tests under sbt 2
         run: sbt sbt2PluginTest
 
@@ -176,6 +184,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - uses: gradle/actions/setup-gradle@v4
       # The plugin resolves the Java API, and the core through it, from Maven Local until they are
       # on Maven Central.
@@ -197,6 +208,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - uses: gradle/actions/setup-gradle@v4
       # One sbt run publishes the core and the API: the library resolves the core from Maven Local
       # until it is on Maven Central, and sbt builds and publishes the artifact itself; the run
@@ -220,6 +234,9 @@ jobs:
           java-version: '17'
           cache: maven
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       # The plugin resolves the Java API, and the core through it, from Maven Local until they are
       # on Maven Central.
       - name: Publish the core and the Java API locally
@@ -241,6 +258,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       # The isolated worker resolves the API and core from Ivy until they are on Maven Central.
       - name: Publish the formatter locally
         run: sbt -J-Xmx3g coreJVM/publishLocal javaApi/publishLocal
@@ -262,6 +282,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -283,6 +306,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       # Links the Scala.js and Scala Native builds, and runs the suite against all three runtimes.
       - name: Acceptance tests
         run: sbt -batch acceptance/test
@@ -317,6 +343,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Fetch the history
         run: git fetch origin refs/notes/benchmarks:refs/notes/benchmarks || echo "no history yet"
       - name: Measure
@@ -348,6 +377,9 @@ jobs:
           java-version: '17'
           cache: sbt
       - uses: sbt/setup-sbt@v1
+      # UPSTREAM-SCONFIG: prepare the pinned fork for every formatter consumer.
+      - name: Publish the sconfig fork
+        run: scripts/fetch-sconfig-fork.sh
       - name: Instrumented tests
         run: sbt coverageJvm
       - name: Publish the HTML reports

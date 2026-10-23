@@ -1,11 +1,12 @@
 import scala.scalanative.build.{LTO, Mode}
 
-val scala3  = "3.9.0"
-val sconfig = "2.0.0"
-val munit   = "1.2.4"
-// UPSTREAM-SCONFIG: the sconfig fork the project page runs on, published by scripts/fetch-sconfig-fork.sh.
-// Delete with the script and `checkSconfigFork` once ekrich/sconfig releases setKeepDetachedComments.
-val sconfigFork = "2.1.0-hocon-fmt-727eb3074a"
+val scala3 = "3.9.0"
+// UPSTREAM-SCONFIG: all formatter modules use the fork until released sconfig carries
+// ConfigDocument.format (#655) and setKeepDetachedComments (#646/#647).
+// Published locally by scripts/fetch-sconfig-fork.sh; see docs/site.md for removal.
+val sconfigFork = "2.1.0-hocon-fmt-298311f25f"
+val sconfig     = sconfigFork
+val munit       = "1.2.4"
 val osLib       = "0.11.8"
 val sjavatime   = "1.5.0"
 // The latest stable Laminar for _sjs1_3; 18.0.0-M5 is a milestone.
@@ -20,7 +21,6 @@ val munitScalaCheck = "1.2.0"
 
 ThisBuild / scalaVersion := scala3
 ThisBuild / version      := "0.1.0"
-
 // The compiler enforces what review would otherwise have to catch: a match that misses a case (a
 // new Refusal reaching code that does not handle it), a value computed and dropped, == between
 // types that can never be equal, a null from a Java API used as a value, an object read before it
@@ -123,7 +123,7 @@ def guardPublish(p: Project): Project =
   )
 
 // UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
-// releases the option (#646/#647); see "Returning to upstream sconfig" in docs/site.md.
+// releases ConfigDocument.format and the comment option (#655/#646/#647); see docs/site.md.
 val checkSconfigFork =
   taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
 
@@ -136,12 +136,15 @@ val checkReleaseSet =
   taskKey[Unit]("Fails unless the release set is closed under its inter-project dependencies.")
 
 ThisBuild / checkSconfigFork := {
-  val ivyHome  = ivyPaths.value.ivyHome.getOrElse(Path.userHome / ".ivy2")
-  val artifact = ivyHome / "local" / "org.ekrich" / "sconfig_sjs1_3" / sconfigFork
-  if (!artifact.isDirectory)
+  val ivyHome = ivyPaths.value.ivyHome.getOrElse(Path.userHome / ".ivy2")
+  val missing = Seq("sconfig_3", "sconfig_sjs1_3", "sconfig_native0.5_3").flatMap { name =>
+    val artifact = ivyHome / "local" / "org.ekrich" / name / sconfigFork
+    Seq(artifact / "jars" / s"$name.jar", artifact / "ivys" / "ivy.xml").filterNot(_.isFile)
+  }
+  if (missing.nonEmpty)
     sys.error(
-      s"The sconfig fork $sconfigFork is not published ($artifact is missing). " +
-        "Run scripts/fetch-sconfig-fork.sh once, then retry."
+      s"The sconfig fork $sconfigFork is not published (${missing.mkString(", ")} missing). " +
+        "Run scripts/fetch-sconfig-fork.sh once, then retry with the same Ivy home."
     )
 }
 
@@ -209,6 +212,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("core"))
   .settings(
     name := "hocon-fmt-core",
+    // UPSTREAM-SCONFIG: resolve only after the pinned fork has been published on every platform.
+    update := update.dependsOn(ThisBuild / checkSconfigFork).value,
     // UPSTREAM-SCONFIG: the no-op comment seam; `coreSite` swaps it for the real one. Delete both
     // with the seam once ekrich/sconfig releases the option (#646/#647).
     Seq(Compile -> "main", Test -> "test").map { case (configuration, dir) =>

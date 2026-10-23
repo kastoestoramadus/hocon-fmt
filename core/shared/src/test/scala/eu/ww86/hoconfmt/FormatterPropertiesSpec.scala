@@ -39,31 +39,11 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   override def scalaCheckTestParameters = super.scalaCheckTestParameters
     .withMinSuccessfulTests(sys.props.get("hocon.properties").map(_.toInt).getOrElse(1000))
 
-  property("placeholder scan preserves byte-identical output and refusals, in every option combination") {
-    forAll(Gen.oneOf(documents(includes = true), documentsWithConcatenations)) { doc =>
-      allOptions.foreach { options =>
-        val before = PlaceholderFieldOldFormatter.format(doc.text, options)
-        val after  = HoconFormatter.format(doc.text, options)
-        assertEquals(
-          after.map(_.getBytes(java.nio.charset.StandardCharsets.UTF_8).toList),
-          before.map(_.getBytes(java.nio.charset.StandardCharsets.UTF_8).toList),
-          doc.text
-        )
-      }
-    }
-  }
-
-  property("include indexes preserve exact verdicts in every option combination") {
-    forAll(Gen.oneOf(documents(includes = true), documentsWithConcatenations)) { doc =>
-      allOptions.foreach { options =>
-        assertEquals(
-          HoconFormatter.format(doc.text, options),
-          IncludeChecksOldFormatter.format(doc.text, options),
-          doc.text
-        )
-      }
-    }
-  }
+  // The two properties that compared the formatter byte-for-byte with the frozen old pipeline
+  // (placeholder scan, include indexes) are retired with the document engine: it formats what
+  // the resolving render refused, so the pipelines disagree by design. Their generators stay in
+  // use through the other properties; PlaceholderFieldOldFormatter and IncludeChecksOldFormatter
+  // themselves are 912's to delete per the retirement manifest.
 
   property("nested include-bearing inputs always yield a verdict with a reason on refusal") {
     forAll(Gen.choose(1, 160)) { depth =>
@@ -314,6 +294,10 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   property("keeps every key defined before an include before it, in any option combination") {
     val documentsWithUniqueIncludes = documents(includes = true, distinctKeys = true)
       .suchThat(doc => doc.includes.distinct == doc.includes)
+      // A key sharing the include's line is ordered before it in the statement list, but the
+      // reader below sees order through sconfig's line numbers, which do not order same-line
+      // statements (SconfigDefectsSpec); IncludeOrderSpec pins those by exact output instead.
+      .suchThat(doc => !doc.text.linesIterator.exists(line => line.contains(",") && doc.includes.exists(line.contains)))
     forAll(documentsWithUniqueIncludes) { doc =>
       allOptions.foreach { options =>
         HoconFormatter.format(doc.text, options).foreach { out =>
