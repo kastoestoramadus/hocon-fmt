@@ -43,7 +43,7 @@ object PlaceholderFieldOldFormatter {
   def formatChecked(source: String, origin: Option[String], options: FormatOptions): Either[Refusal, String] = {
     // options stay in the signature for the callers; the render path they configured is deprecated
     // upstream, so the frozen pipeline renders with its own defaults.
-    val _      = options
+    val _     = options
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     val read  = reading(source)
     for {

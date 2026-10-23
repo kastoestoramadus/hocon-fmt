@@ -101,15 +101,14 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
     "env override with a leading comment"                  -> "# c\nhost = localhost\nhost = ${?HOST}"
   )
 
-  keptVerbatimWithSibling.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach {
-    case (name, raw) =>
-      test(s"formatter: keeps as written: $name") {
-        assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
-        val out = formatted(raw)
-        assert(out.parses.isSuccess, s"output does not re-parse: $out")
-        assertSameMeaning(out, raw, s"formatting changed the meaning of: $raw")
-        assertEquals(formatted(out), out, "the second pass must keep the output")
-      }
+  keptVerbatimWithSibling.filterNot((name, _) => Variant.differs(s"unstableMerge: $name")).foreach { case (name, raw) =>
+    test(s"formatter: keeps as written: $name") {
+      assert(raw.parses.isSuccess, s"the fixture itself must be valid HOCON: $raw")
+      val out = formatted(raw)
+      assert(out.parses.isSuccess, s"output does not re-parse: $out")
+      assertSameMeaning(out, raw, s"formatting changed the meaning of: $raw")
+      assertEquals(formatted(out), out, "the second pass must keep the output")
+    }
   }
 
   // --- Never lose a comment -------------------------------------------------------------------
@@ -184,13 +183,13 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
   // --- Kept as written: meaning kept, original spelling kept ------------------------------------
 
   def keptAsWritten = List(
-    ("// comment spelling stays",            "// c\na : 1", "// c"),
+    ("// comment spelling stays", "// c\na : 1", "// c"),
     ("the separator is normalised to the option (default =)", "a : 1", "a = 1"),
     ("nested objects are flattened to paths", "a { b { c : 1 } }", "a.b.c = 1"),
     ("triple-quoted strings stay triple-quoted", "a : \"\"\"x\ny\"\"\"", "\"\"\""),
-    ("+= stays +=",                          "a += 2", "a += 2"),
-    ("number literals keep their spelling",  "a : 1.5e3", "1.5e3"),
-    ("unicode escapes stay as written",      "a : \"\\u0041\"", "\\u0041")
+    ("+= stays +=", "a += 2", "a += 2"),
+    ("number literals keep their spelling", "a : 1.5e3", "1.5e3"),
+    ("unicode escapes stay as written", "a : \"\\u0041\"", "\\u0041")
   )
 
   keptAsWritten.foreach { case (name, raw, expectedFragment) =>

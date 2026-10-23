@@ -179,7 +179,7 @@ object HoconFormatter {
       rendered <- attempt(
                     if (reading.parsed.trim.isEmpty) "" else document.format(formattingOptions(options)).render
                   )(unreadable)
-      _        <- if (!probe || masked.originals.isEmpty) Right(())
+      _ <- if (!probe || masked.originals.isEmpty) Right(())
            else {
              val probeText = IncludeMasking.collisionProbe(reading.parsed, rendered)
              attempt(ConfigFactory.parseString(probeText.text, parse))(unreadable).flatMap { checked =>
@@ -294,7 +294,9 @@ object HoconFormatter {
     val written = IncludeMasking.mask(pass.text).originals.toList.sortBy(_._1).map(_._2)
     val moved   = before
       .zip(written)
-      .collectFirst { case (statement, writtenStatement) if collapsed(statement) != collapsed(writtenStatement) => statement }
+      .collectFirst {
+        case (statement, writtenStatement) if collapsed(statement) != collapsed(writtenStatement) => statement
+      }
     moved.map(Refusal.MovedInclude(_)).toLeft(())
   }
 

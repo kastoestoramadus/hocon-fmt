@@ -30,7 +30,7 @@ class TraversalStackSpec extends munit.FunSuite {
     onSmallStack(DuplicateReport.outline(source)) match {
       case Right(outline) =>
         assertEquals(outline.definitions.map(_.keyPath.segments.size), (1 to depth + 1).toVector)
-      case Left(refusal)  => fail(refusal.reason)
+      case Left(refusal) => fail(refusal.reason)
     }
   }
 

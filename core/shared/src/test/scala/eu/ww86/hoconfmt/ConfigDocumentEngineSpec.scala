@@ -16,8 +16,8 @@ trait ConfigDocumentEngineSupport extends munit.FunSuite {
   def fmt(source: String, options: FormatOptions = FormatOptions.default): Either[Refusal, String] =
     HoconFormatter.format(source, options)
 
-  def assertFormats(source: String, expected: String, options: FormatOptions = FormatOptions.default)(
-      using munit.Location
+  def assertFormats(source: String, expected: String, options: FormatOptions = FormatOptions.default)(using
+      munit.Location
   ): Unit =
     assertEquals(fmt(source, options), Right(expected), s"input: ${source.replace("\n", "\\n")}")
 }
@@ -115,7 +115,7 @@ class ConfigDocumentEngineSpec extends munit.FunSuite with ConfigDocumentEngineS
 
   test("formatting the output again changes nothing") {
     fmt("a=1\ninclude \"f.conf\"\na+=2\n") match {
-      case Right(once) => assertEquals(fmt(once), Right(once))
+      case Right(once)   => assertEquals(fmt(once), Right(once))
       case Left(refusal) => fail(s"format refused: ${refusal.reason}")
     }
   }

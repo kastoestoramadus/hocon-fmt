@@ -54,13 +54,12 @@ class IncludeOrderSpec extends munit.FunSuite with HoconTestSupport {
     )
   )
 
-  keptInPlace.filterNot((name, _) => Variant.differs(s"includeOrder: $name")).foreach {
-    case (name, (raw, statement)) =>
-      test(s"formats $name, include in place") {
-        val out = formatted(raw)
-        assert(out.contains(statement), s"[$name] the include statement left the output: $out")
-        assertEquals(formatted(out), out, "the second pass must keep the output")
-      }
+  keptInPlace.filterNot((name, _) => Variant.differs(s"includeOrder: $name")).foreach { case (name, (raw, statement)) =>
+    test(s"formats $name, include in place") {
+      val out = formatted(raw)
+      assert(out.contains(statement), s"[$name] the include statement left the output: $out")
+      assertEquals(formatted(out), out, "the second pass must keep the output")
+    }
   }
 
   def kept = Map(
