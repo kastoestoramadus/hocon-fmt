@@ -188,19 +188,24 @@ class HoconFormatterModuleSpec extends munit.FunSuite {
   }
 
   test("hoconFormat leaves each refused file byte for byte, warns once, and formats the rest") {
-    // `+=` is no longer refused — the document engine writes it verbatim (fork fixture B) — so the
-    // refused set is the broken file and the non-UTF-8 one.
+    // `+=` is no longer refused — the document engine writes it verbatim (fork fixture B) — so it
+    // carries the formatted bytes and its own single report line, and the refused set is the
+    // broken file and the non-UTF-8 one.
+    val plusEquals = "resources/plus-equals.conf" -> text("a : [1]\na += 2\n")
     val refused = Seq(
       "resources/broken.conf" -> text("a : ${\n"),
       "resources/latin1.conf" -> Array[Byte](0x61, 0x20, 0x3a, 0x20, 0x22, 0x63, 0x61, 0x66, 0xe9.toByte, 0x22, 0x0a)
     )
-    withFiles(project, refused :+ ("resources/acceptable.conf" -> text("retries   =   3\n"))*) { run =>
+    withFiles(project, refused :+ plusEquals :+ ("resources/acceptable.conf" -> text("retries   =   3\n"))*) { run =>
       assert(run.eval(project.hoconFormat()).isRight)
       refused.foreach { (path, content) =>
         assertEquals(readBytes(project, path).toSeq, content.toSeq, path)
         assertEquals(s"Leaving $path unchanged".r.findAllMatchIn(run.log).size, 1, run.log)
       }
+      assertEquals(read(project, "resources/plus-equals.conf"), "a = [1]\na += 2\n")
+      assertEquals("Formatted resources/plus-equals.conf".r.findAllMatchIn(run.log).size, 1, run.log)
       assertEquals(read(project, "resources/acceptable.conf"), "retries = 3\n")
+      assert(run.eval(project.hoconFormatCheck()).isRight, run.log)
     }
   }
 
