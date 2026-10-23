@@ -87,7 +87,7 @@ class SconfigForkPinTest(unittest.TestCase):
             git.write_text('#!/bin/sh\necho "fetch required" >&2\nexit 42\n')
             git.chmod(0o755)
             env = {key: value for key, value in os.environ.items()
-                   if not key.startswith('HOCON_FMT_FORK_')}
+                   if not key.startswith('HOCON_FMT_FORK_') and key != 'MAVEN_REPO_LOCAL'}
             env.update(HOME=str(home), PATH=f'{bin_dir}:{env["PATH"]}',
                        HOCON_FMT_FORK_CACHE=str(home / 'source'))
             return subprocess.run(['bash', str(ROOT / 'scripts/fetch-sconfig-fork.sh')],
