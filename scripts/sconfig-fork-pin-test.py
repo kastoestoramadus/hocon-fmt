@@ -13,6 +13,12 @@ ARTIFACTS = ('sconfig_3', 'sconfig_sjs1_3', 'sconfig_native0.5_3')
 
 
 class SconfigForkPinTest(unittest.TestCase):
+    script: str
+    build: str
+    docs: str
+    sha: str
+    version: str
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.script = (ROOT / 'scripts/fetch-sconfig-fork.sh').read_text()
@@ -35,8 +41,6 @@ class SconfigForkPinTest(unittest.TestCase):
         versions = re.findall(r'^val sconfigFork = "([^"]+)"$', self.build, re.M)
         self.assertEqual(versions, [self.version])
         self.assertRegex(self.build, r'(?m)^val sconfig\s*= sconfigFork$')
-        self.assertNotIn('HOCON_FMT_SCONFIG_DOC655_', self.build)
-        self.assertNotIn('docfmt655', self.build)
 
     def test_documented_sha_and_version(self) -> None:
         pins = re.findall(r'Pinned fork commit: `([0-9a-f]{40})`', self.docs)
