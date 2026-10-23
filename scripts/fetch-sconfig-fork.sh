@@ -40,10 +40,10 @@ git -C "$CACHE" fetch -q --depth 1 "$REPOSITORY" "$SHA"
 git -C "$CACHE" checkout -q --detach "$SHA"
 
 # The fork uses sbt 2; publish the Scala version every formatter module compiles with.
-(cd "$CACHE" && sbt -batch "-Dsbt.ivy.home=$IVY_HOME" "-Dmaven.repo.local=$M2" \
-  "set ThisBuild / version := \"$VERSION\"" '++3.9.0!' \
-  sconfigJVM/publishLocal sconfigJVM/publishM2 \
-  sconfigJS/publishLocal sconfigJS/publishM2 \
-  sconfigNative/publishLocal sconfigNative/publishM2)
+# The sbt 2 launcher enters its thin client and joins command arguments with spaces,
+# so the commands travel as one '; '-separated argument: it parses identically with
+# and without the client.
+commands="set ThisBuild / version := \"$VERSION\"; ++3.9.0!; sconfigJVM/publishLocal; sconfigJVM/publishM2; sconfigJS/publishLocal; sconfigJS/publishM2; sconfigNative/publishLocal; sconfigNative/publishM2"
+(cd "$CACHE" && sbt -batch "-Dsbt.ivy.home=$IVY_HOME" "-Dmaven.repo.local=$M2" "$commands")
 published || { echo "sconfig fork publication is incomplete" >&2; exit 1; }
 echo "published sconfig fork $VERSION"
