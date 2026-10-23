@@ -24,7 +24,7 @@ class PluginOptionsTest {
 
     @Test void refusalPolicyIsMirroredAndOverridesRemainIndependent() throws Exception {
         assertFalse(FormatOptions.DEFAULT.failOnRefusal());
-        Path file = Files.writeString(dir.resolve("app.conf"), "# only a comment\n");
+        Path file = Files.writeString(dir.resolve("app.conf"), "a = [1\n");
         Files.writeString(dir.resolve(".hocon-fmt.conf"), "fail-on-refusal = true\nfail-on-duplicates = true\n");
         Inspection strict = HoconFmt.inspectFile(file, Map.of(), true);
         assertTrue(strict.options().failOnRefusal());
@@ -34,12 +34,12 @@ class PluginOptionsTest {
         assertFalse(off.failsOnRefusal());
         assertTrue(off.options().failOnDuplicates());
         assertTrue(HoconFmt.optionsFor(file, Map.of("fail-on-duplicates", "false")).failOnRefusal());
-        assertEquals("# only a comment\n", Files.readString(file));
+        assertEquals("a = [1\n", Files.readString(file));
         assertThrows(IllegalArgumentException.class,
             () -> HoconFmt.optionsFor(file, Map.of("fail-on-refusal", "maybe")));
         FormatOptions enabled = new FormatOptions("=", false, true, false, true);
         assertEquals(enabled, HoconFmt.parseOptions("fail-on-refusal = true", "options.conf"));
-        assertInstanceOf(Verdict.Refused.class, HoconFmt.check("# only a comment\n", "app.conf", enabled));
+        assertInstanceOf(Verdict.Refused.class, HoconFmt.check("a = [1\n", "app.conf", enabled));
         assertInstanceOf(Verdict.AlreadyFormatted.class, HoconFmt.check("a = 1\n", "app.conf", enabled));
     }
 
@@ -47,7 +47,7 @@ class PluginOptionsTest {
         Files.writeString(dir.resolve(".hocon-fmt.conf"), "separator = \":\"\nfail-on-duplicates = true\n");
         Path file = Files.writeString(dir.resolve("app.conf"), "a=1\na=2\nb {c=3}\n");
         Inspection result = HoconFmt.inspectFile(file, Map.of(), true);
-        assertEquals("a: 2\nb.c: 3\n", Files.readString(file));
+        assertEquals("a: 1\na: 2\nb.c: 3\n", Files.readString(file));
         assertTrue(result.options().failOnDuplicates());
         assertEquals(1, result.report().findings().size());
         assertEquals("a", result.report().findings().get(0).keyPath());
