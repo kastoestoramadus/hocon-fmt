@@ -220,10 +220,11 @@ object HoconFormatter {
 
   /** Every include statement the source gave survives in the engine's text, spelled the same up to
     * whitespace, as many times as it occurs. The engine writes includes itself, so the check reads
-    * the statements, not the placeholders the resolving pipeline substituted.
+    * the statements — one locator scan, [[IncludeStatements]], shared with the masking pass — not
+    * the placeholders the resolving pipeline substituted.
     */
   private def includeStatementsPresent(rendered: String, originals: Map[Int, String]): Either[Refusal, Unit] = {
-    val written = IncludeMasking.mask(rendered).originals.values.map(collapsed).toList
+    val written = IncludeStatements.statements(rendered).map(collapsed)
     val missing = originals.toList.sortBy(_._1).map(_._2).filterNot(statement => written.contains(collapsed(statement)))
     missing.headOption.map(Refusal.LostInclude(_)).toLeft(())
   }
@@ -283,13 +284,12 @@ object HoconFormatter {
     *
     * The document engine keeps the order of fields and includes structurally, so the check is the
     * order itself: the statements, whitespace collapsed, appear in the output as many times and in
-    * the order the source gave them. The placeholder walk this check replaced — the retired
-    * include-order machinery — located an include by the field the resolving pipeline substituted
-    * for it.
+    * the order the source gave them. Both sides come from [[IncludeStatements]] — the same locator
+    * the masking pass builds its text from — where this check once read a second masked text.
     */
   private def includesKeptInPlace(pass: Pass): Either[Refusal, Unit] = {
     val before  = pass.originals.toList.sortBy(_._1).map(_._2)
-    val written = IncludeMasking.mask(pass.text).originals.toList.sortBy(_._1).map(_._2)
+    val written = IncludeStatements.statements(pass.text)
     val moved   = before
       .zip(written)
       .collectFirst {

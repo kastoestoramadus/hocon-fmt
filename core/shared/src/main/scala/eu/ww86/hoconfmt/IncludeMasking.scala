@@ -33,32 +33,32 @@ private[hoconfmt] object IncludeMasking {
   def mask(source: String, onOwnLines: Boolean = false): Masked =
     maskWithPrefix(source, onOwnLines, PlaceholderPrefix)
 
+  /** The statements come from [[IncludeStatements.locate]], the one scanner that decides what an
+    * include statement is; the placeholder index is the statement's position in that list, so
+    * `originals` sorted by index is `statements` in source order.
+    */
   private def maskWithPrefix(source: String, onOwnLines: Boolean, prefix: String): Masked = {
-    val masked       = new StringBuilder
-    val originals    = Map.newBuilder[Int, String]
-    val keywords     = IncludeKeyword.matcher(source)
-    lazy val nonCode = HoconText.spans(source) // only a file that mentions include pays for it
-    var copiedUpTo   = 0
-    var nextIndex    = 0
+    val masked     = new StringBuilder
+    val originals  = Map.newBuilder[Int, String]
+    var copiedUpTo = 0
+    var nextIndex  = 0
 
-    while (keywords.find())
-      if (keywords.start >= copiedUpTo && HoconText.isCode(nonCode, keywords.start))
-        targetAfterKeyword(source, keywords.end).foreach { target =>
-          masked.append(source.substring(copiedUpTo, keywords.start))
-          if (onOwnLines) masked.append('\n')
-          masked.append(placeholderFor(nextIndex, prefix))
-          originals += nextIndex -> s"include ${target.text}"
-          nextIndex += 1
-          copiedUpTo = target.endIndex
-          if (onOwnLines) {
-            val comma = skipBlanks(source, copiedUpTo)
-            if (comma < source.length && source.charAt(comma) == ',') {
-              masked.append(source.substring(copiedUpTo, comma + 1))
-              copiedUpTo = comma + 1
-            }
-            masked.append('\n')
-          }
+    IncludeStatements.locate(source).foreach { located =>
+      masked.append(source.substring(copiedUpTo, located.keywordStart))
+      if (onOwnLines) masked.append('\n')
+      masked.append(placeholderFor(nextIndex, prefix))
+      originals += nextIndex -> s"include ${located.target}"
+      nextIndex += 1
+      copiedUpTo = located.end
+      if (onOwnLines) {
+        val comma = skipBlanks(source, copiedUpTo)
+        if (comma < source.length && source.charAt(comma) == ',') {
+          masked.append(source.substring(copiedUpTo, comma + 1))
+          copiedUpTo = comma + 1
         }
+        masked.append('\n')
+      }
+    }
 
     masked.append(source.substring(copiedUpTo))
     Masked(masked.result(), originals.result())
@@ -278,71 +278,12 @@ private[hoconfmt] object IncludeMasking {
   }
 
   // ---- locating an include statement ---------------------------------------------------------
-
-  private val IncludeKeyword  = Pattern.compile("""\binclude""")
-  private val TargetFunctions = List("required", "file", "url", "classpath")
-
-  /** The target text of an include whose keyword ends at `afterKeyword`, and where the statement
-    * ends. `None` when what follows is not a target at all, which is how `include_path` and the
-    * word "include" in prose are left alone.
-    */
-  private case class Target(text: String, endIndex: Int)
-
-  private def targetAfterKeyword(source: String, afterKeyword: Int): Option[Target] = {
-    val start = skipWhitespace(source, afterKeyword)
-    if (start >= source.length) None
-    else if (source.charAt(start) == '"')
-      endOfQuotedString(source, start).map(end => Target(source.substring(start, end), end))
-    else
-      for {
-        function <- TargetFunctions.find(source.startsWith(_, start))
-        openParen = skipWhitespace(source, start + function.length)
-        if openParen < source.length && source.charAt(openParen) == '('
-        end <- endOfParenGroup(source, openParen)
-      } yield Target(function + source.substring(openParen, end), end)
-  }
+  //
+  // Moved to IncludeStatements, the one scanner both this object and the survival checks read.
 
   private def skipBlanks(source: String, from: Int): Int = {
     var i = from
     while (i < source.length && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) i += 1
     i
-  }
-
-  private def skipWhitespace(source: String, from: Int): Int = {
-    var i = from
-    while (i < source.length && Character.isWhitespace(source.charAt(i))) i += 1
-    i
-  }
-
-  /** One past the closing quote, or `None` when the literal is unterminated. */
-  private def endOfQuotedString(source: String, start: Int): Option[Int] = {
-    var i = start + 1
-    while (i < source.length)
-      source.charAt(i) match {
-        case '\\' => i += 2
-        case '"'  => return Some(i + 1)
-        case _    => i += 1
-      }
-    None
-  }
-
-  /** One past the matching close paren, or `None` when the group is unbalanced. */
-  private def endOfParenGroup(source: String, start: Int): Option[Int] = {
-    var i     = start
-    var depth = 0
-    while (i < source.length)
-      source.charAt(i) match {
-        case '"' =>
-          endOfQuotedString(source, i) match {
-            case Some(end) => i = end
-            case None      => return None
-          }
-        case '(' => depth += 1; i += 1
-        case ')' =>
-          depth -= 1
-          if (depth == 0) return Some(i + 1) else i += 1
-        case _ => i += 1
-      }
-    None
   }
 }
