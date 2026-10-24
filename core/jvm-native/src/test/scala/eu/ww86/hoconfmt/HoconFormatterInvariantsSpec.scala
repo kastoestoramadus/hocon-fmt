@@ -82,7 +82,17 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
     "guard text in a string"               -> "include \"a.conf\"\na = \"__INCLUDE_GUARD_0 = g\""
   ).foreach { case (name, raw) =>
     test(s"marker-like input next to an include is kept as written: $name") {
-      assertSameMeaning(formatted(raw), raw, s"marker-like content was corrupted: $name")
+      val out = formatted(raw)
+      // Formatting where the masking pass refused runs on every platform; the meaning
+      // comparison resolves the include, which sconfig cannot on Scala Native: the javalib
+      // java.net.URI stubs behind Parseable's relative-include resolution throw
+      // NotImplementedError (ParseableURL.relativeTo -> PlatformUri.toURL). Same platform
+      // rule as the shared suites' never-parse-includes note for Scala.js.
+      assume(
+        System.getProperty("java.vm.name", "") != "Scala Native",
+        "sconfig on Scala Native cannot resolve a relative include"
+      )
+      assertSameMeaning(out, raw, s"marker-like content was corrupted: $name")
     }
   }
 
