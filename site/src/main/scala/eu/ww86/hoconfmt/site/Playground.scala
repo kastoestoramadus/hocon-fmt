@@ -294,16 +294,14 @@ object Playground {
   private def maskIncludesForResolve(text: String): (String, Map[Int, String]) = {
     val out       = new StringBuilder
     val originals = Map.newBuilder[Int, String]
-    var copied    = 0
-    var index     = 0
-    IncludeStatements.locate(text).foreach { located =>
-      val standIn = s"__RESOLVED_INCLUDE_$index"
-      val _       = out.append(text.substring(copied, located.keywordStart)).append(s"$standIn : \"$standIn\"")
+    val lastEnd   = IncludeStatements.locate(text).zipWithIndex.foldLeft(0) { (copied, withIndex) =>
+      val (located, index) = withIndex
+      val standIn          = s"__RESOLVED_INCLUDE_$index"
+      val _                = out.append(text.substring(copied, located.keywordStart)).append(s"$standIn : \"$standIn\"")
       originals += index -> s"include ${located.target}"
-      copied = located.end
-      index += 1
+      located.end
     }
-    val _ = out.append(text.substring(copied))
+    val _ = out.append(text.substring(lastEnd))
     (out.result(), originals.result())
   }
 
