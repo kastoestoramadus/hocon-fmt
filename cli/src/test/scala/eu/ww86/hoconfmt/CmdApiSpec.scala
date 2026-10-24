@@ -466,20 +466,19 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     }
   }
 
-  // The one-line reason names the two lines to look at; what to do about them needs more room, so
-  // the CLI adds the ways out the user can weigh against what they meant.
-  tmp.test("a shadowed definition reports the lines and how to rework the file") { dir =>
+  // The shadow guard retired with the include masking: a definition that shadows an include's
+  // subtree formats like any other statement instead of refusing. The enum case and the CLI's
+  // advice branch stay for wire compatibility, so a refusal built elsewhere still renders them.
+  tmp.test("a definition shadowed through an include formats instead of refusing") { dir =>
     val shadowed = "include \"f.conf\"\no=3\no.c=7\n"
     for {
       file <- write(dir, "a.conf", shadowed)
       run  <- rewrite(file)
       text <- textOf(file)
     } yield {
-      assertEquals(text, shadowed)
-      assert(run.rendered.contains("line 2"), run.rendered)
-      assert(run.rendered.contains("line 1"), run.rendered)
-      assert(run.rendered.contains("out of o"), run.rendered)
-      assert(run.rendered.contains("fix by hand: delete line 2"), run.rendered)
+      assertEquals(text, "include \"f.conf\"\no = 3\no.c = 7\n")
+      assertEquals(run.exitCode, ExitCode.Success)
+      assert(!run.rendered.contains("cannot format, leaving unchanged"), run.rendered)
     }
   }
 
