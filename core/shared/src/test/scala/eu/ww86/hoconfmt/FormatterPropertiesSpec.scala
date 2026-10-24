@@ -17,8 +17,7 @@ import eu.ww86.hoconfmt.HoconGen.*
   */
 class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSupport {
 
-  val PlaceholderKey = "__INCLUDE_(\\d+)".r
-  val GuardKey       = "__INCLUDE_GUARD_\\d+".r
+  val StandInKey = "__READ_(\\d+)".r
 
   // The duplicate report was cubic in a dotted path's segments before the guard: a 10 KB file
   // (`a.a.a. ... = 1` with 2,000 segments) spent 24 seconds in it, through the command line on
@@ -288,9 +287,10 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
   // A later definition wins, so an include sits where the fields before it say it does. Keys are
   // compared as full paths: formatting turns a nested key into a dotted one. Keys that merge or
   // replace each other are left out, since what counts as "before" is then a question of which
-  // definition survives. The output is read through sconfig, with the includes masked as the
-  // formatter does, so a shared misreading of its line numbers is what could hide a failure here;
-  // the expectation comes from the generated tree and not from sconfig.
+  // definition survives. The output is read through sconfig, with the includes swapped for this
+  // suite's stand-in fields (see [[maskedForRead]]), so a shared misreading of sconfig's line
+  // numbers is what could hide a failure here; the expectation comes from the generated tree and
+  // not from sconfig.
   property("keeps every key defined before an include before it, in any option combination") {
     val documentsWithUniqueIncludes = documents(includes = true, distinctKeys = true)
       .suchThat(doc => doc.includes.distinct == doc.includes)
@@ -363,8 +363,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
-  // User text that looks like what IncludeMasking writes, next to a real include: the formatter may
-  // refuse the file, but a file it formats keeps that text.
+  // User text that looks like the __INCLUDE_ placeholders the retired masking pass wrote, next to
+  // a real include: the formatter may refuse the file, but a file it formats keeps that text.
   property("never alters text that looks like a placeholder, in any option combination") {
     import org.scalacheck.Gen
     val digits    = Gen.oneOf("0", "1", "01", "7", "99999999999", "999999999999999999999")
@@ -399,32 +399,9 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
-  property("refuses concatenated reserved spellings, in any option combination") {
-    import org.scalacheck.Gen
-    val collision = for {
-      index      <- Gen.oneOf("0", "1", "01", "99999999999")
-      guard      <- Gen.oneOf(false, true)
-      split      <- Gen.choose(1, 9)
-      quotedTail <- Gen.oneOf(false, true)
-      place      <- Gen.oneOf("key", "value", "array", "nested")
-    } yield {
-      val text  = s"__INCLUDE_${if (guard) "GUARD_" else ""}$index"
-      val tail  = text.drop(split)
-      val token = s"\"${text.take(split)}\"" + (if (quotedTail) s"\"$tail\"" else tail)
-      val field = place match {
-        case "key"    => s"$token = ${if (guard) "g" else token}"
-        case "array"  => s"a = [$token]"
-        case "nested" => s"o { $token = g }"
-        case _        => s"a = $token"
-      }
-      s"include \"f.conf\"\ninclude \"second.conf\"\n$field\n"
-    }
-    forAll(collision) { source =>
-      allOptions.foreach { options =>
-        assertEquals(HoconFormatter.format(source, options), Left(Refusal.ReservedName))
-      }
-    }
-  }
+  // The concatenated-reserved-spellings property is gone with the masking pass it protected: the
+  // document engine writes no placeholders, so there is no reserved spelling to refuse, and the
+  // "never alters text that looks like a placeholder" property above pins that such text formats.
 
   // Without this the properties above would pass vacuously on a formatter that refused everything.
   property("formats every document it has no reason to refuse, in any option combination") {
@@ -441,17 +418,39 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     }
   }
 
+  /** The include statements of a formatted text swapped in place for stand-in fields, with the
+    * statements keyed by their index: the resolving parse this property reads line numbers through
+    * cannot parse an include on Scala.js, so the reader (not the formatter - the retired masking
+    * pass was the formatter's) hands it text it can parse. A stand-in spells a key no generated
+    * document writes.
+    */
+  private def maskedForRead(text: String): (String, Map[Int, String]) = {
+    val out       = new StringBuilder
+    val originals = Map.newBuilder[Int, String]
+    var copied    = 0
+    var index     = 0
+    IncludeStatements.locate(text).foreach { located =>
+      val standIn = s"__READ_$index"
+      val _       = out.append(text.substring(copied, located.keywordStart)).append(s"$standIn = \"$standIn\"")
+      originals += index -> s"include ${located.target}"
+      copied = located.end
+      index += 1
+    }
+    val _ = out.append(text.substring(copied))
+    (out.result(), originals.result())
+  }
+
   /** The same reading of formatted text as `Document.keysBeforeIncludes` makes of the tree. */
   def keysBeforeIncludes(formatted: String): Map[String, Set[List[String]]] = {
-    val masked = IncludeMasking.mask(formatted)
-    val leaves = leavesOf(masked.text.parsedConfig.root, Nil)
+    val (text, originals) = maskedForRead(formatted)
+    val leaves            = leavesOf(text.parsedConfig.root, Nil)
     leaves.collect { case Leaf(path, line, Some(index)) =>
       val parent = path.init
       val before = leaves.collect {
         case Leaf(other, l, None) if l < line && other.startsWith(parent) => other
-        case Leaf(other, l, Some(i)) if l < line && other.init == parent  => HoconGen.includeKey(masked.originals(i))
+        case Leaf(other, l, Some(i)) if l < line && other.init == parent  => HoconGen.includeKey(originals(i))
       }
-      masked.originals(index) -> before.toSet
+      originals(index) -> before.toSet
     }.toMap
   }
 
@@ -459,9 +458,8 @@ class FormatterPropertiesSpec extends munit.ScalaCheckSuite with HoconTestSuppor
     obj.entrySet.asScala.toList.flatMap { entry =>
       val path = at :+ entry.getKey
       (entry.getKey, entry.getValue) match {
-        case (_, inner: ConfigObject)                                                         => leavesOf(inner, path)
-        case (GuardKey(), _)                                                                  => Nil
-        case (PlaceholderKey(index), value) if Option(value.unwrapped).contains(entry.getKey) =>
+        case (_, inner: ConfigObject)                                                     => leavesOf(inner, path)
+        case (StandInKey(index), value) if Option(value.unwrapped).contains(entry.getKey) =>
           List(Leaf(path, value.origin.lineNumber, Option(index).flatMap(_.toIntOption)))
         case (_, list: ConfigList) => Leaf(path, list.origin.lineNumber, None) :: leavesInItems(list, path)
         case (_, value)            => List(Leaf(path, value.origin.lineNumber, None))

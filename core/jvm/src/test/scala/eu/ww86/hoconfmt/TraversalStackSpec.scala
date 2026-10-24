@@ -22,17 +22,9 @@ class TraversalStackSpec extends munit.FunSuite {
     }
   }
 
-  // UPSTREAM-SCONFIG: the fork parser caps nesting at 100 levels, including the root.
-  // Exercise the deepest tree it exposes; the public report guard still stops at 80.
-  test("the outline walk at the fork parser boundary completes on a one MiB stack") {
-    val depth  = 99
-    val source = "a {" * depth + "x=1" + "}" * depth
-    onSmallStack(DuplicateReport.outline(source)) match {
-      case Right(outline) =>
-        assertEquals(outline.definitions.map(_.keyPath.segments.size), (1 to depth + 1).toVector)
-      case Left(refusal) => fail(refusal.reason)
-    }
-  }
+  // The below-guard outline walk this once exercised at the fork parser's 99-level boundary is
+  // gone with the include-shadow check that read it; the walk itself is covered above, at the
+  // depth the public guard accepts.
 
   test("the include-shadow boundary returns a verdict at the deepest accepted nesting on a one MiB stack") {
     val source = "include \"missing.conf\"\n" + "a {" * 80 + "x=1" + "}" * 80

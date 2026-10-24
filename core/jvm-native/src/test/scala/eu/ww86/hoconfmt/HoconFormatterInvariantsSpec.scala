@@ -73,16 +73,16 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
     }
   }
 
-  // With an include in the file the reserved name cannot be told from our own placeholders, so the
-  // file is refused instead of restored on a guess: lookalikes with and without a matching index
-  // included, and one in a comment, which rendering runs into the next line.
+  // The retired masking pass could not tell its own placeholders from lookalike text beside an
+  // include, and refused the file rather than restore on a guess; the document engine writes no
+  // placeholders, so the same texts format and every spelling survives as written.
   List(
     "value index extends a handed-out one" -> "include \"a.conf\"\nx { __INCLUDE_0 : \"__INCLUDE_01\", y : 1 }",
     "a lookalike in a comment"             -> "# note __INCLUDE_5 :\ninclude \"a.conf\"\nb : 1",
     "guard text in a string"               -> "include \"a.conf\"\na = \"__INCLUDE_GUARD_0 = g\""
   ).foreach { case (name, raw) =>
-    test(s"marker-like input next to an include is refused: $name") {
-      assertEquals(refusalOf(raw), Refusal.ReservedName)
+    test(s"marker-like input next to an include is kept as written: $name") {
+      assertSameMeaning(formatted(raw), raw, s"marker-like content was corrupted: $name")
     }
   }
 

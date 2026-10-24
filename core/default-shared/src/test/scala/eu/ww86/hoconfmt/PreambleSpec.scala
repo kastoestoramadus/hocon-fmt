@@ -76,11 +76,10 @@ class PreambleSpec extends munit.FunSuite with HoconTestSupport {
 
   // The body is read in the file's own lines: the preamble is replaced, line for line, by blank
   // lines before anything is parsed, so a refusal that names a line names the file's line.
-  test("a refusal from the body names the file's own lines") {
-    val source  = "# head\n\ninclude \"f.conf\"\no = 3\no.c = 7\n"
-    val refusal = HoconFormatter.format(source).swap.getOrElse(fail("expected a refusal"))
-    assertEquals(refusal, Refusal.ShadowedByInclude("o", includeLine = 3, definitionLine = 4))
-  }
+  // The shadow refusal this once used as its vehicle named the body's lines (includeLine 3,
+  // definitionLine 4); it is gone with the include-shadow check, and no remaining refusal carries
+  // line numbers, so the preamble's line arithmetic is pinned by the tests above through the
+  // refusals that remain.
 
   // What the preamble path does not cover: the document engine's own comment keeping. These were
   // refusals while the resolving render dropped the comments; they are output pins now, and the

@@ -130,37 +130,18 @@ object DuplicateReport {
       arrayPositionsTrusted: Boolean
   )
 
-  /** One `include` directive: the line it stands on, its position among the statements, the object
-    * it stands in, and the array scope of that object. Read from the masked text, where an include
-    * is a placeholder field, so the walk finds it by that field's key.
-    */
-  private[hoconfmt] case class Include(line: Int, position: Int, scope: KeyPath, arrayScope: List[Int])
-
-  /** Everything the walk finds in source order: the fields and the includes. */
-  private[hoconfmt] case class Outline(definitions: Vector[Definition], includes: Vector[Include]) {
-
-    def add(definition: Definition): Outline = copy(definitions = definitions :+ definition)
-
-    def addAll(more: Vector[Definition]): Outline = copy(definitions = definitions ++ more)
-
-    def add(include: Include): Outline = copy(includes = includes :+ include)
-  }
-
-  /** Every field and every include the document parse holds: what [[IncludeShadow]] reads to see
-    * which definitions a formatting drops around an include.
-    */
-  private[hoconfmt] def outline(source: String): Either[Refusal, Outline] =
-    document(source, None).map(outlineOf)
-
-  private val emptyOutline = Outline(Vector.empty, Vector.empty)
-
-  private def outlineOf(tree: ConfigNodeRoot): Outline =
-    walk(List(Visit(tree, Nil, Nil, positionsTrusted = true)), 1, emptyOutline)
+  private val noDefinitions = Vector.empty[Definition]
 
   private def defined(tree: ConfigNodeRoot): Vector[Definition] =
-    outlineOf(tree).definitions
+    walk(List(Visit(tree, Nil, Nil, positionsTrusted = true)), 1, noDefinitions)
 
-  /** The definitions and includes `node` holds, and the line the text after it starts on. The line
+  /** The walk's definitions without the report on top: the budget differential's reference needs
+    * the raw list the optimized report is checked against.
+    */
+  private[hoconfmt] def definitionsOf(source: String): Either[Refusal, Vector[Definition]] =
+    document(source, None).map(defined)
+
+  /** The definitions `node` holds, and the line the text after it starts on. The line
     * advances by the newlines of every render in source order.
     *
     * `positionsTrusted` is true while every array position on the way here is the merged list's own.
@@ -181,7 +162,7 @@ object DuplicateReport {
 
   // Pending visits retain source order and each child's scope without a call frame per level.
   @tailrec
-  private def walk(pending: List[Visit], line: Int, found: Outline): Outline = pending match {
+  private def walk(pending: List[Visit], line: Int, found: Vector[Definition]): Vector[Definition] = pending match {
     case Nil                                                   => found
     case Visit(node, at, arrayScope, positionsTrusted) :: rest =>
       node match {
@@ -191,7 +172,7 @@ object DuplicateReport {
         // The definition offset identifies arrays with fields uniquely; nesting distinguishes
         // arrays starting at the same offset. Empty arrays have no descendants to compare.
         case array: ConfigNodeArray =>
-          val scope         = arrayScope :+ found.definitions.size
+          val scope         = arrayScope :+ found.size
           val (_, reversed) = array.children.asScala.foldLeft((0, List.empty[Visit])) { case ((index, visits), child) =>
             child match {
               case value: AbstractConfigNodeValue =>
@@ -214,51 +195,37 @@ object DuplicateReport {
       field: ConfigNodeField,
       at: List[KeyPath.Segment],
       line: Int,
-      found: Outline,
+      found: Vector[Definition],
       arrayScope: List[Int],
       positionsTrusted: Boolean
-  ): (List[Visit], Outline) = {
+  ): (List[Visit], Vector[Definition]) = {
     val segments = pathOf(field.path)
     val path     = at ++ segments
     // Every field leaves one definition of its own behind, so the count of what stands in `found`
     // has grown by one per field passed: it says where this statement stands in the source.
-    val position = found.definitions.size + found.includes.size
+    val position = found.size
     // `+=` is the self-referential `${?key} [ ... ]` in another spelling: it reads the earlier
     // value, which the parser only desugars in the merged tree, not in this document tree.
     val holds    = appends(field) || holdsSubstitution(field.value)
-    val contents =
-      if (placeholder(segments)) found.add(Include(line, position, KeyPath(at), arrayScope))
-      else {
-        val own = Definition(
-          KeyPath(path),
-          line,
-          position,
-          objectValued = objectValued(field.value),
-          holdsSubstitution = holds,
-          writesNothing = writesNothing(field.value),
-          arrayScope = arrayScope,
-          arrayPositionsTrusted = positionsTrusted
-        )
-        found.addAll(implicitObjects(at, segments, line, position, holds, arrayScope, positionsTrusted)).add(own)
-      }
+    val contents = {
+      val own = Definition(
+        KeyPath(path),
+        line,
+        position,
+        objectValued = objectValued(field.value),
+        holdsSubstitution = holds,
+        writesNothing = writesNothing(field.value),
+        arrayScope = arrayScope,
+        arrayPositionsTrusted = positionsTrusted
+      )
+      found ++ implicitObjects(at, segments, line, position, holds, arrayScope, positionsTrusted) :+ own
+    }
     // The path and the separator only advance the line; the value may hold fields of its own.
     val children = field.children.asScala.toList.collect {
       case value: AbstractConfigNodeValue      => Visit(value, path, arrayScope, positionsTrusted)
       case other if newlines(other.render) > 0 => Visit(other, path, arrayScope, positionsTrusted)
     }
     (children, contents)
-  }
-
-  /** The masked form of an include directive is a field whose key and value spell the placeholder
-    * name, so a field named like that is an include and not a definition of the user's.
-    */
-  private def placeholder(segments: List[KeyPath.Segment]): Boolean = segments match {
-    case List(KeyPath.Segment.Name(name)) =>
-      name.startsWith(IncludeMasking.PlaceholderPrefix) && {
-        val index = name.substring(IncludeMasking.PlaceholderPrefix.length)
-        index.nonEmpty && index.forall(_.isDigit)
-      }
-    case _ => false
   }
 
   /** A dotted path writes the objects on the way to its leaf too: `a.b = 2` defines `a` as an

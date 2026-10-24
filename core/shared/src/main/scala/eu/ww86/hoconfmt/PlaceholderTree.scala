@@ -6,9 +6,10 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 /** Whether a parsed tree spells a masking pass's prefix anywhere but in the key/value pairs that
-  * pass generated. [[IncludeMasking]] and the site's `CommentCarrier` judge their trees with this,
-  * so a spelling the source reading let through refuses the file instead of restoring on a guess.
-  * The `CommentCarrier` half goes when the seam does (docs/site.md).
+  * pass generated. The site's `CommentCarrier` judges its tree with this — the include masking
+  * pass that judged its own tree with it is retired — so a spelling the source reading let
+  * through refuses the file instead of restoring on a guess. The `CommentCarrier` half goes when
+  * the seam does (docs/site.md).
   */
 private[hoconfmt] object PlaceholderTree {
 

@@ -3,13 +3,13 @@ package eu.ww86.hoconfmt
 import java.util.regex.Pattern
 
 /** Locates `include` statements in a text: where each keyword stands, where the statement ends,
-  * and the target as written. [[IncludeMasking]] builds its masked text from these spans and the
-  * survival checks in [[HoconFormatter]] read a rendered text's statements from them, so the two
-  * cannot drift on what counts as an include.
+  * and the target as written. [[HoconFormatter]] reads the source's statements from these spans
+  * and reads the rendered text's statements back with the same scanner, so the two sides of the
+  * survival checks cannot drift on what counts as an include.
   *
-  * The one definition this locator replaced — a keyword matcher walked inside `maskWithPrefix` —
-  * produced the masked text and, as `mask(rendered).originals`, the statements of the rendered
-  * text; one scanner now answers both.
+  * The one definition this locator replaced — a keyword matcher walked inside the retired masking
+  * pass — produced the masked text and, as `mask(rendered).originals`, the statements of the
+  * rendered text; one scanner now answers both.
   *
   * A character scanner like the masking pass, written with indices and loops; the suppression is
   * for this object only, not a precedent.
