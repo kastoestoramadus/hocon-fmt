@@ -56,8 +56,8 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
     }
   }
 
-  // Adversarial: the masking injects `__INCLUDE_<n>` and `__INCLUDE_GUARD_<n>` fields into the
-  // source. Content that already looks like one must not be mistaken for the real thing.
+  // Adversarial: the retired masking pass injected `__INCLUDE_<n>` and `__INCLUDE_GUARD_<n>`
+  // fields into the source; content that looks like one must still survive as the user's own.
   def markerCases = Map(
     "placeholder as a value"      -> """key : "__INCLUDE_0"""",
     "placeholder as a key"        -> """"__INCLUDE_0" : 1""",
