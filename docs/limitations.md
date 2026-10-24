@@ -124,7 +124,7 @@ dropped:
 
 `Refusal.NestingTooDeep(80)` leaves input with more than **80 simultaneous opening `{` or `[`
 delimiters in code** unchanged, with the reason `input nesting exceeds the maximum depth of 80`.
-The pre-check runs before include masking, parsing, rendering and duplicate analysis on JVM,
+The pre-check runs before parsing, rendering and duplicate analysis on JVM,
 Scala.js and Scala Native. It uses constant space, stops at the first excess opening delimiter,
 and does not depend on catching a stack error. Objects and arrays share the budget, including an
 explicit root object; siblings do not accumulate depth. Strings (ordinary, escaped and
@@ -157,7 +157,7 @@ Scala.js and Scala Native were not run against them.
 `Refusal.PathTooDeep` leaves input whose **longest dotted key path exceeds 120 segments**
 unchanged, with the reason `input dotted key paths exceed the maximum of 120 segments`. The same
 early scan that bounds nesting counts the segments of a key path — the `a.b.c` of `a.b.c = 1` is
-three — and refuses before include masking, parsing, rendering and duplicate analysis, on JVM,
+three — and refuses before parsing, rendering and duplicate analysis, on JVM,
 Scala.js and Scala Native. A path's segments are counted the way sconfig splits them: at unquoted
 dots, with adjacent quoted and unquoted pieces joining into one element (`"a"."b"` is two, `"a""b"`
 is one), so dots inside a quoted key, a quoted value or an include target are never segments, and
@@ -298,12 +298,11 @@ The rule is narrow, so that a block the parse needs never moves:
 - **What is left must hold a comment.** A file that opens with blank lines only has no preamble:
   the leading blank lines are dropped as before. A file of nothing but comments has no body to
   format, so it has no preamble and is still refused.
-- **The block is taken before any masking.** When the file contains an include, the source-level
-  `__INCLUDE_` guard reads the file's own text, preamble included, and refuses a reserved spelling
-  with `ReservedName`. Without an include, the preamble may contain that spelling: the review's
-  `// __INCLUDE_0\n\na : 1` becomes `// __INCLUDE_0\n\na = 1`. Adding
-  `include "defaults.conf"` before the field makes it refuse. Nothing of the preamble is parsed or
-  restored, so it cannot be mistaken for a placeholder; an `include` in a comment is no directive.
+- **Nothing of the block is parsed or restored.** It cannot be mistaken for a placeholder, and an
+  `include` in a comment is no directive. (A source-level `__INCLUDE_` guard once read the file's
+  own text, preamble included, and refused a reserved spelling when the file held an include; the
+  masking retirement of 2026-10-24 took it away, and the review's `// __INCLUDE_0\n\na : 1`
+  formats to `// __INCLUDE_0\n\na = 1` with or without an include.)
 - **The body keeps every normalisation** listed under [intentional
   normalisations](#intentional-normalisations): `//` becomes `#`, `:` becomes `=`, nested objects
   are flattened, plain strings are unquoted, the body's line endings become `\n`. The preamble is
@@ -352,90 +351,32 @@ their comments and nothing else, so blank lines are not kept at all — formatti
 corpus turns 1713 of its 11132 lines into 0. That is spacing rather than a comment, so the checks
 pass and the output is accepted.
 
-Dropped with its object (`Refusal.LostInclude`):
+Dropped with its object, moved across a field, or shadowed (`Refusal.LostInclude`,
+`Refusal.MovedInclude`, `Refusal.ShadowedByInclude`): none of these refusals is reachable on the
+document engine. A resolving parse deletes an include and renders only the surviving definitions,
+so the formatter once refused, before the engine, an include in an object a later definition of
+the key replaces (`o { include "x.conf" }` then `o : 5`); an include that shared a line with
+fields, which a resolving render ordered unpredictably so a later field could resolve to the
+included value (`include "defaults.conf", zone = "us"`); and — most conservatively, because the
+included file cannot be read at format time — a definition the merge dropped beside an include on
+a path it may write (`include "f.conf"` defining `o.retained`, then `o = 3`, `o.c = 7`), in an
+object, an empty object, or any piece of a concatenation, where the merged tree cannot say which
+definition a path and line belong to. An independent review found 18 sources of the object-piece
+shape, every one resolving differently once formatted by that pipeline; the guard refused them
+wholesale rather than guess.
 
-- **An include in an object that a later definition of the key replaces**: `o { include "x.conf" }`
-  then `o : 5`. sconfig merges repeated keys, so the include no longer mattered, but its text would
-  vanish.
-
-Moved across a field (`Refusal.MovedInclude`):
-
-- **An include that shares a line with a field**: `include "defaults.conf", zone = "us"`.
-  `keepOriginOrder` sorts by the line a field starts on, an origin has no column, and fields on
-  one line come out in no defined order (`z = 1, y = 2, x = 3` renders `x`, `y`, `z`). The include
-  is masked as a field, so it moves like one; here it lands after `zone`, and since a later
-  definition wins, `zone` then resolves to the included file's value instead of `us`. The page
-  fork includes the parse-sequence ordering fix (#645), so this same-line input formats there;
-  the published core stays on 2.0.0 and refuses it.
-- **A key defined again after the include**: `a.b = 1`, the include, `a.c = 2`. Repeated keys are
-  rendered once, where the first appeared, so `a.c` would move before the include.
-
-  `format` compares, for every include, the full paths of the keys defined before it in its
-  object, before and after. Includes on their own lines, in any order, are unaffected, and so is
-  an include after the fields on its line. Fields moving among themselves matter only against an
-  include: a key defined twice is merged when parsing. For the same reason sorting fields would
-  move includes across them, and is never offered.
-
-Dropped in the include's object (`Refusal.ShadowedByInclude`):
-
-- **A definition a later one replaces, with the include before it**: `include "f.conf"` (which
-  defines `o.retained`), `o = 3`, `o.c = 7`. The scalar erased the included `o`, and `o.c = 7`
-  replaced the scalar, so the file resolves `o` to `{c = 7}`; `o = 3` leaves no trace in the
-  rendered tree and is dropped, after which the included `o.retained` merges into `o.c = 7`. This
-  is the shape the duplicate report catches, reading a parse that keeps every definition.
-- **An empty object, with the include before it**: `x.a = 5`, `include "scalar.conf"` (which
-  defines `x = 3`), `x {}`. The empty object replaced the included scalar, so the file resolves
-  `x` to `{}`; nothing of it survives the merge, it is dropped, and the include's scalar is what
-  `x` resolves to. The report does not catch this one: a repeated object merges instead of
-  replacing (see "What the duplicate report does not claim").
-- **A definition in a later piece of an array concatenation**: `rows = [0] [{ include "f.conf"`,
-  `q = false`, `q.child = 8 }]`, with `q = { retained = 91 }` in the included file. The file
-  resolves `rows[1].q` to `{ child = 8 }` — `q = false` erased the included object and
-  `q.child = 8` replaced the scalar — and formatted, the dropped `q = false` lets the included
-  object merge back in, resolving `{ child = 8, retained = 91 }`. Each piece of a concatenation
-  counts its elements from zero while the merged list counts them across the pieces, so the merged
-  tree cannot say what stands at the definition's own element; the check refuses the definition
-  rather than read the value of the element its path names there.
-- **A definition in a piece of an object concatenation**: `app = {} { q = 0, q.a = 1, include
-  "f.conf", q {} }`, with `q = 9` in the included file. The file resolves `app.q` to `{}` — `q {}`
-  cleared the included scalar — and formatted, the dropped `q {}` lets the scalar through,
-  resolving `q = 9`. An object piece merges with the pieces beside it, and the merged value at a
-  path and line a piece writes may be the survivor of a definition the merge dropped, with nothing
-  in the tree to tell that it is not the piece's own. An independent review found 18 sources of
-  this shape, every one resolving differently once formatted; the doubt covers the piece whole, so
-  the check reads nothing inside a concatenation off the merged tree.
-
-- **A definition a kept twin's line vouches for**: `q = 0, q.a = 1, include "f.conf", q {}`, with
-  `q = 9` in the included file. The file resolves `q` to `{}` — `q {}` cleared the included scalar —
-  and the check formatted it until this rule, dropping `q {}`: the merged tree carried a value at
-  `q` on that line (the kept `q.a = 1`), and the pair of path and line matched all three
-  definitions, so the empty object passed for kept. The merge follows the source, so a definition a
-  later twin on the same line erases cannot be the value the pair carries, and the pair no longer
-  vouches for it — `q = 0` is erased by both `q.a = 1` and `q {}`, and `q {}` is refused. The doubt
-  is one-sided: a twin in front cannot have replaced anything, so `include "f.conf", p {}, p = 3`,
-  where `p = 3` is the value the merge keeps, still formats.
-
-  The included file cannot be read at format time — a web page has no filesystem, and the target
-  may be a URL — so the formatter cannot check whether the dropped definition mattered. It refuses,
-  naming the include's line and the definition's line, and leaves the file for the user to rework by
-  hand. Deleting the dropped line, moving the include below the definitions, or writing the value
-  the file resolves to as one definition all format; which one is right depends on what the file was
-  meant to say. `o = null` is not a way out: the null is dropped like any other replaced definition,
-  and the include then writes the key again.
-
-  This refuses a little too much. `x.a = 5`, the include, `x {}` is refused even when the included
-  file says nothing about `x` (as one research probe's `f.conf` does): the check sees the text, not
-  the included file, and a file whose included contents are unknown is not one to resolve on a guess.
-  The doubt covering a whole piece refuses ordinary configs too: `app={servers=["one"]} { include
-  "f.conf"` `pool {}` `pool.size=8 }` cannot change what the file resolves to when formatted — an
-  oracle resolved it the same against every one of 29 included bodies tried — but nothing inside the
-  concatenation vouches for `pool {}`, so it is refused like the hazards above. The doubt was
-  measured once more with the one-sided same-line rule in place: reading object pieces off the
-  merged tree again formats 331 sources the doubt refuses and lets five of them (21 comparisons
-  across the reviewer's bodies) resolve differently, the empty object after the include merging away
-  with no erasing twin on its line, so the doubt stays and those configs stay refused. Of the files
-  in `examples/`, the golden files and the research probes, exactly the three that reproduce the
-  first two cases are refused that were not before.
+The document engine (2026-10-23; masking and shadow guard retired 2026-10-24) made the whole
+family moot: it keeps every statement node — includes, duplicate definitions, `+=`,
+substitutions — writes them where they stand, and never loads an include. The shapes above
+format: every definition is kept, a same-line include stays in front of whatever shared its line
+(pinned in `IncludeOrderSpec`), and the duplicate report names a scalar definition a later one
+replaces. The two `catalogue/include-shadowed-by-*` examples, refused since the research task,
+format now. The guards stay for an engine regression: `LostInclude` and `MovedInclude` compare
+the statements the source gave with the ones the output carries (`IncludeStatements`, whitespace
+collapsed), a 13,272-case corpus sweep on the engine refused none, and a test seam that injects
+a losing render is what exercises them. `Refusal.ShadowedByInclude` and `Refusal.ReservedName`
+stay on the wire for enum consumers; the published core produces neither (the site's comment
+carrier still fires `ReservedName` for its own placeholders).
 
 Re-parseable, but not a fixed point (`Refusal.UnstableOutput`):
 
@@ -487,13 +428,15 @@ another, but nothing here promises the options agree:
 - `catalogue/object-substitution-then-field` (`x = ${t} { b = 2 }`) is `Refusal.BrokenOutput` with
   the default nesting and formats without it.
 
-`Refusal.ReservedName`: a file with an `include` is refused when the rest of its text spells
-`__INCLUDE_` literally, or parses to a key or value containing it (including adjacent quoted or
-unquoted token concatenations). This is the prefix of the include placeholders (see
-[architecture](architecture.md#include-masking)); restoring user text as a placeholder corrupted
-it silently. The source check also broadly refuses any case-insensitive `\u005f` underscore
-escape, even in a comment or triple-quoted string where it does not resolve. Include targets are
-masked before this check and remain verbatim. A file without an include is not affected.
+`Refusal.ReservedName`: retired from the published core's formatting with the masking pass
+(2026-10-24). It used to refuse, when a file held an `include`, any other literal `__INCLUDE_`
+spelling, or a key or value parsing to one (including adjacent quoted or unquoted token
+concatenations, and case-insensitive `\u005f` underscore escapes even in comments and
+triple-quoted strings) — restoring user text as a placeholder would have corrupted it silently.
+The document engine masks nothing and keeps comments and statements verbatim, so the spelling is
+harmless and those files format. The refusal stays on the wire, and the site's comment carrier
+still fires it for its own `__COMMENT_` placeholders (see
+[architecture](architecture.md#comment-carrier)).
 
 Rejected at parse time although the specification allows them (`Refusal.NotHocon`):
 
@@ -654,10 +597,9 @@ re-check them when upgrading rather than silently enable formatting because a ne
 
 The one known safety gap the research left behind — an overridden definition beside an include
 disappearing while its include remains, so the formatter wrote a file whose meaning silently
-changed — is refused now (`Refusal.ShadowedByInclude`, above), and the two inputs that reproduced
-it are in the catalogue. The duplicate warning remains useful evidence of the override; it is no
-longer the only thing standing between the user and those bytes. The
-[research probes](research/formatters/REPORT.md#probe-results) keep the inputs and their recorded
-refusals. Tell us if a file is refused that you think is safe, including the smallest input and
-the formatter version: the check sees the text, not the file the include names, so it refuses a
-little too much by design. No upstream issue is posted by the research task.
+changed — is closed by the document engine rather than by a refusal (2026-10-24): the definition
+no longer disappears, every statement is kept, and the duplicate warning names the override. The
+two inputs that reproduced the gap are in the catalogue and format now; the
+[research probes](research/formatters/REPORT.md#probe-results) keep the inputs with their recorded
+refusals, dated as history. Tell us if a file is refused that you think is safe, including the
+smallest input and the formatter version. No upstream issue is posted by the research task.
