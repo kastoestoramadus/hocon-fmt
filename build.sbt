@@ -408,7 +408,14 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     // Tests run where the shipped Native binary runs: a bounded heap, in a forked JVM so an
     // unhandled error in a test ends that JVM rather than this build (probe 480).
     Test / fork := true,
-    Test / javaOptions += "-Xmx512m",
+    Test / javaOptions ++= Seq(
+      "-Xmx512m",
+      // The blank-line probe test can exhaust the heap inside sconfig's tokenizer; the forked
+      // JVM then thrashes in GC and wedges sbt for minutes (480 pre-review, 2-8 min to a kill).
+      // ExitOnOutOfMemoryError halts the JVM at the first OOME, so a red run ends the fork at
+      // once instead. A test-level timeout cannot fire while the JVM is stuck in GC.
+      "-XX:+ExitOnOutOfMemoryError"
+    ),
     // A forked run starts in the project's directory; relative paths mean the one sbt runs in.
     run / baseDirectory := (ThisBuild / baseDirectory).value,
     // A forked test JVM starts there too: without this the 3 JsonReportSpec fixture reads fail with
