@@ -56,4 +56,24 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
     } yield assert(clue(run.outcomes.size == 1))
   }
 
+  tmp.test("a symlink swapped onto the input path mid-format ends in no silent outcome") { dir =>
+    // The 480 pre-review saw a third outcome beside the clobber: with the path entry swapped to
+    // a symlink during the format phase, the run reported success while the formatted text was
+    // written nowhere (exit 0, victim intact, no file holding the text — race/swap-runs.log).
+    // Whichever way the race decides, a report of a write and a write on disk must agree: the
+    // run reports Rewritten exactly when the real current target's bytes changed.
+    for {
+      victim   <- write(dir, "victim.conf", "secret = keep\n")
+      file     <- write(dir, "race.conf", flood(3 * 1024 * 1024))
+      run      <- rewrite(file).start
+      _        <- IO.sleep(600.millis)
+      _        <- Files[IO].move(file, dir / "race.flood")
+      _        <- Files[IO].createSymbolicLink(file, victim)
+      finished <- run.joinWithNever
+      after    <- textOf(victim)
+      wrote      = after != "secret = keep\n"
+      reported   = finished.outcomes.exists(_.result == CmdApi.Result.Rewritten)
+    } yield assert(clue(reported == wrote), s"reported=$reported wrote=$wrote victim now [$after]")
+  }
+
 }
