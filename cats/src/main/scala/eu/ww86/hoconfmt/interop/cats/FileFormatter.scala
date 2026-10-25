@@ -64,13 +64,24 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
 
   /** As [[inspect(Path)]], with the style options the caller asks for. */
   def inspect(path: Path, options: FormatOptions): F[Inspection] =
+    inspectWithContent(path, options).map(_._1)
+
+  /** As [[inspect(Path, FormatOptions)]], also returning the bytes the verdict read: a caller
+    * that writes the file hands them to [[write(Path, String, Array[Byte])]], so the write can
+    * refuse a target that no longer holds them (probe 480, BUG-2).
+    */
+  def inspectWithContent(path: Path, options: FormatOptions): F[(Inspection, Array[Byte])] =
     files.realPath(path).flatMap { target =>
-      files.readAll(target).compile.to(Array).map(bytes => Inspection.of(bytes, target.toString, options))
+      files.readAll(target).compile.to(Array).map(bytes => (Inspection.of(bytes, target.toString, options), bytes))
     }
 
-  /** Replaces the file with text the verdict of the same read said was needed. */
-  def write(path: Path, content: String): F[Unit] =
-    files.realPath(path).flatMap(replace(_, content))
+  /** Replaces the file with text the verdict of the same read said was needed. The read's bytes
+    * are re-checked at the target immediately before staging or truncating, so a file that
+    * changed — or a path whose entry was swapped onto another target — between the verdict and
+    * the write is refused rather than overwritten with stale text (probe 480, BUG-2).
+    */
+  def write(path: Path, content: String, expected: Array[Byte]): F[Unit] =
+    files.realPath(path).flatMap(replaceIfUnchanged(_, expected, content))
 
   /** Canonicalises and deduplicates aliases before parallel work. Missing paths are retained so
     * callers can report their IO errors alongside the other files.
@@ -94,10 +105,12 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
   /** As [[format(Path)]], with the style options the caller asks for. */
   def format(path: Path, options: FormatOptions): F[FormatOutcome] =
     files.realPath(path).flatMap { target =>
-      verdict(target, options).flatMap {
-        case Verdict.AlreadyFormatted         => FormatOutcome.AlreadyFormatted.pure[F]
-        case Verdict.Refused(refusal)         => FormatOutcome.Refused(refusal).pure[F]
-        case Verdict.NeedsFormatting(content) => replace(target, content).as(FormatOutcome.Formatted)
+      files.readAll(target).compile.to(Array).flatMap { bytes =>
+        Verdict.of(bytes, target.toString, options) match {
+          case Verdict.AlreadyFormatted         => FormatOutcome.AlreadyFormatted.pure[F]
+          case Verdict.Refused(refusal)         => FormatOutcome.Refused(refusal).pure[F]
+          case Verdict.NeedsFormatting(content) => replaceIfUnchanged(target, bytes, content).as(FormatOutcome.Formatted)
+        }
       }
     }
 
@@ -106,6 +119,17 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
     format(path).flatMap {
       case FormatOutcome.Refused(refusal) => Async[F].raiseError(new FormatRefusedException(refusal))
       case outcome                        => outcome.pure[F]
+    }
+
+  // PROVISIONAL, owner decision (a) of task 1017: a target that no longer holds the bytes the
+  // verdict read is refused as an IO-style write failure — the CLI reports "cannot write <path>:
+  // file changed during formatting" and exits 2, the way a delete mid-run already fails — rather
+  // than as a new Refusal kind, which would change the published Refusal enum on every platform.
+  // The alternative is recorded in the task's decisions.md.
+  private def replaceIfUnchanged(target: Path, expected: Array[Byte], content: String): F[Unit] =
+    files.readAll(target).compile.to(Array).flatMap { now =>
+      if (now.sameElements(expected)) replace(target, content)
+      else Async[F].raiseError(new java.io.IOException("file changed during formatting"))
     }
 
   private def replace(target: Path, content: String): F[Unit] =

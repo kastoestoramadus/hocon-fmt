@@ -406,14 +406,14 @@ object CmdApi extends IOApp {
 
   private def examine(file: Path, path: String, checkOnly: Boolean, options: FormatOptions): IO[Outcome] =
     formatter
-      .inspect(file, options)
+      .inspectWithContent(file, options)
       .attempt
       .flatMap {
         // A read failure is not a refusal of the file's content, so it is not left to the catch
         // all below: it is the run's own error, in words to act on rather than an exception's.
         case Left(e) =>
           Outcome(Result.Unreadable(ReadFailure.message(e)), path, Nil, failOnDuplicates = false).pure[IO]
-        case Right(inspection) =>
+        case Right((inspection, content)) =>
           def outcome(result: Result) =
             Outcome(
               result,
@@ -429,8 +429,11 @@ object CmdApi extends IOApp {
             case Verdict.NeedsFormatting(formatted) =>
               if (checkOnly) outcome(Result.NeedsFormatting(formatted)).pure[IO]
               else
+                // The read's bytes travel to the write, which re-checks them at the target: a
+                // file changed — or a path swapped onto another target — since the verdict is
+                // refused here rather than overwritten with stale text (probe 480, BUG-2).
                 formatter
-                  .write(file, formatted)
+                  .write(file, formatted, content)
                   .as(outcome(Result.Rewritten))
                   .handleError(e => outcome(Result.Unwritable(ReadFailure.message(e))))
           }
