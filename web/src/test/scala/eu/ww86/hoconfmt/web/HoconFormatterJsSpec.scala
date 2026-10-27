@@ -70,6 +70,7 @@ class HoconFormatterJsSpec extends munit.FunSuite {
     val names = Map(
       Refusal.NestingTooDeep(80)                                                       -> "nestingTooDeep",
       Refusal.PathTooDeep("input dotted key paths exceed the maximum of 120 segments") -> "pathTooDeep",
+      Refusal.SlowMerges("too many definitions merge through the same key")            -> "slowMerges",
       Refusal.NotUtf8                                                                  -> "notUtf8",
       Refusal.NotHocon("")                                                             -> "notHocon",
       Refusal.OtherFormat("JSON")                                                      -> "otherFormat",

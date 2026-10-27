@@ -61,6 +61,7 @@ class ContributionsSpec extends munit.FunSuite {
         "notHocon",
         "nestingTooDeep",
         "pathTooDeep",
+        "slowMerges",
         "otherFormat",
         "brokenOutput",
         "lostComment",
