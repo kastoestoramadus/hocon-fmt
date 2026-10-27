@@ -10,6 +10,7 @@ class ExamplesSpec extends munit.FunSuite {
     case Refusal.NotUtf8                    => "not-utf8"
     case Refusal.NestingTooDeep(_)          => "nesting-too-deep"
     case Refusal.PathTooDeep(_)             => "path-too-deep"
+    case Refusal.SlowMerges(_)              => "slow-merges"
     case Refusal.NotHocon(_)                => "not-hocon"
     case Refusal.OtherFormat(_)             => "other-format"
     case Refusal.BrokenOutput(_)            => "broken-output"
@@ -55,6 +56,7 @@ class ExamplesSpec extends munit.FunSuite {
       Refusal.NotHocon("detail"),
       Refusal.NestingTooDeep(80),
       Refusal.PathTooDeep("input dotted key paths exceed the maximum of 120 segments"),
+      Refusal.SlowMerges("too many definitions merge through the same key"),
       Refusal.OtherFormat("JSON"),
       Refusal.BrokenOutput("detail"),
       Refusal.LostComment("# gone"),

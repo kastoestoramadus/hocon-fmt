@@ -50,6 +50,7 @@ object HoconFormatterJs {
     case Refusal.NotUtf8                    => "notUtf8"
     case Refusal.NestingTooDeep(_)          => "nestingTooDeep"
     case Refusal.PathTooDeep(_)             => "pathTooDeep"
+    case Refusal.SlowMerges(_)              => "slowMerges"
     case Refusal.NotHocon(_)                => "notHocon"
     case Refusal.OtherFormat(_)             => "otherFormat"
     case Refusal.BrokenOutput(_)            => "brokenOutput"

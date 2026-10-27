@@ -20,6 +20,13 @@ enum Refusal derives CanEqual {
     */
   case PathTooDeep(detail: String)
 
+  /** The scan's merge budget, found by the same walk: too many definitions merge through one
+    * key — dotted spellings of its children or `+=` repeats of it — for the parser to resolve
+    * them in bounded time, because sconfig's cost for them grows with the square of their
+    * number. `detail` names the limit's remedy.
+    */
+  case SlowMerges(detail: String)
+
   /** The file is named as a format of its own that Lightbend's loader also reads, and this
     * formatter writes HOCON only. A round trip would hand back HOCON: a `.json` file's objects
     * reordered and its quoting gone, a `.properties` value such as a JDBC URL not even parseable.
@@ -71,6 +78,7 @@ enum Refusal derives CanEqual {
     case NotHocon(detail)                                     => s"not valid HOCON: $detail"
     case NestingTooDeep(limit)                                => s"input nesting exceeds the maximum depth of $limit"
     case PathTooDeep(detail)                                  => detail
+    case SlowMerges(detail)                                   => detail
     case OtherFormat(format)                                  => s"a $format file, and hocon-fmt formats HOCON only"
     case BrokenOutput(detail)                                 => s"the output would not parse again: $detail"
     case LostComment(text)                                    => s"a comment would be lost or duplicated: $text"

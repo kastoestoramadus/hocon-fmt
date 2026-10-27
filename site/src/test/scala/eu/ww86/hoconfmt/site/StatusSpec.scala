@@ -85,6 +85,8 @@ class StatusSpec extends munit.FunSuite {
     case RefusalKind.NestingTooDeep => eu.ww86.hoconfmt.Refusal.NestingTooDeep(80)
     case RefusalKind.PathTooDeep    =>
       eu.ww86.hoconfmt.Refusal.PathTooDeep("input dotted key paths exceed the maximum of 120 segments")
+    case RefusalKind.SlowMerges =>
+      eu.ww86.hoconfmt.Refusal.SlowMerges("too many definitions merge through the same key")
     case RefusalKind.NotHocon          => eu.ww86.hoconfmt.Refusal.NotHocon("no")
     case RefusalKind.OtherFormat       => eu.ww86.hoconfmt.Refusal.OtherFormat("JSON")
     case RefusalKind.BrokenOutput      => eu.ww86.hoconfmt.Refusal.BrokenOutput("no")
