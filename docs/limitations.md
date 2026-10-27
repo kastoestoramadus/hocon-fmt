@@ -269,12 +269,11 @@ stay accepted at their old cost: 16,000 nested keys format in 3.41 s and 30,000 
 definitions in 3.47 s on the same quiet box. These are measured shapes, not a wall-clock
 guarantee; the budget is a shape proxy, as for the report work above.
 
-Repeated `k += 1` was never formattable: sconfig renders the accumulated append chain in a form
-its own parser rejects, so `main` already refuses it with `BrokenOutput` (`the output would not
-parse again`) after paying the quadratic parse. The merge budget refuses the heavy counts at
-the scan instead — 16,000 repeats of one key refuse within 1.12 s of cold JVM CLI — while a
-`+=` count under the budget keeps the pre-existing render refusal: 1,414 repeats pass the scan,
-parse, and refuse exactly as on `main`. Nested spelling avoids the shared-prefix parse cost
+Repeated `k += 1` charges the same units as a dotted merge. Under the budget it formats and keeps
+every append as written (the document engine of #151; before it, sconfig's renderer turned the
+chain into text its own parser rejected, a `BrokenOutput` refusal). Above it, the merge budget
+refuses at the scan — 16,000 repeats of one key refuse within 1.12 s of cold JVM CLI, measured
+before #151 — instead of paying the quadratic parse. Nested spelling avoids the shared-prefix parse cost
 but retains the same report units; replacing repeated appends with an equivalent literal array
 avoids both costs.
 
