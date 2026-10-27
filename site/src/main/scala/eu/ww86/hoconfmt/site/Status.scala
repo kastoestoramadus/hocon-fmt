@@ -7,7 +7,8 @@ import eu.ww86.hoconfmt.{Refusal, Verdict}
   */
 enum RefusalKind derives CanEqual {
 
-  case NotHocon, NestingTooDeep, PathTooDeep, OtherFormat, BrokenOutput, LostComment, LostInclude, MovedInclude,
+  case NotHocon, NestingTooDeep, PathTooDeep, SlowMerges, OtherFormat, BrokenOutput, LostComment, LostInclude,
+    MovedInclude,
     ShadowedByInclude,
     ReservedName,
     UnstableOutput, NotUtf8
@@ -18,6 +19,7 @@ enum RefusalKind derives CanEqual {
   def name: String = this match {
     case NestingTooDeep    => "nestingTooDeep"
     case PathTooDeep       => "pathTooDeep"
+    case SlowMerges        => "slowMerges"
     case NotHocon          => "notHocon"
     case OtherFormat       => "otherFormat"
     case BrokenOutput      => "brokenOutput"
@@ -36,6 +38,7 @@ object RefusalKind {
     case Refusal.NotUtf8                    => RefusalKind.NotUtf8
     case Refusal.NestingTooDeep(_)          => RefusalKind.NestingTooDeep
     case Refusal.PathTooDeep(_)             => RefusalKind.PathTooDeep
+    case Refusal.SlowMerges(_)              => RefusalKind.SlowMerges
     case Refusal.NotHocon(_)                => RefusalKind.NotHocon
     case Refusal.OtherFormat(_)             => RefusalKind.OtherFormat
     case Refusal.BrokenOutput(_)            => RefusalKind.BrokenOutput
@@ -89,6 +92,8 @@ object Status {
     case RefusalKind.NestingTooDeep => "The text exceeds the nesting limit checked before parsing on every platform."
     case RefusalKind.PathTooDeep    =>
       "The text has too many or too long key paths to check safely before parsing; shorten the paths or split the configuration into smaller files."
+    case RefusalKind.SlowMerges =>
+      "Too many definitions merge through the same key for the parser to read the text quickly; write them nested in { } or as one [ ] array, or split the file."
     case RefusalKind.OtherFormat =>
       "The file name specifies another format. This formatter writes HOCON only."
     case RefusalKind.BrokenOutput =>
@@ -109,6 +114,7 @@ object Status {
   private def learnMore(kind: RefusalKind): Option[String] = kind match {
     case RefusalKind.NestingTooDeep                                                => Some(s"$limitationsPage#excessive-nesting")
     case RefusalKind.PathTooDeep                                                   => Some(s"$limitationsPage#long-dotted-key-paths")
+    case RefusalKind.SlowMerges                                                    => Some(s"$limitationsPage#slow-sconfig-object-merges-and-appends-scan-level-refusal")
     case RefusalKind.NotUtf8                                                       => None
     case RefusalKind.NotHocon | RefusalKind.OtherFormat | RefusalKind.ReservedName => Some(limitationsPage)
     case RefusalKind.BrokenOutput | RefusalKind.LostComment | RefusalKind.LostInclude | RefusalKind.MovedInclude |
