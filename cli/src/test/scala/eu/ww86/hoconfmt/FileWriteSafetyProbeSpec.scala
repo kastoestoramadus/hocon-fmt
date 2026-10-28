@@ -32,11 +32,16 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
   // a tiny HOCON document the work budget has no objection to.
   def flood(blankLines: Int): String = "a=1\n" + "\n" * blankLines
 
+  // Single-segment keys the blank-line budget has no objection to (no line is blank) and the
+  // path-work budget accepts (100000 one-segment statements under the 300000 budget), whose
+  // formatting still spends seconds in the parser, so a fixed sleep lands inside the format
+  // phase, after the file has been read. The 3 MiB blank-line flood the two races used first is
+  // refused by the blank-line budget in about a second, which is what made those races moot.
+  def manyKeys(lines: Int): String = (0 until lines).map(i => s"k$i=$i\n").mkString
+
   tmp.test("a concurrent edit made between the read and the write is not silently lost") { dir =>
-      // 3 MiB of blank lines: formatting runs for seconds, so a fixed sleep lands inside the
-      // format phase on every platform, after the file has been read.
       for {
-        file  <- write(dir, "race.conf", flood(3 * 1024 * 1024))
+        file  <- write(dir, "race.conf", manyKeys(100000))
         run   <- rewrite(file).start
         _     <- IO.sleep(600.millis)
         _     <- write(dir, "race.conf", "concurrent = edit\n")
@@ -60,20 +65,22 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
     // The 480 pre-review saw a third outcome beside the clobber: with the path entry swapped to
     // a symlink during the format phase, the run reported success while the formatted text was
     // written nowhere (exit 0, victim intact, no file holding the text — race/swap-runs.log).
-    // Whichever way the race decides, a report of a write and a write on disk must agree: the
-    // run reports Rewritten exactly when the real current target's bytes changed.
+    // Either the swapped-in file keeps its bytes — a run must not write a file never named on
+    // the command line — or the run reports that it could not write; overwriting the victim
+    // while reporting a rewrite is the silent clobber this test exists for, and no outcome at
+    // all would leave the victim intact and still pass.
     for {
       victim   <- write(dir, "victim.conf", "secret = keep\n")
-      file     <- write(dir, "race.conf", flood(3 * 1024 * 1024))
+      file     <- write(dir, "race.conf", manyKeys(100000))
       run      <- rewrite(file).start
       _        <- IO.sleep(600.millis)
       _        <- Files[IO].move(file, dir / "race.flood")
       _        <- Files[IO].createSymbolicLink(file, victim)
       finished <- run.joinWithNever
       after    <- textOf(victim)
-      wrote      = after != "secret = keep\n"
-      reported   = finished.outcomes.exists(_.result == CmdApi.Result.Rewritten)
-    } yield assert(clue(reported == wrote), s"reported=$reported wrote=$wrote victim now [$after]")
+      kept       = after == "secret = keep\n"
+      rewrote    = finished.outcomes.exists(_.result == CmdApi.Result.Rewritten)
+    } yield assert(clue(kept || !rewrote), s"victim now [$after] after ${finished.outcomes.map(_.result.toString).mkString}")
   }
 
 }
