@@ -44,6 +44,15 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
   // refused by the blank-line budget in about a second, which is what made those races moot.
   def manyKeys(lines: Int): String = (0 until lines).map(i => s"k$i=$i\n").mkString
 
+  /** The outcome kinds that own up to not having written: the run could not write the target,
+    * could not read it, or the formatter refused it. A formatting verdict (Rewritten,
+    * AlreadyFormatted, NeedsFormatting) is a claim about the text, not a refusal.
+    */
+  def reportsRefusal(result: CmdApi.Result): Boolean = result match {
+    case CmdApi.Result.Unwritable(_) | CmdApi.Result.Unreadable(_) | CmdApi.Result.Unformattable(_) => true
+    case _                                                                                          => false
+  }
+
   tmp.test("a concurrent edit made between the read and the write is not silently lost") { dir =>
     for {
       file  <- write(dir, "race.conf", manyKeys(100000))
@@ -71,9 +80,9 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
     // a symlink during the format phase, the run reported success while the formatted text was
     // written nowhere (exit 0, victim intact, no file holding the text — race/swap-runs.log).
     // Either the swapped-in file keeps its bytes — a run must not write a file never named on
-    // the command line — or the run reports that it could not write; overwriting the victim
-    // while reporting a rewrite is the silent clobber this test exists for, and no outcome at
-    // all would leave the victim intact and still pass.
+    // the command line — or the run reports a refusal; a victim whose bytes changed while no
+    // outcome owns up to the write — reported as a rewrite, a formatting verdict, or nothing
+    // at all — is the silent overwrite this test exists to fail on.
     for {
       victim   <- write(dir, "victim.conf", "secret = keep\n")
       file     <- write(dir, "race.conf", manyKeys(100000))
@@ -84,9 +93,9 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
       finished <- run.joinWithNever
       after    <- textOf(victim)
       kept      = after == "secret = keep\n"
-      rewrote   = finished.outcomes.exists(_.result == CmdApi.Result.Rewritten)
+      refused   = finished.outcomes.exists(o => reportsRefusal(o.result))
     } yield assert(
-      clue(kept || !rewrote),
+      clue(kept || refused),
       s"victim now [$after] after ${finished.outcomes.map(_.result.toString).mkString}"
     )
   }
