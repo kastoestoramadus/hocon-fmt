@@ -20,7 +20,12 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
     fs2.Stream.emit(text).through(fs2.io.file.Files[IO].writeUtf8(dir / name)).compile.drain.as(dir / name)
 
   def textOf(file: fs2.io.file.Path): IO[String] =
-    fs2.io.file.Files[IO].readAll(file).compile.to(Array).map(bytes => String(bytes, java.nio.charset.StandardCharsets.UTF_8))
+    fs2.io.file
+      .Files[IO]
+      .readAll(file)
+      .compile
+      .to(Array)
+      .map(bytes => String(bytes, java.nio.charset.StandardCharsets.UTF_8))
 
   def rewrite(files: fs2.io.file.Path*): IO[CmdApi.Run] =
     CmdApi
@@ -40,14 +45,14 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
   def manyKeys(lines: Int): String = (0 until lines).map(i => s"k$i=$i\n").mkString
 
   tmp.test("a concurrent edit made between the read and the write is not silently lost") { dir =>
-      for {
-        file  <- write(dir, "race.conf", manyKeys(100000))
-        run   <- rewrite(file).start
-        _     <- IO.sleep(600.millis)
-        _     <- write(dir, "race.conf", "concurrent = edit\n")
-        _     <- run.joinWithNever
-        after <- textOf(file)
-      } yield assert(clue(after == "concurrent = edit\n"))
+    for {
+      file  <- write(dir, "race.conf", manyKeys(100000))
+      run   <- rewrite(file).start
+      _     <- IO.sleep(600.millis)
+      _     <- write(dir, "race.conf", "concurrent = edit\n")
+      _     <- run.joinWithNever
+      after <- textOf(file)
+    } yield assert(clue(after == "concurrent = edit\n"))
   }
 
   tmp.test("a run does not die on a file of blank lines") { dir =>
@@ -78,9 +83,12 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
       _        <- Files[IO].createSymbolicLink(file, victim)
       finished <- run.joinWithNever
       after    <- textOf(victim)
-      kept       = after == "secret = keep\n"
-      rewrote    = finished.outcomes.exists(_.result == CmdApi.Result.Rewritten)
-    } yield assert(clue(kept || !rewrote), s"victim now [$after] after ${finished.outcomes.map(_.result.toString).mkString}")
+      kept      = after == "secret = keep\n"
+      rewrote   = finished.outcomes.exists(_.result == CmdApi.Result.Rewritten)
+    } yield assert(
+      clue(kept || !rewrote),
+      s"victim now [$after] after ${finished.outcomes.map(_.result.toString).mkString}"
+    )
   }
 
 }

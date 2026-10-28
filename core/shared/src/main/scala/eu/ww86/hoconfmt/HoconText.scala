@@ -480,7 +480,7 @@ private[hoconfmt] object HoconText {
     s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files"
   private def mergeBudgetReason =
     "too many definitions merge through the same key; write them nested in { } or as one [ ] array, or split the file"
-  private def blankLineReason    =
+  private def blankLineReason =
     s"input blank lines exceed the maximum of $MaxBlankLines; remove the empty lines or split the configuration into smaller files"
 
   def spans(text: String): Vector[Span] = {

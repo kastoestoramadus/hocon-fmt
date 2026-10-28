@@ -109,7 +109,8 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
         Verdict.of(bytes, target.toString, options) match {
           case Verdict.AlreadyFormatted         => FormatOutcome.AlreadyFormatted.pure[F]
           case Verdict.Refused(refusal)         => FormatOutcome.Refused(refusal).pure[F]
-          case Verdict.NeedsFormatting(content) => replaceIfUnchanged(target, bytes, content).as(FormatOutcome.Formatted)
+          case Verdict.NeedsFormatting(content) =>
+            replaceIfUnchanged(target, bytes, content).as(FormatOutcome.Formatted)
         }
       }
     }
