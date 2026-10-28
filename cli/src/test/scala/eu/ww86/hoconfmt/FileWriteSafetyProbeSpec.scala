@@ -27,9 +27,9 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
       .examineAll(Arguments(files.toList, checkOnly = false, config = None, style = StyleOverrides.none))
       .map(_.fold(e => fail(e), identity))
 
-  // A key followed by a run of blank lines: sconfig queues one token per newline, so formatting
-  // this shape takes seconds of CPU and RAM proportional to the blank lines, while the file stays
-  // a tiny HOCON document the work budget has no objection to.
+  // A key followed by nothing but blank lines: sconfig queues one token per newline, so
+  // formatting this shape takes seconds of CPU and RAM proportional to the blank lines, while
+  // the file stays a tiny HOCON document the work budget has no objection to.
   def flood(blankLines: Int): String = "a=1\n" + "\n" * blankLines
 
   // Single-segment keys the blank-line budget has no objection to (no line is blank) and the

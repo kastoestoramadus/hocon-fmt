@@ -16,9 +16,9 @@ enum Refusal derives CanEqual {
 
   /** The early lexical resource limits, found by the same scan: a dotted key path with more
     * segments than the written cap; key paths whose total squared flattened length exceeds the
-    * duplicate report's work budget; a run of blank lines past the blank-line budget, which the
-    * tokenizer would pay with one queued token per line before parsing. `detail` names the limit
-    * and what it bounds.
+    * duplicate report's work budget; more blank lines in the file than the blank-line budget,
+    * which the tokenizer would pay with one queued token per line before parsing. `detail` names
+    * the limit and what it bounds.
     */
   case PathTooDeep(detail: String)
 

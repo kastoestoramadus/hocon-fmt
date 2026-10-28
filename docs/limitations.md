@@ -277,13 +277,13 @@ before #151 — instead of paying the quadratic parse. Nested spelling avoids th
 but retains the same report units; replacing repeated appends with an equivalent literal array
 avoids both costs.
 
-## Runs of blank lines
+## Total blank lines
 
 `Refusal.PathTooDeep` leaves input with **more than 100,000 blank lines** unchanged, with the
 reason `input blank lines exceed the maximum of 100000; remove the empty lines or split the
 configuration into smaller files`. A newline becomes one queued tokenizer token before the
-parser runs, so a run of blank lines spends heap and time on a file that is otherwise a tiny
-document: 5 MiB of newlines under a 512m heap died uncaught in an `OutOfMemoryError` with no
+parser runs, so a file's blank lines spend heap and time even on a document that is otherwise
+tiny: 5 MiB of newlines under a 512m heap died uncaught in an `OutOfMemoryError` with no
 outcome for the file (the 480 file-write safety probe). The same early scan that bounds nesting
 and key-path work counts, per line, whether anything but whitespace shares the line: a line with
 a key, value, string or comment is not blank, and newlines inside a triple-quoted string are

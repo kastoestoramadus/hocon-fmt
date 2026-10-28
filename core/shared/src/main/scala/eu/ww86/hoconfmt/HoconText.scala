@@ -41,16 +41,17 @@ private[hoconfmt] object HoconText {
   // seconds of JVM CLI time; see limitations.md for the calibration and the times.
   val MaxMergeWork = 2000000L
 
-  // A newline is one queued token before the parser runs, so a run of blank lines spends heap on
-  // a file that is otherwise tiny: 5 MiB of newlines killed a 512m heap in probe 480 (archive
-  // 480-hocon-fmt-file-write-safety-probe, evidence/d10-oome.log). The budget is ~100 KB of the
-  // cheapest input — far below what OOMs, far above a real configuration's blank lines.
+  // A newline is one queued token before the parser runs, so a file's blank lines spend heap on
+  // it even when the file is otherwise tiny: 5 MiB of newlines killed a 512m heap in probe 480
+  // (archive 480-hocon-fmt-file-write-safety-probe, evidence/d10-oome.log). The budget is
+  // ~100 KB of the cheapest input — far below what OOMs, far above a real configuration's
+  // blank lines.
   val MaxBlankLines = 100000
 
   /** Stop before the parser or include passes can spend resources on unbounded nesting, before
     * the duplicate report can spend them on an unbounded dotted key path, written on one line,
     * re-created by nesting, or summed over a file of many definitions, and before the tokenizer
-    * can queue one token per line of a run of blank lines.
+    * can queue one token per blank line of the file.
     */
   def checkNesting(text: String): Either[Refusal, Unit] = {
     // A key path runs from where a field can begin — the file, `{`, `,` or a newline — to the
