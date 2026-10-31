@@ -214,11 +214,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     name := "hocon-fmt-core",
     // UPSTREAM-SCONFIG: the document engine's format is the fork's; resolve only after it is published.
     update := update.dependsOn(ThisBuild / checkSconfigFork).value,
-    // The no-op comment seam the published core carries (R10 removes it).
-    Seq(Compile -> "main", Test -> "test").map { case (configuration, dir) =>
-      configuration / unmanagedSourceDirectories +=
-        (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / dir / "scala"
-    },
+    // Test-only shared sources (the preamble spec and the variant ledger).
+    Test / unmanagedSourceDirectories +=
+      (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / "test" / "scala",
     Test / sourceGenerators += Def.task {
       ExampleGenerator.generate(
         (ThisBuild / baseDirectory).value / "examples",

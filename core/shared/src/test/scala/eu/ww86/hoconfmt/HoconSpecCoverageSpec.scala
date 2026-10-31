@@ -151,8 +151,7 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
   // follows. The old resolving render dropped it inside an object (see SconfigDefectsSpec), so
   // the only safe answer was a refusal; the document engine keeps the block, blank line and all.
   // 20 of 23 reference.conf files in the Akka, Pekko, Play, Kamon, Gatling and ssl-config corpus
-  // hold such a comment. A block at the top of the file is pinned by PreambleSpec and
-  // CommentCarrierSpec.
+  // hold such a comment. A block at the top of the file is pinned by PreambleSpec.
   def commentAboveBlankLine = Map(
     "a comment block split by a blank line" ->
       "o {\n  a : 1\n  # one\n\n  # two\n  b : 2\n}"
@@ -169,10 +168,8 @@ class HoconSpecCoverageSpec extends munit.FunSuite with HoconTestSupport {
       }
   }
 
-  // The header the two variants keep differently: the command line takes the block verbatim — the
-  // blank line included — while the fork renders the same comments through its carrier. The exact
-  // output of each is pinned by its own suite (PreambleSpec, CommentCarrierSpec); here both must
-  // keep the comment and the meaning.
+  // The header a file opens with is kept verbatim, the blank line included, by the preamble path
+  // (PreambleSpec pins the exact bytes); here it must keep the comment and the meaning.
   test("formatter: keeps a detached header: a header followed by a blank line") {
     val source = "# Copyright 2025\n\na : 1"
     val out    = formatted(source)

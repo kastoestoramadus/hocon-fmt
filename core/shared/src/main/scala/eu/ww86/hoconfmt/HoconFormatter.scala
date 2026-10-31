@@ -18,7 +18,7 @@ object HoconFormatter {
 
   // Visible to the tests: a copy over there would drift, and a library test rendering with
   // options other than these would prove nothing about this formatter.
-  private[hoconfmt] val parseOptions = CommentCarrier.parseOptions(ConfigParseOptions.defaults.setAllowMissing(true))
+  private[hoconfmt] val parseOptions = ConfigParseOptions.defaults.setAllowMissing(true)
 
   // The options the document engine applies are doubleIndent, colonAssign and
   // simplifyNestedObjects. Field order and the final newline are structural in it (the text always
@@ -137,10 +137,9 @@ object HoconFormatter {
   /** One document round trip, kept separate from [[format]] so the check there can run another
     * pass without recursing back through it. The formatted text comes from the document engine,
     * which keeps includes as document nodes and never loads one. No resolving parse stands behind
-    * the formatting on the published core: the masking pass that once made the text parseable for
-    * one is gone, and only the site's comment carrier still asks for a tree (see
-    * [[carriedCollides]]). `unreadable` names the refusal for text sconfig cannot parse: the
-    * input's fault on the first pass, the formatter's on the second.
+    * the formatting: the masking pass that once made the text parseable for one is gone, and no
+    * part of the pipeline resolves includes. `unreadable` names the refusal for text sconfig
+    * cannot parse: the input's fault on the first pass, the formatter's on the second.
     */
   private def formatOnce(
       reading: Reading,
@@ -150,10 +149,8 @@ object HoconFormatter {
   )(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
-    val carried    = CommentCarrier.mask(reading.parsed)
     val statements = IncludeStatements.statements(reading.parsed)
     for {
-      _        <- carriedCollides(carried, parse)(unreadable)
       document <- attempt(ConfigDocumentFactory.parseString(reading.parsed, parse))(unreadable)
       rendered <- attempt(
                     if (reading.parsed.trim.isEmpty) "" else document.format(formattingOptions(options)).render
@@ -163,22 +160,6 @@ object HoconFormatter {
       _ <- includeStatementsPresent(rendered, statements)
     } yield Pass(tweak(rendered), statements)
   }
-
-  /** The reserved-name judgement of the site's comment carrier: a tree parsed from the carried
-    * text, for user text that could pass for a placeholder the carrier wrote. Made only when the
-    * carrier carried anything — the published core's carrier never does, so its formatting asks
-    * sconfig for the document tree alone.
-    */
-  private def carriedCollides(carried: Carried, parse: ConfigParseOptions)(
-      unreadable: String => Refusal
-  ): Either[Refusal, Unit] =
-    if (!carried.carriedAnything) Right(())
-    else
-      for {
-        parsed   <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
-        reserved <- attempt(carried.collides(parsed.root))(unreadable)
-        _        <- Either.cond(!reserved, (), Refusal.ReservedName)
-      } yield ()
 
   // The engine normalises the spacing an include statement was written with, and nothing else
   // about one; the survival checks compare statements with runs of whitespace collapsed. The
