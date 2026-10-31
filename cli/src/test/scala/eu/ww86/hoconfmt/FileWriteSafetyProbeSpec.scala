@@ -38,10 +38,16 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
   def flood(blankLines: Int): String = "a=1\n" + "\n" * blankLines
 
   // Single-segment keys the blank-line budget has no objection to (no line is blank) and the
-  // path-work budget accepts (100000 one-segment statements under the 300000 budget), whose
+  // path-work budget accepts (10000 one-segment statements under the 300000 budget), whose
   // formatting still spends seconds in the parser, so a fixed sleep lands inside the format
   // phase, after the file has been read. The 3 MiB blank-line flood the two races used first is
   // refused by the blank-line budget in about a second, which is what made those races moot.
+  // 10000, not 100000: at 100000 the format phase alone runs ~30 s on the JVM and ~90-110 s on
+  // Scala.js under load (probe 1173, 2026-10-31), past munit's 30 s per-test default, so both
+  // races failed by timeout. At 10000 this suite finishes in 2.8 s (JVM) and 5.1 s (JS), and the
+  // 600 ms sleep still lands inside the format phase: with the re-read guard reverted both races
+  // still fail (JVM 3.3 s / 0.8 s, JS 0.8 s / 0.6 s). Native: the author measured 7.2 s at
+  // 10000 against >180 s at 100000; not re-run in this review.
   def manyKeys(lines: Int): String = (0 until lines).map(i => s"k$i=$i\n").mkString
 
   /** The outcome kinds that own up to not having written: the run could not write the target,
@@ -55,7 +61,7 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
 
   tmp.test("a concurrent edit made between the read and the write is not silently lost") { dir =>
     for {
-      file  <- write(dir, "race.conf", manyKeys(100000))
+      file  <- write(dir, "race.conf", manyKeys(10000))
       run   <- rewrite(file).start
       _     <- IO.sleep(600.millis)
       _     <- write(dir, "race.conf", "concurrent = edit\n")
@@ -85,7 +91,7 @@ class FileWriteSafetyProbeSpec extends munit.CatsEffectSuite {
     // at all — is the silent overwrite this test exists to fail on.
     for {
       victim   <- write(dir, "victim.conf", "secret = keep\n")
-      file     <- write(dir, "race.conf", manyKeys(100000))
+      file     <- write(dir, "race.conf", manyKeys(10000))
       run      <- rewrite(file).start
       _        <- IO.sleep(600.millis)
       _        <- Files[IO].move(file, dir / "race.flood")
