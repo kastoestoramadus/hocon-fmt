@@ -420,7 +420,9 @@ lazy val cli = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     Compile / nativeConfig ~= {
       _.withBaseName("hocon-fmt")
         .withMode(Mode.releaseFast)
-        .withLTO(LTO.thin)
+        // ThinLTO fails to link the shipped binary on clang 14: the prebuilt clib object's PIC
+        // level conflicts with the generated one, so the release link runs without LTO.
+        .withLTO(LTO.none)
         // Mitigate intermittent collector crashes by avoiding collections on small CLI workloads.
         .withCompileOptions(_ ++ Seq("-DGC_INITIAL_HEAP_SIZE=512m"))
     },
