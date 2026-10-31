@@ -169,14 +169,25 @@ object HoconFormatter {
   private def collapsed(text: String): String = collapsedWhitespace.replaceAllIn(text, " ").trim
 
   /** Every include statement the source gave survives in the engine's text, spelled the same up to
-    * whitespace, as many times as it occurs. The engine writes includes itself, so the check reads
-    * the statements — one locator scan, [[IncludeStatements]], shared with the source's own
-    * reading — not the placeholders a resolving pipeline substituted.
+    * whitespace, as many times as it occurs: the check compares how often each statement occurs on
+    * the two sides, so one of several identical includes cannot go missing behind the occurrences
+    * that survive — a membership check would still find those. The refusal names the first
+    * statement in source order whose count falls short. An occurrence the source did not give is
+    * not this check's refusal: the count comparison of [[includesKeptInPlace]] refuses it before
+    * the output is written. The engine writes includes itself, so the check reads the statements —
+    * one locator scan, [[IncludeStatements]], shared with the source's own reading — not the
+    * placeholders a resolving pipeline substituted.
     */
-  private def includeStatementsPresent(rendered: String, statements: List[String]): Either[Refusal, Unit] = {
+  // Visible to the tests, which pin this check at its seam: no injection reaches it, because it
+  // reads the real render before the tweak a test injects runs.
+  private[hoconfmt] def includeStatementsPresent(
+      rendered: String,
+      statements: List[String]
+  ): Either[Refusal, Unit] = {
     val written = IncludeStatements.statements(rendered).map(collapsed)
-    val missing = statements.filterNot(statement => written.contains(collapsed(statement)))
-    missing.headOption.map(Refusal.LostInclude(_)).toLeft(())
+    val wanted  = statements.map(statement => (statement, collapsed(statement)))
+    val missing = wanted.find { case (_, key) => written.count(_ == key) < wanted.count { case (_, k) => k == key } }
+    missing.map { case (statement, _) => Refusal.LostInclude(statement) }.toLeft(())
   }
 
   /** Checking UTF-8 encodability and formatting the output again protects the written file. Output that
@@ -229,17 +240,23 @@ object HoconFormatter {
     *
     * The document engine keeps the order of fields and includes structurally, so the check is the
     * order itself: the statements, whitespace collapsed, appear in the output as many times and in
-    * the order the source gave them. Both sides come from [[IncludeStatements]] — the same locator
-    * reads the source's statements and the output's.
+    * the order the source gave them. The counts are compared first, statement by statement — a
+    * `zip` alone would stop at the shorter side and read a lost or an extra occurrence as
+    * agreement — and with every count equal the two sides are equally long, so the pairwise order
+    * comparison reads every position on both. A count that differs is refused as a lost include,
+    * whichever way it differs; an order that differs, as a moved one. Both sides come from
+    * [[IncludeStatements]] — the same locator reads the source's statements and the output's.
     */
   private def includesKeptInPlace(pass: Pass): Either[Refusal, Unit] = {
-    val written = IncludeStatements.statements(pass.text)
-    val moved   = pass.statements
-      .zip(written)
-      .collectFirst {
-        case (statement, writtenStatement) if collapsed(statement) != collapsed(writtenStatement) => statement
-      }
-    moved.map(Refusal.MovedInclude(_)).toLeft(())
+    val written = IncludeStatements.statements(pass.text).map(collapsed)
+    val wanted  = pass.statements.map(statement => (statement, collapsed(statement)))
+    val refused = wanted
+      .find { case (_, key) => written.count(_ == key) != wanted.count { case (_, k) => k == key } }
+      .map { case (statement, _) => Refusal.LostInclude(statement) }
+      .orElse(wanted.zip(written).collectFirst {
+        case ((statement, key), writtenStatement) if key != writtenStatement => Refusal.MovedInclude(statement)
+      })
+    refused.toLeft(())
   }
 
   /** Every comment of the source, as many times as it occurs: the output must carry exactly the
