@@ -54,7 +54,7 @@ class SconfigForkPinTest(unittest.TestCase):
         self.assertIn('VERSION="2.1.0-hocon-fmt-$SHORT"', self.script)
         self.assertIn('++3.9.0!', self.script)
 
-    def test_one_build_version_for_core_and_site(self) -> None:
+    def test_one_build_version_for_every_module(self) -> None:
         versions = re.findall(r'^val sconfigFork = "([^"]+)"$', self.build, re.M)
         self.assertEqual(versions, [self.version])
         self.assertRegex(self.build, r'(?m)^val sconfig\s*= sconfigFork$')
@@ -70,7 +70,8 @@ class SconfigForkPinTest(unittest.TestCase):
                 self.assertIn(f'sconfig{platform}/{task}', self.script)
         for artifact in ARTIFACTS:
             self.assertIn(f'"{artifact}"', self.build)
-        self.assertGreaterEqual(self.build.count('update.dependsOn(ThisBuild / checkSconfigFork)'), 2)
+        # One resolving project: `core`'s cross-build; the page runs it through `coreJS`.
+        self.assertEqual(self.build.count('update.dependsOn(ThisBuild / checkSconfigFork)'), 1)
 
     def test_every_sbt_workflow_job_bootstraps_fork(self) -> None:
         for workflow in ('ci.yml', 'pages.yml', 'release.yml'):
