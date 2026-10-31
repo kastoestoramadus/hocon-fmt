@@ -525,13 +525,13 @@ class ComponentSpec extends munit.FunSuite {
     val container       = install(Github())
     val root            = mount(container)(Playground())
     val (input, output) = panes(container)
-    type_(input, "z = 1\na = 2\nm = 3\n")
+    type_(input, "z = 1\ny = 2\nx = 3\n")
     settle(250).map { _ =>
       val _        = find(container, "resolved-tab").fire("click")
       val rendered = output.value.asInstanceOf[String]
       assertEquals(
         rendered.linesIterator.filter(_.contains(" = ")).map(_.takeWhile(_ != ' ')).toList,
-        List("z", "a", "m")
+        List("z", "y", "x")
       )
       val _ = root.unmount()
       ()
