@@ -333,18 +333,10 @@ pass judges before the comment multiset. None of the 181 has a different comment
 fixed point, and the 153 the Lightbend 1.4.5 oracle can resolve are unchanged (5 it cannot read, 23
 hold an include and are checked by the second pass alone).
 
-<!-- UPSTREAM-SCONFIG: delete this paragraph once the option is released. -->
-**What the playground keeps that the command line refuses** (`coreSite`, on the sconfig fork of
-[site](site.md#running-ahead-of-the-release)): a comment above a blank line anywhere but in the
-file's leading block, and a block of comments before a closing brace or the end of the file,
-including a file of comments only. Blank lines elsewhere are still not kept, there or here. **What
-stays refused there too:** a block of comments before the closing `]` or `)` of an array, since no
-field can stand in it (about 30 corpus files), and the files whose merges sconfig renders
-unstably. The fork's base also renders some merges and `+=` appends that released sconfig breaks,
-so the page formats a few inputs the command line refuses for those reasons. The page's
-placeholders get the same protection as the include ones: user text that quoting could spell into
-`__COMMENT_` — `"__COMM""ENT_0"`, or an escape — is kept, the prefix stepping aside for it, and a
-rendering that could not be told from the placeholders is refused rather than restored on a guess.
+**The page and the command line are one formatter** (task 1174, owner decision 2026-10-31: no site
+users, the page follows the source order and the CLI): the playground runs the published core, so
+there is no input the page formats and the command line refuses, or the reverse. What the command
+line refuses above is what the page refuses.
 
 Blank lines meet the same blind spot outside a preserved preamble: the parse tree holds values and
 their comments and nothing else, so blank lines are not kept at all — formatting the reference.conf
@@ -434,9 +426,8 @@ spelling, or a key or value parsing to one (including adjacent quoted or unquote
 concatenations, and case-insensitive `\u005f` underscore escapes even in comments and
 triple-quoted strings) — restoring user text as a placeholder would have corrupted it silently.
 The document engine masks nothing and keeps comments and statements verbatim, so the spelling is
-harmless and those files format. The refusal stays on the wire, and the site's comment carrier
-still fires it for its own `__COMMENT_` placeholders (see
-[architecture](architecture.md#comment-carrier)).
+harmless and those files format. The refusal stays on the wire; nothing in the repository fires
+it any more since the site's comment carrier went (task 1174).
 
 Rejected at parse time although the specification allows them (`Refusal.NotHocon`):
 

@@ -176,7 +176,7 @@ node -e "require('vm').runInThisContext(require('fs').readFileSync('web/target/b
 ## Build from source
 
 ```bash
-scripts/fetch-sconfig-fork.sh  # UPSTREAM-SCONFIG: the fork the site runs on; delete with it (docs/site.md)
+scripts/fetch-sconfig-fork.sh  # UPSTREAM-SCONFIG: the fork the document engine's format comes from; delete with it (docs/site.md)
 sbt test                    # core, cats and CLI on JVM, Scala.js and Native, plus web and site
 ```
 
