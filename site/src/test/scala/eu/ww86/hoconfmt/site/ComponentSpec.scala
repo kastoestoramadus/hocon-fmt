@@ -538,6 +538,24 @@ class ComponentSpec extends munit.FunSuite {
     }
   }
 
+  test("the playground formats a shared fixture exactly as the command line does") {
+    // The same input and expectation as CmdApiSpec's "the command line formats the page's shared
+    // fixture": one fixture, two engines (this page's core and the CLI's), one pinned output.
+    val source =
+      "# settings\nz : 1\no { x  :  2 }\ny : ${z}\ninclude \"defaults.conf\"\nname : \"orders\"\nx = 3\n"
+    val expected =
+      "# settings\nz = 1\no.x = 2\ny = ${z}\ninclude \"defaults.conf\"\nname = \"orders\"\nx = 3\n"
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    type_(input, source)
+    settle(250).map { _ =>
+      assertEquals(output.value.asInstanceOf[String], expected)
+      val _ = root.unmount()
+      ()
+    }
+  }
+
   test("the style switches shape the resolved view too: its text goes through our renderer") {
     val container   = install(Github())
     val root        = mount(container)(Playground())
