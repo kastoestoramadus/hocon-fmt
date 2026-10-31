@@ -1,6 +1,6 @@
 package eu.ww86.hoconfmt
 
-/** The published core's preserved preamble, which `coreSite` does not use: a leading block of
+/** The published core's preserved preamble: a leading block of
   * comments and blank lines that a blank line separates from the body is taken verbatim, before
   * anything is parsed, and put back in front of the formatted body. Released sconfig drops such a
   * block (`Refusal.LostComment`), and nearly every real file opens with one: a licence, an SPDX

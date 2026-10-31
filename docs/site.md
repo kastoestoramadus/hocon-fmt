@@ -225,7 +225,7 @@ the fork history, including its comment fixes, is preserved by a merge.
    `-Dsbt.ivy.home` and `-Dmaven.repo.local` properties. Defaults are `~/.ivy2` and
    `~/.m2/repository`; the script also honours the release workflow's `MAVEN_REPO_LOCAL`.
 5. With one sbt JVM at a time, run `sbt coreJVM/test acceptance/test site/test site/build
-   scalafmtCheckAll scalafmtSbtCheck crossCompile coreSite/test`. Review changed expectations
+   scalafmtCheckAll scalafmtSbtCheck crossCompile`. Review changed expectations
    against the merged upstream changes before updating fixtures.
 
 ## Returning to upstream sconfig
