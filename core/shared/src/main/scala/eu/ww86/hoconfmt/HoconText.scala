@@ -41,9 +41,16 @@ private[hoconfmt] object HoconText {
   // seconds of JVM CLI time; see limitations.md for the calibration and the times.
   val MaxMergeWork = 2000000L
 
-  /** Stop before the parser or include passes can spend resources on unbounded nesting, and
-    * before the duplicate report can spend them on an unbounded dotted key path, written on one
-    * line, re-created by nesting, or summed over a file of many definitions.
+  // A newline is one queued token before the parser runs, so a run of blank lines spends heap on
+  // a file that is otherwise tiny: 5 MiB of newlines killed a 512m heap in probe 480 (archive
+  // 480-hocon-fmt-file-write-safety-probe, evidence/d10-oome.log). The budget is ~100 KB of the
+  // cheapest input — far below what OOMs, far above a real configuration's blank lines.
+  val MaxBlankLines = 100000
+
+  /** Stop before the parser or include passes can spend resources on unbounded nesting, before
+    * the duplicate report can spend them on an unbounded dotted key path, written on one line,
+    * re-created by nesting, or summed over a file of many definitions, and before the tokenizer
+    * can queue one token per line of a run of blank lines.
     */
   def checkNesting(text: String): Either[Refusal, Unit] = {
     // A key path runs from where a field can begin — the file, `{`, `,` or a newline — to the
@@ -94,11 +101,14 @@ private[hoconfmt] object HoconText {
         work: Long,
         atKeyStart: Boolean,
         afterDot: Boolean,
-        merge: MergeState
+        merge: MergeState,
+        blankLines: Int,
+        lineHasContent: Boolean
     ): Either[Refusal, Unit] =
       if (segments > MaxPathSegments) Left(Refusal.PathTooDeep(writtenLimitReason))
       else if (work > MaxPathWork) Left(Refusal.PathTooDeep(workBudgetReason))
       else if (merge.units > MaxMergeWork) Left(Refusal.SlowMerges(mergeBudgetReason))
+      else if (blankLines > MaxBlankLines) Left(Refusal.PathTooDeep(blankLineReason))
       else if (index >= text.length) Right(())
       else if (text.startsWith("\"\"\"", index))
         scan(
@@ -111,7 +121,9 @@ private[hoconfmt] object HoconText {
           work,
           atKeyStart = false,
           afterDot = false,
-          merge.begun(segments, atKeyStart, afterDot, index)
+          merge.begun(segments, atKeyStart, afterDot, index),
+          blankLines,
+          lineHasContent = true
         )
       else if (text.charAt(index) == '"')
         scan(
@@ -124,10 +136,25 @@ private[hoconfmt] object HoconText {
           work,
           atKeyStart = false,
           afterDot = false,
-          merge.begun(segments, atKeyStart, afterDot, index)
+          merge.begun(segments, atKeyStart, afterDot, index),
+          blankLines,
+          lineHasContent = true
         )
       else if (text.charAt(index) == '#' || text.startsWith("//", index))
-        scan(endOfLine(text, index), depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot, merge)
+        scan(
+          endOfLine(text, index),
+          depth,
+          segments,
+          pending,
+          enclosing,
+          flat,
+          work,
+          atKeyStart,
+          afterDot,
+          merge,
+          blankLines,
+          lineHasContent = true
+        )
       // `${x}` and `${?x}` open no object: a file that nests exactly to the limit may use them.
       else if (text.startsWith("${", index))
         scan(
@@ -140,7 +167,9 @@ private[hoconfmt] object HoconText {
           work,
           atKeyStart = false,
           afterDot = false,
-          merge
+          merge,
+          blankLines,
+          lineHasContent = true
         )
       else {
         text.charAt(index) match {
@@ -158,7 +187,9 @@ private[hoconfmt] object HoconText {
                 work + statementWork(flat, segments),
                 atKeyStart = true,
                 afterDot = false,
-                merge.charge(text, segments, index).openScope
+                merge.charge(text, segments, index).openScope,
+                blankLines,
+                lineHasContent = true
               )
             }
           case '[' =>
@@ -175,7 +206,9 @@ private[hoconfmt] object HoconText {
                 work + statementWork(flat, segments),
                 atKeyStart = false,
                 afterDot = false,
-                merge.charge(text, segments, index).reset
+                merge.charge(text, segments, index).reset,
+                blankLines,
+                lineHasContent = true
               )
             }
           case '}' | ']' =>
@@ -191,7 +224,9 @@ private[hoconfmt] object HoconText {
                   work,
                   atKeyStart = false,
                   afterDot = false,
-                  merge.closed(text.charAt(index) == '}')
+                  merge.closed(text.charAt(index) == '}'),
+                  blankLines,
+                  lineHasContent = true
                 )
               case Nil =>
                 scan(
@@ -204,7 +239,9 @@ private[hoconfmt] object HoconText {
                   work,
                   atKeyStart = false,
                   afterDot = false,
-                  merge.closed(text.charAt(index) == '}')
+                  merge.closed(text.charAt(index) == '}'),
+                  blankLines,
+                  lineHasContent = true
                 )
             }
           // The value follows: the path just written, `+=` included, is whole, and stays pending
@@ -223,7 +260,9 @@ private[hoconfmt] object HoconText {
               work + statementWork(flat, segments),
               atKeyStart = false,
               afterDot = false,
-              if (segments > 0) merge.copy(sawPlus = true).charge(text, segments, index) else merge
+              if (segments > 0) merge.copy(sawPlus = true).charge(text, segments, index) else merge,
+              blankLines,
+              lineHasContent = true
             )
           case '=' | ':' =>
             scan(
@@ -236,7 +275,9 @@ private[hoconfmt] object HoconText {
               work + statementWork(flat, segments),
               atKeyStart = false,
               afterDot = false,
-              if (segments > 0) merge.charge(text, segments, index) else merge
+              if (segments > 0) merge.charge(text, segments, index) else merge,
+              blankLines,
+              lineHasContent = true
             )
           case ',' =>
             scan(
@@ -249,8 +290,12 @@ private[hoconfmt] object HoconText {
               work,
               atKeyStart = true,
               afterDot = false,
-              merge.reset
+              merge.reset,
+              blankLines,
+              lineHasContent = true
             )
+          // A newline ends the line the blank-line budget counts: the run costs one queued
+          // tokenizer token per line, but only a line no string, comment or word shares in.
           case '\n' =>
             scan(
               index + 1,
@@ -262,7 +307,9 @@ private[hoconfmt] object HoconText {
               work,
               atKeyStart = true,
               afterDot = false,
-              merge
+              merge,
+              blankLines = if (lineHasContent) blankLines else blankLines + 1,
+              lineHasContent = false
             )
           // A dot ends an element; the next piece or word begins one. A leading dot belongs to
           // no path and changes nothing.
@@ -277,11 +324,26 @@ private[hoconfmt] object HoconText {
               work,
               atKeyStart = false,
               afterDot = segments > 0,
-              merge.endedFirst(segments, index)
+              merge.endedFirst(segments, index),
+              blankLines,
+              lineHasContent = true
             )
           // Whitespace keeps the run: `a . b` and `a b` are one path expression either way.
           case ' ' | '\t' | '\r' | '\u000C' =>
-            scan(index + 1, depth, segments, pending, enclosing, flat, work, atKeyStart, afterDot, merge)
+            scan(
+              index + 1,
+              depth,
+              segments,
+              pending,
+              enclosing,
+              flat,
+              work,
+              atKeyStart,
+              afterDot,
+              merge,
+              blankLines,
+              lineHasContent
+            )
           case _ =>
             // A word is a key, which takes the count of the path it begins, or the start of a
             // value that is not an object, which takes the pending count away.
@@ -296,7 +358,9 @@ private[hoconfmt] object HoconText {
                 work,
                 atKeyStart = false,
                 afterDot = false,
-                merge.begun(segments, atKeyStart, afterDot, index)
+                merge.begun(segments, atKeyStart, afterDot, index),
+                blankLines,
+                lineHasContent = true
               )
             else
               scan(
@@ -309,7 +373,9 @@ private[hoconfmt] object HoconText {
                 work,
                 atKeyStart = false,
                 afterDot = false,
-                merge
+                merge,
+                blankLines,
+                lineHasContent = true
               )
         }
       }
@@ -329,7 +395,9 @@ private[hoconfmt] object HoconText {
       work = 0L,
       atKeyStart = true,
       afterDot = false,
-      merge = MergeState(Map.empty[String, Int] :: Nil, 0L, firstStart = -1, firstEnd = -1, sawPlus = false)
+      merge = MergeState(Map.empty[String, Int] :: Nil, 0L, firstStart = -1, firstEnd = -1, sawPlus = false),
+      blankLines = 0,
+      lineHasContent = false
     )
   }
 
@@ -411,6 +479,8 @@ private[hoconfmt] object HoconText {
     s"too many or too long key paths to check safely; use shorter key paths or split the configuration into smaller files"
   private def mergeBudgetReason =
     "too many definitions merge through the same key; write them nested in { } or as one [ ] array, or split the file"
+  private def blankLineReason    =
+    s"input blank lines exceed the maximum of $MaxBlankLines; remove the empty lines or split the configuration into smaller files"
 
   def spans(text: String): Vector[Span] = {
     @tailrec
