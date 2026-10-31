@@ -99,7 +99,7 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
     val original = "a = 1\n".getBytes(UTF_8)
     for {
       file   <- write(dir, "a.conf", original)
-      result <- formatter.write(file, "a = \ud83d\n").attempt
+      result <- formatter.write(file, "a = \ud83d\n", original).attempt
       bytes  <- read(file)
       names  <- Files[IO].list(dir).map(_.fileName.toString).compile.toList
     } yield {
