@@ -46,7 +46,10 @@ enum Refusal derives CanEqual {
   case LostComment(text: String)
 
   /** sconfig drops an include in an object that a later definition of the same key replaces. The
-    * include no longer mattered, but its text is gone all the same.
+    * include no longer mattered, but its text is gone all the same. The include guards compare how
+    * often each statement occurs on the two sides, so an include the output would print more often
+    * than the source gave is this case too — an occurrence nobody wrote is as much a change to the
+    * file as a lost one.
     */
   case LostInclude(statement: String)
 
@@ -84,7 +87,7 @@ enum Refusal derives CanEqual {
     case OtherFormat(format)                                  => s"a $format file, and hocon-fmt formats HOCON only"
     case BrokenOutput(detail)                                 => s"the output would not parse again: $detail"
     case LostComment(text)                                    => s"a comment would be lost or duplicated: $text"
-    case LostInclude(text)                                    => s"an include would be lost: $text"
+    case LostInclude(text)                                    => s"an include would be lost or added: $text"
     case MovedInclude(text)                                   => s"an include would change places with a field: $text"
     case ShadowedByInclude(path, includeLine, definitionLine) =>
       s"formatting would drop the definition on line $definitionLine, which may be what keeps the include on line $includeLine out of $path"
