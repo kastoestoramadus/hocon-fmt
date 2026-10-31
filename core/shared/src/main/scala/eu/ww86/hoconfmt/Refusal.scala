@@ -63,8 +63,10 @@ enum Refusal derives CanEqual {
     */
   case ShadowedByInclude(path: String, includeLine: Int, definitionLine: Int)
 
-  /** The text spells the name the include placeholders are written with, in a file that has an
-    * include. Restoring the placeholders could not tell it from ours.
+  /** The text spells the name a placeholder-writing pass of ours is written with — the comment
+    * carrier's `__COMMENT_`, on the site build that carries one. Restoring the placeholders could
+    * not tell it from ours. The include placeholders this once named are retired with their
+    * masking pass; the case stays so older texts and the wire keep their meaning.
     */
   case ReservedName
 
@@ -86,7 +88,7 @@ enum Refusal derives CanEqual {
     case MovedInclude(text)                                   => s"an include would change places with a field: $text"
     case ShadowedByInclude(path, includeLine, definitionLine) =>
       s"formatting would drop the definition on line $definitionLine, which may be what keeps the include on line $includeLine out of $path"
-    case ReservedName   => "the text uses __INCLUDE_, which the formatter reserves for include placeholders"
+    case ReservedName   => "the text spells a name the formatter reserves for its placeholders"
     case UnstableOutput => "a second formatting pass would change the output again"
   }
 }

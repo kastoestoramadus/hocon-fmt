@@ -63,8 +63,16 @@ class UnresolvedMergeSpec extends munit.FunSuite {
     }
   }
 
+  // The retired masking pass reserved __INCLUDE_ spellings because its placeholders could not be
+  // told from the user's own text; the document engine writes no placeholders, so the spelling is
+  // ordinary text and the output keeps it. The property suite pins lookalikes further.
   for (options <- allOptions)
-    test(s"a reserved name inside an unresolved merge is still refused as reserved ($options)") {
-      assertEquals(HoconFormatter.format(reservedInMerge, options), Left(Refusal.ReservedName))
+    test(s"a reserved-looking name inside an unresolved merge is kept as ordinary text ($options)") {
+      HoconFormatter
+        .format(reservedInMerge, options)
+        .fold(
+          refusal => fail(refusal.reason),
+          output => assert(output.contains("UDE_0"), "the spelling must survive")
+        )
     }
 }

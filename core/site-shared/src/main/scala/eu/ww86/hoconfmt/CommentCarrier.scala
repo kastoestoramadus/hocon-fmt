@@ -12,24 +12,23 @@ import scala.collection.mutable
   * (`setKeepDetachedComments`, ekrich/sconfig#646, draft #647). A comment no field follows is
   * still dropped, because there is nothing to attach it to: the last lines of an object, the end of
   * the file, a file of comments only. Those blocks are swapped for a placeholder field before the
-  * parse and put back after the render, the way [[IncludeMasking]] carries includes.
+  * parse and put back after the render, the way the retired include masking carried them; the document engine keeps includes itself now.
   *
-  * Runs after [[IncludeMasking]], so a comment above an include placeholder is carried like any
-  * other. A block in an array or parentheses stays unmasked, since no field can stand there; the
+  * Runs on the engine's own text, so a comment above an include statement is carried like any
+  * other - includes are document nodes now, not placeholders. A block in an array or parentheses stays unmasked, since no field can stand there; the
   * formatter then refuses the file, as it does for any lost comment.
   *
   * User text is never altered. The prefix is chosen to occur nowhere the parse could put it: not
   * in the text, and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where
   * `"__COMM""ENT_0"` and `"\u005f..."` spell a name this pass would otherwise write. The tree the
-  * parse actually made is judged too, the way [[IncludeMasking]] judges its own
+  * parse actually made is judged too, the way the retired include masking judged its own
   * ([[PlaceholderTree]]), so a spelling the source reading missed refuses the file. And a rendered
   * text whose prefix occurrences are not exactly the ones the placeholders wrote is left alone:
   * the block is then missing from the output, and the formatter's lost-comment check refuses the
   * file rather than restore on a guess.
   *
   * The regexes must hold on RE2 and ES2015: no lookaround, no backreferences, no multiline `^`.
-  * A character scanner like [[IncludeMasking]], written with loops; the suppression is for this
-  * object only.
+  * A character scanner written with loops; the suppression is for this object only.
   *
   * UPSTREAM-SCONFIG: delete this file with the seam once ekrich/sconfig releases the option
   * (#646/#647). The test that signals it is `KeepDetachedCommentsGuardSpec`, "library: sconfig
@@ -66,11 +65,16 @@ private[hoconfmt] object CommentCarrier {
       }
       val _         = masked.append(source.substring(copied))
       val originals = blocks.zipWithIndex.map { case ((_, _, block), index) => index -> block }.toMap
-      Carried(masked.result(), restore(_, prefix, originals), collides(_, prefix, originals.keySet))
+      Carried(
+        masked.result(),
+        restore(_, prefix, originals),
+        collides(_, prefix, originals.keySet),
+        carriedAnything = true
+      )
     }
   }
 
-  /** The same judgement [[IncludeMasking]] makes of its tree: a reserved name is the user's unless
+  /** The same judgement the retired include masking made of its tree: a reserved name is the user's unless
     * it is exactly a key/value pair this pass wrote. `prefixFor` keeps the prefix out of every
     * spelling of the source, so a hit here is a spelling that reading could not see, and refusing
     * is the only safe answer.
@@ -149,7 +153,7 @@ private[hoconfmt] object CommentCarrier {
         s"""([ \\t]*)$OptionalQuote$prefix(\\d+)$OptionalQuote[ \\t]*[:=][ \\t]*$OptionalQuote$prefix(\\d+)$OptionalQuote"""
       val ours                     = originals.keySet
       def dropOurs(guard: Matcher) = Option.when(ours(guard.group(1).toInt))("")
-      // As in IncludeMasking.unmask: own-line guards first, with a newline lent for the pass.
+      // Own-line guards first, with a newline lent for the pass.
       val noOwnLine = replaceEachMatch("\n" + rendered, Pattern.compile(s"""\\n[ \\t]*$guard"""))(dropOurs).drop(1)
       val noGuards  = replaceEachMatch(noOwnLine, Pattern.compile(s""",?[ \\t]*$guard"""))(dropOurs)
       replaceEachMatch(noGuards, Pattern.compile(field)) { f =>

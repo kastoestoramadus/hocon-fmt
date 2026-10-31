@@ -56,8 +56,8 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
     }
   }
 
-  // Adversarial: the masking injects `__INCLUDE_<n>` and `__INCLUDE_GUARD_<n>` fields into the
-  // source. Content that already looks like one must not be mistaken for the real thing.
+  // Adversarial: the retired masking pass injected `__INCLUDE_<n>` and `__INCLUDE_GUARD_<n>`
+  // fields into the source; content that looks like one must still survive as the user's own.
   def markerCases = Map(
     "placeholder as a value"      -> """key : "__INCLUDE_0"""",
     "placeholder as a key"        -> """"__INCLUDE_0" : 1""",
@@ -73,16 +73,26 @@ class HoconFormatterInvariantsSpec extends munit.FunSuite with HoconTestSupport 
     }
   }
 
-  // With an include in the file the reserved name cannot be told from our own placeholders, so the
-  // file is refused instead of restored on a guess: lookalikes with and without a matching index
-  // included, and one in a comment, which rendering runs into the next line.
+  // The retired masking pass could not tell its own placeholders from lookalike text beside an
+  // include, and refused the file rather than restore on a guess; the document engine writes no
+  // placeholders, so the same texts format and every spelling survives as written.
   List(
     "value index extends a handed-out one" -> "include \"a.conf\"\nx { __INCLUDE_0 : \"__INCLUDE_01\", y : 1 }",
     "a lookalike in a comment"             -> "# note __INCLUDE_5 :\ninclude \"a.conf\"\nb : 1",
     "guard text in a string"               -> "include \"a.conf\"\na = \"__INCLUDE_GUARD_0 = g\""
   ).foreach { case (name, raw) =>
-    test(s"marker-like input next to an include is refused: $name") {
-      assertEquals(refusalOf(raw), Refusal.ReservedName)
+    test(s"marker-like input next to an include is kept as written: $name") {
+      val out = formatted(raw)
+      // Formatting where the masking pass refused runs on every platform; the meaning
+      // comparison resolves the include, which sconfig cannot on Scala Native: the javalib
+      // java.net.URI stubs behind Parseable's relative-include resolution throw
+      // NotImplementedError (ParseableURL.relativeTo -> PlatformUri.toURL). Same platform
+      // rule as the shared suites' never-parse-includes note for Scala.js.
+      assume(
+        System.getProperty("java.vm.name", "") != "Scala Native",
+        "sconfig on Scala Native cannot resolve a relative include"
+      )
+      assertSameMeaning(out, raw, s"marker-like content was corrupted: $name")
     }
   }
 

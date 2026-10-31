@@ -43,9 +43,10 @@ or include went missing; it decodes files strictly as UTF-8. A file that fails a
 left byte-for-byte untouched, without failing the run. [Known limitations](docs/limitations.md)
 lists the inputs this applies to.
 
-Parsing HOCON resolves `include` directives and keeps nothing to render, so a plain parse-render
-round trip deletes them. The formatter carries each whole statement across the round trip; see
-[architecture](docs/architecture.md#include-masking).
+Parsing HOCON resolves `include` directives and keeps nothing to render, so a resolving round
+trip deletes them. The formatter runs on sconfig's syntax-preserving document engine, which keeps
+each whole statement as written and never loads an include; see
+[architecture](docs/architecture.md#include-statements).
 
 ## Feedback
 

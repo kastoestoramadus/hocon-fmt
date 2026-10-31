@@ -7,9 +7,9 @@ what it touches: `shared` runs on every platform, `jvm-native` reads files, `jvm
 |---|---|---|
 | `GoldenFileSpec` | `core/jvm-native` | rendering: each `<name>.conf` in `core/jvm-native/src/test/resources` against `<name>.expected.conf` |
 | `HoconFormatterInvariantsSpec` | `core/jvm-native` | idempotence, output re-parses, meaning preserved, inputs shaped like the internal placeholders |
-| `FormatterPropertiesSpec` | `core/shared` | the same guarantees on generated documents: no comment, include or meaning changed (the comments compared as multisets), no placeholder leaked, nothing refused without reason |
+| `FormatterPropertiesSpec` | `core/shared` | the same guarantees on generated documents: no comment, include or meaning changed (the comments compared as multisets), nothing refused without reason |
 | `IncludeDetectionSpec` | `core/shared` | which occurrences of `include` are a directive; the contract of the detection regex |
-| `IncludeOrderSpec` | `core/shared` | an include keeps the fields defined before it: what is refused when formatting would move one across it, what still formats |
+| `IncludeOrderSpec` | `core/shared` | the engine keeps every statement where it stands: same-line and crossing shapes that format, with the include in place; the `MovedInclude` guard behind them |
 | `HoconSpecCoverageSpec` | `core/shared` | the HOCON specification: what is refused (and why), normalised, supported |
 | `PreambleSpec` | `core/default-shared` | the [preserved preamble](limitations.md#the-preserved-preamble) on the published core: the rule's boundary cases, the verbatim header, and that a refusal from the body still names the file's own lines; the page's fork keeps the same comments through its carrier, pinned in `CommentCarrierSpec` |
 | `NestingDepthSpec` | `core/shared` | lexical resource limits: 80 nesting levels, 120 written key segments and 300,000 report-work units; boundary objects/arrays, ignored strings/comments/substitutions, and actionable early refusal |

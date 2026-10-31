@@ -75,8 +75,8 @@ object HoconFormatter {
 
   /** The seam the guard tests inject a losing render through: `tweak` rewrites the text the first
     * pass carries, after the engine's own survival checks have read the real render, and the
-    * second pass renders without it. No reachable input loses a comment or reorders an include —
-    * the document engine keeps both verbatim, and the 13,272-case corpus sweep refused none — so
+    * second pass renders without it. No reachable input loses a comment or an include — the
+    * document engine keeps both verbatim, and the 13,272-case corpus sweep refused none — so
     * without this seam the guards in [[formatChecked]] could not be exercised at all.
     */
   private[hoconfmt] def formatInjecting(
@@ -99,12 +99,11 @@ object HoconFormatter {
     val parse = origin.fold(parseOptions)(parseOptions.setOriginDescription)
     val read  = reading(source)
     for {
-      pass <- formatOnce(read, parse, options, probe = true, tweak)(Refusal.NotHocon(_))
+      pass <- formatOnce(read, parse, options, tweak)(Refusal.NotHocon(_))
       text  = read.putBack(pass.text)
       _    <- secondPassAgrees(text, parse, options)
       _    <- commentsKept(source, text)
       _    <- includesKeptInPlace(pass)
-      _    <- definitionsKept(pass)
     } yield text
   }
 
@@ -130,86 +129,56 @@ object HoconFormatter {
     }
 
   /** What one round trip produced: the formatted text (the document engine writes include
-    * statements itself, so nothing is put back), the includes by the index the source gave them,
-    * and the parse of the masked text the guards read, when there is one to make.
+    * statements itself, so nothing is put back) and the include statements of the source, in the
+    * order the source gave them.
     */
-  private case class Pass(
-      text: String,
-      originals: Map[Int, String],
-      parsedText: String,
-      root: Option[ConfigObject]
-  )
+  private case class Pass(text: String, statements: List[String])
 
   /** One document round trip, kept separate from [[format]] so the check there can run another
     * pass without recursing back through it. The formatted text comes from the document engine,
-    * which keeps includes as document nodes and never loads one; the resolving `ConfigFactory`
-    * parse it also makes feeds only the guards (shadowing, collisions), which read a tree — and
-    * sconfig cannot parse an `include` on Scala.js, so that parse reads the masked text.
-    * `unreadable` names the refusal for text sconfig cannot parse: the input's fault on the first
-    * pass, the formatter's on the second. `probe` asks for the collision probe, which only the
-    * first pass needs: its input is the user's text, where a mimic of a placeholder can hide
-    * behind an identical generated field.
-    *
-    * The parse reads `reading.parsed`; the source-level guard reads the file's own text, so a
-    * reserved spelling in a preserved preamble is refused exactly as it was before the path
-    * existed. Nothing of the preamble is parsed or restored, so it can never be mistaken for a
-    * placeholder — keeping the guard whole-file is the conservative reading, not a necessity.
+    * which keeps includes as document nodes and never loads one. No resolving parse stands behind
+    * the formatting on the published core: the masking pass that once made the text parseable for
+    * one is gone, and only the site's comment carrier still asks for a tree (see
+    * [[carriedCollides]]). `unreadable` names the refusal for text sconfig cannot parse: the
+    * input's fault on the first pass, the formatter's on the second.
     */
   private def formatOnce(
       reading: Reading,
       parse: ConfigParseOptions,
       options: FormatOptions,
-      probe: Boolean,
       tweak: String => String = identity
   )(
       unreadable: String => Refusal
   ): Either[Refusal, Pass] = {
-    val masked  = IncludeMasking.mask(reading.parsed)
-    val written =
-      if (reading.preamble.isEmpty) masked else IncludeMasking.mask(reading.source)
-    // UPSTREAM-SCONFIG: the seam call; inline `restore`'s absence once the option is released.
-    val carried = CommentCarrier.mask(masked.text)
+    val carried    = CommentCarrier.mask(reading.parsed)
+    val statements = IncludeStatements.statements(reading.parsed)
     for {
-      _        <- Either.cond(!IncludeMasking.collides(written), (), Refusal.ReservedName)
-      tree     <- guardTree(carried, masked, parse)(unreadable)
+      _        <- carriedCollides(carried, parse)(unreadable)
       document <- attempt(ConfigDocumentFactory.parseString(reading.parsed, parse))(unreadable)
       rendered <- attempt(
                     if (reading.parsed.trim.isEmpty) "" else document.format(formattingOptions(options)).render
                   )(unreadable)
-      _ <- if (!probe || masked.originals.isEmpty) Right(())
-           else {
-             val probeText = IncludeMasking.collisionProbe(reading.parsed, rendered)
-             attempt(ConfigFactory.parseString(probeText.text, parse))(unreadable).flatMap { checked =>
-               attempt(IncludeMasking.probeCollides(checked.root))(unreadable).flatMap { collision =>
-                 Either.cond(!collision, (), Refusal.ReservedName)
-               }
-             }
-           }
-      // `collides(masked, rendered)` counted the placeholders the resolving render was to hand
-      // back for unmasking; the document engine writes no placeholders, and the statements
-      // themselves are what the survival check above reads.
-      _ <- includeStatementsPresent(rendered, masked.originals)
-    } yield Pass(tweak(rendered), masked.originals, carried.text, tree)
+      // The engine writes the include statements themselves, and the survival check reads them
+      // back with the same locator that read the source's.
+      _ <- includeStatementsPresent(rendered, statements)
+    } yield Pass(tweak(rendered), statements)
   }
 
-  /** The resolving parse the guards read: the masked text with its includes as placeholders, the
-    * only form sconfig parses on every platform. Made only when there is an include to guard:
-    * without one there is no placeholder to collide with and no include to shadow, and a root the
-    * resolving parse cannot read (a root array, for one) is none of the guards' business — the
-    * document engine formats it.
+  /** The reserved-name judgement of the site's comment carrier: a tree parsed from the carried
+    * text, for user text that could pass for a placeholder the carrier wrote. Made only when the
+    * carrier carried anything — the published core's carrier never does, so its formatting asks
+    * sconfig for the document tree alone.
     */
-  private def guardTree(carried: Carried, masked: IncludeMasking.Masked, parse: ConfigParseOptions)(
+  private def carriedCollides(carried: Carried, parse: ConfigParseOptions)(
       unreadable: String => Refusal
-  ): Either[Refusal, Option[ConfigObject]] =
-    if (masked.originals.isEmpty) Right(None)
+  ): Either[Refusal, Unit] =
+    if (!carried.carriedAnything) Right(())
     else
       for {
-        parsed    <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
-        collision <- attempt(IncludeMasking.collides(masked, parsed.root))(unreadable)
-        _         <- Either.cond(!collision, (), Refusal.ReservedName)
-        reserved  <- attempt(carried.collides(parsed.root))(unreadable)
-        _         <- Either.cond(!reserved, (), Refusal.ReservedName)
-      } yield Some(parsed.root)
+        parsed   <- attempt(ConfigFactory.parseString(carried.text, parse))(unreadable)
+        reserved <- attempt(carried.collides(parsed.root))(unreadable)
+        _        <- Either.cond(!reserved, (), Refusal.ReservedName)
+      } yield ()
 
   // The engine normalises the spacing an include statement was written with, and nothing else
   // about one; the survival checks compare statements with runs of whitespace collapsed. The
@@ -220,29 +189,25 @@ object HoconFormatter {
 
   /** Every include statement the source gave survives in the engine's text, spelled the same up to
     * whitespace, as many times as it occurs. The engine writes includes itself, so the check reads
-    * the statements, not the placeholders the resolving pipeline substituted.
+    * the statements — one locator scan, [[IncludeStatements]], shared with the source's own
+    * reading — not the placeholders a resolving pipeline substituted.
     */
-  private def includeStatementsPresent(rendered: String, originals: Map[Int, String]): Either[Refusal, Unit] = {
-    val written = IncludeMasking.mask(rendered).originals.values.map(collapsed).toList
-    val missing = originals.toList.sortBy(_._1).map(_._2).filterNot(statement => written.contains(collapsed(statement)))
+  private def includeStatementsPresent(rendered: String, statements: List[String]): Either[Refusal, Unit] = {
+    val written = IncludeStatements.statements(rendered).map(collapsed)
+    val missing = statements.filterNot(statement => written.contains(collapsed(statement)))
     missing.headOption.map(Refusal.LostInclude(_)).toLeft(())
   }
 
   /** Checking UTF-8 encodability and formatting the output again protects the written file. Output that
     * will not parse again would replace a valid config with a broken one; and a formatter that is
     * not a fixed point keeps producing diffs on unchanged files. A raw unpaired surrogate parses
-    * in a String but cannot survive UTF-8 encoding, so check the restored output before masking it.
-    * Parsing alone would not do:
+    * in a String but cannot survive UTF-8 encoding, so check the output before the second pass
+    * reads it. Parsing alone would not do:
     * sconfig renders an unresolved merge as a comment banner that parses but grows on every pass.
     *
-    * The pass parses the masked form. The include statements in the output are the ones just put
-    * back verbatim, and resolving them would reach for the filesystem, which says nothing about
-    * whether the text is well formed and which sconfig cannot do at all on Scala.js.
-    *
-    * No collision probe here: the probe hunts user text mimicking a placeholder, and this pass's
-    * input is our own output, whose `__INCLUDE_` sits only inside the restored include statements,
-    * which masking removes. A mimic the first pass could not see is the one its probe already
-    * refused, and the probe would cost this pass a fourth parse of every include-bearing file.
+    * The include statements in the second pass's input are the ones the first pass's output
+    * carries verbatim, and resolving them would reach for the filesystem, which says nothing
+    * about whether the text is well formed and which sconfig cannot do at all on Scala.js.
     */
   private def secondPassAgrees(
       formatted: String,
@@ -256,7 +221,7 @@ object HoconFormatter {
              (),
              Refusal.BrokenOutput("an unpaired surrogate cannot be encoded as UTF-8")
            )
-      _ <- formatOnce(read, parse, options, probe = false)(Refusal.BrokenOutput(_))
+      _ <- formatOnce(read, parse, options)(Refusal.BrokenOutput(_))
              .filterOrElse(pass => read.putBack(pass.text) == formatted, Refusal.UnstableOutput)
     } yield ()
   }
@@ -283,30 +248,18 @@ object HoconFormatter {
     *
     * The document engine keeps the order of fields and includes structurally, so the check is the
     * order itself: the statements, whitespace collapsed, appear in the output as many times and in
-    * the order the source gave them. The placeholder walk it replaces (`IncludeOrder`) located an
-    * include by the field the resolving pipeline substituted for it.
+    * the order the source gave them. Both sides come from [[IncludeStatements]] — the same locator
+    * reads the source's statements and the output's.
     */
   private def includesKeptInPlace(pass: Pass): Either[Refusal, Unit] = {
-    val before  = pass.originals.toList.sortBy(_._1).map(_._2)
-    val written = IncludeMasking.mask(pass.text).originals.toList.sortBy(_._1).map(_._2)
-    val moved   = before
+    val written = IncludeStatements.statements(pass.text)
+    val moved   = pass.statements
       .zip(written)
       .collectFirst {
         case (statement, writtenStatement) if collapsed(statement) != collapsed(writtenStatement) => statement
       }
     moved.map(Refusal.MovedInclude(_)).toLeft(())
   }
-
-  /** Judged after the includes' places, so a file that would keep an include in place is refused
-    * for the definition it drops rather than the other way around. Both mean the same to the user:
-    * the file resolves to other values after formatting. Without an include there is nothing to
-    * shadow and no guard tree to read.
-    */
-  private def definitionsKept(pass: Pass): Either[Refusal, Unit] =
-    pass.root match {
-      case Some(root) => IncludeShadow.shadowed(pass.parsedText, pass.originals, root).toLeft(())
-      case None       => Right(())
-    }
 
   /** Every comment of the source, as many times as it occurs: the output must carry exactly the
     * multiset of the input, no comment dropped and none printed twice. A difference alone misses

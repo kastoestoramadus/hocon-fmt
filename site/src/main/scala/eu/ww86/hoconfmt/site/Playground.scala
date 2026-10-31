@@ -14,7 +14,7 @@ import eu.ww86.hoconfmt.{
   Finding,
   FormatOptions,
   HoconFormatter,
-  IncludeMasking,
+  IncludeStatements,
   Separator,
   Verdict
 }
@@ -285,7 +285,27 @@ object Playground {
           .setNewLineAtEnd(true)
       )
 
-  /** Resolve only accepted text, removing the include placeholders without reading any files.
+  /** The include statements of `text` swapped in place for stand-in fields of the site's own,
+    * with the statements keyed by their index. The resolving parse sconfig needs here cannot read
+    * an include in the browser at all; the formatter's retired masking pass once did this job, and
+    * this is the display's own reader, not a formatter mechanism: a user key spelled exactly like
+    * a stand-in is dropped from this view alone.
+    */
+  private def maskIncludesForResolve(text: String): (String, Map[Int, String]) = {
+    val out       = new StringBuilder
+    val originals = Map.newBuilder[Int, String]
+    val lastEnd   = IncludeStatements.locate(text).zipWithIndex.foldLeft(0) { (copied, withIndex) =>
+      val (located, index) = withIndex
+      val standIn          = s"__RESOLVED_INCLUDE_$index"
+      val _                = out.append(text.substring(copied, located.keywordStart)).append(s"$standIn : \"$standIn\"")
+      originals += index -> s"include ${located.target}"
+      located.end
+    }
+    val _ = out.append(text.substring(lastEnd))
+    (out.result(), originals.result())
+  }
+
+  /** Resolve only accepted text, removing the include statements without reading any files.
     * The browser has no process environment; disabling it also makes the preview reproducible.
     * What sconfig renders resolved is raw text again, so the style choices reach the resolved
     * view only through our renderer, the one the formatted pane shows.
@@ -294,12 +314,10 @@ object Playground {
     case (text, Verdict.Refused(_)) => text
     case (text, _)                  =>
       Try {
-        val masked    = IncludeMasking.mask(text)
-        val generated = masked.originals.keys
-          .flatMap(index => List(s"${IncludeMasking.PlaceholderPrefix}$index", s"${IncludeMasking.GuardPrefix}$index"))
-          .toSet
-        val config = ConfigFactory.parseString(masked.text)
-        val local  = config.entrySet.asScala
+        val (maskedText, statements) = maskIncludesForResolve(text)
+        val generated                = statements.keys.map(index => s"__RESOLVED_INCLUDE_$index").toSet
+        val config                   = ConfigFactory.parseString(maskedText)
+        val local                    = config.entrySet.asScala
           .map(_.getKey)
           .filter(path => ConfigUtil.splitPath(path).asScala.lastOption.exists(generated.contains))
           .foldLeft(config)((acc, path) => acc.withoutPath(path))

@@ -45,9 +45,9 @@ class DuplicateReportBudgetSpec extends munit.ScalaCheckSuite {
   property("the bounded report preserves the original findings and their source order") {
     forAll(Gen.choose(1, 35).flatMap(n => Gen.listOfN(n, statement)), Gen.oneOf("\n", ", ")) { (lines, separator) =>
       val source = lines.mkString(separator)
-      DuplicateReport.outline(source) match {
-        case Right(outline) => assertEquals(DuplicateReport.findings(source), Right(reference(outline.definitions)))
-        case Left(refusal)  => fail(refusal.reason)
+      DuplicateReport.definitionsOf(source) match {
+        case Right(definitions) => assertEquals(DuplicateReport.findings(source), Right(reference(definitions)))
+        case Left(refusal)      => fail(refusal.reason)
       }
     }
   }

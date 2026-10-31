@@ -1,8 +1,8 @@
 package eu.ww86.hoconfmt.bench
 
-import org.ekrich.config.ConfigFactory
+import org.ekrich.config.parser.ConfigDocumentFactory
 
-import eu.ww86.hoconfmt.{HoconFormatter, IncludeMasking}
+import eu.ww86.hoconfmt.{HoconFormatter, IncludeStatements}
 
 /** Times each phase of the formatter on every scenario and prints one JSON object per line.
   *
@@ -20,18 +20,15 @@ object Bench {
         f""""min_us":${stats.minMicros}%.1f,"median_us":${stats.medianMicros}%.1f,"p90_us":${stats.p90Micros}%.1f}"""
   }
 
-  def phases(source: String): List[Phase] = {
-    val masked   = IncludeMasking.mask(source)
-    val parsed   = ConfigFactory.parseString(masked.text, HoconFormatter.parseOptions)
-    val rendered = parsed.root.render(HoconFormatter.renderOptions)
+  // The mask/parse/unmask phases of the resolving pipeline are gone with the pipeline; the
+  // statements phase times the locator the survival checks read, the document phase the engine's
+  // own parse, and the format phase the whole verdict.
+  def phases(source: String): List[Phase] =
     List(
-      Phase("mask", () => IncludeMasking.mask(source)),
-      Phase("parse", () => ConfigFactory.parseString(masked.text, HoconFormatter.parseOptions)),
-      Phase("render", () => parsed.root.render(HoconFormatter.renderOptions)),
-      Phase("unmask", () => IncludeMasking.unmask(rendered, masked.originals)),
+      Phase("statements", () => IncludeStatements.statements(source)),
+      Phase("document", () => ConfigDocumentFactory.parseString(source, HoconFormatter.parseOptions)),
       Phase("format", () => HoconFormatter.format(source))
     )
-  }
 
   /** Warms up, then samples until the time budget is spent, keeping every result reachable so no
     * optimiser can drop the work. Loops and a mutable sink, so the harness adds as

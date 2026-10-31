@@ -2,7 +2,7 @@
 
 The policy:
 
-1. **Test only our domain.** A suite is ours when its subject is include masking, the comment
+1. **Test only our domain.** A suite is ours when its subject is include handling, the comment
    carrier, a refusal or a verdict, the duplicate report, an option, a file write, the CLI, a plugin
    or the page. Everything else is sconfig's.
 2. A case is **SCONFIG** when it passes or fails on bare sconfig — parse, render with the options
@@ -47,14 +47,13 @@ The Java/plugin/acceptance counts were checked from source registration only.
 | `SconfigDefectsSpec` (core/shared) | 32 | SCONFIG | bare library calls; 2026-10-16: 31 red JVM, 32 red JS, 30 red Native (one skipped); includes two parse-cost cases |
 | `KeepDetachedCommentsGuardSpec` (core/jvm) | 1 | SCONFIG | red until the option is released |
 | `HoconSpecCoverageSpec` (core/shared) | 48 | 17 SCONFIG / 31 MIXED | normalised 8 + supported 9 SCONFIG; the other 31 are refusal and comment groups, MIXED |
-| `HoconFormatterInvariantsSpec` (core/jvm-native) | 22 | 17 OURS / 5 MIXED | marker 10, idempotence 3, re-parse 3, discovery 1; meaning 5 MIXED |
+| `HoconFormatterInvariantsSpec` (core/jvm-native) | 7 | OURS / MIXED | idempotence, re-parse, discovery, meaning, marker-like input kept as written |
 | `FormatterPropertiesSpec` (core/shared) | 18 | OURS / MIXED | 1000 successful checks per property by default; option-matrix properties cover 8 styles |
 | `NumericRenderingSpec` (core/shared) | 10 | MIXED | accepted verdict and current numeric output; change the pins when #654 is fixed |
 | `DuplicateReportSpec` (core/shared) | 29 | OURS / MIXED | resolution assertions are sconfig's |
 | `ExamplesSpec` (core/shared) | 31 | 23 OURS / 8 MIXED | one case per example (23) plus 8 suite tests |
 | `IncludeDetectionSpec` (core/shared) | 23 | OURS | the detection contract |
-| `IncludeOrderSpec` (core/shared) | 17 | OURS | moved include = our refusal |
-| `IncludeCollisionSpec` (core/shared) | 235 | OURS | placeholder collision, every option set |
+| `IncludeOrderSpec` (core/shared) | 17 | OURS | the include stays in place: what formats now that the engine keeps statement order (`MovedInclude` stays as a guard) |
 | `UnresolvedMergeSpec` (core/shared) | 24 | 8 OURS / 16 MIXED | variant rendering under include |
 | `VerdictSpec`, `OptionsSpec`, `FormatOptionsSpec` (core/shared) | 56 | OURS | verdicts, pinned options, config parsing |
 | `GoldenFileSpec` (core/jvm-native) | 3 | OURS | our output, byte for byte |
@@ -96,8 +95,9 @@ Evidence, one quote per class:
   parentheses ')' here, not: '${')`); the defect is upstream, the refusal is ours
   (`probe/bare-sconfig-mixed.txt`). A comment after the last field renders as plain `a = 1` with
   `kept: false` — `LostComment` is ours, the drop is sconfig's.
-- **OURS**, `IncludeOrderSpec` "refuses a field after the include on its line" pins
-  `Refusal.MovedInclude`, and `VerdictSpec` "a .json file is refused as JSON, not rewritten as
+- **OURS**, `IncludeOrderSpec` "formats a field after the include on its line, include in place"
+  pins that the engine keeps shared-line statement order (the `MovedInclude` guard stays behind
+  it), and `VerdictSpec` "a .json file is refused as JSON, not rewritten as
   HOCON" pins a name rule. Neither has a bare-sconfig counterpart: no library call produces either
   verdict.
 
@@ -118,7 +118,7 @@ fixed point and origin lines; do not restate them.
 
 Not portable, and why:
 
-- `IncludeDetectionSpec`, `IncludeCollisionSpec`, `IncludeOrderSpec`, `IncludeMasking` cases: no
+- `IncludeDetectionSpec`, `IncludeOrderSpec` cases: no
   include handling upstream; ours by the division of labour.
 - The comment cases: blocked on `#646`/`#647`; a green test cannot be written before the option is
   merged.
@@ -162,7 +162,7 @@ green, and the full `coreJVM` run on main fails exactly where a release will for
 | `CommentCarrier` (336 lines), `Carried` (15), `core/default-shared` (25), the call sites | the seam plus its two halves | `#647` | same | enable the option in `parseOptions`, delete the seam and `Variant` — step 3 |
 | `CommentCarrierSpec` (192), `Variant` ledger (50), `KeepDetachedCommentsGuardSpec` (27) | 27 ledger entries to keep in step with the examples | `#647` | same | delete with the seam — step 4 |
 | Refusal paths for library defects: `BrokenOutput`, `UnstableOutput`, `LostComment` checks and their docs | stays as the safety net; the red list above is what would shrink | `#598`/`#600`/`#605`/`#647` | one release at a time | the checks never go: a release only stops them firing for the retired cases; update `limitations.md`, the red list and the examples' `upstream` notes |
-| `MovedInclude`/`LostInclude` guards, `IncludeMasking` (348 lines) and `IncludeOrder` (118 lines) | ours, kept forever: include handling is ours by the division of labour | [Java #733] relates, no fix | — | none |
+| `MovedInclude`/`LostInclude` guards (ours, kept forever: include handling is ours by the division of labour); `IncludeOrder` (118 lines) and `IncludeMasking` (348 lines) retired — `IncludeOrder` with the document engine, `IncludeMasking` with its probes on 2026-10-24 | | [Java #733] relates, no fix | — | none |
 | Pinned `sconfig = "2.0.0"` in `build.sbt` | one line, plus the artifact set | releases after v2.0.0 | each release | bump; a release containing `#598`/`#605` also drops the refusals named above |
 | Documented normalisations (`//`→`#`, flattening, canonical numbers, LF/no BOM, inline comments moving) | none: renderer behaviour we ask for | none | — | never; they are the pinned style |
 
