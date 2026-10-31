@@ -189,6 +189,23 @@ class FileFormatterSpec extends munit.CatsEffectSuite {
     }
   }
 
+  // Added by the 490 mutation audit: `format` realPaths its target, but `write` is public and a
+  // direct caller hands it a link; writing the link itself would replace it with a regular file.
+  tmp.test("write through a symlink reaches the target and keeps the link a link") { dir =>
+    for {
+      file      <- write(dir, "target.conf", "a : 1".getBytes(UTF_8))
+      canonical <- Files[IO].realPath(file)
+      link       = dir / "link.conf"
+      _         <- Files[IO].createSymbolicLink(link, canonical)
+      _         <- formatter.write(link, "a = 1\n")
+      isLink    <- Files[IO].isSymbolicLink(link)
+      bytes     <- read(file)
+    } yield {
+      assert(isLink)
+      assertEquals(bytes, "a = 1\n".getBytes(UTF_8).toList)
+    }
+  }
+
   // A replacement is only allowed to change the file's identity when it can be kept: the same
   // owner, group and mode bits, setgid included. Otherwise the file is written in place.
   tmp.test("a replacement keeps the owner, group and every mode bit of the file") { dir =>
