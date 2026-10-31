@@ -192,7 +192,12 @@ object HoconFormatter {
     * the statements — one locator scan, [[IncludeStatements]], shared with the source's own
     * reading — not the placeholders a resolving pipeline substituted.
     */
-  private def includeStatementsPresent(rendered: String, statements: List[String]): Either[Refusal, Unit] = {
+  // Visible to the tests, which pin this check at its seam: no injection reaches it, because it
+  // reads the real render before the tweak a test injects runs.
+  private[hoconfmt] def includeStatementsPresent(
+      rendered: String,
+      statements: List[String]
+  ): Either[Refusal, Unit] = {
     val written = IncludeStatements.statements(rendered).map(collapsed)
     val missing = statements.filterNot(statement => written.contains(collapsed(statement)))
     missing.headOption.map(Refusal.LostInclude(_)).toLeft(())
