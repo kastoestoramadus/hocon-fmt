@@ -80,12 +80,10 @@ Notes are shared with `git push origin refs/notes/benchmarks`, and survive rebas
 - **`SconfigDefectsSpec` is excluded from `sbt test`**, because a permanently red CI teaches people
   to ignore it. `sbt libraryDefects` runs it on all three platforms, since sconfig's Scala.js and
   Native builds have defects of their own.
-<!-- UPSTREAM-SCONFIG: delete this bullet with the fork and `coreSite`; docs/site.md has the steps. -->
-- **`coreSite` runs core's shared suite** with `Variant.ledger`: the tests that pin a refusal the
-  fork does not produce (comments it keeps, merges its base renders) are listed in
-  `core/site-shared/src/test` with a reason each, and `CommentCarrierSpec` pins the outcome there
-  instead. `KeepDetachedCommentsGuardSpec` (JVM, `sbt libraryDefects`) is red until released
-  sconfig has the option: the signal to return to upstream.
+- **The page runs the published core** (`site` depends on `coreJS`, task 1174), so `site/test` is
+  the page's own suite and the core's shared suite is `core`'s. `KeepDetachedCommentsGuardSpec`
+  (JVM, `sbt libraryDefects`) is red until released sconfig has the comment option: the signal to
+  return to upstream.
 - **Ownership.** [Test ownership](test-ownership.md) classifies every suite — and the groups of the
   big ones — as ours, sconfig's or mixed, with the counts and the evidence; it lists the red ledger,
   the upstream candidates to port and every patch this repository carries for sconfig. A new case
@@ -147,15 +145,9 @@ examples also require `url` and `licence`. A distilled entry may carry
 ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.
 
-Fork differences with pinned page output declare `now-site: formatted` and carry
-`expected/site-default.conf`. The published suites still assert `now`; the fork's
-`Variant.ledger` routes these inputs to `CommentCarrierSpec`, which asserts `now-site`
-and the exact fork output for showcase and catalogue fixtures. Regenerate only these page goldens
-with `UPDATE_GOLDEN=1 sbt "coreSite/testOnly eu.ww86.hoconfmt.CommentCarrierSpec"`,
-then read the diff and rerun without `UPDATE_GOLDEN`. This runs the actual Scala.js fork and
-writes only `expected/site-default.conf`; it cannot rewrite published-core expectations.
-`target` is always authored
-independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
+`now-site:` and `expected/site-default.conf` are the retired fork's per-page outputs: the page
+runs the published core since task 1174, so both are dead data (left for the metadata sweep, not
+read by any suite). `target` is always authored independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
 
 An upstream gap (`now != target`, except the formatter’s own same-line include
 restriction) requires `upstream: { issue: "https://github.com/ekrich/sconfig/…",

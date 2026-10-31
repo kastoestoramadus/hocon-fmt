@@ -525,14 +525,32 @@ class ComponentSpec extends munit.FunSuite {
     val container       = install(Github())
     val root            = mount(container)(Playground())
     val (input, output) = panes(container)
-    type_(input, "z = 1\na = 2\nm = 3\n")
+    type_(input, "z = 1\ny = 2\nx = 3\n")
     settle(250).map { _ =>
       val _        = find(container, "resolved-tab").fire("click")
       val rendered = output.value.asInstanceOf[String]
       assertEquals(
         rendered.linesIterator.filter(_.contains(" = ")).map(_.takeWhile(_ != ' ')).toList,
-        List("z", "a", "m")
+        List("z", "y", "x")
       )
+      val _ = root.unmount()
+      ()
+    }
+  }
+
+  test("the playground formats a shared fixture exactly as the command line does") {
+    // The same input and expectation as CmdApiSpec's "the command line formats the page's shared
+    // fixture": one fixture, two engines (this page's core and the CLI's), one pinned output.
+    val source =
+      "# settings\nz : 1\no { x  :  2 }\ny : ${z}\ninclude \"defaults.conf\"\nname : \"orders\"\nx = 3\n"
+    val expected =
+      "# settings\nz = 1\no.x = 2\ny = ${z}\ninclude \"defaults.conf\"\nname = \"orders\"\nx = 3\n"
+    val container       = install(Github())
+    val root            = mount(container)(Playground())
+    val (input, output) = panes(container)
+    type_(input, source)
+    settle(250).map { _ =>
+      assertEquals(output.value.asInstanceOf[String], expected)
       val _ = root.unmount()
       ()
     }

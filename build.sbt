@@ -1,8 +1,10 @@
 import scala.scalanative.build.{LTO, Mode}
 
 val scala3 = "3.9.0"
-// UPSTREAM-SCONFIG: all formatter modules use the fork until released sconfig carries
-// ConfigDocument.format (#655) and setKeepDetachedComments (#646/#647).
+// UPSTREAM-SCONFIG: every module resolves the fork for `ConfigDocument.format`, which released
+// sconfig 2.1.0 does not have (ekrich/sconfig#655; checked with javap on the 2.1.0 jar). The page
+// no longer needs the fork's comment option (owner decision 2026-10-31: no site users, the site
+// matches the CLI), so the fork is now only the document engine's carrier.
 // Published locally by scripts/fetch-sconfig-fork.sh; see docs/site.md for removal.
 val sconfigFork = "2.1.0-hocon-fmt-298311f25f"
 val sconfig     = sconfigFork
@@ -122,16 +124,16 @@ def guardPublish(p: Project): Project =
       }
   )
 
-// UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
-// releases ConfigDocument.format and the comment option (#655/#646/#647); see docs/site.md.
-val checkSconfigFork =
-  taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
-
 /** Fails unless every project a release uploads also uploads the projects a consumer of it needs:
   * the ones a POM names (`hocon-fmt-cli_3`'s POM names `hocon-fmt-cats_3`), plus the ones a project
   * resolves at run time without a `dependsOn` (the sbt plugin's Java API). The set and those extra
   * edges are at the bottom, next to the release aliases.
   */
+// UPSTREAM-SCONFIG: delete this task, `sconfigFork` above and every use of it once ekrich/sconfig
+// releases ConfigDocument.format (#655); see docs/site.md.
+val checkSconfigFork =
+  taskKey[Unit]("Fails, naming scripts/fetch-sconfig-fork.sh, unless the sconfig fork is published.")
+
 val checkReleaseSet =
   taskKey[Unit]("Fails unless the release set is closed under its inter-project dependencies.")
 
@@ -158,7 +160,6 @@ lazy val root = project
     coreJVM,
     coreJS,
     coreNative,
-    coreSite,
     catsJVM,
     catsJS,
     catsNative,
@@ -191,7 +192,6 @@ lazy val root = project
         zioJS / Test / test,
         zioNative / Test / test,
         coreJS / Test / test,
-        coreSite / Test / test,
         catsJS / Test / test,
         cliJS / Test / test,
         web / Test / test,
@@ -212,14 +212,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .in(file("core"))
   .settings(
     name := "hocon-fmt-core",
-    // UPSTREAM-SCONFIG: resolve only after the pinned fork has been published on every platform.
+    // UPSTREAM-SCONFIG: the document engine's format is the fork's; resolve only after it is published.
     update := update.dependsOn(ThisBuild / checkSconfigFork).value,
-    // UPSTREAM-SCONFIG: the no-op comment seam; `coreSite` swaps it for the real one. Delete both
-    // with the seam once ekrich/sconfig releases the option (#646/#647).
-    Seq(Compile -> "main", Test -> "test").map { case (configuration, dir) =>
-      configuration / unmanagedSourceDirectories +=
-        (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / dir / "scala"
-    },
+    // Test-only shared sources (the preamble spec and the variant ledger).
+    Test / unmanagedSourceDirectories +=
+      (ThisBuild / baseDirectory).value / "core" / "default-shared" / "src" / "test" / "scala",
     Test / sourceGenerators += Def.task {
       ExampleGenerator.generate(
         (ThisBuild / baseDirectory).value / "examples",
@@ -261,46 +258,6 @@ lazy val coreJS = guardPublish(core.js).settings(
   Test / unmanagedSources += (ThisBuild / baseDirectory).value / "site" / "snippets" / "ScalaJsExample.scala"
 )
 lazy val coreNative = guardPublish(core.native)
-
-/** UPSTREAM-SCONFIG: the core as the project page runs it, against the sconfig fork that keeps
-  * detached comments (ekrich/sconfig#646, draft #647). The same sources as `coreJS`, the real
-  * `CommentCarrier` from `core/site-shared` in place of the no-op one, and core's shared suite
-  * with an explicit ledger of what differs. Not published. When the option is released, delete
-  * this project, `sconfigFork`, `checkSconfigFork` and `scripts/fetch-sconfig-fork.sh`; the list
-  * of places is "Returning to upstream sconfig" in docs/site.md.
-  */
-lazy val coreSite = project
-  .in(file("core/site"))
-  .enablePlugins(ScalaJSPlugin)
-  .settings(
-    name           := "hocon-fmt-core-site",
-    publish / skip := true,
-    announceRuntime("core for the page on Scala.js"),
-    Compile / unmanagedSourceDirectories := Seq(
-      (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "main" / "scala",
-      (ThisBuild / baseDirectory).value / "core" / "site-shared" / "src" / "main" / "scala"
-    ),
-    Test / unmanagedSourceDirectories := Seq(
-      (ThisBuild / baseDirectory).value / "core" / "shared" / "src" / "test" / "scala",
-      (ThisBuild / baseDirectory).value / "core" / "site-shared" / "src" / "test" / "scala"
-    ),
-    Test / sourceGenerators += Def.task {
-      ExampleGenerator.generate(
-        (ThisBuild / baseDirectory).value / "examples",
-        (Test / sourceManaged).value
-      )
-    }.taskValue,
-    // Resolving the fork without it published would end in a bare "not found"; this names the fix.
-    update := update.dependsOn(ThisBuild / checkSconfigFork).value,
-    libraryDependencies ++= Seq(
-      "org.ekrich"    %%% "sconfig"          % sconfigFork,
-      "org.ekrich"    %%% "sjavatime"        % sjavatime       % Provided,
-      "org.scalameta" %%% "munit"            % munit           % Test,
-      "org.scalameta" %%% "munit-scalacheck" % munitScalaCheck % Test
-    ),
-    // The upstream defect suite describes released sconfig, which core's own suites run.
-    Test / test / testOptions += Tests.Exclude(Seq("eu.ww86.hoconfmt.SconfigDefectsSpec"))
-  )
 
 /** Effectful file operations shared by applications and the CLI. */
 lazy val cats = crossProject(JVMPlatform, JSPlatform, NativePlatform)
@@ -515,7 +472,7 @@ val build =
 lazy val site = project
   .in(file("site"))
   .enablePlugins(ScalaJSPlugin, BuildInfoPlugin)
-  .dependsOn(coreSite)
+  .dependsOn(coreJS)
   .settings(
     name := "hocon-fmt-site",
     Compile / sourceGenerators += Def.task {
@@ -578,7 +535,6 @@ addCommandAlias(
     coreJVM,
     coreJS,
     coreNative,
-    coreSite,
     catsJVM,
     catsJS,
     catsNative,

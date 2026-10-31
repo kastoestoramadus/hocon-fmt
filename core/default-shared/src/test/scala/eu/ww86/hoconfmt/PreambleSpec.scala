@@ -1,6 +1,6 @@
 package eu.ww86.hoconfmt
 
-/** The published core's preserved preamble, which `coreSite` does not use: a leading block of
+/** The published core's preserved preamble: a leading block of
   * comments and blank lines that a blank line separates from the body is taken verbatim, before
   * anything is parsed, and put back in front of the formatted body. Released sconfig drops such a
   * block (`Refusal.LostComment`), and nearly every real file opens with one: a licence, an SPDX
@@ -12,10 +12,9 @@ package eu.ww86.hoconfmt
   * left must hold a comment, so a file that opens with blank lines only has no preamble; a file
   * of nothing but comments has no body to format, and the document engine keeps it as written.
   *
-  * The page's fork keeps the same comments through its `CommentCarrier` instead, normalised and
-  * without the blank lines; `CommentCarrierSpec` pins that output there. Comments the preamble
-  * does not cover are the document engine's now, kept where they stand; only the preamble block
-  * itself is byte-exact.
+  * Comments the preamble does not cover are the document engine's now, kept where they stand;
+  * only the preamble block itself is byte-exact. The page runs the same path: its playground
+  * uses this core.
   */
 class PreambleSpec extends munit.FunSuite with HoconTestSupport {
 

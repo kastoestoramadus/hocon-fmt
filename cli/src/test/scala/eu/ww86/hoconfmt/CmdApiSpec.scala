@@ -310,6 +310,23 @@ class CmdApiSpec extends munit.CatsEffectSuite {
     )
   }
 
+  tmp.test("the command line formats the page's shared fixture as the page pins it") { dir =>
+    // One fixture, two engines: site/ComponentSpec, "the playground formats a shared fixture
+    // exactly as the command line does", asserts the same output from the playground.
+    val source =
+      "# settings\nz : 1\no { x  :  2 }\ny : ${z}\ninclude \"defaults.conf\"\nname : \"orders\"\nx = 3\n"
+    val expected =
+      "# settings\nz = 1\no.x = 2\ny = ${z}\ninclude \"defaults.conf\"\nname = \"orders\"\nx = 3\n"
+    for {
+      file   <- write(dir, "parity.conf", source)
+      run    <- rewrite(file)
+      output <- textOf(file)
+    } yield {
+      assertEquals(output, expected)
+      assertEquals(run.exitCode, ExitCode.Success)
+    }
+  }
+
   tmp.test("plugin parity fixture uses repository style and the original duplicate report") { dir =>
     for {
       _      <- write(dir, ".hocon-fmt.conf", "separator = \":\"\n")

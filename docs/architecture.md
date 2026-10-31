@@ -19,8 +19,7 @@ make `format` refuse the file. Do not work around it in `HoconFormatter`.
 | `cli` | `CmdApi`, an `IOApp`: arguments, `.hocon-fmt.conf` filesystem access, parallelism, report | JVM, Scala.js (Node), Scala Native | cats, cats-effect, fs2-io, decline |
 | `java-api` | `HoconFmt` and the mirrored `Verdict` records and `RefusalKind` for Java and Kotlin callers; published as `eu.ww86:hocon-fmt-java-api` from sbt, tested by the standalone Gradle build in `java-api/` | JVM, Java 17 | core, jspecify |
 | `web` | the formatter as a script for web pages: one global, `HoconFormatter` | Scala.js | core |
-| `coreSite` | the core's sources against a sconfig fork that keeps detached comments, with the real `CommentCarrier`; not published | Scala.js | the fork |
-| `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling `coreSite` directly; see [site](site.md) | Scala.js | coreSite |
+| `site` | the project page — presentation, [playground](playground.md), contributions — on Laminar, calling `coreJS` directly; see [site](site.md) | Scala.js | coreJS |
 | `sbt-plugin` | `hoconFormat`, `hoconFormatCheck` for sbt 1.x and sbt 2, one cross-built source tree | JVM, Scala 2.12 and 3.8.4 | java-api, at run time |
 | `gradle-plugin` | the same two tasks for Gradle; standalone Gradle build | JVM, Java 17 | java-api, at run time |
 | `maven-plugin` | `hocon-fmt:format`, `hocon-fmt:check`; standalone Maven build | JVM, Java 17 | java-api |
@@ -180,10 +179,9 @@ against object collapsing) and restore it after the render — `IncludeMasking`,
 probes over the reserved name on both the source and the parsed tree (`PlaceholderTree`,
 `Refusal.ReservedName`). The document engine made all of that unnecessary: it keeps include
 statements as document nodes and writes them itself. The masking pass and its probes were retired
-with the shadow guard on 2026-10-24. Two placeholder spellings survive elsewhere, both display or
-seam-side, none of them a formatter mechanism: the site's resolve view masks includes with a
-stand-in of its own for its own display, and the [comment carrier](#comment-carrier) keeps
-`PlaceholderTree` for its reserved-name judgement until its seam retires. `Refusal.ReservedName`
+with the shadow guard on 2026-10-24. One placeholder spelling survives, display-side and not a
+formatter mechanism: the site's resolve view masks includes with a stand-in of its own for its own
+display. Its reserved-name judgement went with the comment carrier (task 1174). `Refusal.ReservedName`
 stays on the wire; the core's formatter no longer produces it.
 
 ## The preserved preamble
@@ -221,46 +219,22 @@ with `UnstableOutput`: rendering leaves only the preamble, which becomes a comme
 on the next pass. Comments-only input still refuses with `LostComment`. These boundaries of the
 preserved path leave refused files unwritten.
 
-`CommentCarrier.keepsDetachedComments` is what turns the path off: where the parse already keeps a
-detached block (the page's fork), the block survives the ordinary path and the carrier renders it,
-and the preamble path stays out of its way — one mechanism owns a block, never both. The seam goes
-with the fork, the preamble path does not: it keeps what the released library drops.
+The preamble path is the only mechanism that owns a detached leading block: the comment carrier
+that once rendered such a block on the page is gone (task 1174), so no switch turns the path off.
 
-## Comment carrier
+## Comments
 
-<!-- UPSTREAM-SCONFIG: delete this section with the seam once the option is released. -->
+sconfig attaches a comment to the field below it. Comments the parse does not attach are the
+document engine's: it keeps the file as written, so a block above a blank line, before a closing
+brace or at the end of the file stays where it stands. A detached block at the top of the file is
+the [preserved preamble](#the-preserved-preamble), held byte for byte.
 
-sconfig attaches a comment to the field below it and drops one that attaches to nothing. The
-fork the project page runs on has `setKeepDetachedComments` (ekrich/sconfig#646, draft #647), which
-attaches a block a blank line detaches. A block that no field follows is still dropped: the last
-lines of an object, the end of the file, a file of comments only.
-
-`HoconFormatter` reaches this through `CommentCarrier` (`parseOptions`, and `mask` returning a
-`Carried` with its `restore` and its tree judgement). Two sources exist and a project compiles
-exactly one:
-
-- `core/default-shared`, in `coreJVM`, `coreJS` and `coreNative`: does nothing, so the published
-  core is unchanged and still depends on sconfig alone. There is no run-time switch.
-- `core/site-shared`, in `coreSite` only: sets the option and masks those blocks with a
-  placeholder field plus a guard, restored after the render — the one placeholder machinery the
-  formatter still runs, and only there. A block inside an array or parentheses is left alone,
-  because no field can stand there, and the file is refused as a lost comment.
-
-The placeholder prefix is chosen to occur nowhere the parse could put it: not in the masked text,
-and not in its reading with quotes dropped and `\uXXXX` escapes resolved, where `"__COMM""ENT_0"`
-spells `__COMMENT_0`. So the prefix steps aside for user text that could be rendered into it, and
-the restore matches only what this pass generated. That reading is a source-level
-over-approximation; the tree the parse made is judged as well (`PlaceholderTree`, kept from the
-retired include masking for this one judgement), so a spelling the reading missed is
-refused (`Refusal.ReservedName`) rather than restored. Both `:` and `=` are matched, the renderer
-writing the asked-for separator. A rendering whose prefix occurrences are not exactly the three
-each placeholder writes is left unrestored: the block is then a lost comment and the file is
-refused, never altered. The order check gets the text with the comments already restored, so it
-never sees a placeholder. The carrier's regexes follow the platform rules: no lookaround, no
-backreferences, no multiline `^`.
-
-This is temporary: [site](site.md#returning-to-upstream-sconfig) lists what goes when sconfig
-releases the option.
+The page used to differ here: `coreSite` ran the core on a sconfig fork with the comment option
+(ekrich/sconfig#646, draft #647) and carried unattached blocks through a placeholder field
+(`CommentCarrier`, `Carried`, `PlaceholderTree`). Owner decision 2026-10-31 (no site users, the page
+follows the command line): the page runs the published core, and that project, the carrier and its
+placeholder machinery are deleted (task 1174). The fork itself stays, for `ConfigDocument.format`
+only (#655, not in released sconfig yet); `docs/site.md` has the remaining revert.
 
 ## Platforms
 

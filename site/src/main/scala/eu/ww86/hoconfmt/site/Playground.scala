@@ -197,16 +197,6 @@ object Playground {
               }
             )
         }
-      ),
-      // UPSTREAM-SCONFIG: delete this line, and the page runs on released sconfig again, once
-      // ekrich/sconfig releases the option (#646/#647); docs/site.md, "Returning to upstream sconfig".
-      p(
-        cls := "muted",
-        "The playground runs a development build of sconfig (",
-        a(href := "https://github.com/ekrich/sconfig/issues/646", "#646"),
-        ", draft ",
-        a(href := "https://github.com/ekrich/sconfig/pull/647", "#647"),
-        "), shared by the command line and playground until the document engine and comment fixes are released."
       )
     )
   }

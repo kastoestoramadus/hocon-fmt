@@ -8,8 +8,9 @@ does.
 
 ## The module
 
-`site` is a Scala.js project that depends on `coreSite` directly (`coreJS` against a sconfig fork,
-see [running ahead](#running-ahead-of-the-release)): the page calls `HoconFormatter`
+`site` is a Scala.js project that depends on `coreJS` directly (the core against the sconfig fork
+that carries the document engine, see [running ahead](#running-ahead-of-the-release)): the page
+calls `HoconFormatter`
 and `Verdict` itself, with no JavaScript API in between (that is what replaced the lab-directory
 plan in [playground](playground.md); the `web` module and its script are unchanged). Laminar
 17.2.1, the latest stable for `_sjs1_3`, renders it; sjavatime supplies the `java.time` sconfig
@@ -201,7 +202,7 @@ the fork history, including its comment fixes, is preserved by a merge.
   `~/.cache/hocon-fmt/sconfig-fork-<sha10>` and publishes JVM, Scala.js and Scala Native
   artifacts for Scala 3.9.0 to local Ivy and Maven repositories. Run it before any build.
   A complete publication is reused; a missing jar or descriptor triggers publication again.
-- `checkSconfigFork` runs before core and coreSite resolve dependencies, checking jars and Ivy
+- `checkSconfigFork` runs before core resolves dependencies, checking jars and Ivy
   descriptors for all three platforms. Its failure names the bootstrap script.
 - Every sbt workflow job prepares the fork first. CI and Pages caches include both local
   repositories and are keyed by the script's hash.
@@ -224,7 +225,7 @@ the fork history, including its comment fixes, is preserved by a merge.
    `-Dsbt.ivy.home` and `-Dmaven.repo.local` properties. Defaults are `~/.ivy2` and
    `~/.m2/repository`; the script also honours the release workflow's `MAVEN_REPO_LOCAL`.
 5. With one sbt JVM at a time, run `sbt coreJVM/test acceptance/test site/test site/build
-   scalafmtCheckAll scalafmtSbtCheck crossCompile coreSite/test`. Review changed expectations
+   scalafmtCheckAll scalafmtSbtCheck crossCompile`. Review changed expectations
    against the merged upstream changes before updating fixtures.
 
 ## Returning to upstream sconfig
@@ -241,13 +242,11 @@ and `setKeepDetachedComments`, run the guard and the full formatter suites, then
    `build.sbt`, and every fork bootstrap step (with its cache) in `.github/workflows/ci.yml`,
    `pages.yml`, `release.yml` and `scripts/pre-commit-e2e.sh`. Replace the `sconfig = sconfigFork`
    alias with the released version, and delete `scripts/sconfig-fork-pin-test.py`.
-2. Delete the `coreSite` project, point `site` back at `coreJS`, and drop it from `root`'s aggregate and `test` sequence and from `crossCompile`.
-3. In `core`, enable the option in `HoconFormatter.parseOptions` and delete the seam:
-   `CommentCarrier` with `keepsDetachedComments` (which gates the preamble path: with the option
-   on, the parse keeps a detached block itself), `Carried`, `core/default-shared`,
-   `core/site-shared` (only the masking of blocks no field follows may still be wanted: compare
-   with the measured corpus), the calls in `HoconFormatter`, and `Variant` in the tests with its
-   ledger. Then the two pinned refusals left (`trailing-comment-in-object`, the
+2. Done by task 1174 (owner decision 2026-10-31: no site users, the page follows the command
+   line): `site` depends on `coreJS`, and `coreSite`, `core/site-shared`, `CommentCarrier`,
+   `Carried` and `PlaceholderTree` are deleted.
+3. In `core`, enable the option in `HoconFormatter.parseOptions`. The seam it needed is already
+   gone (1174), so this is the option alone. Then the two pinned refusals left (`trailing-comment-in-object`, the
    `commentAboveBlankLine` block split by a blank line) flip for the command line as well; the
    leading header case already formats, kept verbatim by the
    [preamble path](limitations.md#the-preserved-preamble), and one decision is left: with the
