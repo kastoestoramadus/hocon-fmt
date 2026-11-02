@@ -145,9 +145,9 @@ examples also require `url` and `licence`. A distilled entry may carry
 ignores it. Add fixtures only after reviewing their
 inputs, metadata, and expected output; the generator never derives the target.
 
-`now-site:` and `expected/site-default.conf` are the retired fork's per-page outputs: the page
-runs the published core since task 1174, so both are dead data (left for the metadata sweep, not
-read by any suite). `target` is always authored independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
+`now-site:` and `expected/site-default.conf` were the retired fork's per-page outputs: the page
+has run the published core since task 1174, and task 1536 deleted both after re-measuring the
+CLI on every example. `target` is always authored independently. Verbatim provenance may also carry `source.sha`, embedded alongside the URL and licence.
 
 An upstream gap (`now != target`, except the formatter’s own same-line include
 restriction) requires `upstream: { issue: "https://github.com/ekrich/sconfig/…",
