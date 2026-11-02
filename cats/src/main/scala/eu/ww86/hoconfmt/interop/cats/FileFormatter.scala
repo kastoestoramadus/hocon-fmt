@@ -3,7 +3,7 @@ package eu.ww86.hoconfmt.interop.cats
 import _root_.cats.effect.Async
 import _root_.cats.syntax.all.*
 import fs2.{Chunk, Pipe, Stream}
-import fs2.io.file.{Files, Path}
+import fs2.io.file.{FileHandle, Files, Flag, Flags, Path}
 import eu.ww86.hoconfmt.{DuplicateReport, Finding, FormatOptions, FormatRefusedException, Refusal, Verdict}
 
 import java.nio.charset.StandardCharsets.UTF_8
@@ -127,13 +127,22 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
   // file changed during formatting" and exits 2, the way a delete mid-run already fails — rather
   // than as a new Refusal kind, which would change the published Refusal enum on every platform.
   // The alternative is recorded in the task's decisions.md.
+  //
+  // The target is pinned by one open handle before the re-check: the in-place write goes through
+  // that handle, to the file it holds, so a path entry swapped onto a symlink after the open can
+  // redirect neither the write nor the check into the symlink's target (task 1473, cliJS CI run
+  // 41228182216). The check re-reads the path by name after the open, so an entry already swapped
+  // when the pin was taken still fails the comparison. The staged-rename branch replaces the
+  // directory entry itself and needs no pin.
   private def replaceIfUnchanged(target: Path, expected: Array[Byte], content: String): F[Unit] =
-    files.readAll(target).compile.to(Array).flatMap { now =>
-      if (now.sameElements(expected)) replace(target, content)
-      else Async[F].raiseError(new java.io.IOException("file changed during formatting"))
+    files.open(target, Flags(Flag.Write)).use { pinned =>
+      files.readAll(target).compile.to(Array).flatMap { now =>
+        if (now.sameElements(expected)) replace(target, content, pinned)
+        else Async[F].raiseError(new java.io.IOException("file changed during formatting"))
+      }
     }
 
-  private def replace(target: Path, content: String): F[Unit] =
+  private def replace(target: Path, content: String, pinned: FileHandle[F]): F[Unit] =
     // Validate the exact bytes both write paths will use, before creating staging or truncating.
     // write is public, so a caller may supply text that never passed through the core's guard.
     Async[F].delay(content.getBytes(UTF_8)).flatMap { bytes =>
@@ -141,7 +150,7 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
       else
         replaceWithStaged(target, bytes).flatMap {
           case true  => ().pure[F]
-          case false => writeInPlace(target, bytes)
+          case false => writeInPlace(pinned, bytes)
         }
     }
 
@@ -176,10 +185,22 @@ final class FileFormatter[F[_]: Async](using files: Files[F]) {
       } yield kept
     }
 
-  // Truncate and write, as the CLI did before this adapter. The formatted text was verified
-  // before either write, so a refusal never reaches here.
-  private def writeInPlace(target: Path, bytes: Array[Byte]): F[Unit] =
-    Stream.chunk(Chunk.array(bytes)).through(files.writeAll(target)).compile.drain
+  // Truncate and write through the handle opened before the unchanged-bytes check, so the write
+  // lands on the file that check saw, whatever the directory entry names by then. The formatted
+  // text was verified before either write, so a refusal never reaches here.
+  private def writeInPlace(pinned: FileHandle[F], bytes: Array[Byte]): F[Unit] =
+    for {
+      _ <- pinned.truncate(0L)
+      _ <- writeAll(pinned, bytes, 0L)
+    } yield ()
+
+  // FileHandle.write may write fewer bytes than given, as a channel can; write the remainder.
+  private def writeAll(pinned: FileHandle[F], bytes: Array[Byte], offset: Long): F[Unit] =
+    if offset >= bytes.length then ().pure[F]
+    else
+      pinned
+        .write(Chunk.array(bytes, offset.toInt, bytes.length - offset.toInt), offset)
+        .flatMap(written => writeAll(pinned, bytes, offset + written))
 }
 
 object FileFormatter {
