@@ -67,7 +67,6 @@ object ExampleGenerator {
         val target = verdict(str("target"), target = true)
         val now    = verdict(str("now"))
         if (config.hasPath("pending")) verdict(str("pending"))
-        if (config.hasPath("now-site")) verdict(str("now-site"))
         val sourceKind = str("source.kind")
         require(Set("synthetic", "distilled", "verbatim")(sourceKind), s"$id: unknown source kind")
         val pattern = str("source.pattern")
@@ -81,19 +80,14 @@ object ExampleGenerator {
             require(expectedFile.isFile, s"$id: missing $expectedFile")
             s"""Map("default" -> ${quoted(IO.read(expectedFile))})"""
           }
-        val siteExpectedFile = dir / "expected" / "site-default.conf"
-        val withSiteExpected =
-          if (siteExpectedFile.isFile)
-            expected + s""" ++ Map("site-default" -> ${quoted(IO.read(siteExpectedFile))})"""
-          else expected
         val input = dir / "input.conf"
         require(input.isFile, s"$id: missing input.conf")
         val findings = if (config.hasPath("findings")) config.getStringList("findings").asScala.toList else Nil
         s"Example(${quoted(id)}, ${quoted(str("title"))}, ${quoted(str("story"))}, ${quoted(str("shows"))}, " +
           s"${quoted(IO.read(input))}, ${quoted(target)}, ${quoted(now)}, ${optional("pending")}, " +
-          s"${optional("reason-if-different")}, ${optional("now-site")}, ${list(findings)}, " +
+          s"${optional("reason-if-different")}, ${list(findings)}, " +
           s"ExampleSource(${quoted(sourceKind)}, ${quoted(pattern)}, ${optional("source.url")}, ${optional("source.licence")}, ${optional("source.sha")}), " +
-          s"${list(options)}, $withSiteExpected, $upstream, $playgroundOrder)"
+          s"${list(options)}, $expected, $upstream, $playgroundOrder)"
       }
     }
     val output = managed / "eu" / "ww86" / "hoconfmt" / "ExampleData.scala"
@@ -113,7 +107,6 @@ final case class Example(
     now: String,
     pending: Option[String],
     reasonIfDifferent: Option[String],
-    siteNow: Option[String],
     findings: List[String],
     source: ExampleSource,
     options: List[String],
