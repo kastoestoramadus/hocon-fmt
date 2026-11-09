@@ -41,6 +41,14 @@ class DuplicateReportSpec extends munit.FunSuite with HoconTestSupport {
     assertEquals(only(source), Finding.KeyDefinedAgain(KeyPath.of("x"), 1, 2))
   }
 
+  // Added by the 490 mutation audit: a later definition holding a substitution is left alone even
+  // when this text's own resolution would replace the earlier value, because the merge stays
+  // unresolved and an optional substitution may still fall back to what the earlier one wrote.
+  // (The text itself is refused as unstable, so only the report's decision is pinned here.)
+  test("a later substitution is not reported as replacing the earlier definition") {
+    assertEquals(report("y = 2\nx = 1\nx = ${y}\n"), Nil)
+  }
+
   test("an object replaced by a value") {
     val source = "x { a = 1 }\nx = 2\n"
     dead(source, "x = 2\n")
