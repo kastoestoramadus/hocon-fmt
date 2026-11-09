@@ -77,12 +77,20 @@ class SconfigForkPinTest(unittest.TestCase):
         for workflow in ('ci.yml', 'pages.yml', 'release.yml'):
             content = (ROOT / '.github/workflows' / workflow).read_text()
             for job in re.split(r'(?m)^  [\w-]+:\n', content)[1:]:
-                if 'uses: sbt/setup-sbt@' in job:
+                if 'uses: sbt/setup-sbt@' in job or 'uses: ./.github/actions/setup-sbt' in job:
                     self.assertIn('run: scripts/fetch-sconfig-fork.sh', job, workflow)
                     self.assertLess(job.index('run: scripts/fetch-sconfig-fork.sh'),
                                     job.index('run: sbt') if 'run: sbt' in job else len(job))
         precommit = (ROOT / 'scripts/pre-commit-e2e.sh').read_text()
         self.assertIn('"$root/scripts/fetch-sconfig-fork.sh"', precommit)
+
+    def test_ci_and_pages_set_sbt_up_through_the_retrying_wrapper(self) -> None:
+        # sbt/setup-sbt@v1 downloads with `curl -sL` and leaves an empty zip on a bad response
+        # (PR 153, 2026-11-09: five CI attempts); the wrapper retries it.
+        for workflow in ('ci.yml', 'pages.yml'):
+            content = (ROOT / '.github/workflows' / workflow).read_text()
+            self.assertNotIn('uses: sbt/setup-sbt@', content, workflow)
+            self.assertIn('uses: ./.github/actions/setup-sbt', content, workflow)
 
     def probe_cache(self, missing: str | None) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as directory:

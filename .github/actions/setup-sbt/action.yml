@@ -1,0 +1,49 @@
+name: Set up sbt
+description: >
+  sbt/setup-sbt@v1 downloads the sbt zip with `curl -sL` (no --fail), so a bad response leaves an
+  empty sbt-<version>.zip and the job fails far from the cause (PR #153 needed 5 CI attempts on
+  2026-11-09). This wraps it: a setup that fails, or leaves an sbt that does not answer, is
+  retried twice after a pause.
+runs:
+  using: composite
+  steps:
+    - name: Set up sbt (attempt 1)
+      id: a1
+      uses: sbt/setup-sbt@v1
+      continue-on-error: true
+    - name: Check sbt (attempt 1)
+      id: k1
+      if: always()
+      shell: bash
+      run: |
+        if command -v sbt >/dev/null && sbt --script-version; then echo ok=true >> "$GITHUB_OUTPUT"; else echo ok=false >> "$GITHUB_OUTPUT"; fi
+
+    - name: Wait before attempt 2
+      if: steps.k1.outputs.ok != 'true'
+      shell: bash
+      run: sleep 20
+    - name: Set up sbt (attempt 2)
+      id: a2
+      if: steps.k1.outputs.ok != 'true'
+      uses: sbt/setup-sbt@v1
+      continue-on-error: true
+    - name: Check sbt (attempt 2)
+      id: k2
+      if: steps.k1.outputs.ok != 'true'
+      shell: bash
+      run: |
+        if command -v sbt >/dev/null && sbt --script-version; then echo ok=true >> "$GITHUB_OUTPUT"; else echo ok=false >> "$GITHUB_OUTPUT"; fi
+
+    - name: Wait before attempt 3
+      if: steps.k1.outputs.ok != 'true' && steps.k2.outputs.ok != 'true'
+      shell: bash
+      run: sleep 60
+    - name: Set up sbt (attempt 3)
+      id: a3
+      if: steps.k1.outputs.ok != 'true' && steps.k2.outputs.ok != 'true'
+      uses: sbt/setup-sbt@v1
+      continue-on-error: true
+    - name: Check sbt (final)
+      if: steps.k1.outputs.ok != 'true' && steps.k2.outputs.ok != 'true'
+      shell: bash
+      run: command -v sbt >/dev/null && sbt --script-version
