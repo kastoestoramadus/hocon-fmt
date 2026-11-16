@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "comment": "The one file that holds the GitHub write convention (owner.md 'Pull requests and code' and 'Attribution'). Read by bin/gh-write and by ~/.claude/hooks/guard.py; edit here, never in a tool.",
+  "assistants": {
+    "zcode": "ZCode",
+    "claude-code": "[Claude Code](https://claude.com/claude-code)",
+    "codex": "Codex",
+    "opencode": "opencode"
+  },
+  "efforts": ["l", "m", "h", "xh", "max", "fast"],
+  "pr_footer_template": "Generated with {model}/{effort} through {assistant}",
+  "commit_helped_by_template": "Helped by: {model}/{effort} by {assistant}",
+  "reviewed_by_template": "Reviewed by {model}/{effort}",
+  "revised_by_template": "Revised by {model}/{effort}",
+  "tldr_prefix": "**TLDR:**",
+  "model_aliases": {
+    "claude-opus-5-5": "opus-5.5",
+    "claude-sonnet-5-5": "sonnet-5.5",
+    "claude-haiku-5-5": "haiku-5.5",
+    "claude-fable-5-2": "fable-5.2"
+  },
+  "human_coauthors": [],
+  "forbidden": {
+    "trailers": [
+      "co-authored-by:.*(claude|anthropic|openai|codex|gpt|glm|zcode|deepseek)"
+    ],
+    "lines": [
+      "^generated with claude code\\s*$",
+      "^\ud83e\udd16 .*claude code",
+      "^\ud83e\udd16"
+    ]
+  },
+  "non_english": {
+    "diacritics": ["ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż"],
+    "words": ["się", "oraz", "który", "która", "które", "przez", "został", "została", "zostały", "powinien", "powinna", "zrobić", "robimy", "mamy", "jest"]
+  },
+  "families": {
+    "glm": ["glm", "zhipu"],
+    "deepseek": ["deepseek"],
+    "codex": ["codex", "gpt", "openai", "sol", "luna"],
+    "claude": ["claude", "anthropic", "opus", "sonnet", "haiku", "fable", "astra"]
+  }
+}

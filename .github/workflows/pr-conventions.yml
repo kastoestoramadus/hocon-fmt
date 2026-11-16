@@ -1,0 +1,27 @@
+# PR convention check (task 1717, prepared; the owner copies this into each repo).
+# Install per repo (see agent-instructions/github-gate/branch-protection.md):
+#   mkdir -p .github/workflows .github/gate
+#   cp github-gate/pr-conventions.yml  <repo>/.github/workflows/pr-conventions.yml
+#   cp github-gate/check-pr.py         <repo>/.github/gate/check-pr.py
+#   cp conventions/github.json         <repo>/.github/gate/github.json
+# agent-instructions is private, so each repo carries its own copy; the copies are refreshed
+# by the same snippet (one cp per repo), conventions stay authored in one file.
+name: pr-conventions
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  pull-requests: read
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PR body and commits against the attribution convention
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json body,commits > pr-view.json
+          python3 .github/gate/check-pr.py pr-view.json .github/gate/github.json
