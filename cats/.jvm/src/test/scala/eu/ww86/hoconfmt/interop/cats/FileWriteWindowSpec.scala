@@ -38,21 +38,21 @@ class FileWriteWindowSpec extends munit.CatsEffectSuite {
       case _                                                         => IO.unit
     }
 
-    def pure[A](a: A): IO[A]                                                     = delegate.pure(a)
-    def flatMap[A, B](fa: IO[A])(f: A => IO[B]): IO[B]                           = delegate.flatMap(fa)(f)
-    def tailRecM[A, B](a: A)(f: A => IO[Either[A, B]]): IO[B]                    = delegate.tailRecM(a)(f)
-    def raiseError[A](e: Throwable): IO[A]                                       = delegate.raiseError(e)
-    def handleErrorWith[A](fa: IO[A])(f: Throwable => IO[A]): IO[A]              = delegate.handleErrorWith(fa)(f)
-    def uncancelable[A](body: cats.effect.Poll[IO] => IO[A]): IO[A]              = delegate.uncancelable(body)
-    def canceled: IO[Unit]                                                       = delegate.canceled
-    def monotonic: IO[scala.concurrent.duration.FiniteDuration] = delegate.monotonic
-    def realTime: IO[scala.concurrent.duration.FiniteDuration]   = delegate.realTime
-    def suspend[A](hint: cats.effect.Sync.Type)(thunk: => A): IO[A] = delegate.suspend(hint)(thunk)
-    def executionContext: IO[scala.concurrent.ExecutionContext]     = delegate.executionContext
-    def cont[K, R](body: cats.effect.Cont[IO, K, R]): IO[R]         = delegate.cont(body)
-    def evalOn[A](fa: IO[A], ec: scala.concurrent.ExecutionContext): IO[A] = delegate.evalOn(fa, ec)
-    def deferred[A]: IO[cats.effect.kernel.Deferred[IO, A]]                = delegate.deferred
-    def ref[A](a: A): IO[cats.effect.kernel.Ref[IO, A]]                    = delegate.ref(a)
+    def pure[A](a: A): IO[A]                                                = delegate.pure(a)
+    def flatMap[A, B](fa: IO[A])(f: A => IO[B]): IO[B]                      = delegate.flatMap(fa)(f)
+    def tailRecM[A, B](a: A)(f: A => IO[Either[A, B]]): IO[B]               = delegate.tailRecM(a)(f)
+    def raiseError[A](e: Throwable): IO[A]                                  = delegate.raiseError(e)
+    def handleErrorWith[A](fa: IO[A])(f: Throwable => IO[A]): IO[A]         = delegate.handleErrorWith(fa)(f)
+    def uncancelable[A](body: cats.effect.Poll[IO] => IO[A]): IO[A]         = delegate.uncancelable(body)
+    def canceled: IO[Unit]                                                  = delegate.canceled
+    def monotonic: IO[scala.concurrent.duration.FiniteDuration]             = delegate.monotonic
+    def realTime: IO[scala.concurrent.duration.FiniteDuration]              = delegate.realTime
+    def suspend[A](hint: cats.effect.Sync.Type)(thunk: => A): IO[A]         = delegate.suspend(hint)(thunk)
+    def executionContext: IO[scala.concurrent.ExecutionContext]             = delegate.executionContext
+    def cont[K, R](body: cats.effect.Cont[IO, K, R]): IO[R]                 = delegate.cont(body)
+    def evalOn[A](fa: IO[A], ec: scala.concurrent.ExecutionContext): IO[A]  = delegate.evalOn(fa, ec)
+    def deferred[A]: IO[cats.effect.kernel.Deferred[IO, A]]                 = delegate.deferred
+    def ref[A](a: A): IO[cats.effect.kernel.Ref[IO, A]]                     = delegate.ref(a)
     def cede: IO[Unit]                                                      = delegate.cede
     def start[A](fa: IO[A]): IO[cats.effect.kernel.Fiber[IO, Throwable, A]] = delegate.start(fa)
     def forceR[A, B](fa: IO[A])(fb: IO[B]): IO[B]                           = delegate.forceR(fa)(fb)
@@ -70,8 +70,8 @@ class FileWriteWindowSpec extends munit.CatsEffectSuite {
     val file      = dir / "race.conf"
     val victim    = dir / "victim.conf"
     val moved     = dir / "race.moved"
-    val formatter = FileFormatter[IO](
-      using new SwapAfterStaging(
+    val formatter = FileFormatter[IO](using
+      new SwapAfterStaging(
         TestPosix.chmod(dir, 0x1ed) *> // 0755 again, so the swap may write the directory
           real.move(file, moved) *>
           real.createSymbolicLink(file, victim)
