@@ -133,6 +133,17 @@
           <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
           <!-- A private repository, so a test run never leaves a half-built plugin in ~/.m2. -->
           <localRepositoryPath>${project.build.directory}/local-repo</localRepositoryPath>
+          <!-- Reading the plexus-utils 4.0.3 descriptor pulls in its parent plexus-25, whose
+               dependencyManagement imports org.junit:junit-bom. That BOM is not a dependency of
+               anything here, so the install step leaves it out — and the offline ITs
+               (invoker.offline = true) then cannot read the descriptor at all unless an online IT
+               happened to fetch the BOM first. The IT order follows the filesystem, so that luck
+               runs out (run 43870150772 attempt 2: the offline other-format-strict-check ran
+               first). Seeding the BOM makes every IT hermetic. Bump this together with
+               plexus-utils: the version must match the junit5Version of its parent plexus POM. -->
+          <extraArtifacts>
+            <extraArtifact>org.junit:junit-bom:5.14.1:pom</extraArtifact>
+          </extraArtifacts>
           <preBuildHookScript>setup</preBuildHookScript>
           <postBuildHookScript>verify</postBuildHookScript>
           <streamLogsOnFailures>true</streamLogsOnFailures>
