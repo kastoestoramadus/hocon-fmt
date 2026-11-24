@@ -61,6 +61,21 @@ object `package` extends ScalaModule, PublishModule {
       def mvnDeps   = Seq(mvn"com.lihaoyi:mill-runner-launcher_3:$crossValue")
       def mainClass = Some("mill.launcher.MillLauncherMain")
     }
+
+    // testLocal runs the suites in-process, where forkEnv cannot reach: the spec's first
+    // sys.env read would die with a bare NoSuchElementException. Refuse with the reason;
+    // the runnable form is testForked (CI: `mill __.testForked`). One goal per mill call:
+    // a token after `testForked` becomes its test-name filter, not a second goal.
+    override def testLocal(
+        args: String*
+    ): Task.Command[(msg: String, results: Seq[mill.javalib.testrunner.TestResult])] =
+      Task.Command {
+        val never: (msg: String, results: Seq[mill.javalib.testrunner.TestResult]) =
+          throw new Exception(
+            "integration suites need forkEnv, which only reaches forked JVMs: run testForked instead of testLocal"
+          )
+        never
+      }
   }
 
   def publishVersion = formatterVersion
